@@ -212,11 +212,12 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
-    # Proxy API al backend (evita CORS in produzione)
-    # IMPORTANTE: il path /api/ viene preservato nel target (proxy_pass con /api/)
-    # Questo significa che /api/articles → radar-backend:8000/api/articles
+    # Proxy API al backend (evita CORS in produzione e previene errori 502 Bad Gateway tramite DNS resolver dinamico)
+    # IMPORTANTE: Con le variabili in proxy_pass, è obbligatorio usare $request_uri esplicito
     location /api/ {
-        proxy_pass http://radar-backend:8000/api/;
+        resolver 127.0.0.11 valid=10s;
+        set $backend_upstream http://radar-backend:8000;
+        proxy_pass $backend_upstream$request_uri;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -284,3 +285,4 @@ README.md
 | Nginx senza proxy `/api/` al backend     | CORS errors in produzione                 |
 | Uso del carattere `$` nelle password     | Causa errori di interpolazione di variabili in Docker Compose |
 | Assenza di file `.dockerignore`          | Rallentamento della build e caricamento di contesti pesanti (es. `node_modules`, `.venv`) |
+| proxy_pass statico in Nginx senza resolver | Causa errori 502 Bad Gateway se l'IP del container backend cambia dopo un riavvio |

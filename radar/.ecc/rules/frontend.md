@@ -217,14 +217,14 @@ Il componente `p-sidebar` di PrimeNG può essere usato come wrapper UI.
 
 ---
 
-## Regola 7: Clustering a 40px
+## Regola 7: Clustering e Calibrazione Marker
 
-Il raggio di clustering dei marker è fisso a **40px**.
-Non modificare questo valore senza un task esplicito.
+Il raggio di clustering dei marker è fisso a **40px**. I cluster si disattivano allo zoom **9** per far apparire tempestivamente le icone geopolitiche individuali.
 
 ```typescript
 const clusterGroup = L.markerClusterGroup({
-  maxClusterRadius: 40,  // VALORE FISSO — non modificare
+  maxClusterRadius: 40,
+  disableClusteringAtZoom: 9, // Disattiva clustering da zoom 9 in poi
   showCoverageOnHover: false
 });
 ```
@@ -312,6 +312,18 @@ I tipi TypeScript vengono usati solo a compile-time, il runtime usa sempre `wind
 
 ---
 
+## Regola 11: Limitazioni Zoom, Bounding Box Focus e Legenda Monoriga
+
+1. **Limitazioni Zoom all'indietro:** Per impedire lo zoom all'indietro infinito e lo scorrimento verso aree nere o duplicazioni di mappa, la configurazione di `L.map` deve comprendere `minZoom: 2.2`, `maxBounds` impostati sui confini del globo terrestre e `maxBoundsViscosity: 1.0`.
+2. **Focus Bounding Box (US & RU):** Per evitare crash o anomalie nel calcolo dinamico dei bounds derivati dall'antimeridiano, utilizzare bounding box statici hardcoded per lo zoom di focus su:
+   * Stati Uniti (`US`): `[24.39, -125.0]` a `[49.38, -66.93]`
+   * Russia (`RU`): `[41.18, 19.63]` a `[81.85, 169.0]`
+3. **Legenda Monoriga:** La legenda in basso alla mappa deve disporsi su una singola riga orizzontale (`flex-wrap: nowrap` con `overflow-x: auto` e `max-width: 90vw` in CSS) per un look glassmorphic premium e per evitare il wrap verticale.
+4. **Allineamento Tooltip Nazioni:** La riga del tooltip delle nazioni (`.tooltip-row`) deve allineare perfettamente flag, nome e badge a livello di baseline/center impostando un `line-height` comune ed allineando i flex item.
+5. **Livello di Zoom Massimo Focus:** Lo zoom durante l'azione di focus su nazione deve essere moderato (`maxZoom: 4` o inferiore nel `fitBounds`) per prevenire uno zoom-in troppo profondo che farebbe perdere il contesto.
+
+---
+
 ## Criteri di Accettazione Automatici
 
 | Pattern Vietato                                       | Motivo                                              |
@@ -327,3 +339,7 @@ I tipi TypeScript vengono usati solo a compile-time, il runtime usa sempre `wind
 | `npm install` o `npm ci` senza `--legacy-peer-deps`   | Causa fallimenti di installazione per conflitti di peer dependencies tra Angular 21 e librerie terze |
 | `import * as L from 'leaflet'` nel componente         | Con esbuild crea namespace separato, markercluster non funziona |
 | `import 'leaflet.markercluster'` side-effect nel componente | Il plugin non trova `window.L` e lancia TypeError  |
+| `disableClusteringAtZoom` diverso da 9                | Nuova calibrazione zoom per icone geopolitiche      |
+| `maxZoom` per fitBounds del focus maggiore di 4        | Lo zoom di focus risulterebbe troppo profondo        |
+| Zoom all'indietro senza `minZoom` o `maxBounds`       | Consente la navigazione verso aree nere / infinite  |
+| Legenda con `flex-wrap: wrap` senza nowrap/scroll     | Rischia di spezzarsi verticalmente su schermi piccoli|

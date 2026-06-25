@@ -72,7 +72,8 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
    * Ciascun Dockerfile deve contenere file `.dockerignore` per non includere cache locali o cartelle pesanti (`node_modules`, `.venv`).
 6. **Workflow di Compilazione Frontend (Local-to-Docker Copy):**
    * Il Dockerfile del frontend copia gli asset pre-compilati locali da `dist/radar-frontend/browser`. Qualsiasi modifica al codice Angular del frontend richiede prima la compilazione locale (`npm run build` da `radar/frontend`) e poi la ricostruzione del container (`docker compose up --build -d radar-frontend`) affinché Nginx possa servire la versione aggiornata.
-
+7. **Risoluzione DNS Dinamica in Nginx (Prevenzione 502 Bad Gateway):**
+   * Per evitare errori `502 Bad Gateway` a seguito di riavvii dei container o riassegnazioni di IP nella rete bridge, `nginx.conf` deve utilizzare un resolver interno (`resolver 127.0.0.11 valid=10s;`) ed una variabile locale per il `proxy_pass` (es. `set $backend_upstream http://radar-backend:8000; proxy_pass $backend_upstream$request_uri;`). Questo costringe Nginx a risolvere l'IP a runtime anziché solo all'avvio.
 
 ---
 
@@ -89,9 +90,14 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 
 > [!NOTE]
 > ### 🗺️ Regole di Visualizzazione Mappa e Clustering
-> 1. **Calibrazione Clustering**: Configurare `disableClusteringAtZoom: 13` nel `markerClusterGroup`. Questo garantisce che i marker rimangano raggruppati a zoom bassi e intermedi, dividendosi progressivamente in sub-cluster per poi scomporsi automaticamente in singole icone di categoria geopolitica al livello di zoom 13 (evitando sovrapposizioni e zoom infiniti).
-> 2. **Estensione Bounding Box per Stati Trans-Antimeridiano**: Nel calcolo dello zoom per nazioni con territori oltre la linea di cambio data (Stati Uniti `US` e Russia `RU`), escludere le coordinate dei territori esterni (es. Alaska/Hawaii per `US`, Chukotka per `RU`) dal calcolo del bounding box per prevenire zoom out globali indesiderati. **Tali territori remoti esclusi devono comunque mantenere l'hatching e la colorazione attiva sulla mappa.**
-> 3. **Legenda Colori**: Inserire una legenda glassmorphic orizzontale in assoluto in basso al centro della mappa (`bottom: 20px; left: 50%`) che mostri cerchi luminosi (`box-shadow` del colore di categoria) affiancati alle emoji e ai nomi delle categorie geopolitiche.
+> 1. **Calibrazione Clustering**: Configurare `disableClusteringAtZoom: 9` nel `markerClusterGroup`. Questo garantisce che i marker rimangano raggruppati a zoom bassi e intermedi, dividendosi progressivamente in sub-cluster per poi scomporsi automaticamente in singole icone di categoria geopolitica al livello di zoom 9 (evitando sovrapposizioni e zoom infiniti).
+> 2. **Estensione Bounding Box per Stati Trans-Antimeridiano**: Nel calcolo dello zoom di focus per nazioni con territori oltre la linea di cambio data (Stati Uniti `US` e Russia `RU`), per garantire la validità del bounding box ed evitare comportamenti bloccanti, utilizzare bounding box statici Mainland hardcoded:
+>    * `US`: `L.latLngBounds(L.latLng(24.396308, -125.0), L.latLng(49.384358, -66.93457))`
+>    * `RU`: `L.latLngBounds(L.latLng(41.1856, 19.6389), L.latLng(81.8587, 169.0))`
+>    * Tali territori remoti esclusi devono comunque mantenere l'hatching e la colorazione attiva sulla mappa.
+> 3. **Legenda Colori**: Inserire una legenda glassmorphic orizzontale in assoluto in basso al centro della mappa (`bottom: 20px; left: 50%`) che mostri cerchi luminosi (`box-shadow` del colore di categoria) affiancati alle emoji e ai nomi delle categorie geopolitiche. **La legenda deve essere disposta su una singola riga orizzontale (`flex-wrap: nowrap` e `overflow-x: auto` per schermi piccoli).**
+> 4. **Limitazioni Zoom Mappa**: Impedire lo zoom all'indietro infinito e lo scroll laterale al di fuori della terraferma configurando `minZoom: 2.2`, `maxBounds` impostati sui limiti del globo terrestre (`[-85, -180]` a `[85, 180]`) e `maxBoundsViscosity: 1.0`.
+> 5. **Uniformazione Click e Zoom di Focus**: Il click su qualsiasi nazione (sia da mappa che da toolbar) deve aprire la barra di sinistra ed eseguire il focus (fitBounds) con uno zoom controllato e moderato (`maxZoom: 4` o inferiore) per evitare zoom troppo profondi.
 
 > [!IMPORTANT]
 > ### Esecuzione Manuale degli Hook
