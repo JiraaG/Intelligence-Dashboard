@@ -1,0 +1,275 @@
+.radar-sidebar-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-min-width);
+  height: 100vh;
+  background: var(--color-bg-overlay);
+  border-right: 1px solid var(--color-border-primary);
+  backdrop-filter: blur(20px);
+  transform: translateX(-100%);
+  transition: transform var(--transition-medium);
+  z-index: var(--z-sidebar);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-accent) transparent;
+
+  &.open { transform: translateX(0); }
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  border-bottom: 1px solid var(--color-border-primary);
+
+  .header-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    .sidebar-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: var(--color-text-primary);
+      letter-spacing: 0.2em;
+    }
+  }
+
+  .close-btn {
+    background: transparent;
+    border: none;
+    color: var(--color-text-secondary);
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: color var(--transition-fast);
+    &:hover { color: var(--color-text-accent); }
+  }
+}
+
+.sidebar-content {
+  padding: 24px;
+}
+
+.article-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.card-meta-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  .country-code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.875rem;
+    color: var(--color-text-accent);
+    font-weight: 600;
+  }
+}
+
+.category-badge {
+  display: inline-block;
+  padding: 3px 10px; border-radius: 4px;
+  font-size: 0.6875rem; font-weight: 700;
+  letter-spacing: 0.12em;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--cat-color, var(--color-border-card));
+  color: var(--cat-color, var(--color-text-accent));
+}
+
+.sentiment-badge {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 4px 12px; border-radius: 6px;
+  font-size: 0.75rem; font-weight: 600; width: fit-content;
+
+  &.sentiment-pos { background: rgba(63,185,80,0.10); color: var(--color-sentiment-pos); border: 1px solid rgba(63,185,80,0.22); }
+  &.sentiment-neu { background: rgba(139,148,158,0.10); color: var(--color-sentiment-neu); border: 1px solid rgba(139,148,158,0.22); }
+  &.sentiment-neg { background: rgba(248,81,73,0.10); color: var(--color-sentiment-neg); border: 1px solid rgba(248,81,73,0.22); }
+
+  .relevance-stars span { color: var(--color-text-muted); font-size: 0.625rem; }
+  .relevance-stars span.active { color: var(--color-energia); }
+}
+
+.article-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--color-text-primary);
+}
+
+.article-summary {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+}
+
+.article-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  border-top: 1px solid var(--color-border-card);
+  padding-top: 12px;
+
+  .meta-source {
+    color: var(--color-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 150px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .source-link {
+    color: var(--color-text-accent);
+    text-decoration: none;
+    font-weight: 500;
+    &:hover { text-decoration: underline; }
+  }
+}
+
+.badge-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  .badge-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .badge-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+}
+
+::ng-deep .radar-chip {
+  background: rgba(22, 27, 34, 0.8) !important;
+  border: 1px solid var(--color-border-card) !important;
+  color: var(--color-text-secondary) !important;
+  font-size: 0.75rem !important;
+  padding: 2px 10px !important;
+  border-radius: 4px !important;
+}
+::ng-deep .infra-chip { color: var(--color-text-accent) !important; }
+::ng-deep .company-chip { border-color: rgba(0, 212, 255, 0.12) !important; }
+
+// Stili Vista Cluster
+.sidebar-cluster {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.cluster-summary {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border-primary);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  .cluster-count {
+    font-size: 0.875rem;
+    color: var(--color-text-primary);
+    strong { color: var(--color-text-accent); }
+  }
+
+  .cluster-categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+}
+
+.cat-pill {
+  display: inline-block;
+  padding: 2px 8px; border-radius: 3px;
+  font-size: 0.6875rem; font-weight: 600;
+  background: rgba(255,255,255,0.04);
+  color: var(--cat-color, var(--color-text-secondary));
+  border: 1px solid var(--cat-color, var(--color-border-card));
+}
+
+.radar-carousel {
+  width: 100%;
+}
+
+.carousel-card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border-primary);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+
+  .carousel-category {
+    display: inline-block;
+    padding: 2px 8px; border-radius: 4px;
+    font-size: 0.6875rem; font-weight: 700;
+    width: fit-content;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--cat-color, var(--color-border-card));
+    color: var(--cat-color, var(--color-text-accent));
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .carousel-country {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--color-text-accent);
+    font-weight: 600;
+  }
+
+  .carousel-title {
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--color-text-primary);
+  }
+
+  .carousel-summary {
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: var(--color-text-secondary);
+  }
+
+  .carousel-link {
+    font-size: 0.75rem;
+    color: var(--color-text-accent);
+    text-decoration: none;
+    font-weight: 500;
+    margin-top: 8px;
+    width: fit-content;
+    &:hover { text-decoration: underline; }
+  }
+
+  .carousel-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    border-top: 1px solid var(--color-border-card);
+    padding-top: 10px;
+    margin-top: 4px;
+    font-family: 'JetBrains Mono', monospace;
+
+    .carousel-source {
+      color: var(--color-text-secondary);
+    }
+  }
+}

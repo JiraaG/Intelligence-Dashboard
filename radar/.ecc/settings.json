@@ -1,0 +1,131 @@
+{
+  "version": "1.0",
+  "schemaVersion": "1.0",
+  "generatedBy": "radar-ecc-bootstrap",
+  "generatedAt": "2026-06-23T00:00:00.000Z",
+  "project": "radar-informativo-globale",
+
+  "tools": {
+    "allowlist": [
+      "view_file",
+      "write_to_file",
+      "list_dir",
+      "grep_search",
+      "run_command",
+      "read_url_content",
+      "replace_file_content",
+      "multi_replace_file_content"
+    ],
+    "denylist": [
+      "arbitrary_shell_exec",
+      "eval",
+      "exec"
+    ],
+    "notes": "Solo i tool nella allowlist possono essere invocati dall'agente. run_command è abilitato ma vincolato al dominio della whitelist di rete sotto."
+  },
+
+  "network": {
+    "allowedDomains": [
+      "github.com",
+      "api.miniflux.app",
+      "generativelanguage.googleapis.com",
+      "fonts.googleapis.com",
+      "fonts.gstatic.com",
+      "registry.hub.docker.com",
+      "pypi.org",
+      "npmjs.com"
+    ],
+    "deniedPatterns": [
+      "*.onion",
+      "*.local",
+      "169.254.*",
+      "10.*",
+      "192.168.*"
+    ],
+    "notes": "L'agente non può effettuare richieste HTTP a domini non in lista. Le chiamate interne Docker (radar-db, radar-backend) sono permesse solo via codice applicativo, non via tool di rete dell'agente."
+  },
+
+  "secretRedaction": {
+    "enabled": true,
+    "patterns": [
+      "AIza[0-9A-Za-z_-]{35}",
+      "sk-[A-Za-z0-9]{32,}",
+      "ghp_[A-Za-z0-9]{36}",
+      "postgres://[^\\s]+:[^\\s]+@",
+      "MINIFLUX_API_KEY=[^\\s]+"
+    ],
+    "action": "redact",
+    "redactedValue": "[SECRET_REDACTED]",
+    "scanTargets": ["log_output", "tool_arguments", "model_responses"],
+    "notes": "Qualsiasi stringa corrispondente ai pattern sopra viene automaticamente oscurata prima di essere scritta in log o passata al modello. Impedisce il leak accidentale di chiavi Gemini, token Miniflux e credenziali PostgreSQL."
+  },
+
+  "contextScope": {
+    "pathScoping": true,
+    "rules": [
+      {
+        "path": "backend/**",
+        "loadRules": [".ecc/rules/backend.md"],
+        "excludeRules": [".ecc/rules/frontend.md"]
+      },
+      {
+        "path": "frontend/**",
+        "loadRules": [".ecc/rules/frontend.md"],
+        "excludeRules": [".ecc/rules/backend.md", ".ecc/rules/docker.md"]
+      },
+      {
+        "path": "docker-compose.yml",
+        "loadRules": [".ecc/rules/docker.md"],
+        "excludeRules": [".ecc/rules/backend.md", ".ecc/rules/frontend.md"]
+      },
+      {
+        "path": "**/Dockerfile",
+        "loadRules": [".ecc/rules/docker.md"],
+        "excludeRules": [".ecc/rules/backend.md", ".ecc/rules/frontend.md"]
+      }
+    ],
+    "notes": "Il path-scoping garantisce che l'agente carichi solo le regole pertinenti al file che sta modificando, ottimizzando il budget di token e prevenendo allucinazioni cross-tecnologia."
+  },
+
+  "contextBudget": {
+    "maxUsagePercent": 80,
+    "checkpointOnThreshold": true,
+    "checkpointFile": "CHECKPOINT.md",
+    "action": "halt_and_checkpoint",
+    "notes": "Implementazione della Regola 80/20 di ECC. L'agente si ferma all'80% della finestra di contesto, scrive CHECKPOINT.md e avvisa l'utente prima di fermare la sessione."
+  },
+
+  "codeQuality": {
+    "forbiddenPatterns": [
+      "# TODO",
+      "# FIXME",
+      "# HACK",
+      "# XXX",
+      "pass  # implement",
+      "raise NotImplementedError",
+      "console.log('TODO')",
+      "// TODO",
+      "/* TODO */"
+    ],
+    "requireCompleteImplementations": true,
+    "notes": "L'agente non può produrre codice con placeholder o implementazioni parziali. Ogni funzione scritta deve essere funzionante."
+  },
+
+  "agentProfiles": {
+    "pipeline-engineer": {
+      "file": ".ecc/agents/pipeline-engineer.md",
+      "scope": ["backend/**"],
+      "model": "sonnet"
+    },
+    "geo-data-architect": {
+      "file": ".ecc/agents/geo-data-architect.md",
+      "scope": ["backend/app/models/**", "backend/app/db/**"],
+      "model": "sonnet"
+    },
+    "angular-map-expert": {
+      "file": ".ecc/agents/angular-map-expert.md",
+      "scope": ["frontend/**"],
+      "model": "sonnet"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+<div class="radar-map-canvas-container" appLeafletHatch>
+  <!-- Canvas Mappa Leaflet -->
+  <div id="radar-map" class="radar-map-canvas" [class.blur-active]="isParsingGeoJson()"></div>
+  
+  <!-- Legenda Categorie Geopolitiche -->
+  <div class="map-legend" *ngIf="!isParsingGeoJson()">
+    <div class="legend-item" *ngFor="let item of legendItems">
+      <span class="legend-color-dot" [class]="'dot-' + item.label.toLowerCase()"></span>
+      <span class="legend-icon">{{ item.icon }}</span>
+      <span class="legend-label">{{ item.label }}</span>
+    </div>
+  </div>
+
+  <!-- App Bootstrapping Overlay grafico non bloccante -->
+  <div class="bootstrapping-overlay" *ngIf="isParsingGeoJson()">
+    <div class="loader-content">
+      <span class="loader-icon">📡</span>
+      <h2>INIZIALIZZAZIONE RADAR</h2>
+      <p>Caricamento e ottimizzazione dei confini vettoriali...</p>
+      <div class="loader-bar">
+        <div class="loader-bar-fill"></div>
+      </div>
+    </div>
+  </div>
+</div>

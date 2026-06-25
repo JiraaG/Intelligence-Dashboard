@@ -1,0 +1,123 @@
+<div class="radar-sidebar-wrapper" [class.open]="isOpen()">
+
+  <div class="sidebar-header">
+    <div class="header-brand">
+      <span class="header-icon">📡</span>
+      <span class="sidebar-title">INTELLIGENCE</span>
+    </div>
+    <button class="close-btn" id="sidebar-close-btn" (click)="closed.emit()">✕</button>
+  </div>
+
+  <!-- VISTA SINGOLA NOTIZIA -->
+  <div class="sidebar-content" *ngIf="mode() === 'single' && displayArticle()">
+    <div class="article-card">
+      <div class="card-meta-top">
+        <span class="category-badge"
+              [style.--cat-color]="'var(--color-' + displayArticle()!.primary_category.toLowerCase() + ')'">
+          {{ displayArticle()!.primary_category | uppercase }}
+        </span>
+        <span class="country-code">{{ displayArticle()!.country_code }}</span>
+      </div>
+
+      <div [class]="'sentiment-badge ' + sentimentClass()">
+        <span>{{ displayArticle()!.sentiment }}</span>
+        <span class="relevance-stars">
+          @for (i of [1,2,3,4,5]; track i) {
+            <span [class.active]="i <= displayArticle()!.relevance_level">★</span>
+          }
+        </span>
+      </div>
+
+      <h2 class="article-title">{{ displayArticle()!.title }}</h2>
+      <p class="article-summary">{{ displayArticle()!.summary }}</p>
+
+      <div class="article-meta">
+        <span class="meta-date">{{ displayArticle()!.published_at }}</span>
+        <span class="meta-source" *ngIf="displayArticle()?.feed_title">Fonte: {{ displayArticle()!.feed_title }}</span>
+        <a [href]="displayArticle()!.source_url" target="_blank" rel="noopener" class="source-link">
+          Leggi fonte →
+        </a>
+      </div>
+
+      <!-- Entità Infrastrutturali -->
+      <div class="badge-section" *ngIf="displayArticle()?.infrastructural_entities?.length">
+        <span class="badge-label">🏭 Entità Infrastrutturali</span>
+        <div class="badge-list">
+          <p-chip
+            *ngFor="let e of displayArticle()?.infrastructural_entities || []"
+            [label]="e"
+            styleClass="radar-chip infra-chip">
+          </p-chip>
+        </div>
+      </div>
+
+      <!-- Aziende -->
+      <div class="badge-section" *ngIf="displayArticle()?.companies_involved?.length">
+        <span class="badge-label">🏢 Aziende</span>
+        <div class="badge-list">
+          <p-chip
+            *ngFor="let c of displayArticle()?.companies_involved || []"
+            [label]="c"
+            styleClass="radar-chip company-chip">
+          </p-chip>
+        </div>
+      </div>
+
+      <!-- Tag -->
+      <div class="badge-section" *ngIf="displayArticle()?.tags?.length">
+        <span class="badge-label">🏷️ Tag</span>
+        <div class="badge-list">
+          <p-chip
+            *ngFor="let t of displayArticle()?.tags || []"
+            [label]="t"
+            styleClass="radar-chip tag-chip">
+          </p-chip>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VISTA CLUSTER / MULTI-ARTICOLI -->
+  <div class="sidebar-cluster" *ngIf="mode() === 'cluster' && clusterArticles().length > 1">
+    <div class="cluster-summary">
+      <span class="cluster-count">
+        <strong>{{ clusterArticles().length }}</strong> notizie rilevate
+      </span>
+      <div class="cluster-categories">
+        @for (entry of clusterSummary() | keyvalue; track entry.key) {
+          <span class="cat-pill"
+                [style.--cat-color]="'var(--color-' + entry.key.toLowerCase() + ')'">
+            {{ entry.key }}: {{ entry.value }}
+          </span>
+        }
+      </div>
+    </div>
+
+    <p-carousel
+      [value]="clusterArticles()"
+      [numVisible]="1"
+      [numScroll]="1"
+      [circular]="true"
+      [responsiveOptions]="carouselResponsiveOptions"
+      styleClass="radar-carousel">
+      <ng-template pTemplate="item" let-a>
+        <div class="carousel-card">
+          <span class="carousel-category"
+                [style.--cat-color]="'var(--color-' + a.primary_category.toLowerCase() + ')'">
+            {{ a.primary_category }}
+          </span>
+          <span class="carousel-country">{{ a.country_code }}</span>
+          <h3 class="carousel-title">{{ a.title }}</h3>
+          <p class="carousel-summary">{{ a.summary }}</p>
+          <div class="carousel-meta" *ngIf="a.feed_title || a.published_at">
+            <span>{{ a.published_at }}</span>
+            <span class="carousel-source" *ngIf="a.feed_title">| Fonte: {{ a.feed_title }}</span>
+          </div>
+          <a [href]="a.source_url" target="_blank" rel="noopener" class="carousel-link">
+            Apri Fonte →
+          </a>
+        </div>
+      </ng-template>
+    </p-carousel>
+  </div>
+</div>

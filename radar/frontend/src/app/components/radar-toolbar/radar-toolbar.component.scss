@@ -1,0 +1,493 @@
+.radar-toolbar {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-toolbar);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 28px;
+  background: var(--color-bg-toolbar);
+  border: 1px solid var(--color-border-primary);
+  border-radius: 12px;
+  backdrop-filter: blur(20px);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(0, 212, 255, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  white-space: nowrap;
+  min-width: 1040px;
+  justify-content: space-between;
+
+  .brand-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+
+    .brand-icon { font-size: 1.1rem; }
+
+    .brand-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      color: var(--color-text-accent);
+      text-transform: uppercase;
+    }
+  }
+
+  .divider {
+    width: 1px;
+    height: 28px;
+    background: rgba(255, 255, 255, 0.1);
+    flex-shrink: 0;
+  }
+
+  .article-count-container {
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+
+    .article-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8125rem;
+      color: var(--color-text-secondary);
+      padding: 6px 12px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      transition: border-color 0.2s, background-color 0.2s;
+
+      strong {
+        color: var(--color-text-accent);
+        font-weight: 600;
+      }
+    }
+
+    .countries-tooltip {
+      position: absolute;
+      top: calc(100% + 10px);
+      right: 0;
+      z-index: 1000;
+      width: 240px;
+      padding: 12px;
+      background: rgba(13, 17, 23, 0.95);
+      border: 1px solid var(--color-border-primary);
+      border-radius: 8px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(16px);
+      opacity: 1;
+      pointer-events: auto;
+
+      .tooltip-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--color-border-primary);
+        padding-bottom: 6px;
+        margin-bottom: 8px;
+
+        .tooltip-title {
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 0.75rem;
+          font-weight: 700;
+          letter-spacing: 0.05em;
+          color: var(--color-text-accent);
+          text-transform: uppercase;
+          border-bottom: none;
+          padding-bottom: 0;
+          margin-bottom: 0;
+        }
+
+        .tooltip-close-btn {
+          background: transparent;
+          border: none;
+          color: var(--color-text-secondary);
+          cursor: pointer;
+          font-size: 0.875rem;
+          padding: 2px 6px;
+          border-radius: 4px;
+          transition: color 0.2s, background-color 0.2s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          &:hover {
+            color: var(--color-text-accent);
+            background: rgba(0, 212, 255, 0.08);
+          }
+        }
+      }
+
+      .tooltip-list {
+        max-height: 200px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+
+        &::-webkit-scrollbar {
+          width: 4px;
+        }
+        &::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        &::-webkit-scrollbar-thumb {
+          background: var(--color-border-primary);
+          border-radius: 2px;
+        }
+
+        .tooltip-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          font-size: 0.8125rem;
+          color: var(--color-text-primary);
+          padding: 4px 8px;
+          border-radius: 4px;
+          transition: background-color 0.2s, color 0.2s;
+
+          &.clickable {
+            cursor: pointer;
+            &:hover {
+              background: rgba(0, 212, 255, 0.08);
+              color: var(--color-text-accent);
+            }
+          }
+
+          .country-flag {
+            font-size: 1.1rem;
+            margin-right: 8px;
+          }
+
+          .country-name {
+            flex-grow: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+
+          .country-badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            font-weight: 700;
+            background: rgba(0, 212, 255, 0.15);
+            color: var(--color-text-accent);
+            padding: 1px 6px;
+            border-radius: 4px;
+            border: 1px solid var(--color-border-primary);
+          }
+        }
+      }
+    }
+  }
+
+  .loader-wrapper {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+    overflow: hidden;
+  }
+
+  ::ng-deep {
+    .p-calendar,
+    .p-multiselect {
+      width: 195px;
+      background: transparent !important;
+      border: 1px solid rgba(255, 255, 255, 0.12) !important;
+      border-radius: 8px !important;
+      display: inline-flex;
+      align-items: center;
+      min-height: 38px;
+      transition: all 0.2s ease-in-out;
+      box-sizing: border-box;
+
+      .p-inputtext,
+      .p-multiselect-label {
+        background: transparent !important;
+        border: none !important;
+        color: var(--color-text-secondary) !important;
+        border-radius: 0 !important;
+        font-size: 0.8125rem !important;
+        padding: 0 12px !important;
+        height: 100%;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        box-sizing: border-box;
+      }
+
+      .p-multiselect-trigger {
+        background: transparent !important;
+        color: var(--color-text-secondary) !important;
+        width: 32px !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      &:hover,
+      &.p-focus {
+        border-color: var(--color-border-accent) !important;
+        background: rgba(0, 212, 255, 0.03) !important;
+        
+        .p-inputtext,
+        .p-multiselect-label,
+        .p-multiselect-trigger {
+          color: var(--color-text-primary) !important;
+        }
+      }
+
+      &.p-inputwrapper-filled {
+        background: transparent !important;
+        border-color: var(--color-border-accent) !important;
+        
+        .p-inputtext,
+        .p-multiselect-label {
+          color: var(--color-text-accent) !important;
+        }
+        .p-multiselect-trigger {
+          color: var(--color-text-accent) !important;
+        }
+      }
+    }
+
+    .p-calendar {
+      .p-inputtext {
+        flex: 1 1 auto;
+        border: none !important;
+      }
+
+      .p-datepicker-trigger {
+        background: transparent !important;
+        border: none !important;
+        color: var(--color-text-secondary) !important;
+        height: 100%;
+        width: 38px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease-in-out;
+      }
+
+      &:hover .p-datepicker-trigger,
+      &.p-focus .p-datepicker-trigger {
+        color: var(--color-text-primary) !important;
+      }
+
+      &.p-inputwrapper-filled .p-datepicker-trigger {
+        color: var(--color-text-accent) !important;
+      }
+    }
+
+    .p-datepicker {
+      background: var(--color-bg-secondary) !important;
+      border: 1px solid var(--color-border-primary) !important;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7) !important;
+      border-radius: 10px !important;
+      padding: 12px !important;
+      backdrop-filter: blur(15px);
+
+      .p-datepicker-header {
+        background: transparent !important;
+        border-bottom: 1px solid var(--color-border-primary) !important;
+        color: var(--color-text-primary) !important;
+        padding-bottom: 8px !important;
+        margin-bottom: 8px !important;
+
+        .p-datepicker-title {
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 0.875rem;
+          font-weight: 700;
+        }
+
+        .p-link {
+          color: var(--color-text-secondary) !important;
+          &:hover {
+            color: var(--color-text-accent) !important;
+            background: rgba(0, 212, 255, 0.08) !important;
+          }
+        }
+      }
+
+      table {
+        th {
+          color: var(--color-text-secondary) !important;
+          font-size: 0.75rem !important;
+          font-family: 'JetBrains Mono', monospace;
+          font-weight: 500;
+          text-transform: uppercase;
+        }
+
+        td {
+          padding: 2px !important;
+
+          span {
+            width: 28px !important;
+            height: 28px !important;
+            border-radius: 6px !important;
+            font-size: 0.8125rem !important;
+            color: var(--color-text-primary) !important;
+            transition: all 0.2s !important;
+
+            &:hover {
+              background: rgba(0, 212, 255, 0.15) !important;
+              color: var(--color-text-accent) !important;
+            }
+
+            &.p-highlight {
+              background: var(--color-text-accent) !important;
+              color: var(--color-bg-primary) !important;
+              font-weight: 700;
+            }
+
+            &.p-disabled {
+              color: rgba(255, 255, 255, 0.15) !important;
+              background: transparent !important;
+            }
+          }
+        }
+      }
+    }
+
+    .p-multiselect-panel {
+      background: var(--color-bg-secondary) !important;
+      border: 1px solid var(--color-border-primary) !important;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7) !important;
+      border-radius: 10px !important;
+      padding: 6px 0 !important;
+      min-width: 240px !important;
+
+      .p-multiselect-header {
+        background: transparent !important;
+        border-bottom: 1px solid var(--color-border-primary) !important;
+        padding: 8px 12px !important;
+        color: var(--color-text-primary) !important;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        .p-checkbox .p-checkbox-box {
+          border-color: var(--color-border-primary) !important;
+          background: rgba(0, 0, 0, 0.3) !important;
+          border-radius: 4px;
+          width: 18px;
+          height: 18px;
+
+          &.p-highlight {
+            background: var(--color-text-accent) !important;
+            border-color: var(--color-text-accent) !important;
+            color: var(--color-bg-primary) !important;
+          }
+        }
+
+        .p-multiselect-filter-container {
+          position: relative;
+          width: 100%;
+          display: flex;
+          align-items: center;
+
+          .p-inputtext {
+            background: rgba(0, 0, 0, 0.3) !important;
+            border: 1px solid var(--color-border-primary) !important;
+            color: var(--color-text-primary) !important;
+            padding: 8px 12px 8px 32px !important;
+            border-radius: 6px !important;
+            font-size: 0.875rem !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+            height: 36px !important;
+          }
+
+          .p-multiselect-filter-icon,
+          .pi-search {
+            position: absolute !important;
+            left: 10px !important;
+            color: var(--color-text-secondary) !important;
+            font-size: 0.8125rem !important;
+            pointer-events: none !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            margin: 0 !important;
+            transform: translateY(-50%) !important;
+            top: 50% !important;
+          }
+        }
+
+        .p-multiselect-close {
+          color: var(--color-text-secondary) !important;
+          &:hover {
+            color: var(--color-text-accent) !important;
+            background: rgba(0, 212, 255, 0.08) !important;
+          }
+        }
+      }
+
+      .p-multiselect-items {
+        padding: 4px 0 !important;
+
+        .p-multiselect-item {
+          padding: 8px 12px !important;
+          color: var(--color-text-primary) !important;
+          font-size: 0.8125rem !important;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          transition: background-color 0.2s;
+
+          &:hover {
+            background: rgba(0, 212, 255, 0.08) !important;
+            color: var(--color-text-accent) !important;
+          }
+
+          &.p-highlight {
+            background: rgba(0, 212, 255, 0.12) !important;
+            color: var(--color-text-accent) !important;
+            font-weight: 600;
+          }
+
+          .p-checkbox {
+            margin-right: 0 !important;
+            
+            .p-checkbox-box {
+              border-color: var(--color-border-primary) !important;
+              background: rgba(0, 0, 0, 0.3) !important;
+              border-radius: 4px;
+              width: 16px;
+              height: 16px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+
+              &.p-highlight {
+                background: var(--color-text-accent) !important;
+                border-color: var(--color-text-accent) !important;
+                
+                span {
+                  color: var(--color-bg-primary) !important;
+                  font-size: 9px;
+                  font-weight: 700;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    .radar-progress-bar {
+      height: 3px !important;
+      background-color: transparent !important;
+      .p-progressbar-value {
+        background-color: var(--color-text-accent) !important;
+      }
+    }
+  }
+}

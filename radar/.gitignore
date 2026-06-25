@@ -1,0 +1,52 @@
+# ─── Segreti e configurazione locale ────────────────────────────────────────
+.env
+.env.local
+*.env
+
+# ─── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# ─── Node.js / Angular ───────────────────────────────────────────────────────
+node_modules/
+frontend/dist/
+frontend/.angular/
+frontend/.cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─── Docker ──────────────────────────────────────────────────────────────────
+data/postgres/
+
+# ─── IDE e sistema operativo ─────────────────────────────────────────────────
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# ─── GeoJSON (file grande, scaricato manualmente) ────────────────────────────
+frontend/src/assets/data/countries.geo.json
+
+# ─── Log ─────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ─── Checkpoint ECC (generato dall'agente al limite del contesto) ─────────────
+CHECKPOINT.md

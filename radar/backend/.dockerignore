@@ -1,0 +1,12 @@
+# Build context exclusions per il backend Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+tests/
+*.log
+.gitignore
+*.md

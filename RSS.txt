@@ -1,0 +1,64 @@
+-----------
+Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+
+Fetch original content
+-----------
+
+The Guardian - article
+https://www.theguardian.com/world/rss
+https://www.theguardian.com/business/rss
+https://www.theguardian.com/technology/rss
+https://www.theguardian.com/environment/rss
+https://www.theguardian.com/science/rss
+
+BCC NEWS - #main-content
+https://feeds.bbci.co.uk/news/world/rss.xml
+https://feeds.bbci.co.uk/news/business/rss.xml
+https://feeds.bbci.co.uk/news/technology/rss.xml
+https://feeds.bbci.co.uk/news/science_and_environment/rss.xml
+
+NPR (National Public Radio) - .storytext
+https://feeds.npr.org/1004/rss.xml (world)
+https://feeds.npr.org/1014/rss.xml (Politica interna USA)
+https://feeds.npr.org/1006/rss.xml (business)
+https://feeds.npr.org/1019/rss.xml (tecnologia)
+https://feeds.npr.org/1007/rss.xml (scienza)
+
+Deutsche Welle (DW) - article
+https://rss.dw.com/rdf/rss-en-world (world)
+https://rss.dw.com/rdf/rss-en-bus (business)
+
+CNBC - .ArticleBody-articleBody
+https://www.cnbc.com/id/10000664/device/rss/rss.html (Finance)
+https://www.cnbc.com/id/10001147/device/rss/rss.html (Business)
+https://www.cnbc.com/id/100727362/device/rss/rss.html (World)
+https://www.cnbc.com/id/10000113/device/rss/rss.html (Politica)
+https://www.cnbc.com/id/20910258/device/rss/rss.html (Economy)
+https://www.cnbc.com/id/19854910/device/rss/rss.html (Technology)
+https://www.cnbc.com/id/10000108/device/rss/rss.html (Health and Science)
+https://www.cnbc.com/id/19794221/device/rss/rss.html (Europe)
+https://www.cnbc.com/id/19832390/device/rss/rss.html (Asia)
+
+Yahoo Finance - .caas-body
+https://finance.yahoo.com/news/rssindex (world)
+
+Wired - .body__inner-container
+https://www.wired.com/feed/category/business/latest/rss (business)
+https://www.wired.com/feed/tag/ai/latest/rss (tecnology)
+https://www.wired.com/feed/category/science/latest/rss (science)
+https://www.wired.com/feed/category/security/latest/rss (world)
+
+Hacker News (tramite hnrss.org)
+https://hnrss.org/newest (world)
+
+NASA Breaking News - .entry-content
+https://www.nasa.gov/technology/feed/ (technology)
+https://www.nasa.gov/aeronautics/feed/ (space)
+https://www.nasa.gov/news-release/feed/ (world)
+
+Nature News - article
+https://www.nature.com/nature.rss (world)
+
+
+
+

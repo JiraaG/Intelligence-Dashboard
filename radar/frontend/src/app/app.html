@@ -1,0 +1,28 @@
+<!-- Toolbar centrata -->
+<app-radar-toolbar
+  [articles]="state.articles()"
+  [articleCount]="articleCount()"
+  [isLoading]="state.isLoading()"
+  (filtersChange)="onFiltersChange($event)"
+  (countrySelected)="onToolbarCountrySelect($event)">
+</app-radar-toolbar>
+
+<!-- Mappa Leaflet -->
+<div class="map-container" [class.split-active]="isMapSplit()">
+  <app-radar-map
+    [articles]="state.articles()"
+    [countries]="state.countries()"
+    [focusCountryCode]="focusCountryCode()"
+    (markerClicked)="onMarkerClick($event)"
+    (clusterClicked)="onClusterClick($event)"
+    (countryClicked)="onCountryClick($event)">
+  </app-radar-map>
+</div>
+
+<!-- Sidebar Split-Screen -->
+<app-radar-sidebar
+  [article]="selectedArticle()"
+  [clusterArticles]="clusterArticles()"
+  [isOpen]="isSidebarOpen()"
+  (closed)="closeSidebar()">
+</app-radar-sidebar>

@@ -1,0 +1,12 @@
+# Build context exclusions — accelera il trasferimento a Docker daemon
+node_modules/
+# dist/
+.angular/
+.git/
+*.md
+.gitignore
+.editorconfig
+.prettierrc
+.vscode/
+coverage/
+*.log

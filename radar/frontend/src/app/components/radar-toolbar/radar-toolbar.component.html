@@ -1,0 +1,69 @@
+<div class="radar-toolbar">
+  <div class="brand-group">
+    <span class="brand-icon">📡</span>
+    <span class="brand-title">RADAR</span>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- Calendario PrimeNG -->
+  <p-calendar
+    [(ngModel)]="selectedDate"
+    (onSelect)="onFiltersChange()"
+    [maxDate]="today"
+    dateFormat="yy-mm-dd"
+    [showIcon]="true"
+    placeholder="Seleziona Data">
+  </p-calendar>
+
+  <!-- Sentiment MultiSelect -->
+  <p-multiSelect
+    [options]="sentimentOptions"
+    [(ngModel)]="selectedSentiment"
+    (onChange)="onFiltersChange()"
+    placeholder="Sentiment"
+    [maxSelectedLabels]="1"
+    selectedItemsLabel="{0} selezionati">
+  </p-multiSelect>
+
+  <!-- Tipologia MultiSelect -->
+  <p-multiSelect
+    [options]="categoryOptions"
+    [(ngModel)]="selectedCategories"
+    (onChange)="onFiltersChange()"
+    placeholder="Tipologia"
+    [maxSelectedLabels]="1"
+    selectedItemsLabel="{0} selezionate">
+  </p-multiSelect>
+
+  <div class="divider"></div>
+
+  <div class="article-count-container"
+       (mouseenter)="isTooltipHovered.set(true)"
+       (mouseleave)="isTooltipHovered.set(false)">
+    <div class="article-count" (click)="toggleTooltip($event)">
+      NOTIZIE RILEVATE: <strong>{{ articleCount() }}</strong>
+    </div>
+
+    <!-- Hover/Click countries tooltip -->
+    <div class="countries-tooltip" *ngIf="isTooltipVisible() && countriesList().length > 0">
+      <div class="tooltip-header">
+        <span class="tooltip-title">Nazioni Coinvolte</span>
+        <button class="tooltip-close-btn" (click)="closeTooltip($event)">✕</button>
+      </div>
+      <div class="tooltip-list">
+        <div class="tooltip-row clickable" *ngFor="let c of countriesList()" (click)="selectCountry(c.code, $event)">
+          <span class="country-flag">{{ getFlagEmoji(c.code) }}</span>
+          <span class="country-name">{{ c.name }}</span>
+          <span class="country-badge">{{ c.count }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Progress Bar per stato caricamento asincrono -->
+  <div class="loader-wrapper" *ngIf="isLoading()">
+    <p-progressBar mode="indeterminate" styleClass="radar-progress-bar"></p-progressBar>
+  </div>
+</div>
+
