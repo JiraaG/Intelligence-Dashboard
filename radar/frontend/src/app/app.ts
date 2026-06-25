@@ -49,9 +49,12 @@ export class App {
 
   // Click su nazione (zoom < 5)
   onCountryClick(articles: Article[]): void {
-    this.selectedArticle.set(articles[0]);
-    this.clusterArticles.set(articles);
-    this.isSidebarOpen.set(true);
+    if (articles.length > 0) {
+      this.selectedArticle.set(articles[0]);
+      this.clusterArticles.set(articles);
+      this.isSidebarOpen.set(true);
+      this.focusCountryCode.set(articles[0].country_code);
+    }
   }
 
   // Selezione nazione da toolbar tooltip

@@ -100,6 +100,9 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
     this.map = L.map('radar-map', {
       center: [20, 0],
       zoom: 3,
+      minZoom: 2.2,
+      maxBounds: L.latLngBounds(L.latLng(-85, -180), L.latLng(85, 180)),
+      maxBoundsViscosity: 1.0,
       zoomControl: false,
       attributionControl: true
     });
@@ -128,7 +131,7 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
     this.clusterGroup = L.markerClusterGroup({
       maxClusterRadius: 40,
       showCoverageOnHover: false,
-      disableClusteringAtZoom: 13,
+      disableClusteringAtZoom: 9,
       iconCreateFunction: (cluster: any) => {
         const count = cluster.getChildCount();
         return L.divIcon({
@@ -400,39 +403,36 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
   }
 
   private focusOnCountry(code: string): void {
-    const layers = this.countryLayersMap.get(code);
-    if (layers && layers.length > 0 && this.map) {
-      const bounds = L.latLngBounds([]);
-      layers.forEach(layer => {
-        if (typeof (layer as any).getBounds === 'function') {
-          const lBounds = (layer as any).getBounds();
+    if (!this.map) return;
 
-          // Filtro per prevenire estensioni di bounds globali su paesi trans-antimeridiano
-          if (code === 'US') {
-            const center = lBounds.getCenter();
-            // Mainland USA bounding box limit (Alaska/Hawaii/remote islands excluded for zoom calculation)
-            if (center.lng < -130 || center.lng > -65 || center.lat < 20 || center.lat > 55) {
-              return;
-            }
-          }
-          if (code === 'RU') {
-            const center = lBounds.getCenter();
-            // Esclude le parti che ricadono nell'emisfero occidentale
-            if (center.lng < 0) {
-              return;
-            }
-          }
+    let bounds: Leaflet.LatLngBounds | null = null;
 
-          bounds.extend(lBounds);
-        }
-      });
-      if (bounds.isValid()) {
-        this.map.fitBounds(bounds, {
-          maxZoom: 5,
-          animate: true,
-          duration: 1.0
+    // Configurazione statica per paesi trans-antimeridiano per evitare disallineamenti di coordinate
+    if (code === 'US') {
+      bounds = L.latLngBounds(L.latLng(24.396308, -125.0), L.latLng(49.384358, -66.93457));
+    } else if (code === 'RU') {
+      bounds = L.latLngBounds(L.latLng(41.1856, 19.6389), L.latLng(81.8587, 169.0));
+    } else {
+      const layers = this.countryLayersMap.get(code);
+      if (layers && layers.length > 0) {
+        const b = L.latLngBounds([]);
+        layers.forEach(layer => {
+          if (typeof (layer as any).getBounds === 'function') {
+            b.extend((layer as any).getBounds());
+          }
         });
+        if (b.isValid()) {
+          bounds = b;
+        }
       }
+    }
+
+    if (bounds && bounds.isValid()) {
+      this.map.fitBounds(bounds, {
+        maxZoom: 4,
+        animate: true,
+        duration: 1.0
+      });
     }
   }
 

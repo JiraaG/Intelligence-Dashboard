@@ -99,7 +99,7 @@
   transform: translateX(-50%);
   z-index: 800;
   display: flex;
-  gap: 20px;
+  gap: 16px;
   padding: 10px 24px;
   background: rgba(13, 17, 23, 0.85);
   backdrop-filter: blur(12px);
@@ -109,9 +109,16 @@
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
   align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  max-width: 90vw;
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
   transition: all var(--transition-medium);
   pointer-events: auto;
+
+  &::-webkit-scrollbar {
+    display: none; /* Safari e Chrome */
+  }
 
   .legend-item {
     display: flex;
