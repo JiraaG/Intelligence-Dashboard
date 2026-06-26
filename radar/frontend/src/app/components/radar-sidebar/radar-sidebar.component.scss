@@ -162,7 +162,9 @@
 ::ng-deep .infra-chip { color: var(--color-text-accent) !important; }
 ::ng-deep .company-chip { border-color: rgba(0, 212, 255, 0.12) !important; }
 
-// Stili Vista Cluster
+/* -----------------------------
+   VISTA CLUSTER & CAROSELLO
+------------------------------ */
 .sidebar-cluster {
   padding: 20px;
   display: flex;
@@ -201,75 +203,31 @@
   border: 1px solid var(--cat-color, var(--color-border-card));
 }
 
-.radar-carousel {
-  width: 100%;
+::ng-deep .radar-carousel {
+  /* 1. Allarghiamo il carosello compensando con margini negativi per sfruttare più spazio */
+  width: calc(100% + 24px);
+  margin-left: -12px;
+
+  /* 2. Riduciamo drasticamente l'ingombro laterale delle frecce di PrimeNG */
+  .p-carousel-prev, .p-carousel-next {
+    width: 24px !important;
+    height: 24px !important;
+    margin: 0 4px !important; 
+  }
+
+  /* 3. Azzeriamo il padding di default degli item che stringeva ulteriormente la card */
+  .p-carousel-item {
+    padding: 0 4px !important;
+  }
 }
 
 .carousel-card {
+  width: 100%;
+  box-sizing: border-box;
   background: var(--color-bg-card);
   border: 1px solid var(--color-border-primary);
   border-radius: 12px;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  /* 4. Padding laterale leggermente ridotto (da 20px a 16px) per dare più larghezza al testo */
+  padding: 20px 16px; 
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-
-  .carousel-category {
-    display: inline-block;
-    padding: 2px 8px; border-radius: 4px;
-    font-size: 0.6875rem; font-weight: 700;
-    width: fit-content;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid var(--cat-color, var(--color-border-card));
-    color: var(--cat-color, var(--color-text-accent));
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-  }
-
-  .carousel-country {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.75rem;
-    color: var(--color-text-accent);
-    font-weight: 600;
-  }
-
-  .carousel-title {
-    font-size: 1rem;
-    font-weight: 600;
-    line-height: 1.4;
-    color: var(--color-text-primary);
-  }
-
-  .carousel-summary {
-    font-size: 0.8125rem;
-    line-height: 1.5;
-    color: var(--color-text-secondary);
-  }
-
-  .carousel-link {
-    font-size: 0.75rem;
-    color: var(--color-text-accent);
-    text-decoration: none;
-    font-weight: 500;
-    margin-top: 8px;
-    width: fit-content;
-    &:hover { text-decoration: underline; }
-  }
-
-  .carousel-meta {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.75rem;
-    color: var(--color-text-muted);
-    border-top: 1px solid var(--color-border-card);
-    padding-top: 10px;
-    margin-top: 4px;
-    font-family: 'JetBrains Mono', monospace;
-
-    .carousel-source {
-      color: var(--color-text-secondary);
-    }
-  }
 }

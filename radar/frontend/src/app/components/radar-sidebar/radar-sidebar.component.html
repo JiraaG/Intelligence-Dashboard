@@ -8,7 +8,6 @@
     <button class="close-btn" id="sidebar-close-btn" (click)="closed.emit()">✕</button>
   </div>
 
-  <!-- VISTA SINGOLA NOTIZIA -->
   <div class="sidebar-content" *ngIf="mode() === 'single' && displayArticle()">
     <div class="article-card">
       <div class="card-meta-top">
@@ -39,7 +38,6 @@
         </a>
       </div>
 
-      <!-- Entità Infrastrutturali -->
       <div class="badge-section" *ngIf="displayArticle()?.infrastructural_entities?.length">
         <span class="badge-label">🏭 Entità Infrastrutturali</span>
         <div class="badge-list">
@@ -51,7 +49,6 @@
         </div>
       </div>
 
-      <!-- Aziende -->
       <div class="badge-section" *ngIf="displayArticle()?.companies_involved?.length">
         <span class="badge-label">🏢 Aziende</span>
         <div class="badge-list">
@@ -63,7 +60,6 @@
         </div>
       </div>
 
-      <!-- Tag -->
       <div class="badge-section" *ngIf="displayArticle()?.tags?.length">
         <span class="badge-label">🏷️ Tag</span>
         <div class="badge-list">
@@ -77,7 +73,6 @@
     </div>
   </div>
 
-  <!-- VISTA CLUSTER / MULTI-ARTICOLI -->
   <div class="sidebar-cluster" *ngIf="mode() === 'cluster' && clusterArticles().length > 1">
     <div class="cluster-summary">
       <span class="cluster-count">
@@ -101,23 +96,70 @@
       [responsiveOptions]="carouselResponsiveOptions"
       styleClass="radar-carousel">
       <ng-template pTemplate="item" let-a>
-        <div class="carousel-card">
-          <span class="carousel-category"
-                [style.--cat-color]="'var(--color-' + a.primary_category.toLowerCase() + ')'">
-            {{ a.primary_category }}
-          </span>
-          <span class="carousel-country">{{ a.country_code }}</span>
-          <h3 class="carousel-title">{{ a.title }}</h3>
-          <p class="carousel-summary">{{ a.summary }}</p>
-          <div class="carousel-meta" *ngIf="a.feed_title || a.published_at">
-            <span>{{ a.published_at }}</span>
-            <span class="carousel-source" *ngIf="a.feed_title">| Fonte: {{ a.feed_title }}</span>
+        
+        <div class="carousel-card article-card">
+          <div class="card-meta-top">
+            <span class="category-badge"
+                  [style.--cat-color]="'var(--color-' + a.primary_category.toLowerCase() + ')'">
+              {{ a.primary_category | uppercase }}
+            </span>
+            <span class="country-code">{{ a.country_code }}</span>
           </div>
-          <a [href]="a.source_url" target="_blank" rel="noopener" class="carousel-link">
-            Apri Fonte →
-          </a>
+
+          <div [class]="'sentiment-badge ' + getSentimentClass(a.sentiment)">
+            <span>{{ a.sentiment }}</span>
+            <span class="relevance-stars">
+              @for (i of [1,2,3,4,5]; track i) {
+                <span [class.active]="i <= a.relevance_level">★</span>
+              }
+            </span>
+          </div>
+
+          <h2 class="article-title">{{ a.title }}</h2>
+          <p class="article-summary">{{ a.summary }}</p>
+
+          <div class="article-meta">
+            <span class="meta-date">{{ a.published_at }}</span>
+            <span class="meta-source" *ngIf="a.feed_title">Fonte: {{ a.feed_title }}</span>
+            <a [href]="a.source_url" target="_blank" rel="noopener" class="source-link">
+              Leggi fonte →
+            </a>
+          </div>
+
+          <div class="badge-section" *ngIf="a.infrastructural_entities?.length">
+            <span class="badge-label">🏭 Entità Infrastrutturali</span>
+            <div class="badge-list">
+              <p-chip
+                *ngFor="let e of a.infrastructural_entities || []"
+                [label]="e"
+                styleClass="radar-chip infra-chip">
+              </p-chip>
+            </div>
+          </div>
+
+          <div class="badge-section" *ngIf="a.companies_involved?.length">
+            <span class="badge-label">🏢 Aziende</span>
+            <div class="badge-list">
+              <p-chip
+                *ngFor="let c of a.companies_involved || []"
+                [label]="c"
+                styleClass="radar-chip company-chip">
+              </p-chip>
+            </div>
+          </div>
+
+          <div class="badge-section" *ngIf="a.tags?.length">
+            <span class="badge-label">🏷️ Tag</span>
+            <div class="badge-list">
+              <p-chip
+                *ngFor="let t of a.tags || []"
+                [label]="t"
+                styleClass="radar-chip tag-chip">
+              </p-chip>
+            </div>
+          </div>
         </div>
-      </ng-template>
+        </ng-template>
     </p-carousel>
   </div>
 </div>

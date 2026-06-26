@@ -113,6 +113,11 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
       attributionControl: true
     });
 
+    // Se l'utente clicca su un punto vuoto della mappa, chiudiamo tutti i grafi e la sidebar.
+    this.map.on('click', () => {
+      this.collapseAllGraphs(true);
+    });
+
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
       attribution: '© OpenStreetMap contributors © CARTO',
       subdomains: 'abcd',
@@ -162,6 +167,12 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
         }
       });
 
+      // GARANZIA: Se Leaflet interviene in autonomia a chiudere i nodi (es: per zoom), 
+      // spazziamo via i dummy clone per evitare l'effetto "fantasma intoccabile".
+      cg.on('unspiderfied', () => {
+        this.clearRootMarkers();
+      });
+
       cg.on('clusterclick', (e: any) => {
         if (e.originalEvent) {
           e.originalEvent.preventDefault();
@@ -171,13 +182,10 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
         const cluster = e.layer;
         const childMarkers: Leaflet.Marker[] = cluster.getAllChildMarkers();
         
-        // Risoluzione del BUG: Leggiamo in modo nativo se QUESTO cluster era il prescelto
         const isAlreadyOpen = (cg as any)._spiderfied === cluster;
         
         this.collapseAllGraphs();
 
-        // Se era già aperto, abbiamo appena chiuso tutto. 
-        // Emettiamo un array vuoto per spegnere anche la Sidebar e ci fermiamo.
         if (isAlreadyOpen) {
           this.clusterClicked.emit([]);
           return;
@@ -193,19 +201,15 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
         const currentZoom = this.map.getZoom();
         const targetZoom = 6; 
 
-        // Se siamo già pronti come zoom, apriamo subito a grafo e usciamo
         if (currentZoom >= targetZoom) {
           this.spiderfyAndCreateRoot(cg, childMarkers);
           return;
         }
 
-        // Se dobbiamo zoomare, voliamo verso il cluster...
         this.isNavigating = true;
         this.navigatingTargetZoom = targetZoom;
         this.map.flyTo(cluster.getLatLng(), targetZoom, { animate: true, duration: 0.6 });
 
-        // RISOLUZIONE BUG: Usiamo zoomend invece di moveend e diamo 250ms a 
-        // MarkerCluster per completare il rigeneramento fisico post-volo.
         this.map.once('zoomend', () => {
           setTimeout(() => {
             this.spiderfyAndCreateRoot(cg, childMarkers);
@@ -224,19 +228,29 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
       this.currentZoomLevel.set(zoom);
       this.refreshHatchingStyles();
 
-      // Risoluzione Bug: Assicuriamoci che se l'utente zooma via troppo indietro, tutto si chiuda
       if (zoom < 5) {
         this.collapseAllGraphs(true);
       }
     });
   }
 
+  private clearRootMarkers(): void {
+    // Eliminiamo dalla mappa tutti i pallini radice clone "fantasma" rimasti in sospeso
+    this.activeRootMarkers.forEach(m => {
+      if (this.map.hasLayer(m)) this.map.removeLayer(m);
+    });
+    this.activeRootMarkers = [];
+  }
+
   private spiderfyAndCreateRoot(cg: any, childMarkers: any[]): void {
     if (!childMarkers || childMarkers.length === 0) return;
     const newParent = cg.getVisibleParent(childMarkers[0]);
     
-    if (newParent && typeof newParent.spiderfy === 'function' && !(newParent as any)._hasRootBubble) {
+    if (newParent && typeof newParent.spiderfy === 'function') {
       
+      // Assicuriamoci che non ci siano vecchi cloni attivi (risolve bug di persistenza clicks)
+      this.clearRootMarkers();
+
       const rootIcon = newParent.getIcon();
       const rootMarker = L.marker(newParent.getLatLng(), {
         icon: rootIcon,
@@ -246,13 +260,11 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
       
       rootMarker.on('click', (e: any) => {
         L.DomEvent.stopPropagation(e);
-        // Quando l'utente riclicca sul centro aperto, ordina di chiudere anche la sidebar
         this.collapseAllGraphs(true); 
       });
 
       this.activeRootMarkers.push(rootMarker);
-      (newParent as any)._hasRootBubble = true;
-
+      
       newParent.spiderfy();
     }
   }
@@ -294,8 +306,12 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
           })
         });
 
-        layer.on('click', () => {
+        layer.on('click', (e: any) => {
           if (this.isZoomedOut()) {
+            // Impediamo alla mappa di far scattare il suo "click a vuoto" in background
+            if (e.originalEvent) {
+              L.DomEvent.stopPropagation(e.originalEvent);
+            }
             const countryArts = this.articles().filter(a => a.country_code === code);
             if (countryArts.length > 0) this.countryClicked.emit(countryArts);
           }
@@ -596,21 +612,15 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
     this.refreshHatchingStyles();
   }
 
-  // Risoluzione Bug totale di persistenza cluster:
-  // Leggiamo la memoria nativa del MarkerCluster per spegnere lo spiderfy anziché cercarlo.
   collapseAllGraphs(emitClose: boolean = false): void {
     if (!this.map) return;
     
-    this.activeRootMarkers.forEach(m => {
-      if (this.map.hasLayer(m)) this.map.removeLayer(m);
-    });
-    this.activeRootMarkers = [];
+    this.clearRootMarkers();
     
     this.categoryClusterGroups.forEach(cg => {
       const spiderfiedCluster = (cg as any)._spiderfied;
       if (spiderfiedCluster && typeof spiderfiedCluster.unspiderfy === 'function') {
         spiderfiedCluster.unspiderfy();
-        spiderfiedCluster._hasRootBubble = false;
       }
     });
 

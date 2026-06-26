@@ -30,11 +30,15 @@ export class RadarSidebarComponent {
   });
 
   sentimentClass = computed(() => {
-    const s = this.displayArticle()?.sentiment;
-    return s === 'Positivo' ? 'sentiment-pos'
-         : s === 'Negativo' ? 'sentiment-neg'
-         : 'sentiment-neu';
+    return this.getSentimentClass(this.displayArticle()?.sentiment);
   });
+
+  // Nuovo metodo riutilizzabile per il template del carosello
+  getSentimentClass(sentiment?: string): string {
+    return sentiment === 'Positivo' ? 'sentiment-pos'
+         : sentiment === 'Negativo' ? 'sentiment-neg'
+         : 'sentiment-neu';
+  }
 
   clusterSummary = computed(() => {
     const arts = this.clusterArticles();
