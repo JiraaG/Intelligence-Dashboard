@@ -88,7 +88,8 @@ export class RadarToolbarComponent {
     'PG': 'Papua Nuova Guinea',
     'PK': 'Pakistan',
     'TR': 'Turchia',
-    'MX': 'Messico'
+    'MX': 'Messico',
+    'XX': 'World Wide'
   };
 
   // Calcolo dei paesi coinvolti per l'hover tooltip
@@ -109,7 +110,7 @@ export class RadarToolbarComponent {
   });
 
   getFlagEmoji(countryCode: string): string {
-    if (!countryCode || countryCode === 'XX') return '🏳️';
+    if (!countryCode || countryCode === 'XX') return 'WW';
     const codePoints = countryCode
       .toUpperCase()
       .split('')

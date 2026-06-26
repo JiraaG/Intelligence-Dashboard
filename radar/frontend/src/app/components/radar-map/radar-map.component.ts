@@ -545,6 +545,7 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
     for (const article of articles) {
       if (article.latitude && article.longitude) {
         const code = article.country_code || 'XX';
+        if (code === 'XX') continue;
         const current = countryCenters.get(code) || { latSum: 0, lngSum: 0, count: 0 };
         current.latSum += article.latitude;
         current.lngSum += article.longitude;
@@ -557,6 +558,7 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
 
     for (const article of articles) {
       const code = article.country_code || 'XX';
+      if (code === 'XX') continue;
       const center = countryCenters.get(code);
       
       if (!center) continue; 
