@@ -90,14 +90,15 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 
 > [!NOTE]
 > ### 🗺️ Regole di Visualizzazione Mappa e Clustering
-> 1. **Calibrazione Clustering**: Configurare `disableClusteringAtZoom: 9` nel `markerClusterGroup`. Questo garantisce che i marker rimangano raggruppati a zoom bassi e intermedi, dividendosi progressivamente in sub-cluster per poi scomporsi automaticamente in singole icone di categoria geopolitica al livello di zoom 9 (evitando sovrapposizioni e zoom infiniti).
-> 2. **Estensione Bounding Box per Stati Trans-Antimeridiano**: Nel calcolo dello zoom di focus per nazioni con territori oltre la linea di cambio data (Stati Uniti `US` e Russia `RU`), per garantire la validità del bounding box ed evitare comportamenti bloccanti, utilizzare bounding box statici Mainland hardcoded:
+> 1. **Clustering a Icona Composita (Anello per Categoria)**: Un singolo `L.markerClusterGroup` raggruppa spazialmente tutti i marker a coordinate reali (nessun offset geografico). L'icona del cluster è una scomposizione ad anello: categoria singola = pallino colorato 40×40 con conteggio; multi-categoria = anello 60×60 con sub-dot radiali colorati per categoria + conteggio totale centrale. `maxClusterRadius: 100`, `disableClusteringAtZoom: 12`, `spiderfyOnMaxZoom: true`.
+> 2. **Spiderfy Anticipato a Grafo**: A zoom ≥ 12 il cluster si espande automaticamente in marker individuali collegati al centro da linee radiali (struttura a grafo). Un marker di ancoraggio centrale persiste visibile durante l'espansione. Il click su un sub-dot categoria emette solo gli articoli di quella categoria.
+> 3. **Notizia Singola in Pallino**: Anche una notizia singola (count=1) viene renderizzata dentro un pallino cluster (mai icona nuda). L'ancoraggio è sempre centrato sulla coordinata reale.
+> 4. **Estensione Bounding Box per Stati Trans-Antimeridiano**: Nel calcolo dello zoom di focus per nazioni con territori oltre la linea di cambio data (Stati Uniti `US` e Russia `RU`), per garantire la validità del bounding box ed evitare comportamenti bloccanti, utilizzare bounding box statici Mainland hardcoded:
 >    * `US`: `L.latLngBounds(L.latLng(24.396308, -125.0), L.latLng(49.384358, -66.93457))`
 >    * `RU`: `L.latLngBounds(L.latLng(41.1856, 19.6389), L.latLng(81.8587, 169.0))`
->    * Tali territori remoti esclusi devono comunque mantenere l'hatching e la colorazione attiva sulla mappa.
-> 3. **Legenda Colori**: Inserire una legenda glassmorphic orizzontale in assoluto in basso al centro della mappa (`bottom: 20px; left: 50%`) che mostri cerchi luminosi (`box-shadow` del colore di categoria) affiancati alle emoji e ai nomi delle categorie geopolitiche. **La legenda deve essere disposta su una singola riga orizzontale (`flex-wrap: nowrap` e `overflow-x: auto` per schermi piccoli).**
-> 4. **Limitazioni Zoom Mappa**: Impedire lo zoom all'indietro infinito e lo scroll laterale al di fuori della terraferma configurando `minZoom: 2.2`, `maxBounds` impostati sui limiti del globo terrestre (`[-85, -180]` a `[85, 180]`) e `maxBoundsViscosity: 1.0`.
-> 5. **Uniformazione Click e Zoom di Focus**: Il click su qualsiasi nazione (sia da mappa che da toolbar) deve aprire la barra di sinistra ed eseguire il focus (fitBounds) con uno zoom controllato e moderato (`maxZoom: 4` o inferiore) per evitare zoom troppo profondi.
+> 5. **Legenda Colori**: Inserire una legenda glassmorphic orizzontale in assoluto in basso al centro della mappa (`bottom: 20px; left: 50%`) che mostri cerchi luminosi (`box-shadow` del colore di categoria) affiancati alle emoji e ai nomi delle categorie geopolitiche.
+> 6. **Limitazioni Zoom Mappa**: Impedire lo zoom all'indietro infinito e lo scroll laterale al di fuori della terraferma configurando `minZoom: 2.2`, `maxBounds` impostati sui limiti del globo terrestre (`[-85, -180]` a `[85, 180]`) e `maxBoundsViscosity: 1.0`.
+> 7. **Uniformazione Click e Zoom di Focus**: Il click su qualsiasi nazione (sia da mappa che da toolbar) deve aprire la barra di sinistra ed eseguire il focus (fitBounds) con uno zoom controllato e moderato (`maxZoom: 4` o inferiore).
 
 > [!IMPORTANT]
 > ### Esecuzione Manuale degli Hook

@@ -198,6 +198,7 @@ Miniflux API (ogni 15 min)
 > - Il toggle mock/prod usa `const USE_MOCK` in `article.service.ts` — NON `environment.ts` (deprecato con esbuild).
 > - Il componente mappa espone tre output: `markerClicked`, `clusterClicked`, `countryClicked` (vedi PRD Fase 5).
 > - **⚠️ Leaflet + esbuild:** `leaflet.markercluster` è una libreria UMD che si aggancia a `window.L`. Con Angular 21 + esbuild NON usare `import 'leaflet.markercluster'` come side-effect import nel componente; il bundler crea un oggetto Leaflet separato e il plugin non si aggancia correttamente. Soluzione: caricare Leaflet e MarkerCluster come script globali in `angular.json` → `scripts[]`, e accedere via `const L = (window as any).L` nel componente. La direttiva `leaflet-hatch.directive.ts` usa questo pattern.
+> - **🗂️ Clustering a Icona Composita:** Singolo `L.markerClusterGroup` con `maxClusterRadius: 100`, `disableClusteringAtZoom: 12`, `spiderfyOnMaxZoom: true`. Icona ad anello (ring layout): categoria singola = pallino colorato, multi-categoria = scomposizione radiale con sub-dot per categoria + conteggio totale centrale. Nessun offset geografico (coordinate reali). Marker ancoraggio centrale persistente durante spiderfy. Click su sub-dot → filtra per categoria.
 
 ---
 

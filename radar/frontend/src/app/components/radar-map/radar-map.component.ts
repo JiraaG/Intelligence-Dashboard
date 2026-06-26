@@ -5,7 +5,6 @@ import {
 import { HttpClient } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import type * as Leaflet from 'leaflet';
-import type * as LMarkerCluster from 'leaflet.markercluster';
 
 const L = (window as any).L;
 import { Article, CountrySummary } from '../../models/article.model';
@@ -34,9 +33,8 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
   // Stato zoom e caricamento GeoJSON
   currentZoomLevel = signal<number>(3);
   isZoomedOut      = computed(() => this.currentZoomLevel() < 5);
-  isParsingGeoJson = signal<boolean>(true); // Gestisce l'overlay grafico iniziale
+  isParsingGeoJson = signal<boolean>(true);
 
-  // Mappe categoria → icona emoji
   private readonly CATEGORY_ICONS: Record<string, string> = {
     'Nucleare':       '☢️',
     'Chip':           '💾',
@@ -46,7 +44,6 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
     'Infrastrutture': '🏗️',
   };
 
-  // Mappatura delle variabili CSS Custom Properties globali (Isolamento Radicale dei Colori - NO HEX in TS)
   private readonly CATEGORY_CSS_VARS: Record<string, string> = {
     'Nucleare':       '--color-nucleare',
     'Elettronica':    '--color-elettronica',
@@ -56,7 +53,6 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
     'Infrastrutture': '--color-infrastrutture',
   };
 
-  // Legenda delle categorie geopolitiche
   readonly legendItems = [
     { label: 'Nucleare', icon: '☢️', cssVar: '--color-nucleare' },
     { label: 'Chip', icon: '💾', cssVar: '--color-chip' },
@@ -66,26 +62,36 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
     { label: 'Infrastrutture', icon: '🏗️', cssVar: '--color-infrastrutture' }
   ];
 
-  // Istanze Leaflet
+  private readonly UI_OFFSETS: Record<string, [number, number]> = {
+    'Nucleare':       [0, -34],  
+    'Chip':           [29, -17], 
+    'Elettronica':    [29, 17],  
+    'Acqua':          [0, 34],   
+    'Energia':        [-29, 17], 
+    'Infrastrutture': [-29, -17] 
+  };
+
   private map!: Leaflet.Map;
-  private clusterGroup!: Leaflet.MarkerClusterGroup;
+  private categoryClusterGroups = new Map<string, any>();
+  private isNavigating = false;
+  private navigatingTargetZoom = 0;               
   private geoJsonLayerGroup = L.layerGroup();
-  private countryLayersMap = new Map<string, Leaflet.Path[]>(); // Riferimento per il refresh rapido via .setStyle()
+  private countryLayersMap = new Map<string, Leaflet.Path[]>();
+  
+  private activeRootMarkers: Leaflet.Marker[] = [];
 
   constructor() {
-    // Effect: aggiorna i dati visivi sulla mappa in base a filtri e date
     effect(() => {
       const arts = this.articles();
       const ctrs = this.countries();
-      if (this.map && !this.isParsingGeoJson()) {
+      if (this.map && !this.isParsingGeoJson() && !this.isNavigating) {
         this.updateMapData(arts, ctrs);
       }
     });
 
-    // Effect: focus su nazione quando viene selezionata
     effect(() => {
       const code = this.focusCountryCode();
-      if (code && this.map && !this.isParsingGeoJson()) {
+      if (code && this.map && !this.isParsingGeoJson() && !this.isNavigating) {
         this.focusOnCountry(code);
       }
     });
@@ -107,67 +113,156 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
       attributionControl: true
     });
 
-    // Doppio Layer - Base Layer scuro (Senza etichette) sotto i poligoni di hatching
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
       attribution: '© OpenStreetMap contributors © CARTO',
       subdomains: 'abcd',
       maxZoom: 19
     }).addTo(this.map);
 
-    // Doppio Layer - Creazione Pane custom per le etichette geografiche (Labels Overlay Pane)
-    // Configurato forzatamente SOPRA i poligoni del GeoJSON
     const labelsPane = this.map.createPane('labelsPane');
     labelsPane.style.zIndex = '650';
-    labelsPane.style.pointerEvents = 'none'; // I click passano sotto per poter cliccare i paesi/marker
+    labelsPane.style.pointerEvents = 'none';
 
-    // Aggiunta Tile Layer per le sole etichette testuali sul Pane custom
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
       pane: 'labelsPane',
       subdomains: 'abcd',
       maxZoom: 19
     }).addTo(this.map);
 
-    // Cluster Group - clustering attivo fino a zoom elevato (17) per evitare sovrapposizioni e consentire spiderfy
-    this.clusterGroup = L.markerClusterGroup({
-      maxClusterRadius: 40,
-      showCoverageOnHover: false,
-      disableClusteringAtZoom: 9,
-      iconCreateFunction: (cluster: any) => {
-        const count = cluster.getChildCount();
-        return L.divIcon({
-          html: `<div class="cluster-icon">${count}</div>`,
-          className: 'radar-cluster',
-          iconSize: [40, 40]
+    const categories = Object.keys(this.CATEGORY_CSS_VARS);
+    for (const cat of categories) {
+      const cssVar = this.CATEGORY_CSS_VARS[cat];
+      const catClass = `cat-${cat.toLowerCase()}`;
+
+      const cg = L.markerClusterGroup({
+        maxClusterRadius: 40,            
+        showCoverageOnHover: false,
+        spiderfyOnMaxZoom: false,        
+        zoomToBoundsOnClick: false,
+        spiderfyDistanceMultiplier: 2.8, 
+        iconCreateFunction: (cluster: any) => {
+          const childMarkers = cluster.getAllChildMarkers();
+          
+          const realCount = childMarkers.filter((m: any) => !m['isDummy']).length;
+          if (realCount === 0) return L.divIcon({ className: 'hidden', iconSize: [0,0] });
+
+          const zoom = this.map ? this.map.getZoom() : 3;
+          const iconScale = Math.max(1.0, Math.min(3.0, 1.0 + (zoom - 5) * 0.15));
+          const iconPx = Math.round(52 * iconScale);
+          const half = Math.round(iconPx / 2);
+          
+          const [ox, oy] = this.UI_OFFSETS[cat] || [0, 0];
+
+          return L.divIcon({
+            html: `<div class="cluster-icon">${realCount}</div>`,
+            className: `radar-cluster ${catClass}`,
+            iconSize: [iconPx, iconPx],
+            iconAnchor: [half - (ox * iconScale), half - (oy * iconScale)]
+          });
+        }
+      });
+
+      cg.on('clusterclick', (e: any) => {
+        if (e.originalEvent) {
+          e.originalEvent.preventDefault();
+          L.DomEvent.stopPropagation(e.originalEvent);
+        }
+
+        const cluster = e.layer;
+        const childMarkers: Leaflet.Marker[] = cluster.getAllChildMarkers();
+        
+        // Risoluzione del BUG: Leggiamo in modo nativo se QUESTO cluster era il prescelto
+        const isAlreadyOpen = (cg as any)._spiderfied === cluster;
+        
+        this.collapseAllGraphs();
+
+        // Se era già aperto, abbiamo appena chiuso tutto. 
+        // Emettiamo un array vuoto per spegnere anche la Sidebar e ci fermiamo.
+        if (isAlreadyOpen) {
+          this.clusterClicked.emit([]);
+          return;
+        }
+
+        let arts: Article[] = childMarkers
+          .filter((m: any) => !m['isDummy'])
+          .map((m: any) => m['articleData'] as Article)
+          .filter(Boolean);
+
+        if (arts.length > 0) this.clusterClicked.emit(arts);
+
+        const currentZoom = this.map.getZoom();
+        const targetZoom = 6; 
+
+        // Se siamo già pronti come zoom, apriamo subito a grafo e usciamo
+        if (currentZoom >= targetZoom) {
+          this.spiderfyAndCreateRoot(cg, childMarkers);
+          return;
+        }
+
+        // Se dobbiamo zoomare, voliamo verso il cluster...
+        this.isNavigating = true;
+        this.navigatingTargetZoom = targetZoom;
+        this.map.flyTo(cluster.getLatLng(), targetZoom, { animate: true, duration: 0.6 });
+
+        // RISOLUZIONE BUG: Usiamo zoomend invece di moveend e diamo 250ms a 
+        // MarkerCluster per completare il rigeneramento fisico post-volo.
+        this.map.once('zoomend', () => {
+          setTimeout(() => {
+            this.spiderfyAndCreateRoot(cg, childMarkers);
+            this.isNavigating = false;
+          }, 250);
         });
-      }
-    });
+      });
 
-    this.clusterGroup.on('clusterclick', (e: any) => {
-      const childMarkers: Leaflet.Marker[] = e.layer.getAllChildMarkers();
-      const arts: Article[] = childMarkers
-        .map((m: any) => m['articleData'] as Article)
-        .filter(Boolean);
-      if (arts.length > 0) this.clusterClicked.emit(arts);
-    });
-
-    this.map.addLayer(this.clusterGroup);
+      this.categoryClusterGroups.set(cat, cg);
+      this.map.addLayer(cg);
+    }
     this.geoJsonLayerGroup.addTo(this.map);
 
-    // Listener zoom → attiva l'hatching in zoom-out
     this.map.on('zoomend', () => {
       const zoom = this.map.getZoom();
       this.currentZoomLevel.set(zoom);
       this.refreshHatchingStyles();
+
+      // Risoluzione Bug: Assicuriamoci che se l'utente zooma via troppo indietro, tutto si chiuda
+      if (zoom < 5) {
+        this.collapseAllGraphs(true);
+      }
     });
   }
 
+  private spiderfyAndCreateRoot(cg: any, childMarkers: any[]): void {
+    if (!childMarkers || childMarkers.length === 0) return;
+    const newParent = cg.getVisibleParent(childMarkers[0]);
+    
+    if (newParent && typeof newParent.spiderfy === 'function' && !(newParent as any)._hasRootBubble) {
+      
+      const rootIcon = newParent.getIcon();
+      const rootMarker = L.marker(newParent.getLatLng(), {
+        icon: rootIcon,
+        interactive: true,
+        zIndexOffset: 1000 
+      }).addTo(this.map);
+      
+      rootMarker.on('click', (e: any) => {
+        L.DomEvent.stopPropagation(e);
+        // Quando l'utente riclicca sul centro aperto, ordina di chiudere anche la sidebar
+        this.collapseAllGraphs(true); 
+      });
+
+      this.activeRootMarkers.push(rootMarker);
+      (newParent as any)._hasRootBubble = true;
+
+      newParent.spiderfy();
+    }
+  }
+
   private loadGeoJson(): void {
-    // Caricamento una tantum dell'asset locale da 14.6 MB per prevenire memory leak
     this.http.get<GeoJSON.FeatureCollection>('assets/data/countries.geo.json')
       .subscribe({
         next: (geoData) => this.parseGeoJsonIncremental(geoData),
         error: (err) => {
-          console.error('[RadarMap] Errore caricamento GeoJSON:', err);
+          console.error('[RadarMap] Errore GeoJSON:', err);
           this.isParsingGeoJson.set(false);
         }
       });
@@ -176,7 +271,7 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
   private parseGeoJsonIncremental(geoData: GeoJSON.FeatureCollection): void {
     const features = geoData.features;
     let index = 0;
-    const batchSize = 15; // Processa 15 poligoni per frame per mantenere l'interfaccia a 60fps all'avvio
+    const batchSize = 15;
 
     const processBatch = () => {
       const end = Math.min(index + batchSize, features.length);
@@ -191,7 +286,7 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
 
         const layer = L.geoJSON(feature, {
           style: () => ({
-            color: 'rgba(0, 212, 255, 0.15)', // Bordo soft
+            color: 'rgba(0, 212, 255, 0.15)',
             weight: 0.5,
             fillOpacity: 0,
             fillColor: 'transparent',
@@ -199,7 +294,6 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
           })
         });
 
-        // Click su nazione in hatching-mode
         layer.on('click', () => {
           if (this.isZoomedOut()) {
             const countryArts = this.articles().filter(a => a.country_code === code);
@@ -209,7 +303,6 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
 
         layer.addTo(this.geoJsonLayerGroup);
 
-        // Memorizza il riferimento ai path vettoriali (supporta MultiPolygons come isole/parti distaccate)
         layer.eachLayer((subLayer: any) => {
           if (subLayer instanceof L.Path) {
             const list = this.countryLayersMap.get(code) || [];
@@ -221,9 +314,9 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
 
       index = end;
       if (index < features.length) {
-        requestAnimationFrame(processBatch); // Esecuzione al frame successivo
+        requestAnimationFrame(processBatch);
       } else {
-        this.isParsingGeoJson.set(false); // Nasconde l'App Bootstrapping Overlay
+        this.isParsingGeoJson.set(false);
         this.refreshHatchingStyles();
       }
     };
@@ -233,7 +326,7 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
 
   private refreshHatchingStyles(): void {
     const ctrs = this.countries();
-    const zoomedOut = this.isZoomedOut();
+    const zoomedOut = this.currentZoomLevel() < 5;
 
     const svg = this.map ? this.map.getContainer().querySelector('.leaflet-overlay-pane svg') : null;
     let defs: SVGElement | null = null;
@@ -245,7 +338,6 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
       }
     }
 
-    // Aggiornamento dei layer vettoriali tramite metodo nativo .setStyle() a frame rate pieno su tutte le parti geografiche
     const baseUrl = window.location.href.split('#')[0];
     this.countryLayersMap.forEach((layers, code) => {
       const summary = ctrs.find(c => c.country_code === code);
@@ -275,16 +367,12 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
   }
 
   private getOrCreateComboPattern(categories: string[], defs: SVGElement): string {
-    if (!categories || categories.length === 0) {
-      return '';
-    }
+    if (!categories || categories.length === 0) return '';
 
     const sortedCats = [...categories].sort();
     const id = 'hatch-grid-' + sortedCats.map(c => c.toLowerCase().replace(/ /g, '-')).join('-');
 
-    if (defs.querySelector(`#${id}`)) {
-      return id;
-    }
+    if (defs.querySelector(`#${id}`)) return id;
 
     const pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
     pattern.setAttribute('id', id);
@@ -388,7 +476,7 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
           pattern.appendChild(line1);
 
           const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-          line2.setAttribute('x1', '0'); line2.setAttribute('y1', '12');
+          line2.setAttribute('x1', '0'); line1.setAttribute('y1', '12');
           line2.setAttribute('x2', '12'); line2.setAttribute('y2', '24');
           line2.setAttribute('stroke', strokeColor);
           line2.setAttribute('stroke-width', strokeWidth);
@@ -404,10 +492,10 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
 
   private focusOnCountry(code: string): void {
     if (!this.map) return;
+    if (this.isNavigating) return;
 
     let bounds: Leaflet.LatLngBounds | null = null;
 
-    // Configurazione statica per paesi trans-antimeridiano per evitare disallineamenti di coordinate
     if (code === 'US') {
       bounds = L.latLngBounds(L.latLng(24.396308, -125.0), L.latLng(49.384358, -66.93457));
     } else if (code === 'RU') {
@@ -421,9 +509,7 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
             b.extend((layer as any).getBounds());
           }
         });
-        if (b.isValid()) {
-          bounds = b;
-        }
+        if (b.isValid()) bounds = b;
       }
     }
 
@@ -437,43 +523,100 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
   }
 
   private updateMapData(articles: Article[], countries: CountrySummary[]): void {
-    // Svuota solo i marker del cluster group, senza toccare il GeoJSON di sfondo
-    this.clusterGroup.clearLayers();
-
-    const coordinateCounts = new Map<string, number>();
-
+    this.categoryClusterGroups.forEach(group => group.clearLayers());
+    const countryCenters = new Map<string, { latSum: number, lngSum: number, count: number }>();
+    
     for (const article of articles) {
-      if (!article.latitude || !article.longitude) continue;
-
-      let lat = article.latitude;
-      let lng = article.longitude;
-      const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;
-      const count = coordinateCounts.get(key) || 0;
-      coordinateCounts.set(key, count + 1);
-
-      if (count > 0) {
-        // Applica una dispersione a cerchio deterministica per evitare sovrapposizioni complete (zoom >= 7)
-        const angle = (count * 2 * Math.PI) / 8; // Distribuisce in 8 direzioni
-        const radius = 0.004 * (1 + Math.floor(count / 8) * 0.5); // Concentrico se > 8
-        lat += Math.sin(angle) * radius;
-        lng += Math.cos(angle) * radius;
+      if (article.latitude && article.longitude) {
+        const code = article.country_code || 'XX';
+        const current = countryCenters.get(code) || { latSum: 0, lngSum: 0, count: 0 };
+        current.latSum += article.latitude;
+        current.lngSum += article.longitude;
+        current.count++;
+        countryCenters.set(code, current);
       }
-
-      const emoji = this.CATEGORY_ICONS[article.primary_category] ?? '📍';
-      const icon = L.divIcon({
-        html: `<div class="marker-icon" title="${article.title}">${emoji}</div>`,
-        className: `marker-${article.primary_category.toLowerCase()}`,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16]
-      });
-
-      const marker = L.marker([lat, lng], { icon });
-      (marker as any)['articleData'] = article;
-      marker.on('click', () => this.markerClicked.emit(article));
-      this.clusterGroup.addLayer(marker);
     }
 
+    const populatedSpots = new Set<string>();
+
+    for (const article of articles) {
+      const code = article.country_code || 'XX';
+      const center = countryCenters.get(code);
+      
+      if (!center) continue; 
+      
+      let baseLat = center.latSum / center.count;
+      let baseLng = center.lngSum / center.count;
+      const realLatLng = L.latLng(baseLat, baseLng);
+
+      const cat = article.primary_category;
+      const [ox, oy] = this.UI_OFFSETS[cat] || [0, 0];
+      
+      populatedSpots.add(`${code}_${cat}`);
+
+      const emoji = this.CATEGORY_ICONS[cat] ?? '📍';
+      const icon = L.divIcon({
+        html: `<div class="marker-icon" style="font-size: 24px; line-height: 44px; text-align: center;" title="${article.title}">${emoji}</div>`,
+        className: `marker-${cat.toLowerCase()}`,
+        iconSize: [44, 44],
+        iconAnchor: [22 - ox, 22 - oy] 
+      });
+
+      const marker = L.marker([baseLat, baseLng], { icon });
+      (marker as any)['articleData'] = article;
+      (marker as any)['realLatLng'] = realLatLng;
+      (marker as any)['isDummy'] = false;
+      
+      marker.on('click', () => this.markerClicked.emit(article));
+
+      const targetGroup = this.categoryClusterGroups.get(cat);
+      if (targetGroup) targetGroup.addLayer(marker);
+    }
+
+    populatedSpots.forEach(spot => {
+      const [code, cat] = spot.split('_');
+      const center = countryCenters.get(code)!;
+      let baseLat = center.latSum / center.count;
+      let baseLng = center.lngSum / center.count;
+
+      const invisibleIcon = L.divIcon({
+        html: '',
+        className: '',
+        iconSize: [0, 0], 
+        iconAnchor: [0, 0]
+      });
+
+      const dummyMarker = L.marker([baseLat, baseLng], { icon: invisibleIcon, interactive: false });
+      (dummyMarker as any)['isDummy'] = true;
+      
+      const targetGroup = this.categoryClusterGroups.get(cat);
+      if (targetGroup) targetGroup.addLayer(dummyMarker);
+    });
+
     this.refreshHatchingStyles();
+  }
+
+  // Risoluzione Bug totale di persistenza cluster:
+  // Leggiamo la memoria nativa del MarkerCluster per spegnere lo spiderfy anziché cercarlo.
+  collapseAllGraphs(emitClose: boolean = false): void {
+    if (!this.map) return;
+    
+    this.activeRootMarkers.forEach(m => {
+      if (this.map.hasLayer(m)) this.map.removeLayer(m);
+    });
+    this.activeRootMarkers = [];
+    
+    this.categoryClusterGroups.forEach(cg => {
+      const spiderfiedCluster = (cg as any)._spiderfied;
+      if (spiderfiedCluster && typeof spiderfiedCluster.unspiderfy === 'function') {
+        spiderfiedCluster.unspiderfy();
+        spiderfiedCluster._hasRootBubble = false;
+      }
+    });
+
+    if (emitClose) {
+      this.clusterClicked.emit([]);
+    }
   }
 
   ngOnDestroy(): void {

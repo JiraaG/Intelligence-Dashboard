@@ -294,15 +294,17 @@ con i dati mockati prima di connettere il backend reale.
 
 - [ ] L'hatching SVG sfuma gradualmente con CSS transition opacity a 0
 - [ ] I marker puntuali compaiono con la loro icona tematica (☢️ 💾 ⚡ 💧)
-- [ ] I due marker tedeschi (Dresda e Monaco) sono separati e cliccabili
-- [ ] I due marker ucraini (Zaporizhzhia e Kakhovka) formano un cluster (< 40px)
+- [ ] I due marker tedeschi (Dresda Chip e Monaco Energia) sono separati e cliccabili
+- [ ] I due marker ucraini (Zaporizhzhia Nucleare e Kakhovka Acqua) **NON** formano un cluster unico — ciascuno appartiene al proprio cluster group di categoria
+- [ ] A zoom intermedio (5-9), i marker della stessa categoria in aree vicine si raggruppano in cluster colorati per categoria
 
-### ✅ Test 3: Cluster e Carosello PrimeNG
+### ✅ Test 3: Cluster per Categoria e Carosello PrimeNG
 
-- [ ] I due marker ucraini vicini si uniscono in un marker cluster numerato "2"
-- [ ] Cliccando sul cluster si apre la sidebar sinistra
-- [ ] Il componente `p-carousel` scorre correttamente tra le 2 notizie ucraine
+- [ ] I cluster mostrano colori diversi per categoria (Nucleare=arancione, Chip=viola, Acqua=blu, Energia=giallo, Elettronica=ciano, Infrastrutture=verde)
+- [ ] Cliccando su un cluster categoria si apre la sidebar sinistra con **solo** gli articoli di quella categoria
+- [ ] Il componente `p-carousel` scorre correttamente tra le notizie della categoria selezionata
 - [ ] Ogni slide del carousel mostra: titolo, summary, badge tags, link sorgente
+- [ ] A zoom >= 17, i marker sono ancora clusterizzati (spiderfy su click per vederli singolarmente)
 
 ### ✅ Test 4: Split-Screen 70/30
 

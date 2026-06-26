@@ -283,30 +283,76 @@ const CATEGORY_ICONS: Record<string, L.DivIcon> = {
 // clusterArticles() e apre la sidebar in modalità riepilogo-nazione.
 ```
 
-### Clustering Spaziale (40px radius)
+### Clustering a 6 Gruppi con Offset Geografici Progressivi
 
 > **⚠️ GOTCHA ESBuild:** NON usare `import * as L from 'leaflet'` né `import 'leaflet.markercluster'` nei componenti.
-> Il bundler crea un namespace Leaflet separato e il plugin non si aggancia a `window.L`.
 > Caricali come script globali in `angular.json` e accedi via `(window as any).L`.
 
+**6 Cluster Group indipendenti** — offset geografici progressivi, nessun offset CSS/ancoraggio:
+
 ```typescript
-// CORRETTO: Leaflet e MarkerCluster caricati come global scripts in angular.json
-// NON importare leaflet nel componente TypeScript
 const L = (window as any).L as typeof import('leaflet');
 
-const clusterGroup = L.markerClusterGroup({
-  maxClusterRadius: 40,
-  showCoverageOnHover: false,
-  iconCreateFunction: (cluster) => {
-    const count = cluster.getChildCount();
-    return L.divIcon({
-      html: `<div class="cluster-icon">${count}</div>`,
-      className: 'radar-cluster',
-      iconSize: [40, 40]
-    });
-  }
-});
+// Direzioni offset geografico (magnitudine ~1.2 uniforme)
+const GEO_DIRECTIONS: [number, number][] = [
+  [-1, -0.6], [1, -0.6], [-1, 0.6], [1, 0.6], [0, -1.2], [0, 1.2]
+];
+
+const categoryClusterGroups = new Map<string, any>();
+const categories = Object.keys(CATEGORY_CSS_VARS);
+for (const cat of categories) {
+  const cg = L.markerClusterGroup({
+    maxClusterRadius: 200,            // previene duplicati stessa categoria
+    showCoverageOnHover: false,
+    disableClusteringAtZoom: 18,      // zero icone nude
+    spiderfyOnMaxZoom: true,
+    spiderfyDistanceMultiplier: 2.0,
+    iconCreateFunction: (cluster: any) => {
+      const count = cluster.getChildCount();
+      return L.divIcon({
+        html: `<div class="cluster-icon">${count}</div>`,
+        className: `radar-cluster cat-${cat.toLowerCase()}`,
+        iconSize: [52, 52],
+        iconAnchor: [26, 26]           // fisso, centrato
+      });
+    }
+  });
+
+  cg.on('clusterclick', (e: any) => {
+    let arts: Article[] = e.layer.getAllChildMarkers()
+      .map((m: any) => m['articleData'] as Article)
+      .filter(Boolean);
+    arts = arts.filter(a => a.primary_category === cat); // filtro esplicito
+    if (arts.length > 0) clusterClicked.emit(arts);
+  });
+
+  categoryClusterGroups.set(cat, cg);
+  map.addLayer(cg);
+}
+
+// In updateMapData — offset geografico progressivo:
+const zoom = currentZoomLevel();
+const geoScale = 0.04 * Math.max(1, zoom - 4);
+const catIdx = catDirs.get(article.primary_category) ?? 0;
+const [dx, dy] = GEO_DIRECTIONS[catIdx];
+const marker = L.marker(
+  [article.latitude + dx * geoScale, article.longitude + dy * geoScale],
+  { icon }
+);
+(marker as any)['articleData'] = article;
+const targetGroup = categoryClusterGroups.get(article.primary_category);
+if (targetGroup) {
+  targetGroup.addLayer(marker);
+} else {
+  console.warn(`Categoria non riconosciuta: "${article.primary_category}"`);
+}
 ```
+
+**Vantaggi dell'architettura:**
+- Spiderfy **nativamente per-categoria** + filtro esplicito doppia sicurezza
+- Spiderfy origin **corretto**: cluster center = media coordinate offset = centro icona
+- `maxClusterRadius: 200` → mai duplicati stessa categoria nello stesso hub
+- `disableClusteringAtZoom: 18` → zero icone nude, solo spiderfy mostra icone
 
 **In `angular.json` → `projects.radar-frontend.architect.build.options`:**
 ```json
@@ -458,4 +504,7 @@ cd frontend && npx tsc --noEmit
 - **BLOCCA** se: colori hardcoded diversi dalla palette Palantir definita
 - **BLOCCA** se: `import * as L from 'leaflet'` o `import 'leaflet.markercluster'` nei componenti (causa TypeError con esbuild)
 - **AVVISA** se: manca la transizione CSS per split-screen
-- **AVVISA** se: cluster radius diverso da 40px
+- **AVVISA** se: `maxClusterRadius` ≠ 200 o `disableClusteringAtZoom` ≠ 18
+- **AVVISA** se: offset CSS/iconAnchor invece di offset geografici sui marker
+- **AVVISA** se: filtro categoria assente nel `clusterclick` handler
+- **AVVISA** se: marker senza gruppo target (categoria non riconosciuta)
