@@ -75,4 +75,17 @@ export class App {
     this.focusCountryCode.set(null);
     this.mapComponent()?.collapseAllGraphs();
   }
+
+  onSidebarCategoryClick(category: string): void {
+    const code = this.focusCountryCode();
+    if (code) {
+      this.mapComponent()?.focusAndSpiderfyCategory(code, category);
+    } else {
+      // Se focusCountryCode non è impostato, usiamo quello del primo articolo del cluster
+      const arts = this.clusterArticles();
+      if (arts.length > 0 && arts[0].country_code) {
+        this.mapComponent()?.focusAndSpiderfyCategory(arts[0].country_code, category);
+      }
+    }
+  }
 }

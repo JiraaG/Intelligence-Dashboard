@@ -80,8 +80,9 @@
       </span>
       <div class="cluster-categories">
         @for (entry of clusterSummary() | keyvalue; track entry.key) {
-          <span class="cat-pill"
-                [style.--cat-color]="'var(--color-' + entry.key.toLowerCase() + ')'">
+          <span class="cat-pill clickable"
+                [style.--cat-color]="'var(--color-' + entry.key.toLowerCase() + ')'"
+                (click)="onCategoryPillClick(entry.key)">
             {{ entry.key }}: {{ entry.value }}
           </span>
         }
@@ -89,7 +90,7 @@
     </div>
 
     <p-carousel
-      [value]="clusterArticles()"
+      [value]="sortedClusterArticles()"
       [numVisible]="1"
       [numScroll]="1"
       [circular]="true"

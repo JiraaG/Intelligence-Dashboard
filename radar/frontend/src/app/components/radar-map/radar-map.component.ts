@@ -658,6 +658,51 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  public focusAndSpiderfyCategory(countryCode: string, category: string): void {
+    if (!this.map) return;
+    const cg = this.categoryClusterGroups.get(category);
+    if (!cg) return;
+
+    const allMarkers = cg.getLayers();
+    const countryMarkers = allMarkers.filter((m: any) => m.articleData && m.articleData.country_code === countryCode);
+
+    if (countryMarkers.length === 0) return;
+
+    this.collapseAllGraphs(false);
+
+    const firstMarker = countryMarkers[0];
+    const parent = cg.getVisibleParent(firstMarker);
+
+    if (!parent) return;
+
+    const currentZoom = this.map.getZoom();
+    const targetZoom = 6;
+    
+    const latLng = typeof parent.getLatLng === 'function' ? parent.getLatLng() : firstMarker.getLatLng();
+
+    if (currentZoom >= targetZoom) {
+      this.spiderfyAndCreateRoot(cg, countryMarkers);
+      return;
+    }
+
+    this.isNavigating = true;
+    this.navigatingTargetZoom = targetZoom;
+    this.map.flyTo(latLng, targetZoom, { animate: true, duration: 0.6 });
+
+    const cleanup = () => {
+      setTimeout(() => {
+        this.spiderfyAndCreateRoot(cg, countryMarkers);
+        this.isNavigating = false;
+        this.map.off('zoomend', cleanup);
+        this.map.off('moveend', cleanup);
+      }, 250);
+    };
+
+    this.map.once('zoomend', cleanup);
+    this.map.once('moveend', cleanup);
+    setTimeout(cleanup, 1200);
+  }
+
   ngOnDestroy(): void {
     this.map?.remove();
   }

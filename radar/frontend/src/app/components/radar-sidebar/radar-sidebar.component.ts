@@ -1,6 +1,6 @@
-import { Component, input, output, computed } from '@angular/core';
+import { Component, input, output, computed, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { CarouselModule } from 'primeng/carousel';
+import { CarouselModule, Carousel } from 'primeng/carousel';
 import { ChipModule } from 'primeng/chip';
 import { ButtonModule } from 'primeng/button';
 import { Article } from '../../models/article.model';
@@ -19,7 +19,10 @@ export class RadarSidebarComponent {
   clusterArticles = input<Article[]>([]);
   isOpen          = input<boolean>(false);
 
-  closed = output<void>();
+  @ViewChild(Carousel) carousel!: Carousel;
+
+  closed          = output<void>();
+  categoryClicked = output<string>();
 
   mode = computed((): SidebarMode => {
     return this.clusterArticles().length > 1 ? 'cluster' : 'single';
@@ -49,7 +52,21 @@ export class RadarSidebarComponent {
     return byCategory;
   });
 
+  sortedClusterArticles = computed(() => {
+    return [...this.clusterArticles()].sort((a, b) => a.primary_category.localeCompare(b.primary_category));
+  });
+
   carouselResponsiveOptions = [
     { breakpoint: '1400px', numVisible: 1, numScroll: 1 }
   ];
+
+  onCategoryPillClick(category: string): void {
+    this.categoryClicked.emit(category);
+    
+    // Trova il primo articolo di questa categoria nell'array ordinato
+    const idx = this.sortedClusterArticles().findIndex(a => a.primary_category === category);
+    if (idx !== -1 && this.carousel) {
+      this.carousel.page = idx;
+    }
+  }
 }

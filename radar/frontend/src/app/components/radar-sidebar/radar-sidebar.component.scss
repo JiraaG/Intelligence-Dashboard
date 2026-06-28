@@ -201,6 +201,16 @@
   background: rgba(255,255,255,0.04);
   color: var(--cat-color, var(--color-text-secondary));
   border: 1px solid var(--cat-color, var(--color-border-card));
+  transition: all var(--transition-fast);
+
+  &.clickable {
+    cursor: pointer;
+    &:hover {
+      background: var(--cat-color);
+      color: var(--color-bg-primary);
+      box-shadow: 0 0 8px var(--cat-color);
+    }
+  }
 }
 
 ::ng-deep .radar-carousel {
