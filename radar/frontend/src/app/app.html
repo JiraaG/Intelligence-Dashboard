@@ -25,5 +25,6 @@
   [clusterArticles]="clusterArticles()"
   [isOpen]="isSidebarOpen()"
   (closed)="closeSidebar()"
-  (categoryClicked)="onSidebarCategoryClick($event)">
+  (categoryClicked)="onSidebarCategoryClick($event)"
+  (activeArticleChanged)="onActiveArticleChanged($event)">
 </app-radar-sidebar>

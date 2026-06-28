@@ -703,6 +703,58 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
     setTimeout(cleanup, 1200);
   }
 
+  private highlightedMarker: any = null;
+  private pendingHighlightArticle: Article | null = null;
+
+  public highlightMarkerForArticle(article: Article | null): void {
+    if (this.highlightedMarker) {
+      const iconDiv = this.highlightedMarker._icon;
+      if (iconDiv) {
+        iconDiv.classList.remove('marker-highlight');
+      }
+      if (this.highlightedMarker.setZIndexOffset) {
+         this.highlightedMarker.setZIndexOffset(0);
+      }
+      this.highlightedMarker = null;
+    }
+    this.pendingHighlightArticle = article;
+    
+    if (article) {
+      this.applyHighlight(20);
+    }
+  }
+
+  private applyHighlight(retries: number): void {
+    if (!this.pendingHighlightArticle) return;
+    const article = this.pendingHighlightArticle;
+
+    let targetMarker: any = null;
+    const cg = this.categoryClusterGroups.get(article.primary_category);
+    if (cg) {
+      const markers = cg.getLayers();
+      targetMarker = markers.find((m: any) => m.articleData && m.articleData.id === article.id);
+    }
+
+    if (targetMarker) {
+      const iconDiv = targetMarker._icon;
+      if (iconDiv) {
+        iconDiv.classList.add('marker-highlight');
+        this.highlightedMarker = targetMarker;
+        if (targetMarker.setZIndexOffset) {
+           targetMarker.setZIndexOffset(1000);
+        }
+      } else if (retries > 0) {
+        setTimeout(() => {
+          this.applyHighlight(retries - 1);
+        }, 150);
+      }
+    } else if (retries > 0) {
+      setTimeout(() => {
+        this.applyHighlight(retries - 1);
+      }, 150);
+    }
+  }
+
   ngOnDestroy(): void {
     this.map?.remove();
   }

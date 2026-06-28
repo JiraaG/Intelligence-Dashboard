@@ -172,6 +172,12 @@ html, body {
   }
 }
 
+.marker-highlight .marker-icon {
+  transform: scale(1.4) !important;
+  filter: drop-shadow(0 0 14px rgba(255, 255, 255, 0.9)) !important;
+  z-index: 1000 !important;
+}
+
 // Mutua esclusione: griglie visibili in zoom-out, cluster visibili in zoom-in
 .zoom-out-mode {
   .leaflet-marker-pane,

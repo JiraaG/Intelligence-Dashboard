@@ -95,7 +95,8 @@
       [numScroll]="1"
       [circular]="true"
       [responsiveOptions]="carouselResponsiveOptions"
-      styleClass="radar-carousel">
+      styleClass="radar-carousel"
+      (onPage)="onCarouselPage($event)">
       <ng-template pTemplate="item" let-a>
         
         <div class="carousel-card article-card">

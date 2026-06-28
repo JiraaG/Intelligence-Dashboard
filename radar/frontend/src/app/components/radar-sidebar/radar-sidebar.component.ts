@@ -1,4 +1,4 @@
-import { Component, input, output, computed, ViewChild } from '@angular/core';
+import { Component, input, output, computed, ViewChild, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CarouselModule, Carousel } from 'primeng/carousel';
 import { ChipModule } from 'primeng/chip';
@@ -21,8 +21,28 @@ export class RadarSidebarComponent {
 
   @ViewChild(Carousel) carousel!: Carousel;
 
-  closed          = output<void>();
-  categoryClicked = output<string>();
+  closed               = output<void>();
+  categoryClicked      = output<string>();
+  activeArticleChanged = output<Article | null>();
+
+  constructor() {
+    effect(() => {
+      if (!this.isOpen()) {
+        this.activeArticleChanged.emit(null);
+        return;
+      }
+      
+      if (this.mode() === 'single') {
+        this.activeArticleChanged.emit(this.displayArticle() || null);
+      } else {
+        const arts = this.sortedClusterArticles();
+        if (arts.length > 0) {
+          // Quando si apre il cluster, di default p-carousel parte dalla pagina 0
+          this.activeArticleChanged.emit(arts[0]);
+        }
+      }
+    });
+  }
 
   mode = computed((): SidebarMode => {
     return this.clusterArticles().length > 1 ? 'cluster' : 'single';
@@ -67,6 +87,15 @@ export class RadarSidebarComponent {
     const idx = this.sortedClusterArticles().findIndex(a => a.primary_category === category);
     if (idx !== -1 && this.carousel) {
       this.carousel.page = idx;
+      this.activeArticleChanged.emit(this.sortedClusterArticles()[idx]);
+    }
+  }
+
+  onCarouselPage(event: any): void {
+    const page = event.page;
+    const arts = this.sortedClusterArticles();
+    if (page >= 0 && page < arts.length) {
+      this.activeArticleChanged.emit(arts[page]);
     }
   }
 }
