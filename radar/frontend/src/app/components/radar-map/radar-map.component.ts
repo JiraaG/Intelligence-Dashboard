@@ -114,7 +114,8 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
     });
 
     // Se l'utente clicca su un punto vuoto della mappa, chiudiamo tutti i grafi e la sidebar.
-    this.map.on('click', () => {
+    this.map.on('click', (e: any) => {
+      if (e.originalEvent && (e.originalEvent as any)._radarHandled) return;
       this.collapseAllGraphs(true);
     });
 
@@ -177,6 +178,7 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
         if (e.originalEvent) {
           e.originalEvent.preventDefault();
           L.DomEvent.stopPropagation(e.originalEvent);
+          (e.originalEvent as any)._radarHandled = true;
         }
 
         const cluster = e.layer;
@@ -228,7 +230,7 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
       this.currentZoomLevel.set(zoom);
       this.refreshHatchingStyles();
 
-      if (zoom < 5) {
+      if (zoom < 5 && !this.isNavigating) {
         this.collapseAllGraphs(true);
       }
     });
@@ -259,6 +261,9 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
       }).addTo(this.map);
       
       rootMarker.on('click', (e: any) => {
+        if (e.originalEvent) {
+          (e.originalEvent as any)._radarHandled = true;
+        }
         L.DomEvent.stopPropagation(e);
         this.collapseAllGraphs(true); 
       });
@@ -313,7 +318,12 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
               L.DomEvent.stopPropagation(e.originalEvent);
             }
             const countryArts = this.articles().filter(a => a.country_code === code);
-            if (countryArts.length > 0) this.countryClicked.emit(countryArts);
+            if (countryArts.length > 0) {
+              if (e.originalEvent) {
+                (e.originalEvent as any)._radarHandled = true;
+              }
+              this.countryClicked.emit(countryArts);
+            }
           }
         });
 
@@ -530,11 +540,22 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
     }
 
     if (bounds && bounds.isValid()) {
+      this.isNavigating = true;
       this.map.fitBounds(bounds, {
         maxZoom: 4,
         animate: true,
         duration: 1.0
       });
+      
+      const cleanup = () => {
+        this.isNavigating = false;
+        this.map.off('zoomend', cleanup);
+        this.map.off('moveend', cleanup);
+      };
+      
+      this.map.once('zoomend', cleanup);
+      this.map.once('moveend', cleanup);
+      setTimeout(cleanup, 1500);
     }
   }
 
@@ -585,7 +606,13 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
       (marker as any)['realLatLng'] = realLatLng;
       (marker as any)['isDummy'] = false;
       
-      marker.on('click', () => this.markerClicked.emit(article));
+      marker.on('click', (e: any) => {
+        if (e.originalEvent) {
+          L.DomEvent.stopPropagation(e.originalEvent);
+          (e.originalEvent as any)._radarHandled = true;
+        }
+        this.markerClicked.emit(article);
+      });
 
       const targetGroup = this.categoryClusterGroups.get(cat);
       if (targetGroup) targetGroup.addLayer(marker);
