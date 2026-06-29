@@ -50,3 +50,7 @@ logs/
 
 # ─── Checkpoint ECC (generato dall'agente al limite del contesto) ─────────────
 CHECKPOINT.md
+
+# ─── Vault Obsidian ──────────────────────────────────────────────────────────
+vault/*
+!vault/.gitkeep
