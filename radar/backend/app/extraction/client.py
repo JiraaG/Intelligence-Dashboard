@@ -1,5 +1,6 @@
 import logging
 import httpx
+import time
 from app.core.config import MINIFLUX_API_URL, MINIFLUX_API_KEY
 
 logger = logging.getLogger("radar.extraction.client")
@@ -30,7 +31,10 @@ class MinifluxClient:
         url = f"{self.api_url}/v1/entries"
         params = {
             "status": "unread",
-            "limit": limit
+            "limit": limit,
+            "order": "published_at",
+            "direction": "desc",
+            "published_after": int(time.time()) - (48 * 3600)
         }
         
         logger.info(f"Recupero fino a {limit} articoli non letti da Miniflux...")
