@@ -99,6 +99,19 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 > 5. **Legenda Colori**: Inserire una legenda glassmorphic orizzontale in assoluto in basso al centro della mappa (`bottom: 20px; left: 50%`) che mostri cerchi luminosi (`box-shadow` del colore di categoria) affiancati alle emoji e ai nomi delle categorie geopolitiche.
 > 6. **Limitazioni Zoom Mappa**: Impedire lo zoom all'indietro infinito e lo scroll laterale al di fuori della terraferma configurando `minZoom: 2.2`, `maxBounds` impostati sui limiti del globo terrestre (`[-85, -180]` a `[85, 180]`) e `maxBoundsViscosity: 1.0`.
 > 7. **Uniformazione Click e Zoom di Focus**: Il click su qualsiasi nazione (sia da mappa che da toolbar) deve aprire la barra di sinistra ed eseguire il focus (fitBounds) con uno zoom controllato e moderato (`maxZoom: 4` o inferiore).
+> 8. **Gestione Dinamica Altezza Carosello**: Il ridimensionamento dinamico dell'altezza delle schede nel carosello laterale DEVE essere calcolato estraendo l'ID univoco dell'articolo corrente (`document.getElementById('article-card-' + id)`) anziché affidarsi alla classe `.p-carousel-item-active` di PrimeNG, la quale introduce race-condition nel DOM al primo avvio.
+> 9. **Allineamento Flexbox e Troncamento Fonti**: Le sezioni di metadati contenenti stringhe potenzialmente lunghe (es. la fonte dell'articolo) e bottoni affiancati (es. `Leggi fonte →`) devono impiegare rigorosamente layout *Flexbox* (`flex: 1`, `min-width: 0` per il contenitore di testo e `flex-shrink: 0`, `white-space: nowrap` per il link).
+> 10. **Pulizia Prefisso Feed**: I titoli dei feed provenienti da Miniflux devono essere processati in Angular tramite Regex (es. `.replace(/^Feed:\s*/i, '')`) per rimuovere la dicitura automatica "Feed: " prima del rendering.
+
+---
+
+## 6. Gestione Repository e Vault (Git)
+
+> [!IMPORTANT]
+> ### ⛔ Regole di Esclusione Vault
+> La cartella radice `vault/` deve essere tracciata su Git unicamente tramite il file `.gitkeep`.
+> Qualsiasi file markdown (`.md`) o sottocartella generata per categoria o nazione DEVE essere ignorato inserendo `vault/*` e `!vault/.gitkeep` all'interno del file `.gitignore` globale. 
+> Non è necessario spingere la struttura ad albero su Git, in quanto il modulo di backend (`router.py`) si occupa di ricreare dinamicamente (`os.makedirs`) tutte le categorie e sottocartelle all'arrivo del primo articolo.
 
 > [!IMPORTANT]
 > ### Esecuzione Manuale degli Hook

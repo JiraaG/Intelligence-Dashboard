@@ -73,6 +73,11 @@ export class RadarSidebarComponent {
     }, 100);
   }
 
+  cleanFeedTitle(title: string | undefined): string {
+    if (!title) return '';
+    return title.replace(/^Feed:\s*/i, '');
+  }
+
   @HostListener('window:resize')
   onResize() {
     if (this.isOpen() && this.mode() === 'cluster') {

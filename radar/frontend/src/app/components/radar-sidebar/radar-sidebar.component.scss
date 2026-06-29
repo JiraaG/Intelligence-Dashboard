@@ -124,6 +124,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   font-size: 0.75rem;
   color: var(--color-text-muted);
   border-top: 1px solid var(--color-border-card);
@@ -131,17 +132,20 @@
 
   .meta-source {
     color: var(--color-text-secondary);
+    flex: 1;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 259px;
     font-family: 'JetBrains Mono', monospace;
   }
 
   .source-link {
+    flex-shrink: 0;
     color: var(--color-text-accent);
     text-decoration: none;
     font-weight: 500;
+    white-space: nowrap;
     &:hover { text-decoration: underline; }
   }
 }

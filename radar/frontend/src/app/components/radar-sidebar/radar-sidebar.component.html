@@ -127,7 +127,7 @@
           <p class="article-summary">{{ a.summary }}</p>
 
           <div class="article-meta">
-            <span class="meta-source" *ngIf="a.feed_title">{{ a.feed_title }}</span>
+            <span class="meta-source" *ngIf="a.feed_title" [title]="cleanFeedTitle(a.feed_title)">{{ cleanFeedTitle(a.feed_title) }}</span>
             <a [href]="a.source_url" target="_blank" rel="noopener" class="source-link">
               Leggi fonte →
             </a>
