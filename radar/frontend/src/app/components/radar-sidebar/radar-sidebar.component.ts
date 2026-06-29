@@ -78,6 +78,16 @@ export class RadarSidebarComponent {
     return title.replace(/^Feed:\s*/i, '');
   }
 
+  getCountryName(code: string | undefined): string {
+    if (!code) return '';
+    try {
+      const displayNames = new Intl.DisplayNames(['it-IT'], { type: 'region' });
+      return displayNames.of(code) || code;
+    } catch (e) {
+      return code;
+    }
+  }
+
   @HostListener('window:resize')
   onResize() {
     if (this.isOpen() && this.mode() === 'cluster') {

@@ -15,7 +15,7 @@
               [style.--cat-color]="'var(--color-' + displayArticle()!.primary_category.toLowerCase() + ')'">
           {{ displayArticle()!.primary_category | uppercase }}
         </span>
-        <span class="country-code">{{ displayArticle()!.country_code }}</span>
+        <span class="country-code">{{ getCountryName(displayArticle()!.country_code) }}</span>
       </div>
 
       <div class="sentiment-and-date">
@@ -108,7 +108,7 @@
                   [style.--cat-color]="'var(--color-' + a.primary_category.toLowerCase() + ')'">
               {{ a.primary_category | uppercase }}
             </span>
-            <span class="country-code">{{ a.country_code }}</span>
+            <span class="country-code">{{ getCountryName(a.country_code) }}</span>
           </div>
 
           <div class="sentiment-and-date">
