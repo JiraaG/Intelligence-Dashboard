@@ -102,7 +102,19 @@ export class RadarToolbarComponent {
     
     const list: { code: string; name: string; count: number }[] = [];
     countMap.forEach((count, code) => {
-      const name = this.COUNTRY_NAMES[code] || code;
+      let name = this.COUNTRY_NAMES[code];
+      if (!name) {
+        if (code === 'XX') {
+          name = 'World Wide';
+        } else {
+          try {
+            const displayNames = new Intl.DisplayNames(['it-IT'], { type: 'region' });
+            name = displayNames.of(code) || code;
+          } catch (e) {
+            name = code;
+          }
+        }
+      }
       list.push({ code, name, count });
     });
     
