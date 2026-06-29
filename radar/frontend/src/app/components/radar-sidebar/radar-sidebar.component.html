@@ -18,21 +18,23 @@
         <span class="country-code">{{ displayArticle()!.country_code }}</span>
       </div>
 
-      <div [class]="'sentiment-badge ' + sentimentClass()">
-        <span>{{ displayArticle()!.sentiment }}</span>
-        <span class="relevance-stars">
-          @for (i of [1,2,3,4,5]; track i) {
-            <span [class.active]="i <= displayArticle()!.relevance_level">★</span>
-          }
-        </span>
+      <div class="sentiment-and-date">
+        <div [class]="'sentiment-badge ' + sentimentClass()">
+          <span>{{ displayArticle()!.sentiment }}</span>
+          <span class="relevance-stars">
+            @for (i of [1,2,3,4,5]; track i) {
+              <span [class.active]="i <= displayArticle()!.relevance_level">★</span>
+            }
+          </span>
+        </div>
+        <span class="meta-date">{{ displayArticle()!.published_at }}</span>
       </div>
 
       <h2 class="article-title">{{ displayArticle()!.title }}</h2>
       <p class="article-summary">{{ displayArticle()!.summary }}</p>
 
       <div class="article-meta">
-        <span class="meta-date">{{ displayArticle()!.published_at }}</span>
-        <span class="meta-source" *ngIf="displayArticle()?.feed_title">Fonte: {{ displayArticle()!.feed_title }}</span>
+        <span class="meta-source" *ngIf="displayArticle()?.feed_title">{{ displayArticle()!.feed_title }}</span>
         <a [href]="displayArticle()!.source_url" target="_blank" rel="noopener" class="source-link">
           Leggi fonte →
         </a>
@@ -94,12 +96,13 @@
       [numVisible]="1"
       [numScroll]="1"
       [circular]="true"
+      [showIndicators]="false"
       [responsiveOptions]="carouselResponsiveOptions"
       styleClass="radar-carousel"
       (onPage)="onCarouselPage($event)">
       <ng-template pTemplate="item" let-a>
         
-        <div class="carousel-card article-card">
+        <div class="carousel-card article-card" [id]="'article-card-' + a.id">
           <div class="card-meta-top">
             <span class="category-badge"
                   [style.--cat-color]="'var(--color-' + a.primary_category.toLowerCase() + ')'">
@@ -108,21 +111,23 @@
             <span class="country-code">{{ a.country_code }}</span>
           </div>
 
-          <div [class]="'sentiment-badge ' + getSentimentClass(a.sentiment)">
-            <span>{{ a.sentiment }}</span>
-            <span class="relevance-stars">
-              @for (i of [1,2,3,4,5]; track i) {
-                <span [class.active]="i <= a.relevance_level">★</span>
-              }
-            </span>
+          <div class="sentiment-and-date">
+            <div [class]="'sentiment-badge ' + getSentimentClass(a.sentiment)">
+              <span>{{ a.sentiment }}</span>
+              <span class="relevance-stars">
+                @for (i of [1,2,3,4,5]; track i) {
+                  <span [class.active]="i <= a.relevance_level">★</span>
+                }
+              </span>
+            </div>
+            <span class="meta-date">{{ a.published_at }}</span>
           </div>
 
           <h2 class="article-title">{{ a.title }}</h2>
           <p class="article-summary">{{ a.summary }}</p>
 
           <div class="article-meta">
-            <span class="meta-date">{{ a.published_at }}</span>
-            <span class="meta-source" *ngIf="a.feed_title">Fonte: {{ a.feed_title }}</span>
+            <span class="meta-source" *ngIf="a.feed_title">{{ a.feed_title }}</span>
             <a [href]="a.source_url" target="_blank" rel="noopener" class="source-link">
               Leggi fonte →
             </a>
@@ -163,5 +168,9 @@
         </div>
         </ng-template>
     </p-carousel>
+
+    <div class="carousel-custom-indicator">
+      <span class="indicator-text">{{ carouselCurrentPage() + 1 }} / {{ sortedClusterArticles().length }}</span>
+    </div>
   </div>
 </div>

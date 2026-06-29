@@ -1,4 +1,4 @@
-import { Component, input, output, computed, ViewChild, effect } from '@angular/core';
+import { Component, input, output, computed, ViewChild, effect, signal, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CarouselModule, Carousel } from 'primeng/carousel';
 import { ChipModule } from 'primeng/chip';
@@ -25,6 +25,9 @@ export class RadarSidebarComponent {
   categoryClicked      = output<string>();
   activeArticleChanged = output<Article | null>();
 
+  carouselCurrentPage = signal<number>(0);
+  private heightUpdateInterval: any;
+
   constructor() {
     effect(() => {
       if (!this.isOpen()) {
@@ -38,10 +41,43 @@ export class RadarSidebarComponent {
         const arts = this.sortedClusterArticles();
         if (arts.length > 0) {
           // Quando si apre il cluster, di default p-carousel parte dalla pagina 0
+          this.carouselCurrentPage.set(0);
           this.activeArticleChanged.emit(arts[0]);
+          this.updateCarouselHeight();
         }
       }
-    });
+    }, { allowSignalWrites: true });
+  }
+
+  updateCarouselHeight() {
+    if (this.heightUpdateInterval) {
+      clearInterval(this.heightUpdateInterval);
+    }
+    
+    let attempts = 0;
+    this.heightUpdateInterval = setInterval(() => {
+      const arts = this.sortedClusterArticles();
+      if (arts.length === 0) return;
+      const currentArt = arts[this.carouselCurrentPage()];
+      const activeCard = document.getElementById('article-card-' + currentArt.id);
+
+      const contentContainer = document.querySelector('.p-carousel-items-content') as HTMLElement;
+      if (activeCard && contentContainer && activeCard.offsetHeight > 0) {
+        contentContainer.style.height = `${activeCard.offsetHeight}px`;
+        contentContainer.style.transition = 'height 0.3s ease-in-out';
+      }
+      attempts++;
+      if (attempts > 15) { // Run for 1.5 seconds to strictly enforce it over PrimeNG
+        clearInterval(this.heightUpdateInterval);
+      }
+    }, 100);
+  }
+
+  @HostListener('window:resize')
+  onResize() {
+    if (this.isOpen() && this.mode() === 'cluster') {
+      this.updateCarouselHeight();
+    }
   }
 
   mode = computed((): SidebarMode => {
@@ -83,19 +119,22 @@ export class RadarSidebarComponent {
   onCategoryPillClick(category: string): void {
     this.categoryClicked.emit(category);
     
-    // Trova il primo articolo di questa categoria nell'array ordinato
     const idx = this.sortedClusterArticles().findIndex(a => a.primary_category === category);
     if (idx !== -1 && this.carousel) {
       this.carousel.page = idx;
+      this.carouselCurrentPage.set(idx);
       this.activeArticleChanged.emit(this.sortedClusterArticles()[idx]);
+      this.updateCarouselHeight();
     }
   }
 
   onCarouselPage(event: any): void {
     const page = event.page;
+    this.carouselCurrentPage.set(page);
     const arts = this.sortedClusterArticles();
     if (page >= 0 && page < arts.length) {
       this.activeArticleChanged.emit(arts[page]);
     }
+    this.updateCarouselHeight();
   }
 }

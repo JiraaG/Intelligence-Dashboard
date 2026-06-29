@@ -81,6 +81,13 @@
   color: var(--cat-color, var(--color-text-accent));
 }
 
+.sentiment-and-date {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
 .sentiment-badge {
   display: inline-flex; align-items: center; gap: 10px;
   padding: 4px 12px; border-radius: 6px;
@@ -107,6 +114,12 @@
   color: var(--color-text-secondary);
 }
 
+.meta-date {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
 .article-meta {
   display: flex;
   align-items: center;
@@ -121,7 +134,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 150px;
+    max-width: 259px;
     font-family: 'JetBrains Mono', monospace;
   }
 
@@ -228,11 +241,15 @@
   /* 3. Azzeriamo il padding di default degli item che stringeva ulteriormente la card */
   .p-carousel-item {
     padding: 0 4px !important;
+    display: flex;
+    align-items: flex-start;
   }
 }
 
 .carousel-card {
   width: 100%;
+  height: fit-content;
+  margin-bottom: auto;
   box-sizing: border-box;
   background: var(--color-bg-card);
   border: 1px solid var(--color-border-primary);
@@ -240,4 +257,23 @@
   /* 4. Padding laterale leggermente ridotto (da 20px a 16px) per dare più larghezza al testo */
   padding: 20px 16px; 
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.carousel-custom-indicator {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: -10px;
+
+  .indicator-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-text-accent);
+    background: rgba(0, 212, 255, 0.1);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    padding: 6px 16px;
+    border-radius: 20px;
+    letter-spacing: 0.1em;
+  }
 }
