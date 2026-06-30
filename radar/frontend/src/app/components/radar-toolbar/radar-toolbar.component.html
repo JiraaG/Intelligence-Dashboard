@@ -42,7 +42,7 @@
        (mouseenter)="isTooltipHovered.set(true)"
        (mouseleave)="isTooltipHovered.set(false)">
     <div class="article-count" (click)="toggleTooltip($event)">
-      NOTIZIE RILEVATE: <strong>{{ articleCount() }}</strong>
+      NOTIZIE LETTE/TROVATE: <strong>{{ readCount() }}/{{ articleCount() }}</strong>
     </div>
 
     <!-- Hover/Click countries tooltip -->
@@ -55,7 +55,7 @@
         <div class="tooltip-row clickable" *ngFor="let c of countriesList()" (click)="selectCountry(c.code, $event)">
           <span class="country-flag">{{ getFlagEmoji(c.code) }}</span>
           <span class="country-name">{{ c.name }}</span>
-          <span class="country-badge">{{ c.count }}</span>
+          <span class="country-badge">{{ c.readCount }}/{{ c.count }}</span>
         </div>
       </div>
     </div>

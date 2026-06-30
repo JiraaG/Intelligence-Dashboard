@@ -11,11 +11,13 @@
   transform: translateX(-100%);
   transition: transform var(--transition-medium);
   z-index: var(--z-sidebar);
-  overflow-y: auto;
+  overflow-y: scroll;
   scrollbar-width: thin;
   scrollbar-color: var(--color-border-accent) transparent;
 
-  &.open { transform: translateX(0); }
+  &.open {
+    transform: translateX(0);
+  }
 }
 
 .sidebar-header {
@@ -29,6 +31,7 @@
     display: flex;
     align-items: center;
     gap: 10px;
+
     .sidebar-title {
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.875rem;
@@ -45,7 +48,10 @@
     font-size: 1.1rem;
     cursor: pointer;
     transition: color var(--transition-fast);
-    &:hover { color: var(--color-text-accent); }
+
+    &:hover {
+      color: var(--color-text-accent);
+    }
   }
 }
 
@@ -63,20 +69,35 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+
+  .category-badge {
+    flex-shrink: 0;
+  }
+
   .country-code {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.875rem;
     color: var(--color-text-accent);
     font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: right;
+    min-width: 0;
+    flex: 1;
   }
 }
 
 .category-badge {
   display: inline-block;
-  padding: 3px 10px; border-radius: 4px;
-  font-size: 0.6875rem; font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 700;
   letter-spacing: 0.12em;
-  background: rgba(255,255,255,0.04);
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--cat-color, var(--color-border-card));
   color: var(--cat-color, var(--color-text-accent));
 }
@@ -85,20 +106,47 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
   margin-top: 4px;
 }
 
 .sentiment-badge {
-  display: inline-flex; align-items: center; gap: 10px;
-  padding: 4px 12px; border-radius: 6px;
-  font-size: 0.75rem; font-weight: 600; width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  width: fit-content;
 
-  &.sentiment-pos { background: rgba(63,185,80,0.10); color: var(--color-sentiment-pos); border: 1px solid rgba(63,185,80,0.22); }
-  &.sentiment-neu { background: rgba(139,148,158,0.10); color: var(--color-sentiment-neu); border: 1px solid rgba(139,148,158,0.22); }
-  &.sentiment-neg { background: rgba(248,81,73,0.10); color: var(--color-sentiment-neg); border: 1px solid rgba(248,81,73,0.22); }
+  &.sentiment-pos {
+    background: rgba(63, 185, 80, 0.10);
+    color: var(--color-sentiment-pos);
+    border: 1px solid rgba(63, 185, 80, 0.22);
+  }
 
-  .relevance-stars span { color: var(--color-text-muted); font-size: 0.625rem; }
-  .relevance-stars span.active { color: var(--color-energia); }
+  &.sentiment-neu {
+    background: rgba(139, 148, 158, 0.10);
+    color: var(--color-sentiment-neu);
+    border: 1px solid rgba(139, 148, 158, 0.22);
+  }
+
+  &.sentiment-neg {
+    background: rgba(248, 81, 73, 0.10);
+    color: var(--color-sentiment-neg);
+    border: 1px solid rgba(248, 81, 73, 0.22);
+  }
+
+  .relevance-stars span {
+    color: var(--color-text-muted);
+    font-size: 0.625rem;
+  }
+
+  .relevance-stars span.active {
+    color: var(--color-energia);
+  }
 }
 
 .article-title {
@@ -146,7 +194,10 @@
     text-decoration: none;
     font-weight: 500;
     white-space: nowrap;
-    &:hover { text-decoration: underline; }
+
+    &:hover {
+      text-decoration: underline;
+    }
   }
 }
 
@@ -154,6 +205,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+
   .badge-label {
     font-size: 0.75rem;
     font-weight: 600;
@@ -161,6 +213,7 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
+
   .badge-list {
     display: flex;
     flex-wrap: wrap;
@@ -175,15 +228,29 @@
   font-size: 0.75rem !important;
   padding: 2px 10px !important;
   border-radius: 4px !important;
+  max-width: 100% !important;
+  height: auto !important;
+
+  .p-chip-text {
+    white-space: normal !important;
+    word-break: break-word !important;
+    line-height: 1.3 !important;
+  }
 }
-::ng-deep .infra-chip { color: var(--color-text-accent) !important; }
-::ng-deep .company-chip { border-color: rgba(0, 212, 255, 0.12) !important; }
+
+::ng-deep .infra-chip {
+  color: var(--color-text-accent) !important;
+}
+
+::ng-deep .company-chip {
+  border-color: rgba(0, 212, 255, 0.12) !important;
+}
 
 /* -----------------------------
    VISTA CLUSTER & CAROSELLO
 ------------------------------ */
 .sidebar-cluster {
-  padding: 20px;
+  padding: 20px 8px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -201,7 +268,10 @@
   .cluster-count {
     font-size: 0.875rem;
     color: var(--color-text-primary);
-    strong { color: var(--color-text-accent); }
+
+    strong {
+      color: var(--color-text-accent);
+    }
   }
 
   .cluster-categories {
@@ -213,15 +283,18 @@
 
 .cat-pill {
   display: inline-block;
-  padding: 2px 8px; border-radius: 3px;
-  font-size: 0.6875rem; font-weight: 600;
-  background: rgba(255,255,255,0.04);
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.04);
   color: var(--cat-color, var(--color-text-secondary));
   border: 1px solid var(--cat-color, var(--color-border-card));
   transition: all var(--transition-fast);
 
   &.clickable {
     cursor: pointer;
+
     &:hover {
       background: var(--cat-color);
       color: var(--color-bg-primary);
@@ -231,27 +304,31 @@
 }
 
 ::ng-deep .radar-carousel {
-  /* 1. Allarghiamo il carosello compensando con margini negativi per sfruttare più spazio */
-  width: calc(100% + 24px);
-  margin-left: -12px;
+  max-width: 100%;
+  min-width: 0;
 
-  /* 2. Riduciamo drasticamente l'ingombro laterale delle frecce di PrimeNG */
-  .p-carousel-prev, .p-carousel-next {
-    width: 24px !important;
-    height: 24px !important;
-    margin: 0 4px !important; 
+  .p-carousel-prev,
+  .p-carousel-next {
+    width: 28px !important;
+    height: 28px !important;
+    margin: 0 4px !important;
+    flex-shrink: 0 !important;
   }
 
-  /* 3. Azzeriamo il padding di default degli item che stringeva ulteriormente la card */
   .p-carousel-item {
-    padding: 0 4px !important;
     display: flex;
     align-items: flex-start;
+    padding: 0 2px !important;
+    box-sizing: border-box !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
   }
 }
 
 .carousel-card {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   height: fit-content;
   margin-bottom: auto;
   box-sizing: border-box;
@@ -259,8 +336,10 @@
   border: 1px solid var(--color-border-primary);
   border-radius: 12px;
   /* 4. Padding laterale leggermente ridotto (da 20px a 16px) per dare più larghezza al testo */
-  padding: 20px 16px; 
+  padding: 20px 16px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .carousel-custom-indicator {
@@ -279,5 +358,52 @@
     padding: 6px 16px;
     border-radius: 20px;
     letter-spacing: 0.1em;
+  }
+}
+
+/* -----------------------------
+   PULSANTE LETTO/DA LEGGERE
+------------------------------ */
+.read-toggle-container {
+  display: flex;
+  justify-content: center;
+}
+
+.read-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  padding: 8px 24px;
+  background: rgba(0, 212, 255, 0.08);
+  color: var(--color-text-accent);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  outline: none;
+  box-sizing: border-box;
+
+  &:hover {
+    background: rgba(0, 212, 255, 0.18);
+    border-color: var(--color-text-accent);
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
+  }
+
+  &.is-read {
+    color: var(--color-text-secondary);
+    border-color: var(--color-border-primary);
+    background: transparent;
+    box-shadow: none;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: var(--color-text-muted);
+      color: var(--color-text-primary);
+    }
   }
 }

@@ -4,6 +4,8 @@ import { CarouselModule, Carousel } from 'primeng/carousel';
 import { ChipModule } from 'primeng/chip';
 import { ButtonModule } from 'primeng/button';
 import { Article } from '../../models/article.model';
+import { StateService } from '../../services/state.service';
+import { inject } from '@angular/core';
 
 export type SidebarMode = 'single' | 'cluster';
 
@@ -24,6 +26,8 @@ export class RadarSidebarComponent {
   closed               = output<void>();
   categoryClicked      = output<string>();
   activeArticleChanged = output<Article | null>();
+
+  private readonly stateService = inject(StateService);
 
   carouselCurrentPage = signal<number>(0);
   private heightUpdateInterval: any;
@@ -63,8 +67,17 @@ export class RadarSidebarComponent {
 
       const contentContainer = document.querySelector('.p-carousel-items-content') as HTMLElement;
       if (activeCard && contentContainer && activeCard.offsetHeight > 0) {
-        contentContainer.style.height = `${activeCard.offsetHeight}px`;
-        contentContainer.style.transition = 'height 0.3s ease-in-out';
+        const currentHeight = contentContainer.style.height;
+        const newHeight = `${activeCard.offsetHeight}px`;
+        
+        if (currentHeight !== newHeight) {
+          contentContainer.style.height = newHeight;
+          contentContainer.style.transition = 'height 0.3s ease-in-out';
+          
+          // Forza PrimeNG a ricalcolare le dimensioni (larghezza) del carosello
+          // se l'altezza dinamica fa comparire/scomparire la scrollbar
+          setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+        }
       }
       attempts++;
       if (attempts > 15) { // Run for 1.5 seconds to strictly enforce it over PrimeNG
@@ -86,6 +99,11 @@ export class RadarSidebarComponent {
     } catch (e) {
       return code;
     }
+  }
+
+  toggleRead(article: Article): void {
+    if (!article) return;
+    this.stateService.toggleReadStatus(article.id, !article.is_read);
   }
 
   @HostListener('window:resize')

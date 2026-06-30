@@ -47,6 +47,7 @@ async def bootstrap_database(pool: asyncpg.Pool) -> None:
             primary_category VARCHAR(50) NOT NULL CHECK (primary_category IN ('Nucleare', 'Elettronica', 'Chip', 'Acqua', 'Energia', 'Infrastrutture')),
             sentiment VARCHAR(20) NOT NULL CHECK (sentiment IN ('Positivo', 'Neutrale', 'Negativo')),
             relevance_level INTEGER NOT NULL CHECK (relevance_level BETWEEN 1 AND 5),
+            is_read BOOLEAN NOT NULL DEFAULT FALSE,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
@@ -95,5 +96,10 @@ async def bootstrap_database(pool: asyncpg.Pool) -> None:
         async with conn.transaction():
             for query in ddl_queries:
                 await conn.execute(query)
-                
+                        # Esecuzione idempotente di un ALTER TABLE per aggiungere `is_read` a database esistenti
+        try:
+            await conn.execute("ALTER TABLE articles ADD COLUMN IF NOT EXISTS is_read BOOLEAN NOT NULL DEFAULT FALSE;")
+        except Exception as alter_err:
+            logger.warning(f"Impossibile aggiungere colonna is_read (potrebbe già esistere): {alter_err}")
+
     logger.info("Bootstrap database completato con successo.")

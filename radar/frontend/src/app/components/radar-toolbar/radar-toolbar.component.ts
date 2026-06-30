@@ -16,6 +16,7 @@ import { Article, ArticleFilters, Sentiment, PrimaryCategory } from '../../model
 export class RadarToolbarComponent {
   articles     = input<Article[]>([]);
   articleCount = input<number>(0);
+  readCount    = computed(() => this.articles().filter(a => a.is_read).length);
   isLoading    = input<boolean>(false);
 
   filtersChange   = output<ArticleFilters>();
@@ -95,13 +96,16 @@ export class RadarToolbarComponent {
   // Calcolo dei paesi coinvolti per l'hover tooltip
   readonly countriesList = computed(() => {
     const arts = this.articles();
-    const countMap = new Map<string, number>();
+    const countMap = new Map<string, { total: number, read: number }>();
     for (const a of arts) {
-      countMap.set(a.country_code, (countMap.get(a.country_code) || 0) + 1);
+      const stats = countMap.get(a.country_code) || { total: 0, read: 0 };
+      stats.total += 1;
+      if (a.is_read) stats.read += 1;
+      countMap.set(a.country_code, stats);
     }
     
-    const list: { code: string; name: string; count: number }[] = [];
-    countMap.forEach((count, code) => {
+    const list: { code: string; name: string; count: number; readCount: number }[] = [];
+    countMap.forEach((stats, code) => {
       let name = this.COUNTRY_NAMES[code];
       if (!name) {
         if (code === 'XX') {
@@ -115,7 +119,7 @@ export class RadarToolbarComponent {
           }
         }
       }
-      list.push({ code, name, count });
+      list.push({ code, name, count: stats.total, readCount: stats.read });
     });
     
     return list.sort((a, b) => b.count - a.count);

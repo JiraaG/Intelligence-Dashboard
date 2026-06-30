@@ -40,4 +40,14 @@ export class ArticleService {
       })
     );
   }
+
+  updateReadStatus(articleId: number, isRead: boolean): Observable<any> {
+    if (useMockSignal()) {
+      return new Observable(obs => {
+        obs.next({ status: 'success', is_read: isRead });
+        obs.complete();
+      });
+    }
+    return this.http.patch(`/api/articles/${articleId}/read_status`, { is_read: isRead });
+  }
 }

@@ -34,10 +34,17 @@
       <p class="article-summary">{{ displayArticle()!.summary }}</p>
 
       <div class="article-meta">
-        <span class="meta-source" *ngIf="displayArticle()?.feed_title">{{ displayArticle()!.feed_title }}</span>
+        <span class="meta-source" *ngIf="displayArticle()?.feed_title" [title]="cleanFeedTitle(displayArticle()!.feed_title)">{{ cleanFeedTitle(displayArticle()!.feed_title) }}</span>
         <a [href]="displayArticle()!.source_url" target="_blank" rel="noopener" class="source-link">
           Leggi fonte →
         </a>
+      </div>
+
+      <div class="read-toggle-container">
+        <button class="read-btn" [class.is-read]="displayArticle()!.is_read" (click)="toggleRead(displayArticle()!)">
+          <i class="pi" [class.pi-check-circle]="!displayArticle()!.is_read" [class.pi-times-circle]="displayArticle()!.is_read"></i>
+          {{ displayArticle()!.is_read ? 'Segna come non letta' : 'Segna come letta' }}
+        </button>
       </div>
 
       <div class="badge-section" *ngIf="displayArticle()?.infrastructural_entities?.length">
@@ -131,6 +138,13 @@
             <a [href]="a.source_url" target="_blank" rel="noopener" class="source-link">
               Leggi fonte →
             </a>
+          </div>
+
+          <div class="read-toggle-container">
+            <button class="read-btn" [class.is-read]="a.is_read" (click)="toggleRead(a)">
+              <i class="pi" [class.pi-check-circle]="!a.is_read" [class.pi-times-circle]="a.is_read"></i>
+              {{ a.is_read ? 'Segna come non letta' : 'Segna come letta' }}
+            </button>
           </div>
 
           <div class="badge-section" *ngIf="a.infrastructural_entities?.length">

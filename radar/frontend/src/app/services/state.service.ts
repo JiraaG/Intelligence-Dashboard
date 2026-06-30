@@ -69,5 +69,33 @@ export class StateService {
 
   readonly isLoading = computed(() => this.articlesResource.isLoading());
   readonly error = computed(() => this.articlesResource.error());
+
+  toggleReadStatus(articleId: number, isRead: boolean): void {
+    // Aggiornamento ottimistico dell'interfaccia
+    this.articlesResource.value.update(arts => {
+      if (!arts) return arts;
+      const target = arts.find(a => a.id === articleId);
+      if (target) {
+        target.is_read = isRead; // Mutazione in-place per aggiornare i reference nella sidebar
+      }
+      return [...arts]; // Nuovo array per scatenare i computed signal (es. toolbar)
+    });
+
+    // Sincronizzazione in background col backend
+    this.articleService.updateReadStatus(articleId, isRead).subscribe({
+      error: (err) => {
+        console.error('[StateService] Impossibile aggiornare lo stato letto/non letto:', err);
+        // Rollback ottimistico
+        this.articlesResource.value.update(arts => {
+          if (!arts) return arts;
+          const target = arts.find(a => a.id === articleId);
+          if (target) {
+            target.is_read = !isRead;
+          }
+          return [...arts];
+        });
+      }
+    });
+  }
 }
 

@@ -261,6 +261,7 @@ async def get_articles(
             a.id, a.title, a.summary, a.published_at::text AS published_at, a.source_url,
             a.country_code, a.latitude, a.longitude, a.primary_category,
             a.sentiment, a.relevance_level, a.infrastructural_entities, a.feed_title,
+            a.is_read,
             COALESCE(array_agg(DISTINCT c.name) FILTER (WHERE c.name IS NOT NULL), '{}') AS companies_involved,
             COALESCE(array_agg(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL), '{}') AS tags
         FROM articles a
@@ -342,3 +343,26 @@ async def get_countries_summary(
         rows = await conn.fetch(final_query, *params)
         
     return [dict(row) for row in rows]
+
+from pydantic import BaseModel
+
+class ReadStatusUpdate(BaseModel):
+    is_read: bool
+
+@app.patch("/api/articles/{article_id}/read_status")
+async def update_article_read_status(article_id: int, status: ReadStatusUpdate):
+    """
+    Aggiorna lo stato letto/non letto di un articolo.
+    """
+    if not state.db_pool:
+        raise HTTPException(status_code=500, detail="Database non disponibile")
+        
+    async with state.db_pool.acquire() as conn:
+        result = await conn.execute(
+            "UPDATE articles SET is_read = $1, updated_at = NOW() WHERE id = $2",
+            status.is_read, article_id
+        )
+        if result == "UPDATE 0":
+            raise HTTPException(status_code=404, detail="Articolo non trovato")
+            
+    return {"status": "success", "is_read": status.is_read}
