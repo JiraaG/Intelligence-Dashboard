@@ -173,20 +173,26 @@ CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000
 
 ---
 
-## Regola 7: Dockerfile Frontend — Build Local-to-Docker Copy (Eccezione di Workflow)
+## Regola 7: Dockerfile Frontend — Multi-Stage Build (Zero Config)
 
 > [!NOTE]
-> Nel modulo Radar di produzione, per ottimizzare i tempi di compilazione e superare i colli di bottiglia di rete/risorse nel container, la build viene eseguita **localmente sul sistema host** e poi copiata. Il `Dockerfile` finale del frontend esegue una copia diretta degli asset pre-compilati locali.
-> Il workflow per aggiornare il frontend è:
-> 1. Compilare in locale: `npm run build` dalla cartella `radar/frontend`
-> 2. Ricostruire e riavviare il container frontend: `docker compose up --build -d radar-frontend`
+> Per garantire una vera distribuzione plug-and-play ("Zero-Config"), il modulo Radar di produzione DEVE compilare il frontend all'interno di un container. Non si deve mai richiedere all'utente di installare Node.js.
+> Il workflow per aggiornare il frontend è unicamente: `docker compose up --build -d radar-frontend`
 
 ```dockerfile
-# Nginx Production Server
+# Stage 1: Build dell'applicazione Angular
+FROM node:22-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm install --legacy-peer-deps
+COPY . .
+RUN npm run build
+
+# Stage 2: Nginx Production Server
 FROM nginx:alpine-slim AS production
 RUN rm /etc/nginx/conf.d/default.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY dist/radar-frontend/browser /usr/share/nginx/html
+COPY --from=builder /app/dist/radar-frontend/browser /usr/share/nginx/html
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 ```

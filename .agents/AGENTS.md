@@ -70,8 +70,8 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
    * Le credenziali reali vivono esclusivamente nel file `.env` (ignorato da Git).
    * È vietato l'uso del carattere `$` all'interno del valore delle password in quanto Docker Compose lo interpreta come interpolazione di variabili.
    * Ciascun Dockerfile deve contenere file `.dockerignore` per non includere cache locali o cartelle pesanti (`node_modules`, `.venv`).
-6. **Workflow di Compilazione Frontend (Local-to-Docker Copy):**
-   * Il Dockerfile del frontend copia gli asset pre-compilati locali da `dist/radar-frontend/browser`. Qualsiasi modifica al codice Angular del frontend richiede prima la compilazione locale (`npm run build` da `radar/frontend`) e poi la ricostruzione del container (`docker compose up --build -d radar-frontend`) affinché Nginx possa servire la versione aggiornata.
+6. **Workflow di Compilazione Frontend (Multi-Stage Build):**
+   * Il Dockerfile del frontend DEVE utilizzare un approccio multi-stage per garantire una distribuzione totalmente plug-and-play. La fase `builder` (basata su `node`) compilerà il codice, mentre la fase finale copierà solo la cartella `dist/` compilata all'interno del web server Nginx. L'utente finale non dovrà mai installare Node.js né eseguire `npm run build` manualmente. Qualsiasi modifica al codice Angular del frontend richiede unicamente la ricostruzione del container (`docker compose up --build -d radar-frontend`) affinché Nginx possa servire la versione aggiornata.
 7. **Risoluzione DNS Dinamica in Nginx (Prevenzione 502 Bad Gateway):**
    * Per evitare errori `502 Bad Gateway` a seguito di riavvii dei container o riassegnazioni di IP nella rete bridge, `nginx.conf` deve utilizzare un resolver interno (`resolver 127.0.0.11 valid=10s;`) ed una variabile locale per il `proxy_pass` (es. `set $backend_upstream http://radar-backend:8000; proxy_pass $backend_upstream$request_uri;`). Questo costringe Nginx a risolvere l'IP a runtime anziché solo all'avvio.
 

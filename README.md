@@ -7,8 +7,14 @@
 [![Angular](https://img.shields.io/badge/Angular-21.2-DD0031?logo=angular&logoColor=white)](https://angular.dev/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-4_services-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Zero Config](https://img.shields.io/badge/Deployment-100%25_Plug_&_Play-success?logo=rocket&logoColor=white)](#)
 [![Gemini](https://img.shields.io/badge/LLM-Gemma_4_31B-4285F4?logo=google&logoColor=white)](https://aistudio.google.com/)
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
+
+---
+
+## ⚡ Zero-Config & 100% Plug and Play
+Questo progetto è stato ingegnerizzato per essere **completamente indipendente** dall'host. Grazie a un'avanzata architettura Docker Multi-Stage, l'utente finale necessita **esclusivamente di Docker** installato. Nessun requisito per Node.js, Python o database locali. Basta un solo comando (`docker compose up --build -d`) e il sistema si auto-assembla, installando le dipendenze, pre-compilando il frontend Angular e servendolo tramite Nginx.
 
 ---
 

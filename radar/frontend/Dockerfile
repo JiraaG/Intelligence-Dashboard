@@ -1,4 +1,17 @@
-# ─── Nginx Production Server ────────────────────────────────────────
+# ─── 1. Build Stage (Node.js) ───────────────────────────────────────────
+FROM node:22-alpine AS builder
+
+WORKDIR /app
+
+# Installa le dipendenze usando legacy-peer-deps come richiesto dalle regole ECC
+COPY package*.json ./
+RUN npm install --legacy-peer-deps
+
+# Copia il resto del codice e compila
+COPY . .
+RUN npm run build
+
+# ─── 2. Nginx Production Server ────────────────────────────────────────
 FROM nginx:1.27-alpine AS production
 
 # Rimuovi configurazione default di Nginx
@@ -7,8 +20,8 @@ RUN rm /etc/nginx/conf.d/default.conf
 # Copia la configurazione custom
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copia la build Angular compilata localmente nella directory di serving Nginx
-COPY dist/radar-frontend/browser /usr/share/nginx/html
+# Copia la build Angular compilata dallo stage builder
+COPY --from=builder /app/dist/radar-frontend/browser /usr/share/nginx/html
 
 # Healthcheck Nginx
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
