@@ -26,14 +26,20 @@ export class LeafletHatchDirective implements OnInit {
       svg.insertBefore(defs, svg.firstChild);
     }
 
-    // Definizione dei pattern geometrici associati alle 6 categorie
+    // Definizione dei pattern geometrici associati alle 12 macro-categorie
     const patterns = [
       { id: 'hatch-nucleare', angle: 45, color: 'var(--color-nucleare)' },
-      { id: 'hatch-elettronica', angle: 135, color: 'var(--color-elettronica)' },
-      { id: 'hatch-chip', angle: 90, color: 'var(--color-chip)' },
       { id: 'hatch-acqua', angle: 0, color: 'var(--color-acqua)' },
       { id: 'hatch-energia', angle: 30, color: 'var(--color-energia)' },
-      { id: 'hatch-infrastrutture', angle: 60, color: 'var(--color-infrastrutture)' }
+      { id: 'hatch-infrastrutture', angle: 60, color: 'var(--color-infrastrutture)' },
+      { id: 'hatch-geopolitica', angle: 15, color: 'var(--color-geopolitica)' },
+      { id: 'hatch-economia', angle: 75, color: 'var(--color-economia)' },
+      { id: 'hatch-tecnologia', angle: 90, color: 'var(--color-tecnologia)' },
+      { id: 'hatch-scienza', angle: 105, color: 'var(--color-scienza)' },
+      { id: 'hatch-spazio', angle: 120, color: 'var(--color-spazio)' },
+      { id: 'hatch-ambiente', angle: 135, color: 'var(--color-ambiente)' },
+      { id: 'hatch-salute', angle: 150, color: 'var(--color-salute)' },
+      { id: 'hatch-sicurezza', angle: 165, color: 'var(--color-sicurezza)' }
     ];
 
     patterns.forEach(p => {
@@ -55,22 +61,9 @@ export class LeafletHatchDirective implements OnInit {
 
       // Linea diagonale geometrica di hatching
       const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      if (p.angle === 45) {
-        line.setAttribute('x1', '0'); line.setAttribute('y1', '12');
-        line.setAttribute('x2', '12'); line.setAttribute('y2', '0');
-      } else if (p.angle === 135) {
-        line.setAttribute('x1', '0'); line.setAttribute('y1', '0');
-        line.setAttribute('x2', '12'); line.setAttribute('y2', '12');
-      } else if (p.angle === 90) {
-        line.setAttribute('x1', '6'); line.setAttribute('y1', '0');
-        line.setAttribute('x2', '6'); line.setAttribute('y2', '12');
-      } else if (p.angle === 0) {
-        line.setAttribute('x1', '0'); line.setAttribute('y1', '6');
-        line.setAttribute('x2', '12'); line.setAttribute('y2', '6');
-      } else {
-        line.setAttribute('x1', '0'); line.setAttribute('y1', '12');
-        line.setAttribute('x2', '12'); line.setAttribute('y2', '0');
-      }
+      line.setAttribute('x1', '6'); line.setAttribute('y1', '-6');
+      line.setAttribute('x2', '6'); line.setAttribute('y2', '18');
+      line.setAttribute('transform', `rotate(${p.angle}, 6, 6)`);
       line.setAttribute('stroke', p.color);
       line.setAttribute('stroke-width', '1.8');
       line.setAttribute('opacity', '0.65');

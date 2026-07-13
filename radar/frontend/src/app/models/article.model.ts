@@ -1,10 +1,14 @@
 export type PrimaryCategory =
   | 'Nucleare'
-  | 'Elettronica'
-  | 'Chip'
-  | 'Acqua'
   | 'Energia'
-  | 'Infrastrutture';
+  | 'Infrastrutture'
+  | 'Geopolitica'
+  | 'Economia'
+  | 'Tecnologia'
+  | 'Spazio'
+  | 'Ambiente'
+  | 'Salute'
+  | 'Sicurezza';
 
 export type Sentiment = 'Positivo' | 'Neutrale' | 'Negativo';
 

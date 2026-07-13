@@ -135,30 +135,6 @@
       border-radius: 50%;
       transition: box-shadow var(--transition-fast);
 
-      &.dot-nucleare {
-        background-color: var(--color-nucleare);
-        box-shadow: 0 0 8px var(--color-nucleare);
-      }
-      &.dot-chip {
-        background-color: var(--color-chip);
-        box-shadow: 0 0 8px var(--color-chip);
-      }
-      &.dot-elettronica {
-        background-color: var(--color-elettronica);
-        box-shadow: 0 0 8px var(--color-elettronica);
-      }
-      &.dot-acqua {
-        background-color: var(--color-acqua);
-        box-shadow: 0 0 8px var(--color-acqua);
-      }
-      &.dot-energia {
-        background-color: var(--color-energia);
-        box-shadow: 0 0 8px var(--color-energia);
-      }
-      &.dot-infrastrutture {
-        background-color: var(--color-infrastrutture);
-        box-shadow: 0 0 8px var(--color-infrastrutture);
-      }
     }
 
     .legend-icon {

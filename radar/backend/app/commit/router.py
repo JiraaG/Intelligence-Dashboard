@@ -9,12 +9,11 @@ logger = logging.getLogger("radar.commit.router")
 
 def initialize_vault_directories(vault_path: str = None) -> None:
     """
-    Scansiona la directory del Vault di Obsidian e crea le 6 sottocartelle
-    delle macro-categorie geopolitiche (Energia, Chip, Nucleare, Acqua, 
-    Infrastrutture, Elettronica) se non sono già presenti.
+    Scansiona la directory del Vault di Obsidian e crea le 10 sottocartelle
+    delle macro-categorie geopolitiche se non sono già presenti.
     """
     path = vault_path or OBSIDIAN_VAULT_PATH
-    categories = ["Energia", "Chip", "Nucleare", "Acqua", "Infrastrutture", "Elettronica"]
+    categories = ["Nucleare", "Energia", "Infrastrutture", "Geopolitica", "Economia", "Tecnologia", "Spazio", "Ambiente", "Salute", "Sicurezza"]
     
     logger.info(f"Inizializzazione delle directory del Vault su: {path}")
     

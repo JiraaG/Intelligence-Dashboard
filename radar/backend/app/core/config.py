@@ -16,6 +16,11 @@ if not LLM_API_KEY:
 _raw_model = os.getenv("GEMINI_MODEL", "gemma-4-31b")
 GEMINI_MODEL = "gemma-4-31b-it" if _raw_model in ("gemma-4-31b", "gemma-4-31b-it") else _raw_model
 
+# Rate Limits e Governance LLM
+LLM_RPM = int(os.getenv("LLM_RPM", "10"))
+LLM_TPM = int(os.getenv("LLM_TPM", "0"))
+LLM_RPD = int(os.getenv("LLM_RPD", "1400"))
+
 # Altre configurazioni globali con relativi default o fallback
 pg_user = os.getenv("POSTGRES_USER", "radar_user")
 pg_pass = os.getenv("POSTGRES_PASSWORD", "radar_password_secure")

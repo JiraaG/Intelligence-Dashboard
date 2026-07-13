@@ -82,7 +82,11 @@ class GeopoliticalArticleSchema(BaseModel):
     tags: List[str] = Field(
         description="Lista di tag semantici estratti. Il primo tag deve essere uguale alla primary_category."
     )
-    primary_category: Literal["Nucleare", "Elettronica", "Chip", "Acqua", "Energia", "Infrastrutture"] = Field(
+    primary_category: Literal[
+        "Nucleare", "Energia", "Infrastrutture",
+        "Geopolitica", "Economia", "Tecnologia",
+        "Spazio", "Ambiente", "Salute", "Sicurezza"
+    ] = Field(
         description="La macro-categoria principale scelta dall'elenco chiuso."
     )
     sentiment: Literal["Positivo", "Neutrale", "Negativo"] = Field(
@@ -119,11 +123,15 @@ Segui tassativamente le seguenti regole operative per l'estrazione:
 2. CATEGORIZZAZIONE GEOPOLITICA:
    Assegna l'articolo ad ESATTAMENTE UNA delle seguenti categorie primarie (il primo tag in 'tags' deve essere identico alla categoria scelta):
    - 'Nucleare': impianti atomici, reattori, uranio arricchito, sanzioni nucleari, monitoraggio IAEA.
-   - 'Chip': semiconduttori, fabbriche di silicio (fab), litografia EUV, design di microchip, controlli all'esportazione di hardware avanzato.
-   - 'Elettronica': infrastrutture di telecomunicazione 5G/6G, cavi sottomarini, satelliti, sicurezza delle reti, hardware non-chip.
-   - 'Acqua': risorse idriche strategiche, dighe, canali di navigazione, siccità sistemica, dispute fluviali transfrontaliere.
    - 'Energia': oleodotti, gasdotti, reti di trasmissione elettrica, transizione energetica, idrogeno, materie prime energetiche.
    - 'Infrastrutture': porti marittimi commerciali, ferrovie di collegamento merci, aeroporti cargo, corridoi commerciali fisici.
+   - 'Geopolitica': elezioni, conflitti, tensioni diplomatiche, sanzioni, alleanze internazionali.
+   - 'Economia': mercati finanziari, tassi di interesse, inflazione, accordi commerciali, debito.
+   - 'Tecnologia': semiconduttori, intelligenza artificiale, telecomunicazioni, ricerca avanzata, biotecnologie.
+   - 'Spazio': esplorazione spaziale, satelliti, lanci orbitali, missioni.
+   - 'Ambiente': cambiamenti climatici, disastri naturali, inquinamento, politiche green.
+   - 'Salute': pandemie, regolamentazioni sanitarie, organizzazione mondiale della sanità, farmaci strategici.
+   - 'Sicurezza': cybersecurity, difesa militare, intelligence, attacchi hacker, spionaggio.
 
 3. REQUISITI GEOGRAFICI:
    - country_code: codice ISO Alpha-2 (2 lettere maiuscole) del paese protagonista della notizia (usa 'XX' se non identificabile).

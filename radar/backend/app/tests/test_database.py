@@ -9,14 +9,14 @@ from app.commit.router import initialize_vault_directories
 # ─── Tests for Vault Directory Initialization ───────────────────────────────
 
 def test_initialize_vault_directories(tmp_path) -> None:
-    """Verifica che initialize_vault_directories crei le 6 macro-categorie in un path vuoto."""
+    """Verifica che initialize_vault_directories crei le 10 macro-categorie in un path vuoto."""
     vault_dir = tmp_path / "vault"
     
     # Esegue l'inizializzazione sul path temporaneo
     initialize_vault_directories(vault_path=str(vault_dir))
     
     # Categorie attese
-    categories = ["Energia", "Chip", "Nucleare", "Acqua", "Infrastrutture", "Elettronica"]
+    categories = ["Nucleare", "Energia", "Infrastrutture", "Geopolitica", "Economia", "Tecnologia", "Spazio", "Ambiente", "Salute", "Sicurezza"]
     
     # Controlla la presenza fisica delle directory
     assert os.path.exists(vault_dir)

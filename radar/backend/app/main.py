@@ -21,7 +21,8 @@ from app.core.config import (
     OBSIDIAN_VAULT_PATH,
     MINIFLUX_API_URL,
     MINIFLUX_API_KEY,
-    MINIFLUX_LIMIT
+    MINIFLUX_LIMIT,
+    LLM_RPD
 )
 from app.core.database import init_pool, bootstrap_database
 from app.core.logging import setup_logging
@@ -56,85 +57,113 @@ class AppState:
 state = AppState()
 
 
+async def process_single_entry(app_state: AppState, entry: dict) -> bool:
+    """
+    Elabora un singolo articolo: deduplicazione, sanitizzazione, LLM e commit.
+    Ritorna True in caso di completamento (incluso skip per duplicato), False in caso di errore.
+    """
+    entry_id = entry.get("id")
+    source_url = entry.get("url", "").strip()
+    title = entry.get("title", "N/A").strip()
+    raw_content = entry.get("content", "") or entry.get("summary", "") or ""
+    published_at_raw = entry.get("published_at", "")
+    published_date = published_at_raw.split("T")[0] if "T" in published_at_raw else published_at_raw
+    feed_title = entry.get("feed", {}).get("title", "RSS Feed").strip()
+
+    if not source_url:
+        logger.warning("Articolo saltato: URL sorgente mancante o nullo.")
+        return False
+
+    try:
+        # Step A: Deduplicazione (Acquisizione connessione spot dal pool)
+        async with app_state.db_pool.acquire() as conn:
+            is_dup = await is_article_duplicate(conn, source_url)
+        
+        if is_dup:
+            logger.info(f"Articolo duplicato rilevato: '{title[:50]}'. Marcatura come letto su Miniflux...")
+            if entry_id:
+                await app_state.miniflux_client.mark_as_read([entry_id])
+            return True
+
+        # Step B: Sanitizzazione HTML
+        clean_content = strip_html_tags(raw_content)
+
+        # Step C: Estrazione LLM
+        extracted_article = await app_state.classification_client.classify_article(
+            title=title,
+            content=clean_content,
+            url=source_url,
+            date=published_date
+        )
+
+        # Step D: Relational Database Commit
+        async with app_state.db_pool.acquire() as conn:
+            article_id = await commit_article_to_db(conn, extracted_article, feed_title)
+
+        # Step E: File System Markdown Commit
+        md_content = generate_markdown_content(extracted_article)
+        file_path = get_article_file_path(extracted_article, vault_path=OBSIDIAN_VAULT_PATH)
+        write_file_with_lock(file_path, md_content)
+
+        # Step F: Marcatura lettura su Miniflux
+        if entry_id:
+            await app_state.miniflux_client.mark_as_read([entry_id])
+
+        logger.info(f"Articolo elaborato e committato correttamente [ID={article_id}]: '{extracted_article.title[:50]}'")
+        return True
+
+    except Exception as article_err:
+        logger.error(
+            f"Errore durante l'elaborazione del singolo articolo '{title[:50]}': {article_err}",
+            exc_info=True
+        )
+        return False
+
 async def run_pipeline_cycle(app_state: AppState) -> None:
     """
     Esegue un singolo ciclo completo della pipeline (Level 2).
-    Preleva gli articoli non letti, li elabora uno ad uno ed applica i commit.
+    Applica il limite RPD, preleva gli articoli non letti ed elabora in modo concorrente (TaskGroup).
     """
     logger.info("=== Avvio di un nuovo ciclo della pipeline di ingestione ===")
     
+    # Controllo soglia RPD (Requests Per Day) dal DB
+    async with app_state.db_pool.acquire() as conn:
+        processed_today = await conn.fetchval(
+            "SELECT count(*) FROM articles WHERE date(created_at) = CURRENT_DATE"
+        )
+        if processed_today >= LLM_RPD:
+            logger.warning(
+                f"LIMITE RPD RAGGIUNTO: processati {processed_today}/{LLM_RPD} articoli oggi. "
+                "Il ciclo andrà in ibernazione per non superare il Rate Limit giornaliero."
+            )
+            return
+
     # 1. Recupero degli articoli da Miniflux
     entries = await app_state.miniflux_client.fetch_unread_entries(limit=MINIFLUX_LIMIT)
     if not entries:
         logger.info("Nessun articolo non letto presente in Miniflux.")
         return
 
-    processed = 0
-    skipped = 0
+    # Limita l'ingestione se gli articoli recuperati supererebbero l'RPD residuo
+    remaining_rpd = LLM_RPD - processed_today
+    if len(entries) > remaining_rpd:
+        logger.info(f"Riduzione lotto da {len(entries)} a {remaining_rpd} per rispettare il limite RPD.")
+        entries = entries[:remaining_rpd]
 
-    # 2. Elaborazione dei singoli articoli (Level 3)
-    for entry in entries:
-        entry_id = entry.get("id")
-        source_url = entry.get("url", "").strip()
-        title = entry.get("title", "N/A").strip()
-        raw_content = entry.get("content", "") or entry.get("summary", "") or ""
-        published_at_raw = entry.get("published_at", "")
-        published_date = published_at_raw.split("T")[0] if "T" in published_at_raw else published_at_raw
-        feed_title = entry.get("feed", {}).get("title", "RSS Feed").strip()
+    # 2. Elaborazione concorrente degli articoli
+    success_count = 0
+    failure_count = 0
 
-        if not source_url:
-            logger.warning("Articolo saltato: URL sorgente mancante o nullo.")
-            skipped += 1
-            continue
+    async with asyncio.TaskGroup() as tg:
+        tasks = [tg.create_task(process_single_entry(app_state, entry)) for entry in entries]
 
-        try:
-            # Step A: Deduplicazione (Acquisizione connessione spot dal pool)
-            async with app_state.db_pool.acquire() as conn:
-                is_dup = await is_article_duplicate(conn, source_url)
-            
-            if is_dup:
-                logger.info(f"Articolo duplicato rilevato: '{title[:50]}'. Marcatura come letto su Miniflux...")
-                if entry_id:
-                    await app_state.miniflux_client.mark_as_read([entry_id])
-                skipped += 1
-                continue
+    for task in tasks:
+        if task.result():
+            success_count += 1
+        else:
+            failure_count += 1
 
-            # Step B: Sanitizzazione HTML (no DB connection)
-            clean_content = strip_html_tags(raw_content)
-
-            # Step C: Estrazione LLM (no DB connection per non bloccare risorse durante I/O di rete esterno)
-            extracted_article = await app_state.classification_client.classify_article(
-                title=title,
-                content=clean_content,
-                url=source_url,
-                date=published_date
-            )
-
-            # Step D: Relational Database Commit (Acquisizione connessione spot dal pool)
-            async with app_state.db_pool.acquire() as conn:
-                article_id = await commit_article_to_db(conn, extracted_article, feed_title)
-
-            # Step E: File System Markdown Commit (no DB connection)
-            md_content = generate_markdown_content(extracted_article)
-            file_path = get_article_file_path(extracted_article, vault_path=OBSIDIAN_VAULT_PATH)
-            write_file_with_lock(file_path, md_content)
-
-            # Step F: Marcatura lettura su Miniflux
-            if entry_id:
-                await app_state.miniflux_client.mark_as_read([entry_id])
-
-            logger.info(f"Articolo elaborato e committato correttamente [ID={article_id}]: '{extracted_article.title[:50]}'")
-            processed += 1
-
-        except Exception as article_err:
-            logger.error(
-                f"Errore durante l'elaborazione del singolo articolo '{title[:50]}': {article_err}",
-                exc_info=True
-            )
-            skipped += 1
-            continue
-
-    logger.info(f"=== Ciclo della pipeline completato: {processed} inseriti, {skipped} saltati/errori ===")
+    logger.info(f"=== Ciclo della pipeline completato: {success_count} elaborati/saltati, {failure_count} errori ===")
 
 
 async def run_pipeline_loop(app_state: AppState) -> None:
@@ -145,6 +174,13 @@ async def run_pipeline_loop(app_state: AppState) -> None:
     """
     logger.info("Demone pipeline in background avviato con successo.")
     
+    # Eseguiamo un refresh forzato dei feed al primo avvio
+    # per garantire che Miniflux sia sincronizzato dopo un riavvio del PC/container.
+    try:
+        await app_state.miniflux_client.refresh_all_feeds()
+    except Exception as refresh_err:
+        logger.warning(f"Refresh forzato fallito all'avvio: {refresh_err}")
+
     while True:
         try:
             await run_pipeline_cycle(app_state)

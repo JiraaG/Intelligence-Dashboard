@@ -191,11 +191,15 @@ Dashboard finance/                           # ← Git repository root
     │
     ├── vault/                               # Obsidian-compatible Markdown vault
     │   ├── Nucleare/
-    │   ├── Elettronica/
-    │   ├── Chip/
-    │   ├── Acqua/
     │   ├── Energia/
-    │   └── Infrastrutture/
+    │   ├── Infrastrutture/
+    │   ├── Geopolitica/
+    │   ├── Economia/
+    │   ├── Tecnologia/
+    │   ├── Spazio/
+    │   ├── Ambiente/
+    │   ├── Salute/
+    │   └── Sicurezza/
     │       └── {COUNTRY_CODE}/
     │           └── {YYYY-MM-DD}_{slugified-title}_{hash}.md
     │
@@ -373,11 +377,11 @@ class GeopoliticalArticleSchema(BaseModel):
     country_code: str                     # ISO Alpha-2 ('XX' = unknown)
     latitude: float                       # Decimal degrees
     longitude: float                      # Decimal degrees
-    companies_involved: List[str]         # Empty [] if none
-    tags: List[str]                       # First tag = primary_category
-    primary_category: Literal["Nucleare","Elettronica","Chip","Acqua","Energia","Infrastrutture"]
+    companies_involved: str               # Comma-separated (e.g. 'Apple, Tesla'). 'Nessuno' if none. (Mitigates LLM 500 error)
+    tags: str                             # Comma-separated. First tag = primary_category
+    primary_category: Literal["Nucleare","Energia","Infrastrutture","Geopolitica","Economia","Tecnologia","Spazio","Ambiente","Salute","Sicurezza"]
     sentiment: Literal["Positivo","Neutrale","Negativo"]
-    infrastructural_entities: List[str]   # Physical assets (dams, ports, factories)
+    infrastructural_entities: str         # Comma-separated physical assets (dams, ports). 'Nessuno' if none.
     relevance_level: int                  # 1–5 scale
 ```
 
@@ -473,12 +477,16 @@ All colors are defined as **CSS custom properties** in [`styles.scss`](radar/fro
 
 | Category | CSS Variable | Color | Hex |
 |----------|-------------|-------|-----|
-| Nucleare | `--color-nucleare` | Orange | `#FF6B35` |
-| Elettronica | `--color-elettronica` | Cyan | `#00D4FF` |
-| Chip | `--color-chip` | Purple | `#7B2FBE` |
-| Acqua | `--color-acqua` | Blue | `#0080FF` |
-| Energia | `--color-energia` | Yellow | `#FFD700` |
-| Infrastrutture | `--color-infrastrutture` | Green | `#4CAF50` |
+| Nucleare | `--color-nucleare` | Cyan Neon | `#00E5FF` |
+| Energia | `--color-energia` | Yellow | `#FFEA00` |
+| Infrastrutture | `--color-infrastrutture` | Grey/Silver | `#9E9E9E` |
+| Geopolitica | `--color-geopolitica` | Magenta | `#E040FB` |
+| Economia | `--color-economia` | Neon Green | `#00E676` |
+| Tecnologia | `--color-tecnologia` | Blue | `#2979FF` |
+| Spazio | `--color-spazio` | Purple | `#7C4DFF` |
+| Ambiente | `--color-ambiente` | Lime | `#8BC34A` |
+| Salute | `--color-salute` | Red | `#FF1744` |
+| Sicurezza | `--color-sicurezza` | Orange | `#FF9100` |
 
 | Sentiment | CSS Variable | Color |
 |-----------|-------------|-------|
@@ -491,11 +499,15 @@ All colors are defined as **CSS custom properties** in [`styles.scss`](radar/fro
 | Category | Emoji |
 |----------|-------|
 | Nucleare | ⚛️ |
-| Elettronica | 📡 |
-| Chip | 💾 |
-| Acqua | 💧 |
 | Energia | ⚡ |
 | Infrastrutture | 🏗️ |
+| Geopolitica | 🌍 |
+| Economia | 📈 |
+| Tecnologia | 💻 |
+| Spazio | 🚀 |
+| Ambiente | 🌿 |
+| Salute | 🏥 |
+| Sicurezza | 🛡️ |
 
 ### Leaflet + ESBuild Compatibility
 
@@ -532,7 +544,8 @@ CREATE TABLE articles (
     latitude                DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     longitude               DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     primary_category        VARCHAR(50) NOT NULL CHECK (primary_category IN (
-                                'Nucleare','Elettronica','Chip','Acqua','Energia','Infrastrutture')),
+                                'Nucleare','Energia','Infrastrutture','Geopolitica','Economia',
+                                'Tecnologia','Spazio','Ambiente','Salute','Sicurezza')),
     sentiment               VARCHAR(20) NOT NULL CHECK (sentiment IN ('Positivo','Neutrale','Negativo')),
     relevance_level         INTEGER NOT NULL CHECK (relevance_level BETWEEN 1 AND 5),
     infrastructural_entities TEXT[] NOT NULL DEFAULT '{}',

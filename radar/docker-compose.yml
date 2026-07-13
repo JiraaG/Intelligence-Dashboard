@@ -42,9 +42,6 @@ services:
       # NOTA: i $ nella password vengono escaped con $$ nel YAML di Compose.
       DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@radar-db:5432/${POSTGRES_DB}"
       OBSIDIAN_VAULT_PATH: "/app/vault"
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
     volumes:
       - ./vault:/app/vault
     depends_on:
@@ -94,9 +91,6 @@ services:
     restart: unless-stopped
     ports:
       - "8080:8080"
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
     environment:
       - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@radar-db:5432/${POSTGRES_DB}?sslmode=disable
       - RUN_MIGRATIONS=1

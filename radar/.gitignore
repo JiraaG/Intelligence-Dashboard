@@ -47,6 +47,10 @@ frontend/src/assets/data/countries.geo.json
 # ─── Log ─────────────────────────────────────────────────────────────────────
 *.log
 logs/
+logs.txt
+
+# ─── Scratch Scripts & Debug ──────────────────────────────────────────────────
+# I test script sono stati mantenuti tracciati su richiesta per future validazioni di sicurezza/leaks.
 
 # ─── Checkpoint ECC (generato dall'agente al limite del contesto) ─────────────
 CHECKPOINT.md

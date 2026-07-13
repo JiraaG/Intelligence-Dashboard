@@ -5,7 +5,7 @@
   <!-- Legenda Categorie Geopolitiche -->
   <div class="map-legend" *ngIf="!isParsingGeoJson()">
     <div class="legend-item" *ngFor="let item of legendItems">
-      <span class="legend-color-dot" [class]="'dot-' + item.label.toLowerCase()"></span>
+      <span class="legend-color-dot" [ngStyle]="{'background-color': 'var(' + item.cssVar + ')', 'box-shadow': '0 0 8px var(' + item.cssVar + ')'}"></span>
       <span class="legend-icon">{{ item.icon }}</span>
       <span class="legend-label">{{ item.label }}</span>
     </div>

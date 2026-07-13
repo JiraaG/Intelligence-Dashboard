@@ -93,6 +93,7 @@ export class RadarSidebarComponent {
 
   getCountryName(code: string | undefined): string {
     if (!code) return '';
+    if (code === 'XX') return 'WW';
     try {
       const displayNames = new Intl.DisplayNames(['it-IT'], { type: 'region' });
       return displayNames.of(code) || code;

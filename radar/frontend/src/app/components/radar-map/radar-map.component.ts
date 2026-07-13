@@ -37,38 +37,54 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
 
   private readonly CATEGORY_ICONS: Record<string, string> = {
     'Nucleare':       '☢️',
-    'Chip':           '💾',
-    'Acqua':          '💧',
     'Energia':        '⚡',
-    'Elettronica':    '📡',
     'Infrastrutture': '🏗️',
+    'Geopolitica':    '🌍',
+    'Economia':       '📈',
+    'Tecnologia':     '💻',
+    'Spazio':         '🚀',
+    'Ambiente':       '🌿',
+    'Salute':         '⚕️',
+    'Sicurezza':      '🛡️'
   };
 
   private readonly CATEGORY_CSS_VARS: Record<string, string> = {
     'Nucleare':       '--color-nucleare',
-    'Elettronica':    '--color-elettronica',
-    'Chip':           '--color-chip',
-    'Acqua':          '--color-acqua',
     'Energia':        '--color-energia',
     'Infrastrutture': '--color-infrastrutture',
+    'Geopolitica':    '--color-geopolitica',
+    'Economia':       '--color-economia',
+    'Tecnologia':     '--color-tecnologia',
+    'Spazio':         '--color-spazio',
+    'Ambiente':       '--color-ambiente',
+    'Salute':         '--color-salute',
+    'Sicurezza':      '--color-sicurezza'
   };
 
   readonly legendItems = [
     { label: 'Nucleare', icon: '☢️', cssVar: '--color-nucleare' },
-    { label: 'Chip', icon: '💾', cssVar: '--color-chip' },
-    { label: 'Elettronica', icon: '📡', cssVar: '--color-elettronica' },
-    { label: 'Acqua', icon: '💧', cssVar: '--color-acqua' },
     { label: 'Energia', icon: '⚡', cssVar: '--color-energia' },
-    { label: 'Infrastrutture', icon: '🏗️', cssVar: '--color-infrastrutture' }
+    { label: 'Infrastrutture', icon: '🏗️', cssVar: '--color-infrastrutture' },
+    { label: 'Geopolitica', icon: '🌍', cssVar: '--color-geopolitica' },
+    { label: 'Economia', icon: '📈', cssVar: '--color-economia' },
+    { label: 'Tecnologia', icon: '💻', cssVar: '--color-tecnologia' },
+    { label: 'Spazio', icon: '🚀', cssVar: '--color-spazio' },
+    { label: 'Ambiente', icon: '🌿', cssVar: '--color-ambiente' },
+    { label: 'Salute', icon: '⚕️', cssVar: '--color-salute' },
+    { label: 'Sicurezza', icon: '🛡️', cssVar: '--color-sicurezza' }
   ];
 
   private readonly UI_OFFSETS: Record<string, [number, number]> = {
-    'Nucleare':       [0, -34],  
-    'Chip':           [29, -17], 
-    'Elettronica':    [29, 17],  
-    'Acqua':          [0, 34],   
-    'Energia':        [-29, 17], 
-    'Infrastrutture': [-29, -17] 
+    'Nucleare':       [34, 0],
+    'Energia':        [28, 20],
+    'Infrastrutture': [11, 32],
+    'Geopolitica':    [-11, 32],
+    'Economia':       [-28, 20],
+    'Tecnologia':     [-34, 0],
+    'Spazio':         [-28, -20],
+    'Ambiente':       [-11, -32],
+    'Salute':         [11, -32],
+    'Sicurezza':      [28, -20]
   };
 
   private map!: Leaflet.Map;

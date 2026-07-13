@@ -80,3 +80,21 @@ class MinifluxClient:
             except Exception as e:
                 logger.error(f"Errore imprevisto durante l'aggiornamento lettura articoli Miniflux: {e}")
                 raise
+
+    async def refresh_all_feeds(self) -> None:
+        """
+        Invia una richiesta PUT a Miniflux per forzare l'aggiornamento (refresh) 
+        immediato di tutti i feed RSS.
+        """
+        url = f"{self.api_url}/v1/feeds/refresh"
+        logger.info("Richiesta di refresh forzato di tutti i feed RSS su Miniflux...")
+        
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            try:
+                response = await client.put(url, headers=self.headers)
+                response.raise_for_status()
+                logger.info("Refresh di tutti i feed completato con successo su Miniflux.")
+            except httpx.HTTPError as e:
+                logger.warning(f"Errore durante il refresh forzato dei feed: {e}")
+            except Exception as e:
+                logger.error(f"Errore imprevisto durante il refresh dei feed: {e}")

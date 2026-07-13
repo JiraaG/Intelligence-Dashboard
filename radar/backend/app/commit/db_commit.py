@@ -12,6 +12,12 @@ async def commit_article_to_db(conn: asyncpg.Connection, article: GeopoliticalAr
     """
     logger.info(f"Salvataggio relazionale nel DB per l'articolo: '{article.title[:50]}'")
     
+    # Ricostruzione liste dalle stringhe
+    from app.classification.validator import parse_csv_list
+    entities_list = parse_csv_list(article.infrastructural_entities)
+    companies_list = parse_csv_list(article.companies_involved)
+    tags_list = parse_csv_list(article.tags)
+    
     async with conn.transaction():
         # 1. Inserimento dell'articolo (ON CONFLICT DO NOTHING)
         insert_article_query = """
@@ -43,7 +49,7 @@ async def commit_article_to_db(conn: asyncpg.Connection, article: GeopoliticalAr
             article.primary_category,
             article.sentiment,
             article.relevance_level,
-            article.infrastructural_entities,
+            entities_list,
             feed_title
         )
 
@@ -60,7 +66,7 @@ async def commit_article_to_db(conn: asyncpg.Connection, article: GeopoliticalAr
             raise RuntimeError(f"Impossibile recuperare l'ID per l'articolo: {article.source_url}")
 
         # 2. Inserimento delle aziende coinvolte (Junction table)
-        for company in article.companies_involved:
+        for company in companies_list:
             clean_company = company.strip()
             if not clean_company:
                 continue
@@ -82,7 +88,7 @@ async def commit_article_to_db(conn: asyncpg.Connection, article: GeopoliticalAr
             )
 
         # 3. Inserimento dei tag semantici (Junction table)
-        for tag in article.tags:
+        for tag in tags_list:
             clean_tag = tag.strip()
             if not clean_tag:
                 continue

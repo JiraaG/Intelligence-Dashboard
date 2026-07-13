@@ -44,7 +44,7 @@ async def bootstrap_database(pool: asyncpg.Pool) -> None:
             country_code CHAR(2) NOT NULL DEFAULT 'XX',
             latitude DOUBLE PRECISION NOT NULL DEFAULT 0.0,
             longitude DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-            primary_category VARCHAR(50) NOT NULL CHECK (primary_category IN ('Nucleare', 'Elettronica', 'Chip', 'Acqua', 'Energia', 'Infrastrutture')),
+            primary_category VARCHAR(50) NOT NULL CHECK (primary_category IN ('Nucleare', 'Energia', 'Infrastrutture', 'Geopolitica', 'Economia', 'Tecnologia', 'Spazio', 'Ambiente', 'Salute', 'Sicurezza')),
             sentiment VARCHAR(20) NOT NULL CHECK (sentiment IN ('Positivo', 'Neutrale', 'Negativo')),
             relevance_level INTEGER NOT NULL CHECK (relevance_level BETWEEN 1 AND 5),
             is_read BOOLEAN NOT NULL DEFAULT FALSE,

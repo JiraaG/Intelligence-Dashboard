@@ -58,11 +58,15 @@ export class RadarToolbarComponent {
 
   readonly categoryOptions = [
     { label: '☢️ Nucleare', value: 'Nucleare' },
-    { label: '💾 Chip', value: 'Chip' },
-    { label: '📡 Elettronica', value: 'Elettronica' },
-    { label: '💧 Acqua', value: 'Acqua' },
     { label: '⚡ Energia', value: 'Energia' },
-    { label: '🏗️ Infrastrutture', value: 'Infrastrutture' }
+    { label: '🏗️ Infrastrutture', value: 'Infrastrutture' },
+    { label: '🌍 Geopolitica', value: 'Geopolitica' },
+    { label: '📈 Economia', value: 'Economia' },
+    { label: '💻 Tecnologia', value: 'Tecnologia' },
+    { label: '🚀 Spazio', value: 'Spazio' },
+    { label: '🌿 Ambiente', value: 'Ambiente' },
+    { label: '⚕️ Salute', value: 'Salute' },
+    { label: '🛡️ Sicurezza', value: 'Sicurezza' }
   ];
 
   readonly COUNTRY_NAMES: Record<string, string> = {
