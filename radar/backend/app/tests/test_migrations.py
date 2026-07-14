@@ -22,12 +22,13 @@ def _sha256_text(text: str) -> str:
 
 @pytest.mark.unit
 def test_discover_migrations_finds_001_and_002_in_order() -> None:
-    """discover_migrations returns 001 then 002 with non-empty SHA-256 checksums."""
+    """discover_migrations returns 001, 002, 003… with non-empty SHA-256 checksums."""
     migrations = discover_migrations()
     versions = [version for version, _path, _checksum in migrations]
 
     assert versions[0].startswith("001_")
     assert versions[1].startswith("002_")
+    assert any(v.startswith("003_") for v in versions)
     assert versions == sorted(versions)
 
     for version, path, checksum in migrations:

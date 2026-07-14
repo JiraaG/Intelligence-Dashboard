@@ -15,6 +15,7 @@ Log operativo post–branch restore. Distingue **storico pre-restore** (lavoro p
 ### Bug aperti (fuori sidebar)
 
 - [ ] **Read/unread `.marker-read` no-op** — mutazione in-place in `state.service.ts`; marker Leaflet senza path `.marker-read`. Fix in Phase 4 (Change 7) + Phase 5 (Change 4): update immutabile + DOM marker senza rebuild cluster. Non toccare i file sidebar.
+- [ ] **Read/unread collassa le icone a grafo espanse (rilevato 2026-07-14)** — con un cluster/spiderfy già aperto sulla mappa, il bottone *Segna come letta / non letta* (sidebar → `toggleRead` → `StateService.toggleReadStatus`) fa sparire le icone espanse del grafo. Causa probabile: `toggleReadStatus` emette un nuovo array articoli (`return [...arts]`), l’`effect` in `radar-map` ricostruisce i layer MarkerCluster e perde lo stato spiderfy/espanso. Stesso filone del fix Phase 4/5: aggiornare solo lo stato letto sul marker DOM (`.marker-read`) **senza** `clearLayers` / rebuild cluster su cambio `is_read`. Non toccare i file sidebar.
 
 ---
 
@@ -85,19 +86,35 @@ cd radar && backend\.venv\Scripts\python.exe -m pytest -m "not live" -q
 
 - [x] `docker compose up -d --build radar-backend` — healthy; migrazioni 001+002 applicate.
 - [x] HTTP `/`, `/health`, `/api/articles` 200.
-- [x] Sidebar non toccata. **In attesa test manuale UI (grafica/carosello) prima di Phase 2.**
+- [x] Sidebar non toccata. Phase 1 verificata; Phase 2 completata — **in attesa test manuale UI/ops prima di Phase 3.**
 
 ---
 
-### Phase 2 — Worker cancellabile / quota — NON INIZIATA
+### Phase 2 — Worker cancellabile / quota — COMPLETATA (2026-07-14)
 
-- [ ] Separare `worker.py` da FastAPI; servizio Compose `radar-worker` (uno solo).
-- [ ] Advisory lock / singleton guard.
-- [ ] Coda bounded al posto di `TaskGroup` unbounded; limiti concorrenza parsing/DB/Gemini.
-- [ ] `CancelledError` corretto; shutdown bounded; chiusura client/pool.
-- [ ] Ledger quote durable (`llm_request_ledger`) RPM/TPM/RPD per tentativo; timezone quota.
-- [ ] Deadline Gemini + classificazione errori non-retryable.
-- [ ] Test: `test_worker_shutdown.py`, `test_quota_concurrency.py`; `requirements.lock`.
+- [x] `worker.py` separato da FastAPI; Compose `radar-worker` (uno solo, stessa immagine backend, `python -m app.worker`).
+- [x] Advisory lock session-level (`pg_try_advisory_lock`) + retry non-leader senza exit/flap.
+- [x] Coda bounded (`WORKER_QUEUE_DEPTH`) + N consumer; semafori PARSE/DB/GEMINI.
+- [x] `CancelledError` re-raise; shutdown ordinato bounded; chiusura httpx → unlock → pool.
+- [x] Migrazione `003_quota_ledger.sql` + `QuotaLedger` (RPM/TPM/RPD durable, half-open TZ).
+- [x] Client Gemini: reserve prima di ogni tentativo; deadline async SDK; retry classificato; `429`+Retry-After.
+- [x] Test: `test_worker_shutdown.py`, `test_quota_concurrency.py`; `requirements.lock`.
+- [x] Soft-trim RPD ciclo su ledger (non più `date(created_at)=CURRENT_DATE` su `articles`).
+- [x] `setup_logging`: fallback se `logs/` non scrivibile (WORKDIR `/app`).
+
+**Gate regression**
+
+```text
+cd radar && backend\.venv\Scripts\python.exe -m pytest -m "not live" -q
+# → 95 passed, 3 deselected
+```
+
+**Docker / smoke (2026-07-14)**
+
+- [x] `docker compose up -d --build` — backend/frontend/db healthy; `radar-worker` up; leadership acquisita.
+- [x] Migrazione `003_quota_ledger` applicata; schema_migrations 001+002+003.
+- [x] HTTP `/`, `/health`, `/api/articles` 200.
+- [x] Sidebar non toccata. **In attesa conferma UI/ops prima di Phase 3.**
 
 ---
 
@@ -121,7 +138,7 @@ cd radar && backend\.venv\Scripts\python.exe -m pytest -m "not live" -q
 - [ ] Hatch directive cleanup / SVG pattern owner.
 - [ ] ~~Carousel height ResizeObserver~~ — **cancellato (sidebar freeze)**.
 - [ ] `MOCK_MODE` injection token esplicito; errore API visibile, no fallback silenzioso a mock.
-- [ ] **Read/unread**: mutation version + update immutabile in `state.service`; sync `.marker-read` in `radar-map` senza rebuild cluster.
+- [ ] **Read/unread**: mutation version + update immutabile in `state.service`; sync `.marker-read` in `radar-map` senza rebuild cluster; preservare spiderfy/icone a grafo espanse al toggle letta/non letta.
 - [ ] Policy Signals vs RxJS documentata.
 - [ ] Split-screen / `invalidateSize` / mobile **senza** toccare file sidebar; a11y toolbar/country solo fuori sidebar.
 - [ ] Spec: `radar-map.component.spec.ts`, `article.dto.ts`, `mock-mode.token.ts` — **no** `radar-sidebar.component.spec.ts`.
@@ -149,17 +166,19 @@ cd radar && backend\.venv\Scripts\python.exe -m pytest -m "not live" -q
 
 ---
 
-## C. Scoreboard attuale (audit 2026-07-14)
+## C. Scoreboard attuale (audit 2026-07-14, post–Phase 2)
 
 | Phase | Pre-restore (storico) | Codice attuale | Prossimo lavoro |
 |-------|----------------------|----------------|-----------------|
-| 0 | Completata | **DONE** | — |
-| 1 | Completata (persa) | **DONE** | UI manuale, poi Phase 2 |
-| 2 | Completata (persa) | **NOT STARTED** | Dopo conferma UI Phase 1 |
-| 3 | Completata (persa) | **NOT STARTED** | Dopo Phase 2 |
+| 0 | Completata | **DONE** (`0189359`) | — |
+| 1 | Completata (persa) | **DONE** (`bff8abe`) | — |
+| 2 | Completata (persa) | **DONE** (questo restore point) | Conferma UI/ops, poi Phase 3 |
+| 3 | Completata (persa) | **NOT STARTED** | Dopo conferma UI Phase 2 |
 | 4 | Completata (persa) | **NOT STARTED** | Include bug read/unread; no sidebar |
 | 5 | Completata (persa) | **NOT STARTED** | No `article-list` |
 | 5.5 | Completata (persa) | N/A nel piano master | Assorbita in 1–3 al ri-run |
 | 6 | Non iniziata | **NOT STARTED** | Ultima |
 
-**Ordine di ripresa:** Phase 2 → 3 → 4 → 5 → 6 (dopo conferma UI Phase 1).
+**Ordine di ripresa:** Phase 3 → 4 → 5 → 6 (dopo conferma UI/ops Phase 2).
+
+**Restore rapido a Phase 2:** `git checkout <sha-phase2>` su `refactor/enterprise-consolidation` (messaggio commit inizia con `feat(phase2):`).

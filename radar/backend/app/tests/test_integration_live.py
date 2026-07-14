@@ -21,12 +21,24 @@ from scripts.test_production_pipeline import (
 pytestmark = pytest.mark.live
 
 
+def _live_classification_client() -> ClassificationClient:
+    """Live Gemini client with a no-op quota ledger (DB ledger optional for smoke)."""
+    from unittest.mock import AsyncMock
+
+    quota = AsyncMock()
+    quota.reserve = AsyncMock(side_effect=list(range(1, 10_000)))
+    quota.complete = AsyncMock()
+    quota.release = AsyncMock()
+    quota.fail = AsyncMock()
+    return ClassificationClient(quota=quota)
+
+
 @pytest.mark.asyncio
 async def test_live_external_connections() -> None:
     """Verifica le connessioni reali ed i token delle API di Miniflux e Gemini."""
     async with httpx.AsyncClient() as http_client:
         miniflux = MinifluxClient(http_client=http_client)
-        classification = ClassificationClient()
+        classification = _live_classification_client()
         try:
             await run_test_external_connections(miniflux, classification)
         except (socket.gaierror, ConnectionRefusedError, OSError) as e:
@@ -57,7 +69,7 @@ async def test_live_e2e_transactional_commit() -> None:
 @pytest.mark.asyncio
 async def test_live_rate_limiter_throttling() -> None:
     """Verifica il corretto distanziamento temporale delle chiamate asincrone concorrenti."""
-    classification = ClassificationClient()
+    classification = _live_classification_client()
     try:
         await run_stress_test_rate_limiter(classification)
     except Exception as e:

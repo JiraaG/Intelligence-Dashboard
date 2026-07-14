@@ -37,21 +37,18 @@ COPY --chown=radar:radar app/ app/
 COPY --chown=radar:radar scripts/ scripts/
 COPY --chown=radar:radar migrations/ migrations/
 
-# Cambiamo il WORKDIR a /app/app dopo averlo copiato per assicurarci che sia di proprietà di 'radar'
-WORKDIR /app/app
-
-# Aggiungi /app al PYTHONPATH per rendere importabile il package 'app'
+# PYTHONPATH=/app rende importabile il package `app` (API e worker condividono l'immagine)
 ENV PYTHONPATH=/app
 
 # Esegui come utente non-root
 USER radar
 
-# Porta API FastAPI
+# Porta API FastAPI (il servizio radar-worker override il CMD e non espone HTTP)
 EXPOSE 8000
 
-# Healthcheck: verifica che l'endpoint /health risponda
+# Healthcheck API: il servizio Compose radar-worker disabilita questo check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Comando di avvio: uvicorn in modalità produzione
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+# Default: API uvicorn. Worker Compose: command ["python", "-m", "app.worker"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

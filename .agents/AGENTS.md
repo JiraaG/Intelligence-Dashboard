@@ -15,9 +15,9 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 * **Database:** PostgreSQL 15 (`radar-db`). Accesso tramite driver asincrono `asyncpg` puro.
 * **Feed Source:** Miniflux REST API.
 * **Frontend:** Angular 21 (Standalone Components).
-* **Container:** Docker + docker-compose (servizi: `radar-db`, `radar-backend`, `radar-frontend`, `radar-miniflux`). Nessun `radar-worker` finché Phase 2 non lo introduce.
+* **Container:** Docker + docker-compose (servizi: `radar-db`, `radar-backend`, `radar-worker`, `radar-frontend`, `radar-miniflux`) su `radar-network`. Ingestione solo in `radar-worker` (Phase 2 DONE).
 * **Web Server:** Nginx (Alpine) per servire Angular e proxying `/api/`.
-* **Piani operativi:** [`Implementation_Plan.md`](../Implementation_Plan.md) + [`Implementation_Plan_Execution.md`](../Implementation_Plan_Execution.md). Post–branch restore (2026-07-14): **Phase 0–1 DONE**; fasi **2–6 NON presenti** nel codice (worker/edge-network/hardening FE ancora da rifare).
+* **Piani operativi:** [`Implementation_Plan.md`](../Implementation_Plan.md) + [`Implementation_Plan_Execution.md`](../Implementation_Plan_Execution.md). Post–branch restore (2026-07-14): **Phase 0–2 DONE**; fasi **3–6 NON presenti** nel codice (edge-network/hardening FE ancora da fare).
 
 ---
 
@@ -50,7 +50,7 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 1. **Versionamento Dipendenze (requirements.txt):**
    * Non bloccare mai le dipendenze con operatori `==`. Usare sempre `>=` per garantire compatibilità con Python 3.14 su sistemi Windows (es. `asyncpg>=0.31.0`, `pydantic>=2.10.0`).
 2. **Il Demone Non Si Ferma Mai:**
-   * Il loop di monitoraggio `while True` con `asyncio.sleep(900)` deve catturare qualsiasi eccezione a livello di ciclo e di singolo articolo, garantendo l'esecuzione indefinita.
+   * Il loop di monitoraggio vive in `worker.py` (`while True` + `asyncio.sleep(WORKER_POLL_INTERVAL_SECONDS)`), cattura eccezioni a livello di ciclo/articolo, e **re-raise** `CancelledError`. Lo sleep di polling non sta in un `finally` di shutdown.
 3. **Deduplicazione Pre-LLM:**
    * Controllare sempre l'esistenza dell'URL dell'articolo nel DB via query SQL prima di effettuare la chiamata all'LLM per ottimizzare i costi API.
 4. **Gestione Errori a Tre Livelli:**
@@ -61,19 +61,19 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
    * Type hints obbligatori su tutte le funzioni pubbliche.
    * Utilizzare il logger centralizzato configurato in `core/logging.py`, evitando categoricamente l'uso di `print()`.
 6. **Rate Limiting & Rispetto delle Quote LLM:**
-   * Per evitare errori `429 (Too Many Requests)` causati dai limiti del tier di chiamata (15 RPM), implementare un ritardo controllato asincrono di almeno 4 secondi (`await asyncio.sleep(4)`) tra le singole chiamate alle API nel ciclo di classificazione (`classification/client.py`). Questo garantisce uno smaltimento stabile ed affidabile di backlog massivi (1000+ articoli).
+   * Quote durable via `llm_request_ledger` + `classification/quota.py` (reserve RPM/TPM/RPD **prima di ogni** tentativo provider, anche retry). Spacing in-process con `time.monotonic()`; finestre giornaliere half-open su `RADAR_TIME_ZONE`. Rispettare `429` + `Retry-After`. Non basarsi solo su `asyncio.sleep(4)` in-memory.
 7. **Architettura Modulare Backend (Path: `backend/app/`):**
-   * Il backend è diviso in quattro layer: `core/` (config, db, logging), `extraction/` (Miniflux client, parser HTML, dedup), `classification/` (Gemini client, prompts, schema Pydantic), `commit/` (db_commit, vault factory, file router, file lock).
-   * `core/logging.py`: il `RotatingFileHandler` DEVE essere wrappato in `try/except` — il container può non avere permessi di scrittura sulla directory `logs/`. Il fallback deve mantenere attivo il console handler.
+   * Layer: `core/`, `extraction/`, `classification/` (incluso `quota.py`), `commit/`, più `worker.py` (ingest) separato da `main.py` (API).
+   * `core/logging.py`: il `RotatingFileHandler` e `makedirs` per `logs/` DEVONO essere in `try/except` — il container non-root con `WORKDIR=/app` può non avere permessi. Il fallback deve mantenere attivo il console handler.
 
 ---
 
 ## 4. Regole di Containerizzazione (Docker & Compose)
 
-1. **Nomi dei Servizi Immutabili:** `radar-db`, `radar-backend`, `radar-frontend`, `radar-miniflux`.
+1. **Nomi dei Servizi Immutabili:** `radar-db`, `radar-backend`, `radar-worker`, `radar-frontend`, `radar-miniflux`.
 2. **Persistenza Dati:** PostgreSQL deve utilizzare un volume named bind-mounted locale (`./data/postgres`).
-3. **Isolamento di Rete:** Tutti i servizi risiedono sulla rete bridge interna `radar-network`. Solo il frontend espone la porta 80 all'host.
-4. **Healthcheck & dipende_on:** Il backend e il frontend dipendono da `radar-db` con condizione `service_healthy`.
+3. **Isolamento di Rete:** Tutti i servizi risiedono sulla rete bridge interna `radar-network` (Phase 3 introdurrà `edge`/`data`). Solo il frontend espone la porta 80 all'host.
+4. **Healthcheck & dipende_on:** Backend, worker e frontend dipendono da `radar-db` con condizione `service_healthy`. L'ingestione gira solo in `radar-worker` (non nel processo API).
 5. **Password e Sicurezza:** 
    * Le credenziali reali vivono esclusivamente nel file `.env` (ignorato da Git).
    * È vietato l'uso del carattere `$` all'interno del valore delle password in quanto Docker Compose lo interpreta come interpolazione di variabili.

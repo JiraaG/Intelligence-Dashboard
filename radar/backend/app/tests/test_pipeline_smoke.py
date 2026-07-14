@@ -74,7 +74,7 @@ def test_geopolitical_schema_rejects_invalid_category():
 
 def test_strip_html_removes_tags():
     """strip_html_tags deve rimuovere i tag HTML e decodificare le entità."""
-    from app.main import strip_html_tags
+    from app.extraction.parser import strip_html_tags
 
     html = "<p>Articolo <strong>importante</strong> sul &amp; mercato dei chip.</p>"
     result = strip_html_tags(html)
@@ -87,7 +87,7 @@ def test_strip_html_removes_tags():
 
 def test_strip_html_handles_empty_string():
     """strip_html_tags deve gestire stringhe vuote senza eccezioni."""
-    from app.main import strip_html_tags
+    from app.extraction.parser import strip_html_tags
 
     result = strip_html_tags("")
     assert result == ""

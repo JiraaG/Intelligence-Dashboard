@@ -1,12 +1,30 @@
-import pytest
-import time
 import json
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from pydantic import ValidationError
 
-from app.classification.validator import GeopoliticalArticleSchema, get_fallback_article
-from app.classification.client import ClassificationClient
-from app.core.config import LLM_RPM
+from app.classification.client import (
+    ClassificationClient,
+    ErrorClass,
+    classify_provider_error,
+    extract_retry_after_seconds,
+)
+from app.classification.quota import compute_day_window
+from app.classification.validator import GeopoliticalArticleSchema
+from app.core.config import ConfigError
+
+
+def _client_with_mock_quota() -> tuple[ClassificationClient, AsyncMock]:
+    quota = AsyncMock()
+    quota.reserve = AsyncMock(side_effect=[1, 2, 3, 4, 5, 6, 7, 8])
+    quota.complete = AsyncMock()
+    quota.release = AsyncMock()
+    quota.fail = AsyncMock()
+    client = ClassificationClient(quota=quota)
+    return client, quota
+
 
 # ─── Tests per lo Schema Pydantic ─────────────────────────────────────────────
 
@@ -78,39 +96,53 @@ def test_schema_rejects_invalid_relevance() -> None:
         GeopoliticalArticleSchema(**data)
 
 
-# ─── Tests per il Rate Limiter ───────────────────────────────────────────────
+def test_day_window_half_open_utc() -> None:
+    """RPD usa [day_start, next_day) in timezone — non date(created_at)=CURRENT_DATE."""
+    now = datetime(2026, 7, 14, 22, 30, tzinfo=timezone.utc)
+    start, end = compute_day_window(now, timezone.utc)
+    assert start == datetime(2026, 7, 14, 0, 0, tzinfo=timezone.utc)
+    assert end == datetime(2026, 7, 15, 0, 0, tzinfo=timezone.utc)
+    assert start <= now < end
 
-@pytest.mark.asyncio
-async def test_rate_limiter_spacing() -> None:
-    """Verifica che il Rate Limiter calcoli correttamente e chiami sleep per chiamate ravvicinate."""
-    client = ClassificationClient()
-    expected_interval = 60.0 / LLM_RPM
-    
-    with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
-        # Prima chiamata: l'ultimo call time è 0, nessun intervallo richiesto
-        await client._wait_for_rate_limit()
-        assert mock_sleep.call_count == 0
-        
-        # Simuliamo che la precedente chiamata sia avvenuta proprio ora
-        client._last_call_time = time.time()
-        
-        # Seconda chiamata immediata: deve invocare asyncio.sleep per la differenza
-        await client._wait_for_rate_limit()
-        assert mock_sleep.call_count == 1
-        
-        # Assicura che il tempo di sleep sia positivo e allineato all'intervallo RPM
-        sleep_args = mock_sleep.call_args[0][0]
-        assert 0.0 < sleep_args <= expected_interval + 0.1
+
+def test_classify_provider_error_policy() -> None:
+    from google.genai import errors as genai_errors
+
+    assert classify_provider_error(TimeoutError("deadline")) == ErrorClass.RETRYABLE
+    assert classify_provider_error(ConfigError("bad")) == ErrorClass.FATAL
+
+    err_429 = genai_errors.APIError(429, {"error": {"message": "rate"}})
+    assert classify_provider_error(err_429) == ErrorClass.RETRYABLE
+
+    err_401 = genai_errors.APIError(401, {"error": {"message": "auth"}})
+    assert classify_provider_error(err_401) == ErrorClass.FATAL
+
+    err_404 = genai_errors.APIError(404, {"error": {"message": "model not found"}})
+    assert classify_provider_error(err_404) == ErrorClass.FATAL
+
+
+def test_extract_retry_after_header() -> None:
+    from google.genai import errors as genai_errors
+
+    exc = genai_errors.APIError(429, {"error": {"message": "rate"}})
+    exc.response = MagicMock()
+    exc.response.headers = {"Retry-After": "12"}
+    assert extract_retry_after_seconds(exc) == 12.0
 
 
 # ─── Tests per il Client e i Flussi di Fallback/Correzione ───────────────────
 
 @pytest.mark.asyncio
+async def test_client_requires_pool_or_quota() -> None:
+    with pytest.raises(ValueError, match="pool"):
+        ClassificationClient()
+
+
+@pytest.mark.asyncio
 async def test_client_classify_success() -> None:
     """Verifica il successo dell'estrazione al primo tentativo con dati corretti."""
-    client = ClassificationClient()
-    
-    # Mock della risposta dell'SDK
+    client, quota = _client_with_mock_quota()
+
     mock_gen_response = MagicMock()
     mock_gen_response.text = json.dumps({
         "title": "Nuova fab TSMC",
@@ -127,38 +159,38 @@ async def test_client_classify_success() -> None:
         "infrastructural_entities": "Nessuno",
         "relevance_level": 3,
     })
-    
-    # Mockiamo la chiamata di rete sincrona dell'SDK
-    with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_thread, \
+    mock_gen_response.usage_metadata = MagicMock(total_token_count=1200)
+
+    with patch.object(client, "_generate_content", new_callable=AsyncMock) as mock_gen, \
          patch("asyncio.sleep", new_callable=AsyncMock):
-        mock_thread.return_value = mock_gen_response
-        
+        mock_gen.return_value = mock_gen_response
+
         article = await client.classify_article(
             title="Nuova fab TSMC",
             content="Contenuto dell'articolo",
             url="https://example.com/tsmc",
-            date="2026-06-24"
+            date="2026-06-24",
         )
-        
+
         assert article.primary_category == "Tecnologia"
         assert article.country_code == "DE"
         assert article.relevance_level == 3
-        # Nessun sleep asincrono invocato in thread per correzione
-        assert mock_thread.call_count == 1
+        assert mock_gen.call_count == 1
+        quota.reserve.assert_awaited()
+        quota.complete.assert_awaited_once_with(1, 1200)
+
 
 @pytest.mark.asyncio
 async def test_client_classify_retry_success() -> None:
     """Verifica che in caso di errore di validazione il Correction Loop effettui il tentativo di riparazione."""
-    client = ClassificationClient()
-    
-    # Primo tentativo: restituisce JSON corrotto o incompleto (manca country_code)
+    client, quota = _client_with_mock_quota()
+
     bad_response = MagicMock()
     bad_response.text = json.dumps({
         "title": "Nuova fab TSMC",
         "summary": "TSMC apre.",
         "published_at": "2026-06-24",
         "source_url": "https://example.com/tsmc",
-        # country_code mancante
         "latitude": 51.0,
         "longitude": 13.0,
         "companies_involved": "Nessuno",
@@ -168,8 +200,8 @@ async def test_client_classify_retry_success() -> None:
         "infrastructural_entities": "Nessuno",
         "relevance_level": 3,
     })
+    bad_response.usage_metadata = MagicMock(total_token_count=800)
 
-    # Secondo tentativo (correzione): restituisce il JSON valido riparato
     good_response = MagicMock()
     good_response.text = json.dumps({
         "title": "Nuova fab TSMC",
@@ -186,49 +218,71 @@ async def test_client_classify_retry_success() -> None:
         "infrastructural_entities": "Nessuno",
         "relevance_level": 3,
     })
+    good_response.usage_metadata = MagicMock(total_token_count=900)
 
-    with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_thread, \
+    with patch.object(client, "_generate_content", new_callable=AsyncMock) as mock_gen, \
          patch("asyncio.sleep", new_callable=AsyncMock):
-        # Ritorna bad_response al primo colpo, e good_response al secondo
-        mock_thread.side_effect = [bad_response, good_response]
-        
+        mock_gen.side_effect = [bad_response, good_response]
+
         article = await client.classify_article(
             title="Nuova fab TSMC",
             content="Contenuto dell'articolo",
             url="https://example.com/tsmc",
-            date="2026-06-24"
+            date="2026-06-24",
         )
-        
-        # Si accerta che le chiamate siano state 2 (originale + correzione)
-        assert mock_thread.call_count == 2
+
+        assert mock_gen.call_count == 2
         assert article.country_code == "DE"
-        assert article.primary_category == "Tecnologia"
+        assert quota.reserve.await_count == 2
+        assert quota.complete.await_count == 2
+
 
 @pytest.mark.asyncio
 async def test_client_classify_fallback_after_double_error() -> None:
     """Verifica che in caso di fallimenti continuati l'estrazione non crashi e ritorni il fallback."""
-    client = ClassificationClient()
-    
-    # Tutti i tentativi restituiscono dati non validi
+    client, quota = _client_with_mock_quota()
+
     bad_response = MagicMock()
     bad_response.text = "{'invalid_json': true}"
+    bad_response.usage_metadata = None
 
-    with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_thread, \
+    with patch.object(client, "_generate_content", new_callable=AsyncMock) as mock_gen, \
          patch("asyncio.sleep", new_callable=AsyncMock):
-        # Client retry loop: max_attempts = 4
-        mock_thread.side_effect = [bad_response] * 4
-        
+        mock_gen.side_effect = [bad_response] * 4
+
         article = await client.classify_article(
             title="Titolo originale",
             content="Contenuto dell'articolo",
             url="https://example.com/test",
-            date="2026-06-24"
+            date="2026-06-24",
         )
-        
-        assert mock_thread.call_count == 4
-        # Verifica l'applicazione delle proprietà del fallback statico di sicurezza
+
+        assert mock_gen.call_count == 4
         assert article.country_code == "XX"
         assert article.primary_category == "Infrastrutture"
         assert article.latitude == 0.0
         assert article.longitude == 0.0
         assert article.relevance_level == 1
+        assert quota.reserve.await_count == 4
+
+
+@pytest.mark.asyncio
+async def test_client_fatal_auth_fails_fast() -> None:
+    """Auth errors must not burn all correction attempts."""
+    client, quota = _client_with_mock_quota()
+    from google.genai import errors as genai_errors
+
+    with patch.object(client, "_generate_content", new_callable=AsyncMock) as mock_gen, \
+         patch("asyncio.sleep", new_callable=AsyncMock):
+        mock_gen.side_effect = genai_errors.APIError(401, {"error": {"message": "bad key"}})
+
+        article = await client.classify_article(
+            title="Auth fail",
+            content="x",
+            url="https://example.com/a",
+            date="2026-06-24",
+        )
+
+        assert mock_gen.call_count == 1
+        assert article.country_code == "XX"
+        quota.fail.assert_awaited()

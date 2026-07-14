@@ -26,20 +26,15 @@ Carica questa skill ogni volta che:
 
 ## Come Funziona
 
-### Flusso di Esecuzione (Phase 1)
+### Flusso di Esecuzione (Phase 2)
 
 ```
-1. Fetch articolo da Miniflux API (entry_validation + byte limits)
-2. Sanitizzazione HTML → testo pulito
-3. CHECK DUPLICATO: SELECT EXISTS su articles WHERE source_url = ?
-4. (se non duplicato) build_user_prompt(...) con <untrusted_article>
-5. Chiamata google-genai con response_schema=GeopoliticalArticleSchema
-6. Parsing e validazione Pydantic strict (reject category/sentiment/date invalidi)
-7. Overwrite autoritativo source_url + published_at da Miniflux
-8. Commit atomico DB + article_outbox
-9. Reconcile vault (atomic write) → status completed
-10. Mark-read Miniflux solo dopo vault durable
-11. (se FAIL classificazione) fallback geografico + log errore
+1. Worker (radar-worker): advisory lock → reconcile outbox → fetch Miniflux (coda bounded)
+2. Per entry: dedup → sanitize → QuotaLedger.reserve → Gemini (async, deadline)
+3. Parsing/validazione Pydantic strict; complete(reservation_id) con usage reale
+4. Overwrite source_url + published_at da Miniflux
+5. Commit atomico DB + article_outbox
+6. Reconcile vault → mark-read Miniflux solo se durable completed
 ```
 
 ---

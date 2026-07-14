@@ -75,6 +75,16 @@ LLM_RPM = _env_int("LLM_RPM", 10, min_value=1, max_value=120)
 LLM_TPM = _env_int("LLM_TPM", 0, min_value=0, max_value=2_000_000, allow_zero=True)
 LLM_RPD = _env_int("LLM_RPD", 1400, min_value=1, max_value=100_000)
 
+# Application deadline around each Gemini generate_content call (seconds).
+GEMINI_REQUEST_TIMEOUT = _env_int("GEMINI_REQUEST_TIMEOUT", 60, min_value=1, max_value=600)
+# Token estimate reserved before each provider attempt (TPM accounting).
+ESTIMATED_TOKENS_PER_REQUEST = _env_int(
+    "ESTIMATED_TOKENS_PER_REQUEST",
+    1500,
+    min_value=1,
+    max_value=100_000,
+)
+
 # ── Database ─────────────────────────────────────────────────────────────────
 _DEFAULT_PG_PASSWORD = "radar_password_secure"
 
@@ -121,6 +131,33 @@ OUTBOX_STALE_WRITING_SECONDS = _env_int(
 
 _raw_tz = _env_str("RADAR_TIME_ZONE", "UTC") or "UTC"
 RADAR_TIME_ZONE, RADAR_TIME_ZONE_NAME = _resolve_time_zone(_raw_tz)
+
+# ── Worker (ingest daemon) ────────────────────────────────────────────────────
+WORKER_QUEUE_DEPTH = _env_int("WORKER_QUEUE_DEPTH", 100, min_value=1, max_value=10_000)
+WORKER_ENTRY_CONCURRENCY = _env_int("WORKER_ENTRY_CONCURRENCY", 4, min_value=1, max_value=64)
+WORKER_PARSE_CONCURRENCY = _env_int("WORKER_PARSE_CONCURRENCY", 8, min_value=1, max_value=64)
+WORKER_DB_CONCURRENCY = _env_int("WORKER_DB_CONCURRENCY", 4, min_value=1, max_value=32)
+WORKER_GEMINI_CONCURRENCY = _env_int("WORKER_GEMINI_CONCURRENCY", 2, min_value=1, max_value=16)
+WORKER_SHUTDOWN_TIMEOUT = _env_int("WORKER_SHUTDOWN_TIMEOUT", 30, min_value=1, max_value=300)
+WORKER_POLL_INTERVAL_SECONDS = _env_int(
+    "WORKER_POLL_INTERVAL_SECONDS",
+    900,
+    min_value=1,
+    max_value=86_400,
+)
+# Chiave fissa session-level per pg_try_advisory_lock (singleton worker).
+WORKER_ADVISORY_LOCK_KEY = _env_int(
+    "WORKER_ADVISORY_LOCK_KEY",
+    742_014_722,
+    min_value=1,
+    max_value=2_147_483_647,
+)
+WORKER_ADVISORY_LOCK_BACKOFF_SECONDS = _env_int(
+    "WORKER_ADVISORY_LOCK_BACKOFF_SECONDS",
+    5,
+    min_value=1,
+    max_value=300,
+)
 
 
 def _validate_production_secrets() -> None:

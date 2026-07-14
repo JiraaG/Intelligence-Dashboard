@@ -1,0 +1,489 @@
+"""
+QuotaLedger concurrency, reservation identity, and day-window coverage (Phase 2).
+
+Uses an in-memory fake asyncpg pool so `pytest -m "not live"` stays offline.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
+from typing import Any, Callable
+from unittest.mock import AsyncMock, patch
+
+import pytest
+
+from app.classification.client import ClassificationClient
+from app.classification.quota import QuotaLedger, compute_day_window
+
+
+# ─── In-memory fake asyncpg ───────────────────────────────────────────────────
+
+_ACTIVE = frozenset({"reserved", "completed", "failed"})
+
+
+@dataclass
+class _Row:
+    id: int
+    reserved_tokens: int
+    actual_tokens: int | None
+    status: str
+    created_at: datetime
+    model: str | None = None
+    purpose: str | None = None
+
+
+@dataclass
+class InMemoryLedgerStore:
+    """Shared durable ledger state for one or more QuotaLedger instances."""
+
+    rows: dict[int, _Row] = field(default_factory=dict)
+    next_id: int = 1
+    xact_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    utc_now: Callable[[], datetime] = field(
+        default_factory=lambda: (lambda: datetime.now(timezone.utc))
+    )
+
+    def active_count(self) -> int:
+        return sum(1 for r in self.rows.values() if r.status in _ACTIVE)
+
+    def rpm_window_count(self, now: datetime) -> int:
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        else:
+            now = now.astimezone(timezone.utc)
+        window_start = now - timedelta(seconds=60)
+        return sum(
+            1
+            for r in self.rows.values()
+            if r.created_at > window_start and r.status in _ACTIVE
+        )
+
+
+class _TxnCM:
+    def __init__(self, store: InMemoryLedgerStore) -> None:
+        self._store = store
+
+    async def __aenter__(self) -> None:
+        await self._store.xact_lock.acquire()
+
+    async def __aexit__(self, *exc: object) -> None:
+        self._store.xact_lock.release()
+
+
+class FakeConnection:
+    def __init__(self, store: InMemoryLedgerStore) -> None:
+        self._store = store
+
+    def transaction(self) -> _TxnCM:
+        return _TxnCM(self._store)
+
+    async def execute(self, query: str, *args: Any) -> str:
+        return await self._dispatch(query, args, returning=False)  # type: ignore[return-value]
+
+    async def fetchval(self, query: str, *args: Any) -> Any:
+        return await self._dispatch(query, args, returning=True)
+
+    async def _dispatch(self, query: str, args: tuple[Any, ...], *, returning: bool) -> Any:
+        q = " ".join(query.split())
+
+        if "pg_advisory_xact_lock" in q:
+            return None
+
+        if "INSERT INTO llm_request_ledger" in q:
+            rid = self._store.next_id
+            self._store.next_id += 1
+            now = self._store.utc_now()
+            if now.tzinfo is None:
+                now = now.replace(tzinfo=timezone.utc)
+            else:
+                now = now.astimezone(timezone.utc)
+            self._store.rows[rid] = _Row(
+                id=rid,
+                reserved_tokens=int(args[0]),
+                actual_tokens=None,
+                status="reserved",
+                created_at=now,
+                model=args[1] if len(args) > 1 else None,
+                purpose=args[2] if len(args) > 2 else None,
+            )
+            peak = getattr(self._store, "_peak_rpm", None)
+            if isinstance(peak, list):
+                peak.append(self._store.rpm_window_count(now))
+            return rid if returning else f"INSERT 0 1"
+
+        if "status = 'completed'" in q:
+            rid = int(args[0])
+            tokens = int(args[1])
+            row = self._store.rows.get(rid)
+            if row is None or row.status != "reserved":
+                return "UPDATE 0"
+            row.actual_tokens = tokens
+            row.status = "completed"
+            return "UPDATE 1"
+
+        if "status = 'released'" in q:
+            rid = int(args[0])
+            row = self._store.rows.get(rid)
+            if row is None or row.status != "reserved":
+                return "UPDATE 0"
+            row.status = "released"
+            return "UPDATE 1"
+
+        if "status = 'failed'" in q:
+            rid = int(args[0])
+            tokens = args[1] if len(args) > 1 else None
+            row = self._store.rows.get(rid)
+            if row is None or row.status != "reserved":
+                return "UPDATE 0"
+            row.status = "failed"
+            if tokens is not None:
+                row.actual_tokens = max(0, int(tokens))
+            return "UPDATE 1"
+
+        if "SUM(COALESCE" in q:
+            window_start = args[0]
+            statuses = set(args[1])
+            total = 0
+            for row in self._store.rows.values():
+                if row.created_at > window_start and row.status in statuses:
+                    total += (
+                        row.actual_tokens
+                        if row.actual_tokens is not None
+                        else row.reserved_tokens
+                    )
+            return total
+
+        if "MIN(created_at)" in q:
+            window_start = args[0]
+            statuses = set(args[1])
+            times = [
+                row.created_at
+                for row in self._store.rows.values()
+                if row.created_at > window_start and row.status in statuses
+            ]
+            return min(times) if times else None
+
+        if "COUNT(*)" in q:
+            statuses = set(args[-1])
+            if "created_at >=" in q and "created_at <" in q:
+                day_start, day_end = args[0], args[1]
+                return sum(
+                    1
+                    for row in self._store.rows.values()
+                    if day_start <= row.created_at < day_end and row.status in statuses
+                )
+            # Rolling RPM window: created_at > $1
+            window_start = args[0]
+            return sum(
+                1
+                for row in self._store.rows.values()
+                if row.created_at > window_start and row.status in statuses
+            )
+
+        raise AssertionError(f"Unhandled SQL in fake pool: {q[:120]}")
+
+
+class _AcquireCM:
+    def __init__(self, conn: FakeConnection) -> None:
+        self._conn = conn
+
+    async def __aenter__(self) -> FakeConnection:
+        return self._conn
+
+    async def __aexit__(self, *exc: object) -> None:
+        return None
+
+
+class FakePool:
+    """Minimal asyncpg.Pool stand-in shared by concurrent QuotaLedger instances."""
+
+    def __init__(self, store: InMemoryLedgerStore) -> None:
+        self._store = store
+
+    def acquire(self) -> _AcquireCM:
+        return _AcquireCM(FakeConnection(self._store))
+
+    async def execute(self, query: str, *args: Any) -> str:
+        return await FakeConnection(self._store).execute(query, *args)
+
+
+class ControllableClock:
+    """Injectable monotonic + UTC clock; sleep advances both."""
+
+    def __init__(self, start: datetime | None = None) -> None:
+        self.utc = start or datetime(2026, 7, 14, 12, 0, 0, tzinfo=timezone.utc)
+        self.mono = 1_000.0
+
+    def utc_now(self) -> datetime:
+        return self.utc
+
+    def monotonic(self) -> float:
+        return self.mono
+
+    async def sleep(self, seconds: float) -> None:
+        seconds = max(0.0, float(seconds))
+        self.mono += seconds
+        self.utc = self.utc + timedelta(seconds=seconds)
+        await asyncio.sleep(0)
+
+
+def _ledgers(
+    *,
+    rpm: int,
+    tpm: int,
+    rpd: int,
+    n: int = 2,
+    clock: ControllableClock | None = None,
+    tz: timezone = timezone.utc,
+) -> tuple[InMemoryLedgerStore, FakePool, ControllableClock, list[QuotaLedger]]:
+    clock = clock or ControllableClock()
+    store = InMemoryLedgerStore(utc_now=clock.utc_now)
+    store._peak_rpm = []  # type: ignore[attr-defined]
+    pool = FakePool(store)
+    ledgers = [
+        QuotaLedger(
+            pool,
+            rpm=rpm,
+            tpm=tpm,
+            rpd=rpd,
+            time_zone=tz,
+            time_zone_name=getattr(tz, "key", str(tz)),
+            sleep=clock.sleep,
+            monotonic=clock.monotonic,
+            utc_now=clock.utc_now,
+            advisory_lock_key=99_001,
+            default_estimated_tokens=100,
+        )
+        for _ in range(n)
+    ]
+    return store, pool, clock, ledgers
+
+
+# ─── Day window ───────────────────────────────────────────────────────────────
+
+
+@pytest.mark.unit
+def test_compute_day_window_half_open_utc() -> None:
+    now = datetime(2026, 7, 14, 22, 30, tzinfo=timezone.utc)
+    start, end = compute_day_window(now, timezone.utc)
+    assert start == datetime(2026, 7, 14, 0, 0, tzinfo=timezone.utc)
+    assert end == datetime(2026, 7, 15, 0, 0, tzinfo=timezone.utc)
+    assert start <= now < end
+    # Half-open: next day start is exclusive boundary of previous window.
+    assert not (start <= end < end)
+
+
+@pytest.mark.unit
+def test_compute_day_window_fixed_offset_crosses_utc_midnight() -> None:
+    """Non-UTC local midnight: half-open window expressed in UTC."""
+    # Simulate UTC+2 (e.g. Rome summer) without requiring the tzdata package.
+    tz = timezone(timedelta(hours=2))
+    # 22:30 UTC = 00:30 next calendar day in UTC+2.
+    now = datetime(2026, 7, 14, 22, 30, tzinfo=timezone.utc)
+    start, end = compute_day_window(now, tz)
+    assert start == datetime(2026, 7, 14, 22, 0, tzinfo=timezone.utc)
+    assert end == datetime(2026, 7, 15, 22, 0, tzinfo=timezone.utc)
+    assert start <= now < end
+
+
+@pytest.mark.unit
+def test_compute_day_window_naive_treated_as_utc() -> None:
+    now = datetime(2026, 1, 1, 15, 0, 0)  # naive
+    start, end = compute_day_window(now, timezone.utc)
+    assert start.tzinfo is timezone.utc
+    assert end.tzinfo is timezone.utc
+    assert start == datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)
+
+
+@pytest.mark.unit
+def test_compute_day_window_fixed_offset_winter() -> None:
+    """UTC+1 local day boundary (e.g. Rome winter) without tzdata."""
+    tz = timezone(timedelta(hours=1))
+    now = datetime(2026, 1, 15, 10, 0, tzinfo=timezone.utc)
+    start, end = compute_day_window(now, tz)
+    assert start == datetime(2026, 1, 14, 23, 0, tzinfo=timezone.utc)
+    assert end == datetime(2026, 1, 15, 23, 0, tzinfo=timezone.utc)
+    assert start <= now < end
+
+
+# ─── Concurrency / durable caps ───────────────────────────────────────────────
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_two_ledgers_cannot_exceed_rpm() -> None:
+    """Two QuotaLedger instances sharing a pool never push active RPM past the cap."""
+    store, _pool, _clock, (ledger_a, ledger_b) = _ledgers(rpm=3, tpm=0, rpd=100, n=2)
+    peak: list[int] = store._peak_rpm  # type: ignore[attr-defined]
+
+    async def burst(ledger: QuotaLedger, n: int) -> list[int]:
+        ids: list[int] = []
+        for _ in range(n):
+            ids.append(await ledger.reserve(estimated_tokens=10, purpose="rpm-test"))
+        return ids
+
+    # 6 reserves across two "workers"; durable RPM=3 must serialize via advisory lock.
+    results = await asyncio.wait_for(
+        asyncio.gather(burst(ledger_a, 3), burst(ledger_b, 3)),
+        timeout=5.0,
+    )
+    all_ids = results[0] + results[1]
+    assert len(all_ids) == 6
+    assert len(set(all_ids)) == 6
+    assert peak
+    assert max(peak) <= 3
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_two_ledgers_cannot_exceed_rpd() -> None:
+    store, _pool, _clock, (ledger_a, ledger_b) = _ledgers(rpm=50, tpm=0, rpd=4, n=2)
+
+    async def one(ledger: QuotaLedger) -> int:
+        return await ledger.reserve(estimated_tokens=1, purpose="rpd-test")
+
+    # First 4 succeed; further reserves wait for day rollover (sleep advances clock).
+    first = await asyncio.gather(one(ledger_a), one(ledger_b), one(ledger_a), one(ledger_b))
+    assert len(first) == 4
+    assert store.active_count() == 4
+
+    fifth = asyncio.create_task(ledger_a.reserve(estimated_tokens=1, purpose="rpd-overflow"))
+    await asyncio.sleep(0)
+    # Give the reserve loop a chance to sleep past day_end via ControllableClock.sleep.
+    rid = await asyncio.wait_for(fifth, timeout=5.0)
+    assert isinstance(rid, int)
+    # After day boundary advance, prior rows fall out of the local-day window.
+    day_start, day_end = compute_day_window(_clock.utc_now(), timezone.utc)
+    in_day = sum(
+        1
+        for r in store.rows.values()
+        if day_start <= r.created_at < day_end and r.status in _ACTIVE
+    )
+    assert in_day <= 4
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_two_ledgers_cannot_exceed_tpm() -> None:
+    store, _pool, clock, (ledger_a, ledger_b) = _ledgers(rpm=50, tpm=2500, rpd=100, n=2)
+
+    id_a = await ledger_a.reserve(estimated_tokens=2000, purpose="tpm-a")
+    mono_before = clock.mono
+    id_b = await asyncio.wait_for(
+        ledger_b.reserve(estimated_tokens=2000, purpose="tpm-b"),
+        timeout=5.0,
+    )
+
+    assert id_a != id_b
+    assert id_a in store.rows and id_b in store.rows
+    # Second reserve had to wait for the 60s TPM window to slide (clock advanced).
+    assert clock.mono > mono_before
+    # Never two overlapping 2000-token actives in the same 60s window after both done:
+    # the later insert implies the earlier row aged out of the rolling window.
+    later = store.rows[id_b].created_at
+    window_start = later - timedelta(seconds=60)
+    tokens_at_b = sum(
+        (r.actual_tokens if r.actual_tokens is not None else r.reserved_tokens)
+        for r in store.rows.values()
+        if r.created_at > window_start
+        and r.created_at <= later
+        and r.status in _ACTIVE
+        and r.id != id_b
+    )
+    assert tokens_at_b + store.rows[id_b].reserved_tokens <= 2500
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_complete_updates_own_reservation_not_latest() -> None:
+    """A delayed complete(id=N) must not touch a newer reservation M."""
+    store, _pool, clock, (ledger,) = _ledgers(rpm=50, tpm=0, rpd=100, n=1)
+
+    id_n = await ledger.reserve(estimated_tokens=100, purpose="first")
+    id_m = await ledger.reserve(estimated_tokens=100, purpose="second")
+    assert id_m == id_n + 1
+
+    await ledger.complete(id_n, actual_tokens=777)
+
+    assert store.rows[id_n].status == "completed"
+    assert store.rows[id_n].actual_tokens == 777
+    assert store.rows[id_m].status == "reserved"
+    assert store.rows[id_m].actual_tokens is None
+
+    await ledger.complete(id_m, actual_tokens=42)
+    assert store.rows[id_m].actual_tokens == 42
+    assert store.rows[id_n].actual_tokens == 777
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_four_retry_attempts_consume_four_rpd_reservations() -> None:
+    """ClassificationClient reserves once per attempt; 4 retryable failures → 4 reserves."""
+    store, _pool, _clock, (ledger,) = _ledgers(rpm=50, tpm=0, rpd=100, n=1)
+    real_reserve = ledger.reserve
+    reserve_spy = AsyncMock(side_effect=real_reserve)
+    ledger.reserve = reserve_spy  # type: ignore[method-assign]
+
+    client = ClassificationClient(quota=ledger)
+
+    with (
+        patch.object(client, "_generate_content", new_callable=AsyncMock) as mock_gen,
+        patch("asyncio.sleep", new_callable=AsyncMock),
+    ):
+        mock_gen.side_effect = TimeoutError("provider timeout")
+        article = await client.classify_article(
+            title="Retry burn",
+            content="body",
+            url="https://example.com/r",
+            date="2026-07-14",
+        )
+
+    assert article.country_code == "XX"
+    assert reserve_spy.await_count == 4
+    assert mock_gen.await_count == 4
+    assert len(store.rows) == 4
+    assert all(r.status == "failed" for r in store.rows.values())
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_complete_after_newer_reservation_targets_exact_id() -> None:
+    """
+    complete(id=N) while M was created later must update only N's tokens
+    (ledger identity, not 'latest row' semantics).
+    """
+    store, _pool, _clock, (ledger,) = _ledgers(rpm=50, tpm=0, rpd=100, n=1)
+    id_n = await ledger.reserve(estimated_tokens=100, purpose="slow")
+    id_m = await ledger.reserve(estimated_tokens=100, purpose="fast")
+    # Delayed response for N arrives after M exists.
+    await ledger.complete(id_n, actual_tokens=1234)
+    assert store.rows[id_n].actual_tokens == 1234
+    assert store.rows[id_n].status == "completed"
+    assert store.rows[id_m].status == "reserved"
+    assert store.rows[id_m].actual_tokens is None
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_rpm_third_reserve_waits_until_window_slides() -> None:
+    store, _pool, clock, (ledger_a, ledger_b) = _ledgers(rpm=2, tpm=0, rpd=100, n=2)
+
+    id1 = await ledger_a.reserve(estimated_tokens=1)
+    id2 = await ledger_b.reserve(estimated_tokens=1)
+    assert store.active_count() == 2
+
+    third = asyncio.create_task(ledger_a.reserve(estimated_tokens=1))
+    rid = await asyncio.wait_for(third, timeout=5.0)
+    assert rid not in (id1, id2)
+    # Clock advanced by durable wait; at most 2 active in the current 60s window
+    # at any insert — final state may be 1–3 depending on aging.
+    now = clock.utc_now()
+    window_start = now - timedelta(seconds=60)
+    in_window = sum(
+        1
+        for r in store.rows.values()
+        if r.created_at > window_start and r.status in _ACTIVE
+    )
+    assert in_window <= 2

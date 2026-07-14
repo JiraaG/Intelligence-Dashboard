@@ -7,23 +7,25 @@
 
 ## Principio Architetturale Fondamentale
 
-Il sistema Radar è composto da **quattro servizi Docker** su una rete bridge interna
-`radar-network`. Nessun `radar-worker` separato finché Phase 2 non lo introduce.
+Il sistema Radar è composto da **cinque servizi Docker** su una rete bridge interna
+`radar-network`: `radar-db`, `radar-backend` (API), `radar-worker` (ingest),
+`radar-frontend`, `radar-miniflux`.
 Il frontend espone la porta 80; Miniflux può esporre 8080 (da restringere in Phase 3).
 
 ```
 Internet → [Porta 80] → radar-frontend (Nginx)
                                 │
               rete interna radar-network
-                     ┌──────────┼──────────┐
-                     │          │          │
-             radar-backend   radar-db   radar-miniflux
+          ┌──────────┬──────────┼──────────┐
+          │          │          │          │
+   radar-backend  radar-worker radar-db  radar-miniflux
+      (API)         (ingest)
 ```
 
 Phase 3 del Consolidation Plan introdurrà reti `edge`/`data` e hardening — **non** sono lo stato attuale.
 ---
 
-## Regola 1: Quattro Servizi, Nomi Immutabili
+## Regola 1: Cinque Servizi, Nomi Immutabili
 
 I nomi dei servizi in `docker-compose.yml` sono fissi e referenziati nel codice.
 Non rinominarli senza aggiornare anche le variabili d'ambiente e il codice Python.
@@ -31,7 +33,8 @@ Non rinominarli senza aggiornare anche le variabili d'ambiente e il codice Pytho
 | Nome Servizio     | Immagine Base          | Funzione                              |
 |-------------------|------------------------|---------------------------------------|
 | `radar-db`        | `postgres:15-alpine`   | Database PostgreSQL persistente       |
-| `radar-backend`   | Custom Python 3.12     | Demone pipeline + API REST FastAPI    |
+| `radar-backend`   | Custom Python 3.12     | API REST FastAPI (no ingest)          |
+| `radar-worker`    | Stessa immagine backend | Ingest Miniflux→Gemini→DB/Vault (`python -m app.worker`) |
 | `radar-frontend`  | Custom Node + Nginx    | Build Angular 21 + web server Nginx   |
 | `radar-miniflux`  | `miniflux/miniflux:2.3.2` | Aggregatore RSS integrato nello stack |
 

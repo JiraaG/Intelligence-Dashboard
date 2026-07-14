@@ -36,7 +36,7 @@ PostgreSQL via **asyncpg puro** (niente ORM/SQLAlchemy).
 (`run_migrations` con tabella `schema_migrations` + checksum). `bootstrap_database()` in
 `core/database.py` chiama `run_migrations` — **non** reinventare DDL via `CREATE TABLE` ad-hoc nel bootstrap.
 Migrazioni attuali: `001_initial.sql`, `002_pipeline_outbox_and_quotas.sql` (`article_outbox`).
-Phase 2+ (worker, `llm_request_ledger`, reti edge/data) **non** è ancora presente.
+Phase 2 DONE (worker, `llm_request_ledger`). Phase 3+ (reti edge/data, hardening) **non** è ancora presente.
 
 ---
 
@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS article_outbox (
 );
 ```
 
-> Mark-read Miniflux solo dopo `status = completed` (vault durable). `llm_request_ledger` è Phase 2 — non inventarlo.
+> Mark-read Miniflux solo dopo `status = completed` (vault durable). Quote LLM via `llm_request_ledger` (Phase 2).
 
 ### Tabella `companies` (Entità Aziendale)
 
@@ -260,4 +260,4 @@ docker compose exec radar-db psql -U radar_user -d radar_db -c \
 - **BLOCCA** se: relazioni molti-a-molti implementate senza junction table
 - **BLOCCA** se: `DROP TABLE` o `TRUNCATE` senza `IF EXISTS` e senza commento di migrazione
 - **AVVISA** se: query senza `LIMIT` che potrebbero restituire milioni di righe
-- **AVVISA** se: si assume `llm_request_ledger` / worker Phase 2 come già presenti
+- **AVVISA** se: si assume reti `edge`/`data` o `/health/ready` Phase 3 come già presenti

@@ -2,7 +2,14 @@
 
 This plan addresses the production blockers found during the code and architecture review. Execute phases in order. Do not release a later phase while an earlier acceptance gate is failing.
 
-**Progress (audit codice 2026-07-14, post–branch restore):** Phase **0 DONE**. Phase **1 DONE**. Phases **2–6 NOT STARTED** in current sources (pre-restore work was lost; see [`Implementation_Plan_Execution.md`](Implementation_Plan_Execution.md) sezione A vs B). Resume at Phase 2 after manual UI check. Sidebar remains frozen; read/unread `.marker-read` remains in scope via `state.service` + `radar-map` only.
+**Progress (audit codice 2026-07-14, post–branch restore):** Phase **0 DONE**. Phase **1 DONE**. Phase **2 DONE**. Phases **3–6 NOT STARTED**. Resume at Phase 3 after manual UI/ops check. Sidebar remains frozen; read/unread `.marker-read` remains in scope via `state.service` + `radar-map` only.
+
+**Git restore points (branch `refactor/enterprise-consolidation`):**
+| Tag semantico | Commit tipico | Contenuto |
+|---------------|---------------|-----------|
+| Phase 0 | `0189359` | pytest markers / frontend CI baseline |
+| Phase 1 | `bff8abe` | migrations 001–002, outbox, Pydantic strict, vault atomico |
+| Phase 2 | *(questo commit)* | `radar-worker`, coda bounded, `llm_request_ledger`, Gemini deadline/retry |
 
 ## Scope And Exit Criteria
 
@@ -10,7 +17,9 @@ This plan addresses the production blockers found during the code and architectu
 
 Do **not** modify, restyle, refactor, replace, or add specs for `radar/frontend/src/app/components/radar-sidebar/` (including `p-carousel`, `updateCarouselHeight`, markup, SCSS, or a11y inside the sidebar). Do **not** introduce `article-list` or infinite-scroll replacements for the carousel.
 
-**Exception kept in scope:** read/unread sync (`.marker-read` no-op). Fix only via `state.service.ts` and `radar-map.component.ts` — the sidebar already calls `toggleRead` → `StateService` and must keep working without editing sidebar files.
+**Exception kept in scope:** read/unread sync (`.marker-read` no-op **and** expanded graph icons collapsing on toggle — see below). Fix only via `state.service.ts` and `radar-map.component.ts` — the sidebar already calls `toggleRead` → `StateService` and must keep working without editing sidebar files.
+
+**Observed UI bug (2026-07-14):** toggling *Segna come letta / non letta* while a category cluster is spiderfied/expanded makes the expanded graph icons disappear. Root cause is in the same Phase 4/5 path: `StateService.toggleReadStatus` replaces the articles array, `radar-map` rebuilds MarkerCluster layers, and spiderfy state is lost. Acceptance: read toggle must update `.marker-read` (and keep spiderfy/expanded icons) without a full cluster rebuild.
 
 ### Exit criteria
 
@@ -19,7 +28,7 @@ Do **not** modify, restyle, refactor, replace, or add specs for `radar/frontend/
 - [ ] Quotas count every Gemini attempt across retries and process replicas.
 - [ ] The API, worker, database, Miniflux, and frontend have explicit readiness, bounded resources, recoverable state, and documented operations.
 - [ ] The dashboard stays responsive with 10,000 articles and a large cluster never creates unbounded Leaflet markers. (Sidebar DOM card bounding is out of scope.)
-- [ ] Read-status toggles update map marker `.marker-read` without a full cluster rebuild; concurrent toggles converge on the final server state.
+- [ ] Read-status toggles update map marker `.marker-read` without a full cluster rebuild (expanded spiderfy/graph icons must stay); concurrent toggles converge on the final server state.
 - [ ] Documentation, ECC guardrails, test suite, and deployed behavior describe the same system.
 
 ## Phase 0 - Freeze Risky Deployments And Establish A Baseline
@@ -120,42 +129,54 @@ cd radar && python -m pytest -m "not live"
 
 ## Phase 2 - Make The Worker Cancellable, Bounded, And Quota-Correct
 
-**Status:** NOT STARTED after restore — ingestion still in `main.py` with `TaskGroup`; no `worker.py` / quota ledger / Compose worker.
+**Status:** DONE (2026-07-14) on post-restore branch.
 
 ### Files to add
 
-- [ ] `radar/backend/app/worker.py`
-- [ ] `radar/backend/app/classification/quota.py`
-- [ ] `radar/backend/app/tests/test_worker_shutdown.py`
-- [ ] `radar/backend/app/tests/test_quota_concurrency.py`
-- [ ] `radar/backend/requirements.lock`
+- [x] `radar/backend/app/worker.py`
+- [x] `radar/backend/app/classification/quota.py`
+- [x] `radar/backend/app/tests/test_worker_shutdown.py`
+- [x] `radar/backend/app/tests/test_quota_concurrency.py`
+- [x] `radar/backend/requirements.lock`
+- [x] `radar/backend/migrations/003_quota_ledger.sql`
 
 ### Files to modify
 
-- [ ] `radar/backend/app/main.py`
-- [ ] `radar/backend/app/classification/client.py`
-- [ ] `radar/backend/app/core/database.py`
-- [ ] `radar/backend/Dockerfile`
-- [ ] `radar/docker-compose.yml`
+- [x] `radar/backend/app/main.py`
+- [x] `radar/backend/app/classification/client.py`
+- [x] `radar/backend/app/core/config.py`
+- [x] `radar/backend/app/core/logging.py` (makedirs fallback — WORKDIR `/app`)
+- [x] `radar/backend/Dockerfile`
+- [x] `radar/docker-compose.yml`
+- [x] `radar/.env.example`
 
 ### Changes
 
-1. Separate the HTTP application from ingestion. `main.py` creates only the FastAPI API and resources it owns; `worker.py` owns the polling loop. Start exactly one `radar-worker` service in Compose. This prevents duplicate ingestion when API workers or replicas increase.
-2. Use a PostgreSQL advisory lock or a singleton worker deployment guard as defense in depth. Emit a clear metric/log when leadership cannot be acquired.
-3. Replace unbounded `TaskGroup` creation with a bounded queue and a configured worker count. Limit queued entries, parsing concurrency, DB concurrency, and outbound Gemini concurrency separately.
-4. Re-raise `asyncio.CancelledError` in every loop boundary. Do not sleep in a `finally` while shutdown is pending. Cancel workers, await their cleanup with a short bounded shutdown timeout, close HTTP clients, then close the pool.
-5. Add a durable `llm_request_ledger`/reservation table. Reserve RPM, TPM estimate, and RPD capacity transactionally before every provider attempt, including validation and retry attempts. Store a reservation ID per request and update that exact row with actual usage after the response.
-6. Use monotonic time for in-process spacing and UTC timestamps plus the configured quota timezone for durable daily accounting. Re-check a rolling window after every wait. Treat provider `429` and `Retry-After` as authoritative.
-7. Give Gemini an application deadline and classify retryable errors. Do not retry authentication, model-not-found, validation, or configuration failures. Prefer the SDK async client; if a blocking SDK call remains necessary, isolate it and document that cancellation cannot terminate the underlying request.
-8. Add `created_at` index and query quota windows with a timezone-defined half-open range rather than `date(created_at) = CURRENT_DATE`.
+1. [x] Separate the HTTP application from ingestion. `main.py` creates only the FastAPI API and resources it owns; `worker.py` owns the polling loop. Start exactly one `radar-worker` service in Compose. This prevents duplicate ingestion when API workers or replicas increase.
+2. [x] Use a PostgreSQL advisory lock or a singleton worker deployment guard as defense in depth. Emit a clear metric/log when leadership cannot be acquired.
+3. [x] Replace unbounded `TaskGroup` creation with a bounded queue and a configured worker count. Limit queued entries, parsing concurrency, DB concurrency, and outbound Gemini concurrency separately.
+4. [x] Re-raise `asyncio.CancelledError` in every loop boundary. Do not sleep in a `finally` while shutdown is pending. Cancel workers, await their cleanup with a short bounded shutdown timeout, close HTTP clients, then close the pool.
+5. [x] Add a durable `llm_request_ledger`/reservation table. Reserve RPM, TPM estimate, and RPD capacity transactionally before every provider attempt, including validation and retry attempts. Store a reservation ID per request and update that exact row with actual usage after the response.
+6. [x] Use monotonic time for in-process spacing and UTC timestamps plus the configured quota timezone for durable daily accounting. Re-check a rolling window after every wait. Treat provider `429` and `Retry-After` as authoritative.
+7. [x] Give Gemini an application deadline and classify retryable errors. Do not retry authentication, model-not-found, validation, or configuration failures. Prefer the SDK async client; if a blocking SDK call remains necessary, isolate it and document that cancellation cannot terminate the underlying request.
+8. [x] Add `created_at` index and query quota windows with a timezone-defined half-open range rather than `date(created_at) = CURRENT_DATE`.
 
 ### Required tests
 
-- [ ] Cancellation completes in seconds when the daemon is processing, idle, and in the polling wait.
-- [ ] Two worker processes cannot exceed RPM/TPM/RPD combined.
-- [ ] Four retry attempts consume four RPD reservations.
-- [ ] A delayed response updates its own token reservation, not the most recently created reservation.
-- [ ] A 10,000-entry Miniflux response never creates 10,000 runnable tasks at once.
+- [x] Cancellation completes in seconds when the daemon is processing, idle, and in the polling wait.
+- [x] Two worker processes cannot exceed RPM/TPM/RPD combined.
+- [x] Four retry attempts consume four RPD reservations.
+- [x] A delayed response updates its own token reservation, not the most recently created reservation.
+- [x] A 10,000-entry Miniflux response never creates 10,000 runnable tasks at once.
+
+### Acceptance gate
+
+```text
+cd radar && python -m pytest -m "not live"
+cd radar && docker compose up -d --build
+```
+
+**Status (2026-07-14):** gate verde — 95 passed / 3 live deselected. Docker: migrazione 003 applicata; `radar-worker` leader (advisory lock); API healthy; `/` `/health` `/api/articles` 200. Sidebar untouched. **In attesa conferma UI/ops prima di Phase 3.**
 
 ## Phase 3 - Secure And Operate The Container Stack
 
@@ -205,7 +226,7 @@ Run a restore drill in a disposable deployment before declaring this phase compl
 
 ## Phase 4 - Stabilize The Frontend Lifecycle And Security Boundary
 
-**Status:** NOT STARTED after restore — XSS HTML markers, in-place `is_read`, silent mock fallback, no DestroyRef / MOCK_MODE / map specs. Sidebar frozen (Change 5 cancelled). Read/unread fix remains mandatory (Change 7).
+**Status:** NOT STARTED after restore — XSS HTML markers, in-place `is_read`, silent mock fallback, no DestroyRef / MOCK_MODE / map specs. Sidebar frozen (Change 5 cancelled). Read/unread fix remains mandatory (Change 7), including the observed collapse of expanded spiderfy/graph icons on letta/non-letta toggle.
 
 ### Files to add
 
@@ -236,7 +257,7 @@ Run a restore drill in a disposable deployment before declaring this phase compl
 4. Remove the redundant hatch directive or add a stored `MutationObserver` and destroy cleanup. Keep a single SVG-pattern owner and correct the sixth-line typo plus the representation of categories seven through ten.
 5. ~~Carousel-height ResizeObserver~~ — **cancelled (sidebar freeze).**
 6. Make mock data an explicit development-only injection token. An API error must remain visible to the user, preserve the requested date, and never silently switch a production session to synthetic data.
-7. Serialize read-status writes per article with a mutation version. Apply a response or rollback only if it belongs to the most recent mutation. Return the canonical article ID/state/version from the backend. Use immutable article updates in `state.service` so map markers receive `.marker-read` without editing the sidebar.
+7. Serialize read-status writes per article with a mutation version. Apply a response or rollback only if it belongs to the most recent mutation. Return the canonical article ID/state/version from the backend. Use immutable article updates in `state.service` so map markers receive `.marker-read` without editing the sidebar. A read-status-only update must **not** rebuild MarkerCluster layers or clear an open spiderfy — expanded graph icons must remain visible after *Segna come letta / non letta*.
 8. Choose and document one state policy: Signals own UI state; RxJS may exist only at the `HttpClient` transport adapter, or replace GET resources with Angular `httpResource`. The current claim of no RxJS is false because `Observable`, `catchError`, and `rxResource` are used.
 9. Restore a single responsive split-screen rule via shell/map (`map.invalidateSize()` after transitions) and provide mobile layouts **without modifying `radar-sidebar` files**. Remove desktop-only minimum widths and focus-outline removal without a `:focus-visible` replacement on non-sidebar surfaces.
 10. Replace clickable `div`/`span` controls with buttons on toolbar / country UI / map chrome only — **not** inside the frozen sidebar.
@@ -245,7 +266,7 @@ Run a restore drill in a disposable deployment before declaring this phase compl
 
 - [ ] A malicious title cannot create attributes, elements, or executable DOM.
 - [ ] Destroying a map cancels GeoJSON, animation frames, timeouts, and spiderfy work.
-- [ ] Two rapid read toggles converge on the final server state; toggling read updates `.marker-read` on the map marker without a full cluster rebuild.
+- [ ] Two rapid read toggles converge on the final server state; toggling read updates `.marker-read` on the map marker without a full cluster rebuild; an already-expanded spiderfy/graph stays visible after letta/non-letta.
 - [ ] Keyboard-only users can open/close the country UI and activate toolbar category controls (sidebar controls out of scope).
 
 ## Phase 5 - Scale The Query And Map Model

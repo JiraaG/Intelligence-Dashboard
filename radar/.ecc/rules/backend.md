@@ -53,8 +53,9 @@ Quando aggiungi una nuova dipendenza al `requirements.txt`:
 
 ## Regola 1: Il Demone Non Si Ferma Mai
 
-Il loop `while True` con `asyncio.sleep(900)` è il cuore del sistema. Non deve mai terminare
-per un singolo articolo fallito o per un errore dell'API Gemini.
+Il loop vive in `worker.py` (`run_pipeline_loop`). Non deve terminare per un singolo
+articolo fallito o per un errore Gemini. `CancelledError` va sempre re-raised.
+Lo sleep di polling **non** sta in un `finally` di shutdown.
 
 **OBBLIGATORIO:**
 ```python
@@ -62,10 +63,11 @@ async def run_pipeline_loop() -> None:
     while True:
         try:
             await run_pipeline_cycle()
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
-            logger.error(f"Errore ciclo: {e}", exc_info=True)
-        finally:
-            await asyncio.sleep(900)  # SEMPRE asyncio.sleep, SEMPRE 900 secondi
+            logger.error("Errore ciclo: %s", e, exc_info=True)
+        await asyncio.sleep(WORKER_POLL_INTERVAL_SECONDS)
 ```
 
 **VIETATO:**
@@ -77,6 +79,10 @@ time.sleep(900)
 # NO: Exception non gestita fa crashare il demone
 async def run_pipeline_cycle():
     result = await call_gemini()  # Se lancia eccezione, il processo muore
+
+# NO: sleep di polling dentro finally durante shutdown
+finally:
+    await asyncio.sleep(900)
 ```
 
 ---
@@ -206,64 +212,76 @@ Lo schema `GeopoliticalArticleSchema` è il contratto tra backend e frontend.
 
 ---
 
-## Regola 8: Entrypoint di Startup Uvicorn
+## Regola 8: Entrypoint di Startup (API + Worker)
 
-Durante l'avvio dell'applicazione backend con Uvicorn, l'entrypoint deve sempre essere specificato come `main:app` e non `app.main:app`. Nel contesto di build Docker, la directory `./backend/app` viene copiata direttamente in `/app` nel container, quindi `main.py` risiede nella radice del working directory.
+Phase 2: stessa immagine, due processi.
+- API: `WORKDIR=/app`, `PYTHONPATH=/app`, `uvicorn app.main:app`
+- Worker: `python -m app.worker`
 
-**OBBLIGATORIO:**
+**OBBLIGATORIO (Dockerfile / Compose):**
 ```bash
-uvicorn main:app --host 0.0.0.0 --port 8000
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
+# worker Compose override:
+python -m app.worker
 ```
 
 **VIETATO:**
 ```bash
-# NO: fallisce all'avvio nel container con "ModuleNotFoundError: No module named 'app'"
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+# NO: avviare l'ingestione dentro il processo API (lifespan FastAPI)
+# NO: TaskGroup unbounded su tutte le entry Miniflux
 ```
 
 ---
 
-## Regola 9: Rate Limiting Obbligatorio tra Chiamate LLM
+## Regola 9: Quote LLM Durable (QuotaLedger)
 
-Per evitare errori `429 (Too Many Requests)` sul tier gratuito Gemini (15 RPM), è obbligatorio
-attendere almeno 4 secondi tra ogni singola chiamata all'API.
+Ogni tentativo provider (incluso retry/validazione) deve **reservare** capacità su
+`llm_request_ledger` via `classification/quota.py` **prima** della chiamata Gemini.
+Aggiornare **quella** reservation id con usage reale. Spacing in-process con
+`time.monotonic()`; RPD half-open su `RADAR_TIME_ZONE`. Rispettare `429` + `Retry-After`.
 
-**OBBLIGATORIO (in `classification/client.py`):**
+**OBBLIGATORIO:**
 ```python
-async def classify_article(self, ...) -> GeopoliticalArticleSchema:
-    await asyncio.sleep(4)  # Rate limiting: max 15 RPM su tier gratuito
-    response = await self.client.aio.models.generate_content(
-        model=self.model_name,
-        contents=[...],
-        config=types.GenerateContentConfig(...)
+reservation_id = await self.quota.reserve(estimated_tokens=..., model=self.model)
+try:
+    response = await asyncio.wait_for(
+        self.client.aio.models.generate_content(...),
+        timeout=GEMINI_REQUEST_TIMEOUT,
     )
-    ...
+    await self.quota.complete(reservation_id, actual_tokens)
+except asyncio.CancelledError:
+    await self.quota.fail(reservation_id)  # o release se provider non avviato
+    raise
 ```
 
-**PERCHÉ:** Il backend può ricevere backlog di 1000+ articoli. Senza questo sleep,
-Gemini risponde con `429` e gli articoli vengono persi silenziosamente.
+**VIETATO:**
+```python
+# NO: solo asyncio.sleep(4) in-memory come unico rate limit
+# NO: date(created_at) = CURRENT_DATE per RPD
+# NO: complete() sull'"ultima" riga invece che sulla reservation_id
+```
 
 ---
 
 ## Regola 10: Logging.py — Fallback Graceful per Permessi File
 
-Il `RotatingFileHandler` in `core/logging.py` può fallire in ambienti container
-se la directory `logs/` non è scrivibile. L'inizializzazione DEVE essere wrappata in try/except.
+`makedirs` della directory `logs/` e `RotatingFileHandler` DEVONO essere in try/except.
+Con `WORKDIR=/app` e user non-root, `/app/logs` può non essere scrivibile: il console handler resta obbligatorio.
 
 **OBBLIGATORIO:**
 ```python
 try:
+    os.makedirs(log_dir, exist_ok=True)
     file_handler = RotatingFileHandler(log_file, ...)
     root_logger.addHandler(file_handler)
-except Exception as e:
-    logging.warning(f"Impossibile inizializzare RotatingFileHandler su {log_file}: {e}")
-    # Fallback silenzioso — il console handler rimane attivo
+except OSError as e:
+    root_logger.warning("File log non disponibile: %s. Solo console.", e)
 ```
 
 **VIETATO:**
 ```python
 # NO: Crash all'avvio se la directory logs/ non esiste o non è scrivibile
-file_handler = RotatingFileHandler(log_file, ...)  # Senza try/except
+os.makedirs(log_dir, exist_ok=True)  # Senza try/except prima del console handler
 ```
 
 ---
@@ -281,6 +299,7 @@ Questi pattern nel codice causano un BLOCCO immediato:
 | `call_gemini()` prima di `SELECT EXISTS` | Manca deduplicazione pre-Gemini           |
 | `requests.get()` al posto di `httpx`     | Chiamata sincrona in contesto async       |
 | Funzione pubblica senza type hints       | Contratto di interfaccia mancante         |
-| Comando startup `app.main:app`           | Specifica di modulo errata per Uvicorn    |
-| Assenza di `await asyncio.sleep(4)` tra call LLM | Causa errori 429 su tier gratuito Gemini |
-| `os.makedirs()` senza try/except nel RotatingFileHandler | Crash startup per permessi container |
+| Ingestione nel lifespan di `main.py`     | Deve vivere in `worker.py` / `radar-worker` |
+| Solo `asyncio.sleep(4)` senza ledger     | Quote non durable cross-process           |
+| `os.makedirs()` senza try/except nei log | Crash startup per permessi container      |
+| Swallow di `CancelledError`              | Shutdown non cancellabile                 |

@@ -14,10 +14,10 @@ in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categ
 
 ### Vincoli post–branch restore (2026-07-14)
 
-- **Phase 0–1 DONE**; fasi **2–6 NOT STARTED** nel tree attuale. Vedi `Implementation_Plan.md` / `Implementation_Plan_Execution.md`.
-- **Presenti (Phase 1):** `backend/migrations/` (`001_initial.sql`, `002_pipeline_outbox_and_quotas.sql`), `core/migrations.py` (`schema_migrations` + checksums), `article_outbox`, commit atomico DB + reconcile vault, mark-read Miniflux solo dopo vault durable.
-- **Non assumere** `worker.py`, Compose `radar-worker`, reti `edge`/`data`, `/health/live|/ready`, o `article-list` come già presenti (Phase 2+).
-- Pipeline ancora in `backend/app/main.py` (`run_pipeline_loop` + `TaskGroup`); Compose ancora 4 servizi su `radar-network`. `bootstrap_database()` chiama `run_migrations` — schema da SQL ordinato, non da CREATE TABLE ad-hoc.
+- **Phase 0–2 DONE**; fasi **3–6 NOT STARTED**. Vedi `Implementation_Plan.md` / `Implementation_Plan_Execution.md`.
+- **Presenti (Phase 1–2):** `backend/migrations/` (`001`, `002`, `003_quota_ledger.sql`), `core/migrations.py`, `article_outbox`, `llm_request_ledger`, `worker.py` + Compose `radar-worker`, coda bounded + advisory lock, `classification/quota.py`.
+- **Non assumere** reti `edge`/`data`, `/health/live|/ready`, o `article-list` (Phase 3+ / freeze).
+- Pipeline ingest in `backend/app/worker.py`; `main.py` è API-only. Compose: 5 servizi su `radar-network` (incluso `radar-worker`).
 - **Sidebar freeze:** non modificare `frontend/src/app/components/radar-sidebar/**`; tenere `p-carousel` + altezza via `article-card-{id}`; vietato `app-article-list`.
 - Bug **read/unread** (`.marker-read`): solo `state.service.ts` + `radar-map.component.ts`.
 - Pydantic: `companies_involved` / `tags` / `infrastructural_entities` sono **`str` CSV** (non `List[str]`). Nessun campo `reasoning`; `ConfigDict(strict=True, extra="forbid")`. Il modello FE può ancora usare `string[]` dopo `array_agg` API — non confondere i due.
@@ -35,7 +35,7 @@ in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categ
 | Frontend    | Angular 21 (Standalone Components)      | Signals, lazy loading                       |
 | UI Library  | PrimeNG 17+                             | p-sidebar, p-carousel, p-calendar           |
 | Mappa       | Leaflet + CartoDB Dark Positron          | GeoJSON locale in assets/data/             |
-| Container   | Docker + docker-compose                  | Quattro servizi su `radar-network` (no worker finché Phase 2) |
+| Container   | Docker + docker-compose                  | Cinque servizi su `radar-network` (incluso `radar-worker`) |
 | Web Server  | Nginx (Alpine)                          | Serve build Angular, porta 80 esposta       |
 
 ---
@@ -53,25 +53,28 @@ radar/
 │   └── hooks/                     # Automazioni ciclo di vita (pre/post tool)
 ├── backend/
 │   ├── Dockerfile
-│   ├── migrations/                # SQL ordinato (Phase 1 DONE) — source of truth schema
+│   ├── migrations/                # SQL ordinato — source of truth schema
 │   │   ├── 001_initial.sql
-│   │   └── 002_pipeline_outbox_and_quotas.sql
+│   │   ├── 002_pipeline_outbox_and_quotas.sql
+│   │   └── 003_quota_ledger.sql
 │   └── app/
 │       ├── __init__.py
-│       ├── main.py                # FastAPI app + lifespan + endpoint REST + run_pipeline_loop
+│       ├── main.py                # FastAPI API-only (pool + migrations + REST)
+│       ├── worker.py              # Ingest daemon (coda bounded, advisory lock)
 │       ├── requirements.txt
 │       ├── core/                  # Configurazione, DB pool asyncpg, logging centralizzato
-│       │   ├── config.py          # Variabili d'ambiente bounded; RADAR_ENV production fail-fast
+│       │   ├── config.py          # Variabili d'ambiente bounded; knobs worker + Gemini timeout
 │       │   ├── database.py        # init_pool(), bootstrap_database() → run_migrations()
 │       │   ├── migrations.py      # schema_migrations + checksum SHA-256; applica SQL ordinato
-│       │   └── logging.py         # setup_logging() con RotatingFileHandler + fallback graceful
+│       │   └── logging.py         # setup_logging() con fallback se logs/ non scrivibile
 │       ├── extraction/            # Layer E: fetch Miniflux + HTML sanitize + dedup check
 │       │   ├── client.py          # MinifluxClient (httpx async, lifespan, byte limits, retry)
 │       │   ├── entry_validation.py # Validazione entry Miniflux pre-pipeline
 │       │   ├── parser.py          # strip_html_tags() — purge totale media tags
 │       │   └── state.py           # is_article_duplicate() — SELECT EXISTS asyncpg
-│       ├── classification/        # Layer C: Gemini LLM + schema Pydantic + rate limiting
-│       │   ├── client.py          # ClassificationClient — asyncio.sleep(4) tra call LLM
+│       ├── classification/        # Layer C: Gemini LLM + schema Pydantic + quota ledger
+│       │   ├── client.py          # ClassificationClient — async SDK, deadline, retry classificato
+│       │   ├── quota.py           # QuotaLedger durable RPM/TPM/RPD
 │       │   ├── prompts.py         # System prompt (no CoT) + build_user_prompt(<untrusted_article>)
 │       │   └── validator.py       # GeopoliticalArticleSchema strict, extra=forbid, no reasoning
 │       ├── commit/                # Layer K: DB commit + outbox + Vault Obsidian

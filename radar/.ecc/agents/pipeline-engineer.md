@@ -2,9 +2,10 @@
 name: pipeline-engineer
 description: >
   Agente specializzato nell'implementazione e manutenzione della pipeline di ingestione dati del
-  Radar Informativo Globale. Responsabile esclusivo del backend Python: loop asincrono ogni 15
-  minuti, integrazione Miniflux API, chiamate Gemma con schema Pydantic e scrittura idempotente
-  su PostgreSQL. DEVE ESSERE USATO per qualsiasi modifica a backend/app/main.py e ai moduli di
+  Radar Informativo Globale. Responsabile esclusivo del backend Python: worker ingest
+  (`worker.py` / Compose `radar-worker`), integrazione Miniflux API, chiamate Gemma con
+  schema Pydantic, QuotaLedger e scrittura idempotente su PostgreSQL. DEVE ESSERE USATO
+  per qualsiasi modifica a `backend/app/worker.py`, `main.py` (API) e ai moduli di
   pipeline (extraction/, classification/, commit/, core/). Non tocca mai il frontend né i file Docker.
 tools: ["Read", "Write", "Bash", "Grep", "Glob"]
 model: sonnet
@@ -38,30 +39,23 @@ trasforma gli articoli RSS grezzi in eventi geopolitici arricchiti e persistiti 
 
 ### 1. Il Loop Asincrono è Sacro
 
-Il cuore del backend è il demone asincrono. La sua struttura è immutabile:
+Il cuore dell'ingest è `worker.py` (non `main.py`). `CancelledError` sempre re-raised;
+lo sleep di polling non sta in un `finally` di shutdown.
 
 ```python
-import asyncio
-import logging
-
-logger = logging.getLogger(__name__)
-
-async def run_pipeline_loop() -> None:
-    """Entry point del demone di ingestione. Gira per sempre."""
-    logger.info("Pipeline Radar avviata. Polling ogni 15 minuti.")
+async def run_pipeline_loop(state: WorkerState) -> None:
     while True:
         try:
-            await run_pipeline_cycle()
+            await run_pipeline_cycle(state)
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
-            # Il try-except esterno cattura QUALSIASI errore non gestito internamente.
-            # Il demone non si ferma mai per un singolo ciclo fallito.
-            logger.error(f"Errore critico nel ciclo pipeline: {e}", exc_info=True)
-        finally:
-            logger.info("Attesa 15 minuti per il prossimo ciclo...")
-            await asyncio.sleep(900)
+            logger.error("Errore critico nel ciclo pipeline: %s", e, exc_info=True)
+        await asyncio.sleep(WORKER_POLL_INTERVAL_SECONDS)
 ```
 
 **REGOLA:** Non usare `time.sleep()`. Usa solo `asyncio.sleep()` per non bloccare l'event loop.
+Compose: esattamente un `radar-worker` + advisory lock session-level.
 
 ### 2. Deduplicazione Prima di Chiamare Gemini
 
@@ -121,7 +115,7 @@ Dopo la classificazione:
 3. **Reconcile vault** (scrittura atomica); solo a `status=completed` durable.
 4. **Mark-read Miniflux** solo dopo vault durable — mai prima.
 
-Pipeline ancora in `main.py` + `TaskGroup` (niente `worker.py` finché Phase 2).
+Ingestione in `worker.py` (Compose `radar-worker`): coda bounded + advisory lock + `QuotaLedger`. `main.py` è API-only.
 
 ### 4. Gestione Errori a Tre Livelli
 
@@ -156,15 +150,15 @@ def strip_html_tags(html_content: str) -> str:
     return text.strip()
 ```
 
-### 6. Rate Limiting Gemini (asyncio.sleep(4))
+### 6. Quote LLM Durable (QuotaLedger)
 
-Ogni chiamata all'API Gemini deve essere preceduta da `await asyncio.sleep(4)` per
-rispettare il limite di 15 RPM del tier gratuito.
+Ogni tentativo Gemini riserva capacità su `llm_request_ledger` **prima** della chiamata.
+Non basarsi solo su `asyncio.sleep(4)` in-memory.
 
 ```python
-async def classify_article(self, title: str, content: str, url: str, date: str) -> GeopoliticalArticleSchema:
-    await asyncio.sleep(4)  # OBBLIGATORIO: rate limiting 15 RPM Gemini
-    # ... chiamata API ...
+reservation_id = await self.quota.reserve(estimated_tokens=1500, model=self.model)
+# ... generate_content con deadline ...
+await self.quota.complete(reservation_id, actual_tokens)
 ```
 
 ---
@@ -172,20 +166,20 @@ async def classify_article(self, title: str, content: str, url: str, date: str) 
 ## Comandi Diagnostici
 
 ```bash
-# Verificare lo stato del demone (dentro il container)
+# Log API vs worker
 docker compose logs -f radar-backend
+docker compose logs -f radar-worker
 
 # Verificare gli ultimi articoli inseriti
 docker compose exec radar-db psql -U radar_user -d radar_db -c \
   "SELECT title, country_code, primary_category, created_at FROM articles ORDER BY created_at DESC LIMIT 10;"
 
-# Test manuale dell'intera pipeline reale (via script diagnostico)
+# Ledger quote
+docker compose exec radar-db psql -U radar_user -d radar_db -c \
+  "SELECT status, count(*) FROM llm_request_ledger GROUP BY status;"
+
+# Test manuale pipeline (via script diagnostico)
 docker compose exec radar-backend python scripts/test_production_pipeline.py
-
-
-# Linting e type check
-docker compose exec radar-backend ruff check /app/
-docker compose exec radar-backend mypy /app/
 ```
 
 ---
