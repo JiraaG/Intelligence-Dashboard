@@ -9,7 +9,7 @@ This plan addresses the production blockers found during the code and architectu
 |---------------|---------------|-----------|
 | Phase 0 | `0189359` | pytest markers / frontend CI baseline |
 | Phase 1 | `bff8abe` | migrations 001–002, outbox, Pydantic strict, vault atomico |
-| Phase 2 | *(questo commit)* | `radar-worker`, coda bounded, `llm_request_ledger`, Gemini deadline/retry |
+| Phase 2 | `72851d7` | `radar-worker`, coda bounded, `llm_request_ledger`, Gemini deadline/retry |
 
 ## Scope And Exit Criteria
 

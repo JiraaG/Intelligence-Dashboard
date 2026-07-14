@@ -172,7 +172,7 @@ cd radar && backend\.venv\Scripts\python.exe -m pytest -m "not live" -q
 |-------|----------------------|----------------|-----------------|
 | 0 | Completata | **DONE** (`0189359`) | — |
 | 1 | Completata (persa) | **DONE** (`bff8abe`) | — |
-| 2 | Completata (persa) | **DONE** (questo restore point) | Conferma UI/ops, poi Phase 3 |
+| 2 | Completata (persa) | **DONE** (`72851d7`) | Conferma UI/ops, poi Phase 3 |
 | 3 | Completata (persa) | **NOT STARTED** | Dopo conferma UI Phase 2 |
 | 4 | Completata (persa) | **NOT STARTED** | Include bug read/unread; no sidebar |
 | 5 | Completata (persa) | **NOT STARTED** | No `article-list` |
@@ -181,4 +181,4 @@ cd radar && backend\.venv\Scripts\python.exe -m pytest -m "not live" -q
 
 **Ordine di ripresa:** Phase 3 → 4 → 5 → 6 (dopo conferma UI/ops Phase 2).
 
-**Restore rapido a Phase 2:** `git checkout <sha-phase2>` su `refactor/enterprise-consolidation` (messaggio commit inizia con `feat(phase2):`).
+**Restore rapido a Phase 2:** `git checkout 72851d7` su `refactor/enterprise-consolidation` (messaggio: `feat(phase2): radar-worker...`).
