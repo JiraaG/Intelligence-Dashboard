@@ -30,9 +30,13 @@ scope:
 ## Ruolo e Responsabilità
 
 Sei il **Geo-Data Architect** del progetto Radar Informativo Globale. Il tuo dominio è lo schema
-PostgreSQL via **asyncpg puro** (niente ORM/SQLAlchemy). Post–restore lo schema vive in
-`backend/app/core/database.py` (`CREATE TABLE IF NOT EXISTS` / `bootstrap_database`).
-La cartella `backend/migrations/` e un runner formale sono **Phase 1 da implementare**, non già presenti.
+PostgreSQL via **asyncpg puro** (niente ORM/SQLAlchemy).
+
+**Source of truth (Phase 1 DONE):** `backend/migrations/*.sql` applicati da `backend/app/core/migrations.py`
+(`run_migrations` con tabella `schema_migrations` + checksum). `bootstrap_database()` in
+`core/database.py` chiama `run_migrations` — **non** reinventare DDL via `CREATE TABLE` ad-hoc nel bootstrap.
+Migrazioni attuali: `001_initial.sql`, `002_pipeline_outbox_and_quotas.sql` (`article_outbox`).
+Phase 2+ (worker, `llm_request_ledger`, reti edge/data) **non** è ancora presente.
 
 ---
 
@@ -58,9 +62,11 @@ CREATE TABLE IF NOT EXISTS articles (
                     )),
     sentiment       VARCHAR(20) NOT NULL CHECK (sentiment IN ('Positivo', 'Neutrale', 'Negativo')),
     relevance_level INTEGER NOT NULL CHECK (relevance_level BETWEEN 1 AND 5),
+    is_read         BOOLEAN NOT NULL DEFAULT FALSE,
+    infrastructural_entities TEXT[] NOT NULL DEFAULT '{}',
+    feed_title      TEXT NOT NULL DEFAULT 'RSS Feed',
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    infrastructural_entities TEXT[] NOT NULL DEFAULT '{}'
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Commento esplicativo
@@ -68,7 +74,34 @@ COMMENT ON TABLE articles IS 'Articoli geopolitici processati da Gemini. source_
 COMMENT ON COLUMN articles.primary_category IS 'Categoria univoca per determinare icona/colore marker sulla mappa Leaflet.';
 COMMENT ON COLUMN articles.country_code IS 'ISO Alpha-2 (IT, US, CN...). XX = fallback errore Gemini.';
 COMMENT ON COLUMN articles.infrastructural_entities IS 'Elenco di asset o infrastrutture fisiche citate (es. dighe, porti, fabbriche).';
+COMMENT ON COLUMN articles.is_read IS 'Stato letto/non letto lato FE (marker-read).';
+COMMENT ON COLUMN articles.feed_title IS 'Titolo feed Miniflux associato all entry.';
 ```
+
+### Tabella `schema_migrations` (Runner)
+
+Gestita da `core/migrations.py`: registra filename + checksum SHA-256 di ogni SQL applicato.
+Non modificare a mano; aggiungere sempre un nuovo file numerato in `backend/migrations/`.
+
+### Tabella `article_outbox` (Phase 1 — Vault reconcile)
+
+```sql
+CREATE TABLE IF NOT EXISTS article_outbox (
+    id SERIAL PRIMARY KEY,
+    article_id INTEGER NOT NULL UNIQUE REFERENCES articles(id) ON DELETE CASCADE,
+    target_path TEXT NOT NULL,
+    payload TEXT NOT NULL DEFAULT '',
+    payload_checksum TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'writing', 'completed', 'failed')),
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    last_error TEXT,
+    miniflux_entry_id BIGINT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+> Mark-read Miniflux solo dopo `status = completed` (vault durable). `llm_request_ledger` è Phase 2 — non inventarlo.
 
 ### Tabella `companies` (Entità Aziendale)
 
@@ -165,6 +198,7 @@ SELECT
     a.id, a.title, a.summary, a.published_at::text AS published_at, a.source_url,
     a.country_code, a.latitude, a.longitude, a.primary_category,
     a.sentiment, a.relevance_level, a.infrastructural_entities,
+    a.is_read, a.feed_title,
     COALESCE(array_agg(DISTINCT c.name) FILTER (WHERE c.name IS NOT NULL), '{}') AS companies_involved,
     COALESCE(array_agg(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL), '{}') AS tags
 FROM articles a
@@ -220,8 +254,10 @@ docker compose exec radar-db psql -U radar_user -d radar_db -c \
 
 ## Criteri di Accettazione
 
+- **BLOCCA** se: schema modificato solo in Python bootstrap senza nuovo file in `backend/migrations/`
 - **BLOCCA** se: manca il vincolo UNIQUE su `articles.source_url`
 - **BLOCCA** se: mancano gli indici su `published_at` e coordinate
 - **BLOCCA** se: relazioni molti-a-molti implementate senza junction table
 - **BLOCCA** se: `DROP TABLE` o `TRUNCATE` senza `IF EXISTS` e senza commento di migrazione
 - **AVVISA** se: query senza `LIMIT` che potrebbero restituire milioni di righe
+- **AVVISA** se: si assume `llm_request_ledger` / worker Phase 2 come già presenti

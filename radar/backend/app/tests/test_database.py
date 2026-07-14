@@ -47,34 +47,12 @@ async def test_init_pool() -> None:
 
 @pytest.mark.asyncio
 async def test_bootstrap_database() -> None:
-    """Testa che bootstrap_database esegua le query DDL necessarie all'interno di una transazione."""
+    """Testa che bootstrap_database deleghi a run_migrations."""
     mock_pool = MagicMock(spec=asyncpg.Pool)
-    mock_conn = MagicMock(spec=asyncpg.Connection)
-    
-    # Configura il mock pool in modo che restituisca il mock conn come context manager asincrono
-    mock_pool.acquire.return_value.__aenter__.return_value = mock_conn
-    
-    # Configura la transazione come context manager asincrono
-    mock_transaction = MagicMock()
-    mock_conn.transaction.return_value = mock_transaction
-    
-    # Mock dei metodi asincroni
-    mock_conn.execute = AsyncMock()
-    mock_transaction.__aenter__ = AsyncMock()
-    mock_transaction.__aexit__ = AsyncMock()
-    
-    await bootstrap_database(mock_pool)
-    
-    # Verifica che sia stata acquisita la connessione e creata la transazione
-    mock_pool.acquire.assert_called_once()
-    mock_conn.transaction.assert_called_once()
-    
-    # Asserisce che le tabelle primarie siano state create via execute
-    calls = [call[0][0] for call in mock_conn.execute.call_args_list]
-    assert any("CREATE TABLE IF NOT EXISTS articles" in c for c in calls)
-    assert any("CREATE TABLE IF NOT EXISTS companies" in c for c in calls)
-    assert any("CREATE TABLE IF NOT EXISTS tags" in c for c in calls)
-    assert any("CREATE INDEX IF NOT EXISTS idx_articles_published_at" in c for c in calls)
+
+    with patch("app.core.database.run_migrations", new_callable=AsyncMock) as mock_run:
+        await bootstrap_database(mock_pool)
+        mock_run.assert_awaited_once_with(mock_pool)
 
 
 # ─── Tests for Extraction State Deduplication ────────────────────────────────

@@ -24,6 +24,7 @@ from typing import List, Optional, Tuple
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import asyncpg
+import httpx
 from app.core.config import (
     MINIFLUX_API_URL,
     MINIFLUX_API_KEY,
@@ -144,7 +145,6 @@ async def test_e2e_transactional_commit(miniflux: MinifluxClient) -> None:
     title = f"LIVE INTEGRATION TEST RADAR {run_id}"
 
     fake_article = GeopoliticalArticleSchema(
-        reasoning=f"Test di integrazione live run_id={run_id}.",
         title=title,
         summary="Questo e' un articolo di test autogenerato per validare la persistenza relazionale.",
         published_at="2026-06-24",
@@ -157,7 +157,7 @@ async def test_e2e_transactional_commit(miniflux: MinifluxClient) -> None:
         primary_category="Infrastrutture",
         sentiment="Positivo",
         infrastructural_entities=f"Centrale Geotermica Test {run_id}",
-        relevance_level=5
+        relevance_level=5,
     )
 
     article_id: Optional[int] = None
@@ -170,15 +170,23 @@ async def test_e2e_transactional_commit(miniflux: MinifluxClient) -> None:
         logger.info("Apertura connessione a PostgreSQL di test isolato...")
         conn = await asyncpg.connect(db_url)
 
-        logger.info("Esecuzione commit relazionale transazionale su DB di test...")
-        article_id = await commit_article_to_db(conn, fake_article)
-        logger.info(f"Articolo inserito correttamente nel DB con ID: {article_id}")
-
-        logger.info("Generazione contenuto Markdown e scrittura su Vault di test con Lock...")
+        logger.info("Generazione contenuto Markdown e path Vault...")
         md_content = generate_markdown_content(fake_article)
         file_path = get_article_file_path(fake_article, vault_path=vault_path)
         parent = os.path.dirname(file_path)
         os.makedirs(parent, exist_ok=True)
+
+        logger.info("Esecuzione commit relazionale transazionale + outbox su DB di test...")
+        article_id = await commit_article_to_db(
+            conn,
+            fake_article,
+            outbox_target_path=file_path,
+            outbox_payload=md_content,
+            miniflux_entry_id=None,
+        )
+        logger.info(f"Articolo inserito correttamente nel DB con ID: {article_id}")
+
+        logger.info("Scrittura su Vault di test con Lock...")
         write_file_with_lock(file_path, md_content)
         logger.info(f"File Markdown scritto con successo in: {file_path}")
 
@@ -217,6 +225,10 @@ async def test_e2e_transactional_commit(miniflux: MinifluxClient) -> None:
                 if article_id is not None:
                     # Solo il record creato da questo run (id + source_url univoco).
                     logger.info("Rimozione record creato da questo run dal database di test...")
+                    await conn.execute(
+                        "DELETE FROM article_outbox WHERE article_id = $1",
+                        article_id,
+                    )
                     await conn.execute(
                         "DELETE FROM article_companies WHERE article_id = $1",
                         article_id,
@@ -310,27 +322,28 @@ async def main() -> None:
         logger.error("%s", gate_err)
         sys.exit(2)
 
-    miniflux = MinifluxClient(MINIFLUX_API_URL, MINIFLUX_API_KEY)
-    classification = ClassificationClient()
-
-    try:
-        await test_external_connections(miniflux, classification)
+    async with httpx.AsyncClient() as http_client:
+        miniflux = MinifluxClient(MINIFLUX_API_URL, MINIFLUX_API_KEY, http_client=http_client)
+        classification = ClassificationClient()
 
         try:
-            await test_e2e_transactional_commit(miniflux)
-        except (asyncpg.PostgresError, socket.gaierror, ConnectionRefusedError, RuntimeError) as db_net_err:
-            logger.warning(
-                f"[DB INTEGRATION WARNING] E2E isolato non riuscito ({db_net_err}). "
-                "Imposta RADAR_LIVE_TEST_DATABASE_URL verso un database di test dedicato."
-            )
+            await test_external_connections(miniflux, classification)
 
-        await stress_test_rate_limiter(classification)
+            try:
+                await test_e2e_transactional_commit(miniflux)
+            except (asyncpg.PostgresError, socket.gaierror, ConnectionRefusedError, RuntimeError) as db_net_err:
+                logger.warning(
+                    f"[DB INTEGRATION WARNING] E2E isolato non riuscito ({db_net_err}). "
+                    "Imposta RADAR_LIVE_TEST_DATABASE_URL verso un database di test dedicato."
+                )
 
-        logger.info("=== TUTTI I CONTROLLI DI INTEGRAZIONE HANNO AVUTO ESITO POSITIVO ===")
-        sys.exit(0)
-    except Exception as err:
-        logger.error(f"INTEGRATION TEST FALLITO: {err}")
-        sys.exit(1)
+            await stress_test_rate_limiter(classification)
+
+            logger.info("=== TUTTI I CONTROLLI DI INTEGRAZIONE HANNO AVUTO ESITO POSITIVO ===")
+            sys.exit(0)
+        except Exception as err:
+            logger.error(f"INTEGRATION TEST FALLITO: {err}")
+            sys.exit(1)
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -14,12 +14,13 @@ in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categ
 
 ### Vincoli post–branch restore (2026-07-14)
 
-- **Phase 0 DONE**; fasi **1–6 NOT STARTED** nel tree attuale. Vedi `Implementation_Plan.md` / `Implementation_Plan_Execution.md`.
-- **Non assumere** `worker.py`, Compose `radar-worker`, cartella `migrations/`, reti `edge`/`data`, `/health/live|/ready`, o `article-list` come già presenti.
-- Pipeline ancora in `backend/app/main.py` (`run_pipeline_loop` + `TaskGroup`); DDL ancora via `bootstrap_database()` / `CREATE TABLE IF NOT EXISTS`.
+- **Phase 0–1 DONE**; fasi **2–6 NOT STARTED** nel tree attuale. Vedi `Implementation_Plan.md` / `Implementation_Plan_Execution.md`.
+- **Presenti (Phase 1):** `backend/migrations/` (`001_initial.sql`, `002_pipeline_outbox_and_quotas.sql`), `core/migrations.py` (`schema_migrations` + checksums), `article_outbox`, commit atomico DB + reconcile vault, mark-read Miniflux solo dopo vault durable.
+- **Non assumere** `worker.py`, Compose `radar-worker`, reti `edge`/`data`, `/health/live|/ready`, o `article-list` come già presenti (Phase 2+).
+- Pipeline ancora in `backend/app/main.py` (`run_pipeline_loop` + `TaskGroup`); Compose ancora 4 servizi su `radar-network`. `bootstrap_database()` chiama `run_migrations` — schema da SQL ordinato, non da CREATE TABLE ad-hoc.
 - **Sidebar freeze:** non modificare `frontend/src/app/components/radar-sidebar/**`; tenere `p-carousel` + altezza via `article-card-{id}`; vietato `app-article-list`.
 - Bug **read/unread** (`.marker-read`): solo `state.service.ts` + `radar-map.component.ts`.
-- Pydantic: `companies_involved` / `tags` / `infrastructural_entities` sono **`str` CSV** (non `List[str]`). Il modello FE può ancora usare `string[]` dopo `array_agg` API — non confondere i due.
+- Pydantic: `companies_involved` / `tags` / `infrastructural_entities` sono **`str` CSV** (non `List[str]`). Nessun campo `reasoning`; `ConfigDict(strict=True, extra="forbid")`. Il modello FE può ancora usare `string[]` dopo `array_agg` API — non confondere i due.
 
 ---
 
@@ -52,27 +53,33 @@ radar/
 │   └── hooks/                     # Automazioni ciclo di vita (pre/post tool)
 ├── backend/
 │   ├── Dockerfile
+│   ├── migrations/                # SQL ordinato (Phase 1 DONE) — source of truth schema
+│   │   ├── 001_initial.sql
+│   │   └── 002_pipeline_outbox_and_quotas.sql
 │   └── app/
 │       ├── __init__.py
 │       ├── main.py                # FastAPI app + lifespan + endpoint REST + run_pipeline_loop
 │       ├── requirements.txt
 │       ├── core/                  # Configurazione, DB pool asyncpg, logging centralizzato
-│       │   ├── config.py          # Variabili d'ambiente (DATABASE_URL, MINIFLUX_*, GEMINI_*)
-│       │   ├── database.py        # init_pool(), bootstrap_database() — SQL DDL puro asyncpg
+│       │   ├── config.py          # Variabili d'ambiente bounded; RADAR_ENV production fail-fast
+│       │   ├── database.py        # init_pool(), bootstrap_database() → run_migrations()
+│       │   ├── migrations.py      # schema_migrations + checksum SHA-256; applica SQL ordinato
 │       │   └── logging.py         # setup_logging() con RotatingFileHandler + fallback graceful
 │       ├── extraction/            # Layer E: fetch Miniflux + HTML sanitize + dedup check
-│       │   ├── client.py          # MinifluxClient (httpx async)
+│       │   ├── client.py          # MinifluxClient (httpx async, lifespan, byte limits, retry)
+│       │   ├── entry_validation.py # Validazione entry Miniflux pre-pipeline
 │       │   ├── parser.py          # strip_html_tags() — purge totale media tags
 │       │   └── state.py           # is_article_duplicate() — SELECT EXISTS asyncpg
 │       ├── classification/        # Layer C: Gemini LLM + schema Pydantic + rate limiting
 │       │   ├── client.py          # ClassificationClient — asyncio.sleep(4) tra call LLM
-│       │   ├── prompts.py         # System prompt immutabile + user prompt builder
-│       │   └── validator.py       # GeopoliticalArticleSchema (Pydantic v2 BaseModel)
-│       ├── commit/                # Layer K: DB commit + Vault Obsidian + routing file
-│       │   ├── db_commit.py       # commit_article_to_db() — INSERT puro asyncpg
-│       │   ├── factory.py         # generate_markdown_content() — template Markdown
-│       │   ├── lock.py            # write_file_with_lock() — scrittura atomica file
-│       │   └── router.py          # get_article_file_path() + initialize_vault_directories()
+│       │   ├── prompts.py         # System prompt (no CoT) + build_user_prompt(<untrusted_article>)
+│       │   └── validator.py       # GeopoliticalArticleSchema strict, extra=forbid, no reasoning
+│       ├── commit/                # Layer K: DB commit + outbox + Vault Obsidian
+│       │   ├── db_commit.py       # commit atomico articles + outbox
+│       │   ├── outbox.py          # Reconcile vault; mark-read Miniflux solo se completed
+│       │   ├── factory.py         # generate_markdown_content() — yaml.safe_dump frontmatter
+│       │   ├── lock.py            # scrittura atomica tmp→fsync→os.replace; lock sidecar permanente
+│       │   └── router.py          # pathlib + SHA-256 hex[:16] + containment vault
 │       └── tests/                 # Suite pytest smoke + integration + production
 ├── frontend/                      # Angular 21 SPA — già inizializzato
 │   ├── src/
@@ -173,24 +180,22 @@ cd frontend && npm run start
 ```
 Miniflux API (ogni 15 min)
         │
-        ▼ [asyncio.sleep(900) loop]
-  Fetch articoli non letti
-        │
-        ▼ [Sanitizzazione HTML]
-  strip_html(content)
-        │
-        ▼ [Deduplicazione URL]
-  SELECT EXISTS(SELECT 1 FROM articles WHERE source_url = ?)
-        │ (se non esiste)
+        ▼ [asyncio.sleep(900) loop in main.py]
+  Validate entry → sanitize HTML → dedup URL
+        │ (se non duplicato)
         ▼
   Gemma 4 31B (google-genai SDK)
-  → Structured Output: GeopoliticalArticleSchema
+  → GeopoliticalArticleSchema (strict, no reasoning)
         │
-        ▼ [Validation Pydantic]
-        │ ✓ → INSERT INTO articles ...
-        │ ✗ → fallback_coordinates + log_error
+        ▼ overwrite source_url / published_at da Miniflux (authoritative)
+        │
+        ▼ commit atomico DB + article_outbox
+        │
+        ▼ reconcile vault (atomic write) → status completed
+        │
+        ▼ mark-read Miniflux (solo dopo vault durable)
         ▼
-  PostgreSQL 15 (radar-db)
+  PostgreSQL 15 (radar-db) + Vault Obsidian
 ```
 
 ---

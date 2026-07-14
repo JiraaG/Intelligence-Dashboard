@@ -64,17 +64,28 @@ cd radar && backend\.venv\Scripts\python.exe -m pytest -m "not live" -q
 
 ---
 
-### Phase 1 — Data Integrity & Boundaries — NON INIZIATA
+### Phase 1 — Data Integrity & Boundaries — COMPLETATA (2026-07-14)
 
-Da rifare (audit codice attuale):
+- [x] `core/migrations.py` + `migrations/001_*.sql` / `002_*.sql` + tabella `schema_migrations` (checksum); conversione legacy `name` → `version` su DB esistenti.
+- [x] Tabella `article_outbox` + insert atomico articolo/relazioni/outbox; reconcile vault; mark-read Miniflux solo dopo commit durable; upgrade shape pre-restore (`payload`, `id`, `last_error`, `miniflux_entry_id`).
+- [x] Validazione entry Miniflux; settings bounded + fail startup produzione (`RADAR_ENV`).
+- [x] URL source autoritativo; schema Pydantic strict (reject, non coerce silenzioso); rimossi CoT/`reasoning` da prompt/schema.
+- [x] Limiti byte response/content; `httpx` lifespan + stream/reject; retry solo errori retryable.
+- [x] Frontmatter con `yaml.safe_dump`; vault `pathlib` + SHA-256 + containment; write atomica (`tmp` → `fsync` → `os.replace`); lock sidecar permanente.
+- [x] Test: `test_migrations.py`, `test_input_boundaries.py`, `test_vault_recovery.py`.
 
-- [ ] `core/migrations.py` + `migrations/001_*.sql` / `002_*.sql` + tabella `schema_migrations` (checksum).
-- [ ] Tabella `article_outbox` + insert atomico articolo/relazioni/outbox; reconcile vault; mark-read Miniflux solo dopo commit durable.
-- [ ] Validazione entry Miniflux; settings bounded + fail startup produzione.
-- [ ] URL source autoritativo; schema Pydantic strict (reject, non coerce silenzioso); rimuovere CoT/`reasoning` da prompt/schema.
-- [ ] Limiti byte response/content; `httpx` lifespan + stream/reject; retry solo errori retryable.
-- [ ] Frontmatter con `yaml.safe_dump`; vault `pathlib` + SHA-256 + containment; write atomica (`tmp` → `fsync` → `os.replace`).
-- [ ] Test: `test_migrations.py`, `test_input_boundaries.py`, `test_vault_recovery.py`.
+**Gate regression**
+
+```text
+cd radar && backend\.venv\Scripts\python.exe -m pytest -m "not live" -q
+# → 74 passed, 3 deselected
+```
+
+**Docker / smoke (2026-07-14)**
+
+- [x] `docker compose up -d --build radar-backend` — healthy; migrazioni 001+002 applicate.
+- [x] HTTP `/`, `/health`, `/api/articles` 200.
+- [x] Sidebar non toccata. **In attesa test manuale UI (grafica/carosello) prima di Phase 2.**
 
 ---
 
@@ -143,12 +154,12 @@ Da rifare (audit codice attuale):
 | Phase | Pre-restore (storico) | Codice attuale | Prossimo lavoro |
 |-------|----------------------|----------------|-----------------|
 | 0 | Completata | **DONE** | — |
-| 1 | Completata (persa) | **NOT STARTED** | Prima fase da rifare |
-| 2 | Completata (persa) | **NOT STARTED** | Dopo Phase 1 |
+| 1 | Completata (persa) | **DONE** | UI manuale, poi Phase 2 |
+| 2 | Completata (persa) | **NOT STARTED** | Dopo conferma UI Phase 1 |
 | 3 | Completata (persa) | **NOT STARTED** | Dopo Phase 2 |
 | 4 | Completata (persa) | **NOT STARTED** | Include bug read/unread; no sidebar |
 | 5 | Completata (persa) | **NOT STARTED** | No `article-list` |
 | 5.5 | Completata (persa) | N/A nel piano master | Assorbita in 1–3 al ri-run |
 | 6 | Non iniziata | **NOT STARTED** | Ultima |
 
-**Ordine di ripresa:** Phase 1 → 2 → 3 → 4 → 5 → 6.
+**Ordine di ripresa:** Phase 2 → 3 → 4 → 5 → 6 (dopo conferma UI Phase 1).

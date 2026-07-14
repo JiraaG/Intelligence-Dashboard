@@ -82,14 +82,17 @@ di sprecare quota API e di inserire duplicati nel database.
 
 ### 3. Schema Pydantic Immutabile
 
-Lo schema di output di Gemini è un contratto fisso. Non modificarlo senza coordinamento esplicito:
+Lo schema di output di Gemini è un contratto fisso. Non modificarlo senza coordinamento esplicito.
+**Nessun campo `reasoning`.** Strict reject: `ConfigDict(strict=True, extra="forbid")` — categorie,
+sentiment o date invalidi vengono **rifiutati** (no coerce silenzioso).
 
 ```python
-from pydantic import BaseModel, Field
-from typing import List, Literal
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
 
 class GeopoliticalArticleSchema(BaseModel):
-    reasoning: str = Field(description="Analisi logica e considerazioni geopolitiche/industriali preliminari prima di valorizzare i campi successivi.")
+    model_config = ConfigDict(strict=True, extra="forbid")
+
     title: str = Field(description="Titolo dell'articolo ottimizzato e ripulito dall'IA")
     summary: str = Field(description="Riassunto esecutivo di massimo 2 frasi, denso di informazioni")
     published_at: str = Field(description="Data di pubblicazione ISO8601 formato YYYY-MM-DD")
@@ -99,15 +102,26 @@ class GeopoliticalArticleSchema(BaseModel):
     longitude: float = Field(description="Longitudine decimale. Se nazione generica: centroide nazionale")
     companies_involved: str = Field(description="Aziende separate da virgola; 'Nessuno' se nessuna")
     tags: str = Field(description="Tag separati da virgola; il primo deve essere la primary_category")
-    primary_category: str = Field(
-        description="Una di: Nucleare, Energia, Infrastrutture, Geopolitica, Economia, Tecnologia, Spazio, Ambiente, Salute, Sicurezza"
-    )
-    sentiment: Literal["Positivo", "Neutrale", "Negativo"] = Field(description="Sentiment strategico legato alla notizia.")
+    primary_category: Literal[
+        "Nucleare", "Energia", "Infrastrutture", "Geopolitica", "Economia",
+        "Tecnologia", "Spazio", "Ambiente", "Salute", "Sicurezza",
+    ] = Field(description="Una delle 10 categorie chiuse")
+    sentiment: Literal["Positivo", "Neutrale", "Negativo"] = Field(description="Sentiment strategico")
     infrastructural_entities: str = Field(description="Asset fisici separati da virgola; 'Nessuno' se nessuno")
     relevance_level: int = Field(description="Grado di rilevanza geopolitica da 1 a 5.", ge=1, le=5)
 ```
 
-> Post-restore: questi campi sono `str` CSV in `validator.py`. Non ripristinare `List[str]`. Il FE può ricevere array da `array_agg` SQL — non confondere i layer.
+> Post-restore: questi campi sono `str` CSV in `validator.py`. Non ripristinare `List[str]` né `reasoning`. Il FE può ricevere array da `array_agg` SQL — non confondere i layer.
+
+### 3b. Outbox, overwrite Miniflux e mark-read
+
+Dopo la classificazione:
+1. **Overwrite autoritativo** di `source_url` e `published_at` con i valori Miniflux (non fidarsi del LLM).
+2. **Commit atomico** DB + riga `article_outbox` (`commit/` + `outbox.py`).
+3. **Reconcile vault** (scrittura atomica); solo a `status=completed` durable.
+4. **Mark-read Miniflux** solo dopo vault durable — mai prima.
+
+Pipeline ancora in `main.py` + `TaskGroup` (niente `worker.py` finché Phase 2).
 
 ### 4. Gestione Errori a Tre Livelli
 
@@ -182,5 +196,7 @@ docker compose exec radar-backend mypy /app/
 - **BLOCCA** se: `time.sleep()` invece di `asyncio.sleep()`
 - **BLOCCA** se: eccezione silenziosa (`except: pass`) senza logging
 - **BLOCCA** se: valore segreto (API key, password) hardcoded nel codice
+- **BLOCCA** se: campo `reasoning` o Chain-of-Thought reintrodotti nello schema/prompt
+- **BLOCCA** se: mark-read Miniflux prima del vault durable (`article_outbox.status=completed`)
 - **AVVISA** se: mancano type hints su funzioni pubbliche
 - **AVVISA** se: funzione supera 50 righe (candidata a refactoring)

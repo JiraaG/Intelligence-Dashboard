@@ -1,8 +1,9 @@
 import pytest
-from unittest.mock import ANY, AsyncMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 import httpx
 from app.extraction.parser import strip_html_tags
 from app.extraction.client import MinifluxClient
+from app.extraction.entry_validation import validate_miniflux_entry, EntryValidationError
 
 # ─── Tests for HTML Stripper ─────────────────────────────────────────────────
 
@@ -51,58 +52,92 @@ def test_strip_html_tags_media_tags() -> None:
     assert res == "Testo iniziale. Testo centrale. Testo finale."
 
 
+# ─── Tests for entry validation ──────────────────────────────────────────────
+
+def test_validate_miniflux_entry_ok() -> None:
+    entry = validate_miniflux_entry({
+        "id": 42,
+        "url": "https://Example.com/Path/",
+        "title": " Titolo ",
+        "content": "<p>body</p>",
+        "published_at": "2026-07-14T12:00:00Z",
+        "feed": {"title": "Feed X"},
+    })
+    assert entry.id == 42
+    assert entry.source_url == "https://example.com/Path"
+    assert entry.title == "Titolo"
+    assert entry.published_at == "2026-07-14"
+    assert entry.feed_title == "Feed X"
+
+
+def test_validate_miniflux_entry_rejects_bad_id() -> None:
+    with pytest.raises(EntryValidationError):
+        validate_miniflux_entry({
+            "id": "nope",
+            "url": "https://example.com/a",
+            "title": "T",
+            "content": "c",
+            "published_at": "2026-07-14",
+        })
+
+
 # ─── Tests for MinifluxClient ───────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_miniflux_client_fetch_unread() -> None:
     """Testa che fetch_unread_entries effettui la chiamata GET corretta e ritorni le notizie."""
-    client = MinifluxClient(api_url="http://mock-miniflux", api_key="mock_key")
-    
-    mock_response = httpx.Response(
-        status_code=200,
-        json={"entries": [{"id": 123, "title": "Notizia di Test", "url": "https://test.com"}]},
-        request=httpx.Request("GET", "http://mock-miniflux")
+    mock_http = MagicMock(spec=httpx.AsyncClient)
+    client = MinifluxClient(
+        api_url="http://mock-miniflux",
+        api_key="mock_key",
+        http_client=mock_http,
     )
-    
-    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
-        mock_get.return_value = mock_response
-        
+
+    payload = {
+        "entries": [
+            {
+                "id": 123,
+                "title": "Notizia di Test",
+                "url": "https://test.com/article",
+                "content": "hello",
+                "published_at": "2026-07-14T10:00:00Z",
+                "feed": {"title": "Feed"},
+            }
+        ]
+    }
+
+    with patch.object(client, "_request", new_callable=AsyncMock) as mock_request:
+        mock_request.return_value = payload
         entries = await client.fetch_unread_entries(limit=10)
-        
-        # Verifica URL e parametri (published_after è dinamico: now - 48h)
-        mock_get.assert_called_once_with(
-            "http://mock-miniflux/v1/entries",
-            params={
-                "status": "unread",
-                "limit": 10,
-                "order": "published_at",
-                "direction": "desc",
-                "published_after": ANY,
-            },
-            headers={"X-Auth-Token": "mock_key", "Content-Type": "application/json"}
-        )
+
+        mock_request.assert_awaited_once()
+        assert mock_request.await_args.args[0] == "GET"
+        assert mock_request.await_args.args[1] == "/v1/entries"
+        assert mock_request.await_args.kwargs["params"]["limit"] == 10
+        assert mock_request.await_args.kwargs["params"]["status"] == "unread"
+        assert mock_request.await_args.kwargs["params"]["published_after"] == ANY
         assert len(entries) == 1
-        assert entries[0]["id"] == 123
-        assert entries[0]["title"] == "Notizia di Test"
+        assert entries[0].id == 123
+        assert entries[0].title == "Notizia di Test"
+
 
 @pytest.mark.asyncio
 async def test_miniflux_client_mark_as_read() -> None:
     """Testa che mark_as_read invii la richiesta PUT corretta con gli ID degli articoli."""
-    client = MinifluxClient(api_url="http://mock-miniflux", api_key="mock_key")
-    
-    mock_response = httpx.Response(
-        status_code=200,
-        request=httpx.Request("PUT", "http://mock-miniflux")
+    mock_http = MagicMock(spec=httpx.AsyncClient)
+    client = MinifluxClient(
+        api_url="http://mock-miniflux",
+        api_key="mock_key",
+        http_client=mock_http,
     )
-    
-    with patch("httpx.AsyncClient.put", new_callable=AsyncMock) as mock_put:
-        mock_put.return_value = mock_response
-        
+
+    with patch.object(client, "_request", new_callable=AsyncMock) as mock_request:
+        mock_request.return_value = b""
         await client.mark_as_read([123, 456])
-        
-        # Verifica chiamata PUT
-        mock_put.assert_called_once_with(
-            "http://mock-miniflux/v1/entries",
-            json={"entry_ids": [123, 456], "status": "read"},
-            headers={"X-Auth-Token": "mock_key", "Content-Type": "application/json"}
+
+        mock_request.assert_awaited_once_with(
+            "PUT",
+            "/v1/entries",
+            json_body={"entry_ids": [123, 456], "status": "read"},
+            expect_json=False,
         )

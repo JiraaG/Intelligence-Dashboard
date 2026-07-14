@@ -2,6 +2,13 @@ import re
 from html.parser import HTMLParser
 from html import unescape
 
+from app.core.config import MAX_ENTRY_CONTENT_BYTES
+
+
+class EntryContentTooLarge(ValueError):
+    """Raised when raw entry HTML exceeds MAX_ENTRY_CONTENT_BYTES before parsing."""
+
+
 class HTMLStripper(HTMLParser):
     """
     Parser HTML personalizzato che rimuove i tag ed esclude completamente 
@@ -40,11 +47,18 @@ def strip_html_tags(html_content: str) -> str:
     """
     Rimuove tutti i tag HTML, decodifica le entità HTML e normalizza gli spazi bianchi.
     Esclude completamente i contenuti interni di script, style, e tag multimediali.
+    Enforce MAX_ENTRY_CONTENT_BYTES prima del parsing HTML.
     """
     if not html_content:
         return ""
 
-    # Inizializza ed esegue il parsing
+    content_bytes = len(html_content.encode("utf-8"))
+    if content_bytes > MAX_ENTRY_CONTENT_BYTES:
+        raise EntryContentTooLarge(
+            f"Contenuto entry {content_bytes} bytes supera "
+            f"MAX_ENTRY_CONTENT_BYTES={MAX_ENTRY_CONTENT_BYTES}"
+        )
+
     stripper = HTMLStripper()
     stripper.feed(html_content)
     text = stripper.get_data()

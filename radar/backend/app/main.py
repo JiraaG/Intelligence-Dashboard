@@ -2,155 +2,194 @@
 Radar Informativo Globale — Backend FastAPI App
 Coordinatore e API Router centrale conforme all'architettura ECC.
 
-Pipeline: Miniflux RSS → Sanitizzazione HTML → Deduplicazione URL →
-          Google Gemini (Structured Output) → PostgreSQL & Vault Obsidian
+Pipeline: Miniflux RSS → Validazione → Sanitizzazione HTML → Deduplicazione URL →
+          Google Gemini (Structured Output) → PostgreSQL + Outbox → Vault Obsidian → Mark-read
 """
+
+from __future__ import annotations
 
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Optional, List
+from datetime import datetime
+from typing import AsyncGenerator, Optional
 
 import asyncpg
-from fastapi import FastAPI, Query, HTTPException
+import httpx
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
-# Configurazione e Core
 from app.core.config import (
     DATABASE_URL,
-    OBSIDIAN_VAULT_PATH,
-    MINIFLUX_API_URL,
+    LLM_RPD,
+    MAX_MINIFLUX_RESPONSE_BYTES,
     MINIFLUX_API_KEY,
+    MINIFLUX_API_URL,
+    MINIFLUX_CONNECT_TIMEOUT,
     MINIFLUX_LIMIT,
-    LLM_RPD
+    MINIFLUX_READ_TIMEOUT,
+    OBSIDIAN_VAULT_PATH,
 )
-from app.core.database import init_pool, bootstrap_database
+from app.core.database import bootstrap_database, init_pool
 from app.core.logging import setup_logging
 
-# Layer E: Extraction
 from app.extraction.client import MinifluxClient
+from app.extraction.entry_validation import ValidatedMinifluxEntry
 from app.extraction.parser import strip_html_tags
 from app.extraction.state import is_article_duplicate
 
-# Layer C: Classification
 from app.classification.client import ClassificationClient
-from app.classification.validator import GeopoliticalArticleSchema
 
-# Layer C: Commit
 from app.commit.db_commit import commit_article_to_db
 from app.commit.factory import generate_markdown_content
-from app.commit.router import initialize_vault_directories, get_article_file_path
-from app.commit.lock import write_file_with_lock
+from app.commit.outbox import process_outbox_row, reconcile_outbox
+from app.commit.router import get_article_file_path, initialize_vault_directories
 
-# Logger centrale
 logger = logging.getLogger("radar.main")
+
 
 class AppState:
     """Contenitore per lo stato globale condiviso dell'applicazione."""
+
     def __init__(self) -> None:
         self.db_pool: Optional[asyncpg.Pool] = None
+        self.http_client: Optional[httpx.AsyncClient] = None
         self.miniflux_client: Optional[MinifluxClient] = None
         self.classification_client: Optional[ClassificationClient] = None
         self.pipeline_task: Optional[asyncio.Task] = None
 
-# Istanza dello stato globale
+
 state = AppState()
 
 
-async def process_single_entry(app_state: AppState, entry: dict) -> bool:
+async def process_single_entry(app_state: AppState, entry: ValidatedMinifluxEntry) -> bool:
     """
-    Elabora un singolo articolo: deduplicazione, sanitizzazione, LLM e commit.
-    Ritorna True in caso di completamento (incluso skip per duplicato), False in caso di errore.
+    Elabora un singolo articolo già validato: dedup, sanitize, LLM, commit+outbox, vault, mark-read.
+    Ritorna True in caso di completamento (incluso skip duplicato), False in caso di errore.
     """
-    entry_id = entry.get("id")
-    source_url = entry.get("url", "").strip()
-    title = entry.get("title", "N/A").strip()
-    raw_content = entry.get("content", "") or entry.get("summary", "") or ""
-    published_at_raw = entry.get("published_at", "")
-    published_date = published_at_raw.split("T")[0] if "T" in published_at_raw else published_at_raw
-    feed_title = entry.get("feed", {}).get("title", "RSS Feed").strip()
-
-    if not source_url:
-        logger.warning("Articolo saltato: URL sorgente mancante o nullo.")
-        return False
+    entry_id = entry.id
+    source_url = entry.source_url
+    title = entry.title
+    published_date = entry.published_at
+    feed_title = entry.feed_title
 
     try:
-        # Step A: Deduplicazione (Acquisizione connessione spot dal pool)
         async with app_state.db_pool.acquire() as conn:
             is_dup = await is_article_duplicate(conn, source_url)
-        
+
         if is_dup:
-            logger.info(f"Articolo duplicato rilevato: '{title[:50]}'. Marcatura come letto su Miniflux...")
-            if entry_id:
-                await app_state.miniflux_client.mark_as_read([entry_id])
+            logger.info(
+                "Articolo duplicato rilevato: '%s'. Marcatura come letto su Miniflux...",
+                title[:50],
+            )
+            await app_state.miniflux_client.mark_as_read([entry_id])
             return True
 
-        # Step B: Sanitizzazione HTML
-        clean_content = strip_html_tags(raw_content)
+        clean_content = strip_html_tags(entry.content)
 
-        # Step C: Estrazione LLM
         extracted_article = await app_state.classification_client.classify_article(
             title=title,
             content=clean_content,
             url=source_url,
-            date=published_date
+            date=published_date,
         )
 
-        # Step D: Relational Database Commit
-        async with app_state.db_pool.acquire() as conn:
-            article_id = await commit_article_to_db(conn, extracted_article, feed_title)
+        # Identità autoritativa Miniflux: non lasciare che l'URL del modello selezioni ON CONFLICT.
+        extracted_article = extracted_article.model_copy(
+            update={
+                "source_url": source_url,
+                "published_at": published_date,
+            }
+        )
 
-        # Step E: File System Markdown Commit
         md_content = generate_markdown_content(extracted_article)
         file_path = get_article_file_path(extracted_article, vault_path=OBSIDIAN_VAULT_PATH)
-        write_file_with_lock(file_path, md_content)
 
-        # Step F: Marcatura lettura su Miniflux
-        if entry_id:
-            await app_state.miniflux_client.mark_as_read([entry_id])
+        async with app_state.db_pool.acquire() as conn:
+            article_id = await commit_article_to_db(
+                conn,
+                extracted_article,
+                feed_title,
+                outbox_target_path=file_path,
+                outbox_payload=md_content,
+                miniflux_entry_id=entry_id,
+            )
 
-        logger.info(f"Articolo elaborato e committato correttamente [ID={article_id}]: '{extracted_article.title[:50]}'")
+        async with app_state.db_pool.acquire() as conn:
+            outbox_row = await conn.fetchrow(
+                """
+                SELECT id, article_id, target_path, payload, payload_checksum,
+                       attempt_count, miniflux_entry_id, status
+                FROM article_outbox
+                WHERE article_id = $1
+                  AND status IN ('pending', 'failed')
+                """,
+                article_id,
+            )
+
+        if outbox_row is not None:
+            ok = await process_outbox_row(app_state.db_pool, outbox_row, app_state.miniflux_client)
+            if not ok:
+                logger.error(
+                    "Commit DB riuscito ma Vault/outbox fallito per article_id=%s; "
+                    "verrà riconciliato al prossimo ciclo.",
+                    article_id,
+                )
+                return False
+
+        logger.info(
+            "Articolo elaborato e committato correttamente [ID=%s]: '%s'",
+            article_id,
+            extracted_article.title[:50],
+        )
         return True
 
     except Exception as article_err:
         logger.error(
-            f"Errore durante l'elaborazione del singolo articolo '{title[:50]}': {article_err}",
-            exc_info=True
+            "Errore durante l'elaborazione del singolo articolo '%s': %s",
+            title[:50],
+            article_err,
+            exc_info=True,
         )
         return False
 
+
 async def run_pipeline_cycle(app_state: AppState) -> None:
     """
-    Esegue un singolo ciclo completo della pipeline (Level 2).
-    Applica il limite RPD, preleva gli articoli non letti ed elabora in modo concorrente (TaskGroup).
+    Singolo ciclo pipeline (Level 2): reconcile outbox → RPD → fetch → TaskGroup.
     """
     logger.info("=== Avvio di un nuovo ciclo della pipeline di ingestione ===")
-    
-    # Controllo soglia RPD (Requests Per Day) dal DB
+
+    await reconcile_outbox(app_state.db_pool, app_state.miniflux_client)
+
     async with app_state.db_pool.acquire() as conn:
         processed_today = await conn.fetchval(
             "SELECT count(*) FROM articles WHERE date(created_at) = CURRENT_DATE"
         )
         if processed_today >= LLM_RPD:
             logger.warning(
-                f"LIMITE RPD RAGGIUNTO: processati {processed_today}/{LLM_RPD} articoli oggi. "
-                "Il ciclo andrà in ibernazione per non superare il Rate Limit giornaliero."
+                "LIMITE RPD RAGGIUNTO: processati %s/%s articoli oggi. "
+                "Il ciclo andrà in ibernazione per non superare il Rate Limit giornaliero.",
+                processed_today,
+                LLM_RPD,
             )
             return
 
-    # 1. Recupero degli articoli da Miniflux
     entries = await app_state.miniflux_client.fetch_unread_entries(limit=MINIFLUX_LIMIT)
     if not entries:
         logger.info("Nessun articolo non letto presente in Miniflux.")
         return
 
-    # Limita l'ingestione se gli articoli recuperati supererebbero l'RPD residuo
     remaining_rpd = LLM_RPD - processed_today
     if len(entries) > remaining_rpd:
-        logger.info(f"Riduzione lotto da {len(entries)} a {remaining_rpd} per rispettare il limite RPD.")
+        logger.info(
+            "Riduzione lotto da %d a %d per rispettare il limite RPD.",
+            len(entries),
+            remaining_rpd,
+        )
         entries = entries[:remaining_rpd]
 
-    # 2. Elaborazione concorrente degli articoli
     success_count = 0
     failure_count = 0
 
@@ -163,68 +202,88 @@ async def run_pipeline_cycle(app_state: AppState) -> None:
         else:
             failure_count += 1
 
-    logger.info(f"=== Ciclo della pipeline completato: {success_count} elaborati/saltati, {failure_count} errori ===")
+    logger.info(
+        "=== Ciclo della pipeline completato: %d elaborati/saltati, %d errori ===",
+        success_count,
+        failure_count,
+    )
 
 
 async def run_pipeline_loop(app_state: AppState) -> None:
-    """
-    Loop infinito del demone in background (Level 1).
-    Cattura tutte le eccezioni per garantire che il thread non muoia mai.
-    Esegue il polling ogni 15 minuti (900 secondi) come da requisiti PRD.
-    """
+    """Loop infinito demone (Level 1). Polling ogni 900 secondi."""
     logger.info("Demone pipeline in background avviato con successo.")
-    
-    # Eseguiamo un refresh forzato dei feed al primo avvio
-    # per garantire che Miniflux sia sincronizzato dopo un riavvio del PC/container.
+
     try:
         await app_state.miniflux_client.refresh_all_feeds()
     except Exception as refresh_err:
-        logger.warning(f"Refresh forzato fallito all'avvio: {refresh_err}")
+        logger.warning("Refresh forzato fallito all'avvio: %s", refresh_err)
 
     while True:
         try:
             await run_pipeline_cycle(app_state)
         except Exception as cycle_err:
-            logger.error(f"Errore critico durante l'esecuzione del ciclo pipeline: {cycle_err}", exc_info=True)
+            logger.error(
+                "Errore critico durante l'esecuzione del ciclo pipeline: %s",
+                cycle_err,
+                exc_info=True,
+            )
         finally:
             logger.info("Attesa di 15 minuti prima del prossimo ciclo di polling...")
             await asyncio.sleep(900)
 
 
-# ── FastAPI Lifespan ─────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Inizializzazione dello stato globale e dei servizi all'avvio e spegnimento."""
-    # Avvio (Startup)
+    """init pool → migrations → vault → httpx + clients → reconcile → pipeline; reverse on shutdown."""
     setup_logging()
     logger.info("Avvio del server FastAPI. Inizializzazione moduli Core...")
 
     try:
-        # Inizializzazione Database
         state.db_pool = await init_pool(DATABASE_URL)
         await bootstrap_database(state.db_pool)
 
-        # Inizializzazione Vault Obsidian
         initialize_vault_directories(OBSIDIAN_VAULT_PATH)
 
-        # Inizializzazione Client Esterni
-        state.miniflux_client = MinifluxClient(MINIFLUX_API_URL, MINIFLUX_API_KEY)
+        state.http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(
+                connect=float(MINIFLUX_CONNECT_TIMEOUT),
+                read=float(MINIFLUX_READ_TIMEOUT),
+                write=float(MINIFLUX_READ_TIMEOUT),
+                pool=float(MINIFLUX_CONNECT_TIMEOUT),
+            ),
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+            follow_redirects=True,
+        )
+        state.miniflux_client = MinifluxClient(
+            MINIFLUX_API_URL,
+            MINIFLUX_API_KEY,
+            http_client=state.http_client,
+        )
         state.classification_client = ClassificationClient()
 
-        # Avvio del demone asincrono non bloccante
+        await reconcile_outbox(state.db_pool, state.miniflux_client)
+
         state.pipeline_task = asyncio.create_task(
             run_pipeline_loop(state),
-            name="radar-ingest-daemon"
+            name="radar-ingest-daemon",
         )
-        
-        logger.info("Bootstrap completato con successo. Demone avviato in background.")
+
+        logger.info(
+            "Bootstrap completato. MAX_MINIFLUX_RESPONSE_BYTES=%s. Demone avviato.",
+            MAX_MINIFLUX_RESPONSE_BYTES,
+        )
     except Exception as init_err:
-        logger.critical(f"Errore critico all'avvio del lifespan: {init_err}", exc_info=True)
-        raise init_err
+        logger.critical("Errore critico all'avvio del lifespan: %s", init_err, exc_info=True)
+        if state.http_client is not None:
+            await state.http_client.aclose()
+            state.http_client = None
+        if state.db_pool is not None:
+            await state.db_pool.close()
+            state.db_pool = None
+        raise
 
     yield
 
-    # Spegnimento (Shutdown)
     logger.info("Arresto del server FastAPI in corso...")
     if state.pipeline_task:
         state.pipeline_task.cancel()
@@ -233,6 +292,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except asyncio.CancelledError:
             logger.info("Background loop cancellato correttamente.")
 
+    if state.http_client is not None:
+        await state.http_client.aclose()
+        state.http_client = None
+        logger.info("httpx.AsyncClient chiuso correttamente.")
+
     if state.db_pool:
         await state.db_pool.close()
         logger.info("Pool connessioni PostgreSQL chiuso correttamente.")
@@ -240,7 +304,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Radar Backend arrestato.")
 
 
-# Inizializzazione App FastAPI
 app = FastAPI(
     title="Radar Informativo Globale — API",
     description="Backend API del Radar geopolitico ed infrastrutturale.",
@@ -248,21 +311,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Configurazione CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Modificabile per restringere ad host specifici in prod
+    allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["GET", "PATCH", "OPTIONS"],
     allow_headers=["*"],
 )
 
 
-# ── Endpoint REST ─────────────────────────────────────────────────────────────
-
 @app.get("/health")
 async def health_check():
-    """Healthcheck standard utilizzato per i controlli di stato Docker."""
     return {"status": "ok", "service": "radar-backend"}
 
 
@@ -270,30 +329,22 @@ async def health_check():
 async def get_articles(
     date: str,
     sentiment: Optional[str] = Query(None),
-    relevance_level: Optional[int] = Query(None, ge=1, le=5)
+    relevance_level: Optional[int] = Query(None, ge=1, le=5),
 ):
-    """
-    Restituisce gli articoli geopolitici del giorno specificato.
-    Supporta il filtraggio opzionale per sentiment e livello di rilevanza.
-    Utilizza funzioni di aggregazione SQL per combinare tags e companies in liste piatte.
-    """
     if not state.db_pool:
         return []
 
-    # Validazione e parsing della data in un oggetto datetime.date per asyncpg
-    from datetime import datetime
     try:
         pub_date = datetime.strptime(date.replace("/", "-"), "%Y-%m-%d").date()
     except ValueError:
         raise HTTPException(
             status_code=400,
-            detail="Formato data non valido. Usa il formato ISO YYYY-MM-DD."
+            detail="Formato data non valido. Usa il formato ISO YYYY-MM-DD.",
         )
 
-    # Costruzione dinamica della query SQL per massimizzare le performance
     query_parts = [
         """
-        SELECT 
+        SELECT
             a.id, a.title, a.summary, a.published_at::text AS published_at, a.source_url,
             a.country_code, a.latitude, a.longitude, a.primary_category,
             a.sentiment, a.relevance_level, a.infrastructural_entities, a.feed_title,
@@ -308,13 +359,13 @@ async def get_articles(
         WHERE a.published_at = $1
         """
     ]
-    
-    params = [pub_date]
-    
+
+    params: list = [pub_date]
+
     if sentiment:
         params.append(sentiment)
         query_parts.append(f"AND a.sentiment = ${len(params)}")
-        
+
     if relevance_level is not None:
         params.append(relevance_level)
         query_parts.append(f"AND a.relevance_level = ${len(params)}")
@@ -324,7 +375,7 @@ async def get_articles(
 
     async with state.db_pool.acquire() as conn:
         rows = await conn.fetch(final_query, *params)
-        
+
     return [dict(row) for row in rows]
 
 
@@ -332,23 +383,17 @@ async def get_articles(
 async def get_countries_summary(
     date: str,
     sentiment: Optional[str] = Query(None),
-    relevance_level: Optional[int] = Query(None, ge=1, le=5)
+    relevance_level: Optional[int] = Query(None, ge=1, le=5),
 ):
-    """
-    Restituisce l'aggregato delle categorie e del conteggio articoli per nazione in un determinato giorno.
-    Abilita il pattern hatching multilivello e i tooltip riassuntivi sull'interfaccia Angular.
-    """
     if not state.db_pool:
         return []
 
-    # Validazione e parsing della data in un oggetto datetime.date per asyncpg
-    from datetime import datetime
     try:
         pub_date = datetime.strptime(date.replace("/", "-"), "%Y-%m-%d").date()
     except ValueError:
         raise HTTPException(
             status_code=400,
-            detail="Formato data non valido. Usa il formato ISO YYYY-MM-DD."
+            detail="Formato data non valido. Usa il formato ISO YYYY-MM-DD.",
         )
 
     query_parts = [
@@ -361,13 +406,13 @@ async def get_countries_summary(
         WHERE published_at = $1
         """
     ]
-    
-    params = [pub_date]
-    
+
+    params: list = [pub_date]
+
     if sentiment:
         params.append(sentiment)
         query_parts.append(f"AND sentiment = ${len(params)}")
-        
+
     if relevance_level is not None:
         params.append(relevance_level)
         query_parts.append(f"AND relevance_level = ${len(params)}")
@@ -377,28 +422,26 @@ async def get_countries_summary(
 
     async with state.db_pool.acquire() as conn:
         rows = await conn.fetch(final_query, *params)
-        
+
     return [dict(row) for row in rows]
 
-from pydantic import BaseModel
 
 class ReadStatusUpdate(BaseModel):
     is_read: bool
 
+
 @app.patch("/api/articles/{article_id}/read_status")
 async def update_article_read_status(article_id: int, status: ReadStatusUpdate):
-    """
-    Aggiorna lo stato letto/non letto di un articolo.
-    """
     if not state.db_pool:
         raise HTTPException(status_code=500, detail="Database non disponibile")
-        
+
     async with state.db_pool.acquire() as conn:
         result = await conn.execute(
             "UPDATE articles SET is_read = $1, updated_at = NOW() WHERE id = $2",
-            status.is_read, article_id
+            status.is_read,
+            article_id,
         )
         if result == "UPDATE 0":
             raise HTTPException(status_code=404, detail="Articolo non trovato")
-            
+
     return {"status": "success", "is_read": status.is_read}

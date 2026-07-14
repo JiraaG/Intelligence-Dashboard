@@ -2,7 +2,7 @@
 
 This plan addresses the production blockers found during the code and architecture review. Execute phases in order. Do not release a later phase while an earlier acceptance gate is failing.
 
-**Progress (audit codice 2026-07-14, post–branch restore):** Phase **0 DONE**. Phases **1–6 NOT STARTED** in current sources (pre-restore work was lost; see [`Implementation_Plan_Execution.md`](Implementation_Plan_Execution.md) sezione A vs B). Resume at Phase 1. Sidebar remains frozen; read/unread `.marker-read` remains in scope via `state.service` + `radar-map` only.
+**Progress (audit codice 2026-07-14, post–branch restore):** Phase **0 DONE**. Phase **1 DONE**. Phases **2–6 NOT STARTED** in current sources (pre-restore work was lost; see [`Implementation_Plan_Execution.md`](Implementation_Plan_Execution.md) sezione A vs B). Resume at Phase 2 after manual UI check. Sidebar remains frozen; read/unread `.marker-read` remains in scope via `state.service` + `radar-map` only.
 
 ## Scope And Exit Criteria
 
@@ -60,55 +60,63 @@ cd radar && python -m pytest -m "not live"
 
 ## Phase 1 - Eliminate Data-Integrity And Input-Boundary Failures
 
-**Status:** NOT STARTED after restore — re-implement from this checklist.
+**Status:** DONE (2026-07-14) on post-restore branch.
 
 ### Files to add
 
-- [ ] `radar/backend/app/core/migrations.py`
-- [ ] `radar/backend/migrations/001_initial.sql`
-- [ ] `radar/backend/migrations/002_pipeline_outbox_and_quotas.sql`
-- [ ] `radar/backend/app/tests/test_migrations.py`
-- [ ] `radar/backend/app/tests/test_input_boundaries.py`
-- [ ] `radar/backend/app/tests/test_vault_recovery.py`
+- [x] `radar/backend/app/core/migrations.py`
+- [x] `radar/backend/migrations/001_initial.sql`
+- [x] `radar/backend/migrations/002_pipeline_outbox_and_quotas.sql`
+- [x] `radar/backend/app/tests/test_migrations.py`
+- [x] `radar/backend/app/tests/test_input_boundaries.py`
+- [x] `radar/backend/app/tests/test_vault_recovery.py`
 
 ### Files to modify
 
-- [ ] `radar/backend/app/core/config.py`
-- [ ] `radar/backend/app/core/database.py`
-- [ ] `radar/backend/app/main.py`
-- [ ] `radar/backend/app/extraction/client.py`
-- [ ] `radar/backend/app/extraction/parser.py`
-- [ ] `radar/backend/app/classification/prompts.py`
-- [ ] `radar/backend/app/classification/validator.py`
-- [ ] `radar/backend/app/classification/client.py`
-- [ ] `radar/backend/app/commit/db_commit.py`
-- [ ] `radar/backend/app/commit/router.py`
-- [ ] `radar/backend/app/commit/lock.py`
-- [ ] `radar/backend/app/commit/factory.py`
-- [ ] `radar/backend/app/requirements.txt`
+- [x] `radar/backend/app/core/config.py`
+- [x] `radar/backend/app/core/database.py`
+- [x] `radar/backend/app/main.py`
+- [x] `radar/backend/app/extraction/client.py`
+- [x] `radar/backend/app/extraction/parser.py`
+- [x] `radar/backend/app/classification/prompts.py`
+- [x] `radar/backend/app/classification/validator.py`
+- [x] `radar/backend/app/classification/client.py`
+- [x] `radar/backend/app/commit/db_commit.py`
+- [x] `radar/backend/app/commit/router.py`
+- [x] `radar/backend/app/commit/lock.py`
+- [x] `radar/backend/app/commit/factory.py`
+- [x] `radar/backend/app/requirements.txt`
 
 ### Changes
 
-1. Replace the ad-hoc `CREATE TABLE IF NOT EXISTS` bootstrap with ordered SQL migrations recorded in a `schema_migrations` table. Verify a migration checksum before applying it and abort startup on an unknown or incompatible schema.
-2. Add an `article_outbox` table with a unique `article_id`, deterministic target path, payload checksum, status (`pending`, `writing`, `completed`, `failed`), attempt count, and timestamps. Insert the article, relations, and outbox row in one transaction.
-3. On startup and before every fetch, reconcile pending/failed outbox rows. Write the Vault projection atomically, mark the outbox row `completed` only after `os.replace`, and mark the Miniflux entry read only after this state is durable. Retain retryable failures with diagnostic metadata.
-4. Validate Miniflux entries before accessing string methods. Reject malformed IDs, URLs, dates, feeds, titles, and content inside the per-entry exception boundary. A malformed item must not cancel siblings or the cycle.
-5. Add bounded settings with startup validation: positive RPM/RPD, optional positive TPM, bounded `MINIFLUX_LIMIT`, maximum response bytes, maximum entry content bytes, request timeouts, retry counts, and a declared `RADAR_TIME_ZONE`. Fail startup for missing production Miniflux/DB settings instead of silently using a real-looking password.
-6. Normalize a source URL once before deduplication, preserve it as the authoritative identity, and overwrite the LLM-produced URL and publication date with the validated Miniflux values. Do not allow model output to select an existing article through `ON CONFLICT`.
-7. Make `GeopoliticalArticleSchema` use strict, constrained fields. Enforce ISO date, URL scheme and length, ISO country allowlist plus `XX`, finite latitude in `[-90, 90]`, finite longitude in `[-180, 180]`, allowed category/sentiment literals, relevance in `[1, 5]`, and maximum text/list lengths. Reject invalid model output; do not silently change its category, sentiment, or publication date.
-8. Remove the request for chain-of-thought from `classification/prompts.py`. Use a short factual rationale only if it is genuinely required. Delimit untrusted article data and explicitly tell the model that article content cannot modify system instructions.
-9. Enforce response and entry-content limits before HTML parsing. Make `MinifluxClient` stream or reject bodies above `MAX_MINIFLUX_RESPONSE_BYTES`, reuse a lifespan-owned `httpx.AsyncClient`, and retry only retryable transport/HTTP failures with capped exponential backoff and `Retry-After`.
-10. Replace direct YAML interpolation with `yaml.safe_dump` of a mapping. Serialize tags, companies, source URL, title, and all scalars through the serializer. Bound Markdown body sizes before writing.
-11. Make the Vault route safe by using `pathlib.Path`, a validated category and country, a date-derived filename, SHA-256 rather than 8-character MD5, filename-length truncation, and `resolve()` containment under the resolved Vault root.
-12. Replace synchronous truncating writes with a thread-offloaded atomic write: create a temporary sibling file, write, flush, `fsync`, `os.replace`, then `fsync` the parent directory where supported. Keep the lock sidecar permanently; never unlink it after releasing `FileLock`.
+1. [x] Replace the ad-hoc `CREATE TABLE IF NOT EXISTS` bootstrap with ordered SQL migrations recorded in a `schema_migrations` table. Verify a migration checksum before applying it and abort startup on an unknown or incompatible schema.
+2. [x] Add an `article_outbox` table with a unique `article_id`, deterministic target path, payload checksum, status (`pending`, `writing`, `completed`, `failed`), attempt count, and timestamps. Insert the article, relations, and outbox row in one transaction.
+3. [x] On startup and before every fetch, reconcile pending/failed outbox rows. Write the Vault projection atomically, mark the outbox row `completed` only after `os.replace`, and mark the Miniflux entry read only after this state is durable. Retain retryable failures with diagnostic metadata.
+4. [x] Validate Miniflux entries before accessing string methods. Reject malformed IDs, URLs, dates, feeds, titles, and content inside the per-entry exception boundary. A malformed item must not cancel siblings or the cycle.
+5. [x] Add bounded settings with startup validation: positive RPM/RPD, optional positive TPM, bounded `MINIFLUX_LIMIT`, maximum response bytes, maximum entry content bytes, request timeouts, retry counts, and a declared `RADAR_TIME_ZONE`. Fail startup for missing production Miniflux/DB settings instead of silently using a real-looking password.
+6. [x] Normalize a source URL once before deduplication, preserve it as the authoritative identity, and overwrite the LLM-produced URL and publication date with the validated Miniflux values. Do not allow model output to select an existing article through `ON CONFLICT`.
+7. [x] Make `GeopoliticalArticleSchema` use strict, constrained fields. Enforce ISO date, URL scheme and length, ISO country allowlist plus `XX`, finite latitude in `[-90, 90]`, finite longitude in `[-180, 180]`, allowed category/sentiment literals, relevance in `[1, 5]`, and maximum text/list lengths. Reject invalid model output; do not silently change its category, sentiment, or publication date.
+8. [x] Remove the request for chain-of-thought from `classification/prompts.py`. Use a short factual rationale only if it is genuinely required. Delimit untrusted article data and explicitly tell the model that article content cannot modify system instructions.
+9. [x] Enforce response and entry-content limits before HTML parsing. Make `MinifluxClient` stream or reject bodies above `MAX_MINIFLUX_RESPONSE_BYTES`, reuse a lifespan-owned `httpx.AsyncClient`, and retry only retryable transport/HTTP failures with capped exponential backoff and `Retry-After`.
+10. [x] Replace direct YAML interpolation with `yaml.safe_dump` of a mapping. Serialize tags, companies, source URL, title, and all scalars through the serializer. Bound Markdown body sizes before writing.
+11. [x] Make the Vault route safe by using `pathlib.Path`, a validated category and country, a date-derived filename, SHA-256 rather than 8-character MD5, filename-length truncation, and `resolve()` containment under the resolved Vault root.
+12. [x] Replace synchronous truncating writes with a thread-offloaded atomic write: create a temporary sibling file, write, flush, `fsync`, `os.replace`, then `fsync` the parent directory where supported. Keep the lock sidecar permanently; never unlink it after releasing `FileLock`.
 
 ### Required tests
 
-- [ ] Path traversal attempts in title, date, category, country, and URL cannot leave the Vault root.
-- [ ] Quotes, newlines, backslashes, and YAML control characters cannot inject frontmatter keys.
-- [ ] A DB commit plus simulated Vault failure is reconciled on the next run without duplicate relations or premature mark-read.
-- [ ] Invalid Miniflux payloads, response-size limit breaches, and invalid model output are isolated per entry.
-- [ ] Existing databases migrate forward and incompatible databases fail before the worker starts.
+- [x] Path traversal attempts in title, date, category, country, and URL cannot leave the Vault root.
+- [x] Quotes, newlines, backslashes, and YAML control characters cannot inject frontmatter keys.
+- [x] A DB commit plus simulated Vault failure is reconciled on the next run without duplicate relations or premature mark-read.
+- [x] Invalid Miniflux payloads, response-size limit breaches, and invalid model output are isolated per entry.
+- [x] Existing databases migrate forward and incompatible databases fail before the worker starts.
+
+### Acceptance gate
+
+```text
+cd radar && python -m pytest -m "not live"
+```
+
+**Status (2026-07-14):** gate verde — 74 passed / 3 live deselected. Docker rebuild: migrations 001+002 applied (legacy `schema_migrations` converted); `/`, `/health`, `/api/articles` 200. Sidebar untouched.
 
 ## Phase 2 - Make The Worker Cancellable, Bounded, And Quota-Correct
 

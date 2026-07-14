@@ -3,6 +3,7 @@ import pytest
 import socket
 import asyncpg
 import sys
+import httpx
 
 from app.extraction.client import MinifluxClient
 from app.classification.client import ClassificationClient
@@ -23,32 +24,34 @@ pytestmark = pytest.mark.live
 @pytest.mark.asyncio
 async def test_live_external_connections() -> None:
     """Verifica le connessioni reali ed i token delle API di Miniflux e Gemini."""
-    miniflux = MinifluxClient()
-    classification = ClassificationClient()
-    try:
-        await run_test_external_connections(miniflux, classification)
-    except (socket.gaierror, ConnectionRefusedError, OSError) as e:
-        pytest.skip(f"Connessione di rete non disponibile per Miniflux/Gemini: {e}")
-    except Exception as e:
-        err_str = str(e)
-        if "genai" in str(type(e)).lower() or "500" in err_str or "429" in err_str or "limit" in err_str.lower():
-            pytest.skip(f"Servizio Gemini API temporaneamente non disponibile o quota limitata: {e}")
-        else:
-            pytest.fail(f"Errore critico durante la verifica delle connessioni esterne: {e}")
+    async with httpx.AsyncClient() as http_client:
+        miniflux = MinifluxClient(http_client=http_client)
+        classification = ClassificationClient()
+        try:
+            await run_test_external_connections(miniflux, classification)
+        except (socket.gaierror, ConnectionRefusedError, OSError) as e:
+            pytest.skip(f"Connessione di rete non disponibile per Miniflux/Gemini: {e}")
+        except Exception as e:
+            err_str = str(e)
+            if "genai" in str(type(e)).lower() or "500" in err_str or "429" in err_str or "limit" in err_str.lower():
+                pytest.skip(f"Servizio Gemini API temporaneamente non disponibile o quota limitata: {e}")
+            else:
+                pytest.fail(f"Errore critico durante la verifica delle connessioni esterne: {e}")
 
 
 @pytest.mark.asyncio
 async def test_live_e2e_transactional_commit() -> None:
     """Verifica il ciclo di commit su DB/Vault isolati con identificatori run-unique."""
-    miniflux = MinifluxClient()
-    try:
-        await run_test_e2e_transactional_commit(miniflux)
-    except RuntimeError as e:
-        pytest.skip(f"Ambiente live isolato non configurato: {e}")
-    except (asyncpg.PostgresError, socket.gaierror, ConnectionRefusedError, OSError) as e:
-        pytest.skip(
-            f"Database PostgreSQL di test o percorso Vault isolato non disponibile: {e}"
-        )
+    async with httpx.AsyncClient() as http_client:
+        miniflux = MinifluxClient(http_client=http_client)
+        try:
+            await run_test_e2e_transactional_commit(miniflux)
+        except RuntimeError as e:
+            pytest.skip(f"Ambiente live isolato non configurato: {e}")
+        except (asyncpg.PostgresError, socket.gaierror, ConnectionRefusedError, OSError) as e:
+            pytest.skip(
+                f"Database PostgreSQL di test o percorso Vault isolato non disponibile: {e}"
+            )
 
 
 @pytest.mark.asyncio

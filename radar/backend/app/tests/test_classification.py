@@ -13,12 +13,11 @@ from app.core.config import LLM_RPM
 def test_schema_valid_article() -> None:
     """Verifica che GeopoliticalArticleSchema accetti e convalidi dati corretti."""
     data = {
-        "reasoning": "TSMC sta ampliando le fonderie in Sassonia, consolidando la partnership strategica UE-Taiwan.",
         "title": "TSMC inaugura la prima fab a Dresda",
         "summary": "TSMC avvia la costruzione di un nuovo impianto da 10 miliardi in Germania. L'iniziativa punta a rafforzare l'indipendenza strategica europea.",
         "published_at": "2026-06-24",
         "source_url": "https://example.com/tsmc-germany",
-        "country_code": "de",  # Sarà normalizzato in uppercase "DE"
+        "country_code": "DE",
         "latitude": 51.0504,
         "longitude": 13.7373,
         "companies_involved": "TSMC, Infineon",
@@ -26,20 +25,20 @@ def test_schema_valid_article() -> None:
         "primary_category": "Tecnologia",
         "sentiment": "Positivo",
         "infrastructural_entities": "Fabbrica Dresda",
-        "relevance_level": 4
+        "relevance_level": 4,
     }
-    
+
     article = GeopoliticalArticleSchema(**data)
-    assert article.country_code == "DE"  # Convalida normalizzazione Uppercase
+    assert article.country_code == "DE"
     assert article.primary_category == "Tecnologia"
     assert article.sentiment == "Positivo"
     assert article.relevance_level == 4
     assert "TSMC" in article.companies_involved
 
+
 def test_schema_rejects_invalid_category() -> None:
-    """Verifica che categorie non ammesse vengano normalizzate al fallback Tecnologia."""
+    """Verifica che categorie non ammesse vengano rifiutate (strict, no coerce)."""
     data = {
-        "reasoning": "Riflessione logica.",
         "title": "Titolo",
         "summary": "Riassunto.",
         "published_at": "2026-06-24",
@@ -49,18 +48,18 @@ def test_schema_rejects_invalid_category() -> None:
         "longitude": 12.56,
         "companies_involved": "Nessuno",
         "tags": "Tag",
-        "primary_category": "CATEGORIA_INVENTATA",  # Non presente nel set valido
+        "primary_category": "CATEGORIA_INVENTATA",
         "sentiment": "Neutrale",
         "infrastructural_entities": "Nessuno",
-        "relevance_level": 1
+        "relevance_level": 1,
     }
-    article = GeopoliticalArticleSchema(**data)
-    assert article.primary_category == "Tecnologia"
+    with pytest.raises(ValidationError):
+        GeopoliticalArticleSchema(**data)
+
 
 def test_schema_rejects_invalid_relevance() -> None:
     """Verifica che lo schema rifiuti relevance_level di tipo non intero."""
     data = {
-        "reasoning": "Riflessione logica.",
         "title": "Titolo",
         "summary": "Riassunto.",
         "published_at": "2026-06-24",
@@ -73,7 +72,7 @@ def test_schema_rejects_invalid_relevance() -> None:
         "primary_category": "Infrastrutture",
         "sentiment": "Neutrale",
         "infrastructural_entities": "Nessuno",
-        "relevance_level": "alto"  # Deve essere int
+        "relevance_level": "alto",
     }
     with pytest.raises(ValidationError):
         GeopoliticalArticleSchema(**data)
@@ -114,7 +113,6 @@ async def test_client_classify_success() -> None:
     # Mock della risposta dell'SDK
     mock_gen_response = MagicMock()
     mock_gen_response.text = json.dumps({
-        "reasoning": "TSMC Dresda.",
         "title": "Nuova fab TSMC",
         "summary": "TSMC apre a Dresda.",
         "published_at": "2026-06-24",
@@ -127,7 +125,7 @@ async def test_client_classify_success() -> None:
         "primary_category": "Tecnologia",
         "sentiment": "Positivo",
         "infrastructural_entities": "Nessuno",
-        "relevance_level": 3
+        "relevance_level": 3,
     })
     
     # Mockiamo la chiamata di rete sincrona dell'SDK
@@ -156,7 +154,6 @@ async def test_client_classify_retry_success() -> None:
     # Primo tentativo: restituisce JSON corrotto o incompleto (manca country_code)
     bad_response = MagicMock()
     bad_response.text = json.dumps({
-        "reasoning": "TSMC fallito.",
         "title": "Nuova fab TSMC",
         "summary": "TSMC apre.",
         "published_at": "2026-06-24",
@@ -169,13 +166,12 @@ async def test_client_classify_retry_success() -> None:
         "primary_category": "Tecnologia",
         "sentiment": "Positivo",
         "infrastructural_entities": "Nessuno",
-        "relevance_level": 3
+        "relevance_level": 3,
     })
 
     # Secondo tentativo (correzione): restituisce il JSON valido riparato
     good_response = MagicMock()
     good_response.text = json.dumps({
-        "reasoning": "Corretto nel retry.",
         "title": "Nuova fab TSMC",
         "summary": "TSMC apre.",
         "published_at": "2026-06-24",
@@ -188,7 +184,7 @@ async def test_client_classify_retry_success() -> None:
         "primary_category": "Tecnologia",
         "sentiment": "Positivo",
         "infrastructural_entities": "Nessuno",
-        "relevance_level": 3
+        "relevance_level": 3,
     })
 
     with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_thread, \

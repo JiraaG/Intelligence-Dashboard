@@ -35,6 +35,7 @@ WORKDIR /app
 # Il build context è ./backend → copiamo la sottocartella app/ in /app/app
 COPY --chown=radar:radar app/ app/
 COPY --chown=radar:radar scripts/ scripts/
+COPY --chown=radar:radar migrations/ migrations/
 
 # Cambiamo il WORKDIR a /app/app dopo averlo copiato per assicurarci che sia di proprietà di 'radar'
 WORKDIR /app/app

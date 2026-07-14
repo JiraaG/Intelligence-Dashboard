@@ -1,38 +1,154 @@
+"""Application configuration with bounded settings and production fail-fast."""
+
+from __future__ import annotations
+
 import os
+from datetime import timezone as dt_timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
 from dotenv import load_dotenv
 
-# Carica il file .env all'importazione del modulo
 load_dotenv()
 
-# Priorità GOOGLE_API_KEY, fallback automatico su GEMINI_API_KEY
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
+class ConfigError(ValueError):
+    """Raised when configuration is invalid or incomplete for the active environment."""
+
+
+def _env_str(name: str, default: str | None = None) -> str | None:
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    return raw.strip()
+
+
+def _env_int(
+    name: str,
+    default: int,
+    *,
+    min_value: int | None = None,
+    max_value: int | None = None,
+    allow_zero: bool = False,
+) -> int:
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        value = default
+    else:
+        try:
+            value = int(raw.strip())
+        except ValueError as exc:
+            raise ConfigError(f"{name} deve essere un intero (valore: {raw!r})") from exc
+
+    if allow_zero and value == 0:
+        return 0
+    if min_value is not None and value < min_value:
+        raise ConfigError(f"{name} deve essere >= {min_value} (valore: {value})")
+    if max_value is not None and value > max_value:
+        raise ConfigError(f"{name} deve essere <= {max_value} (valore: {value})")
+    return value
+
+
+def _resolve_time_zone(name: str):
+    """Resolve IANA timezone; UTC works without the tzdata package on Windows."""
+    if name.upper() in {"UTC", "GMT"}:
+        return dt_timezone.utc, "UTC"
+    try:
+        return ZoneInfo(name), name
+    except ZoneInfoNotFoundError as exc:
+        raise ConfigError(f"RADAR_TIME_ZONE non valida: {name!r}") from exc
+
+
+RADAR_ENV = (_env_str("RADAR_ENV", "development") or "development").lower()
+IS_PRODUCTION = RADAR_ENV in {"production", "prod"}
+
+# ── LLM ──────────────────────────────────────────────────────────────────────
+GOOGLE_API_KEY = _env_str("GOOGLE_API_KEY")
+GEMINI_API_KEY = _env_str("GEMINI_API_KEY")
 LLM_API_KEY = GOOGLE_API_KEY or GEMINI_API_KEY
 if not LLM_API_KEY:
-    raise ValueError("Configurazione Errata: Manca GOOGLE_API_KEY o GEMINI_API_KEY nel file .env")
+    raise ConfigError("Configurazione errata: manca GOOGLE_API_KEY o GEMINI_API_KEY")
 
-# Configurazione del modello con default "gemma-4-31b-it"
-_raw_model = os.getenv("GEMINI_MODEL", "gemma-4-31b")
+_raw_model = _env_str("GEMINI_MODEL", "gemma-4-31b") or "gemma-4-31b"
 GEMINI_MODEL = "gemma-4-31b-it" if _raw_model in ("gemma-4-31b", "gemma-4-31b-it") else _raw_model
 
-# Rate Limits e Governance LLM
-LLM_RPM = int(os.getenv("LLM_RPM", "10"))
-LLM_TPM = int(os.getenv("LLM_TPM", "0"))
-LLM_RPD = int(os.getenv("LLM_RPD", "1400"))
+LLM_RPM = _env_int("LLM_RPM", 10, min_value=1, max_value=120)
+LLM_TPM = _env_int("LLM_TPM", 0, min_value=0, max_value=2_000_000, allow_zero=True)
+LLM_RPD = _env_int("LLM_RPD", 1400, min_value=1, max_value=100_000)
 
-# Altre configurazioni globali con relativi default o fallback
-pg_user = os.getenv("POSTGRES_USER", "radar_user")
-pg_pass = os.getenv("POSTGRES_PASSWORD", "radar_password_secure")
-pg_db = os.getenv("POSTGRES_DB", "radar_db")
-pg_host = os.getenv("POSTGRES_HOST", "localhost")
-pg_port = os.getenv("POSTGRES_PORT", "5432")
-default_db_url = f"postgresql://{pg_user}:{pg_pass}@{pg_host}:{pg_port}/{pg_db}"
+# ── Database ─────────────────────────────────────────────────────────────────
+_DEFAULT_PG_PASSWORD = "radar_password_secure"
 
-DATABASE_URL = os.getenv("DATABASE_URL", default_db_url)
-OBSIDIAN_VAULT_PATH = os.getenv("OBSIDIAN_VAULT_PATH", "/app/vault")
+pg_user = _env_str("POSTGRES_USER", "radar_user") or "radar_user"
+pg_pass = _env_str("POSTGRES_PASSWORD", _DEFAULT_PG_PASSWORD) or _DEFAULT_PG_PASSWORD
+pg_db = _env_str("POSTGRES_DB", "radar_db") or "radar_db"
+pg_host = _env_str("POSTGRES_HOST", "localhost") or "localhost"
+pg_port = _env_str("POSTGRES_PORT", "5432") or "5432"
+_default_db_url = f"postgresql://{pg_user}:{pg_pass}@{pg_host}:{pg_port}/{pg_db}"
 
-# Configurazione Miniflux
-MINIFLUX_API_URL = os.getenv("MINIFLUX_API_URL", "http://localhost:8080")
-MINIFLUX_API_KEY = os.getenv("MINIFLUX_API_KEY", "")
-MINIFLUX_LIMIT = int(os.getenv("MINIFLUX_LIMIT", "50"))
+DATABASE_URL = _env_str("DATABASE_URL", _default_db_url) or _default_db_url
+OBSIDIAN_VAULT_PATH = _env_str("OBSIDIAN_VAULT_PATH", "/app/vault") or "/app/vault"
+
+# ── Miniflux ─────────────────────────────────────────────────────────────────
+MINIFLUX_API_URL = _env_str("MINIFLUX_API_URL", "http://localhost:8080") or "http://localhost:8080"
+MINIFLUX_API_KEY = _env_str("MINIFLUX_API_KEY", "") or ""
+MINIFLUX_LIMIT = _env_int("MINIFLUX_LIMIT", 50, min_value=1, max_value=500)
+
+MAX_MINIFLUX_RESPONSE_BYTES = _env_int(
+    "MAX_MINIFLUX_RESPONSE_BYTES",
+    5_000_000,
+    min_value=64_000,
+    max_value=50_000_000,
+)
+MAX_ENTRY_CONTENT_BYTES = _env_int(
+    "MAX_ENTRY_CONTENT_BYTES",
+    500_000,
+    min_value=1_000,
+    max_value=5_000_000,
+)
+
+MINIFLUX_CONNECT_TIMEOUT = _env_int("MINIFLUX_CONNECT_TIMEOUT", 10, min_value=1, max_value=120)
+MINIFLUX_READ_TIMEOUT = _env_int("MINIFLUX_READ_TIMEOUT", 30, min_value=1, max_value=300)
+MINIFLUX_MAX_RETRIES = _env_int("MINIFLUX_MAX_RETRIES", 3, min_value=0, max_value=10)
+MINIFLUX_RETRY_BASE_SECONDS = _env_int("MINIFLUX_RETRY_BASE_SECONDS", 1, min_value=1, max_value=60)
+MINIFLUX_RETRY_MAX_SECONDS = _env_int("MINIFLUX_RETRY_MAX_SECONDS", 30, min_value=1, max_value=300)
+
+OUTBOX_STALE_WRITING_SECONDS = _env_int(
+    "OUTBOX_STALE_WRITING_SECONDS",
+    300,
+    min_value=30,
+    max_value=86_400,
+)
+
+_raw_tz = _env_str("RADAR_TIME_ZONE", "UTC") or "UTC"
+RADAR_TIME_ZONE, RADAR_TIME_ZONE_NAME = _resolve_time_zone(_raw_tz)
+
+
+def _validate_production_secrets() -> None:
+    """Fail startup in production when Miniflux/DB settings are missing or insecure defaults."""
+    if not IS_PRODUCTION:
+        return
+
+    missing: list[str] = []
+    if not MINIFLUX_API_KEY:
+        missing.append("MINIFLUX_API_KEY")
+    if not _env_str("DATABASE_URL") and not _env_str("POSTGRES_PASSWORD"):
+        missing.append("DATABASE_URL o POSTGRES_PASSWORD")
+
+    if missing:
+        raise ConfigError(
+            "Ambiente production: impostazioni obbligatorie mancanti: " + ", ".join(missing)
+        )
+
+    if pg_pass == _DEFAULT_PG_PASSWORD and not _env_str("DATABASE_URL"):
+        raise ConfigError(
+            "Ambiente production: rifiutata la password PostgreSQL di default "
+            f"'{_DEFAULT_PG_PASSWORD}'. Imposta POSTGRES_PASSWORD o DATABASE_URL."
+        )
+
+    if "radar_password_secure" in DATABASE_URL and not _env_str("DATABASE_URL"):
+        raise ConfigError(
+            "Ambiente production: DATABASE_URL costruita con password di default non consentita."
+        )
+
+
+_validate_production_secrets()

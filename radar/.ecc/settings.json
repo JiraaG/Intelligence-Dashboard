@@ -121,7 +121,7 @@
       "file": ".ecc/agents/geo-data-architect.md",
       "scope": ["backend/app/core/database.py", "backend/app/commit/**", "backend/migrations/**"],
       "model": "sonnet",
-      "notes": "Post-restore: DDL vive in core/database.py bootstrap. migrations/ esiste solo dopo Phase 1."
+      "notes": "Phase 1 DONE: schema source of truth = backend/migrations/*.sql + core/migrations.py (schema_migrations). Scope include migrations/** e commit/** (outbox)."
     },
     "angular-map-expert": {
       "file": ".ecc/agents/angular-map-expert.md",

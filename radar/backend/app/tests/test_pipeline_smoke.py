@@ -23,10 +23,9 @@ def test_main_module_importable():
 
 def test_geopolitical_schema_valid_article():
     """GeopoliticalArticleSchema deve accettare un articolo ben formato."""
-    from app.main import GeopoliticalArticleSchema
+    from app.classification.validator import GeopoliticalArticleSchema
 
     data = {
-        "reasoning": "Ragionamento CoT.",
         "title": "Test: Nuovo impianto TSMC in Sassonia",
         "summary": "TSMC inaugura la prima fab europea. La Germania punta sulla sovranità tecnologica.",
         "published_at": "2026-06-24",
@@ -39,7 +38,7 @@ def test_geopolitical_schema_valid_article():
         "primary_category": "Tecnologia",
         "sentiment": "Positivo",
         "infrastructural_entities": "Fabbrica TSMC",
-        "relevance_level": 3
+        "relevance_level": 3,
     }
     article = GeopoliticalArticleSchema(**data)
     assert article.country_code == "DE"
@@ -48,11 +47,11 @@ def test_geopolitical_schema_valid_article():
 
 
 def test_geopolitical_schema_rejects_invalid_category():
-    """GeopoliticalArticleSchema deve normalizzare una categoria non valida a Tecnologia."""
-    from app.main import GeopoliticalArticleSchema
+    """GeopoliticalArticleSchema deve rifiutare una categoria non valida (strict)."""
+    from pydantic import ValidationError
+    from app.classification.validator import GeopoliticalArticleSchema
 
     data = {
-        "reasoning": "Ragionamento CoT.",
         "title": "Articolo di test",
         "summary": "Riassunto di test.",
         "published_at": "2026-06-24",
@@ -62,13 +61,13 @@ def test_geopolitical_schema_rejects_invalid_category():
         "longitude": 12.5674,
         "companies_involved": "Nessuno",
         "tags": "Test",
-        "primary_category": "CATEGORIA_NON_ESISTENTE",  # Valore invalido → fallback
+        "primary_category": "CATEGORIA_NON_ESISTENTE",
         "sentiment": "Neutrale",
         "infrastructural_entities": "Nessuno",
-        "relevance_level": 2
+        "relevance_level": 2,
     }
-    article = GeopoliticalArticleSchema(**data)
-    assert article.primary_category == "Tecnologia"
+    with pytest.raises(ValidationError):
+        GeopoliticalArticleSchema(**data)
 
 
 # ─── Test 3: Funzione strip_html ─────────────────────────────────────────────
