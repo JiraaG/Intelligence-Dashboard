@@ -1,73 +1,63 @@
 # 🧠 Il Framework ECC (Everything Claude Code)
 
-Questo progetto implementa una delle architetture di "Agent Harnessing" più avanzate attualmente disponibili per il lavoro delegato all'IA: il framework **ECC (Everything Claude Code)**.
+Questo progetto implementa un'architettura avanzata di "Agent Harnessing": il framework **ECC (Everything Claude Code)**.
 
 ## Che cos'è ECC?
-ECC si definisce come un "Harness-native operator system for agentic work". In altre parole, non è un semplice set di file di configurazione, ma una vera e propria infrastruttura (compatibile con IDE e CLI come Cursor, Antigravity, OpenCode, Zed) pensata per istruire l'AI e forzarla a comportarsi in modo deterministico, sicuro e conforme alle regole di un progetto di produzione.
+ECC è un "Harness-native operator system for agentic work". Fornisce un'infrastruttura per istruire l'AI, vincolandola in modo deterministico e sicuro alle regole di produzione del progetto. L'effettivo caricamento e i trigger logici di questi artefatti dipendono dall'harness del client in uso (es. Antigravity, OpenCode, Cursor, o CLI native).
 
-Tramite ECC, l'agente AI che scrive il codice viene dotato di:
-- **Skills (Competenze)**: Playbook che gli spiegano passo-passo *come* realizzare task complessi senza inventare la ruota.
-- **Rules (Regole)**: Un recinto normativo inviolabile (es. vincoli di framework, divieti assoluti, estetica di base).
-- **Hooks (Controlli)**: Script eseguiti in background prima o dopo che l'agente modifichi i file.
+Il sistema è composto da due namespace di directory:
 
----
+### 1. Spazio di Governance Globale (`.agents/`)
+Questa cartella (situata spesso nella root del progetto o globalmente nell'host) contiene:
+- `AGENTS.md`: La "Magna Carta" globale. Definisce l'identità dell'agente, i divieti assoluti (no placeholders, obbligo `asyncpg` puro) e i vincoli incrociati.
+- `skills/`: Competenze globalmente disponibili, attivabili tramite semantic matching sui frontmatter YAML dei file `SKILL.md`.
 
-## Struttura delle Directory ECC
-
-Se esplori la root del progetto, noterai alcune cartelle e file vitali per ECC.
-
-### 1. `.agents/skills/`
-Qui risiedono le competenze (Skills) specifiche apprese o definite per questo progetto.
-Ad esempio, la cartella `.agents/skills/llm-json-extraction/` contiene il file `SKILL.md`. Quando all'agente AI viene chiesto di "modificare la pipeline Gemini", il sistema analizza questo file e inietta le direttive nel cervello dell'agente prima che scriva il codice.
-*Una skill dice all'agente "Usa sempre il parser e purga i tag multimediali per risparmiare token"*.
-
-### 2. `.ecc/rules/` e `AGENTS.md`
-Questi sono i Guardrail (le recinzioni di sicurezza).
-- `AGENTS.md` (nella radice del progetto o in configurazione globale) agisce come Magna Carta. Contiene i **Vincoli di Produzione Cruciali** (es. divieto di uso di SQLAlchemy, obbligo asincrono puro).
-- Le regole possono essere ulteriormente ripartite (es. `frontend.md` o `backend.md`) per circoscrivere i contesti (Scope-Path).
-
-### 3. `.ecc/hooks/`
-Questi sono script di esecuzione reali, solitamente scritti in Python o JavaScript/Node, come `pre-tool-use.py` o `post-tool-use.py`. 
-Funzionano similmente ai Git Hooks, ma scattano ogni volta che un Agente AI usa uno strumento (es. cerca sul web o scrive un file).
-Assicurano che:
-- Non vi siano *leak* di chiavi segrete nelle shell create dall'agente.
-- L'output dell'agente non contenga commenti temporanei ("TODO", "FIXME").
-- Il codice compilato passi i controlli di Linting (es. ESlint o Ruff) *prima* di essere consolidato.
+### 2. Spazio Operativo di Workspace (`radar/.ecc/`)
+Questo namespace isolato definisce le regole di contesto e il profilo di esecuzione locale:
+- `CLAUDE.md`: Entry-point legacy o configurazione master dell'harness.
+- `settings.json`: Impostazioni base dell'agente.
+- `rules/`: Istruzioni Scope-Path. File come `backend.md` o `frontend.md` che agiscono solo su specifiche path (es. `radar/backend/**`).
+- `agent_profiles/`: Profili comportamentali assunti dall'AI (`pipeline-engineer`, `geo-data-architect`, `angular-map-expert`).
+- `hooks/`: Script di validazione pre e post esecuzione.
+- `skills/`: (Opzionale) Competenze circoscritte al solo microservizio.
 
 ---
 
-## Come Espandere o Modificare l'Architettura ECC
+## Mappatura delle Competenze (Skills)
 
-Il vantaggio di ECC è che la conoscenza cresce assieme al progetto. Come sviluppatore umano o supervisore, puoi modificare il comportamento del tuo Agente AI.
+L'agente apprende dinamicamente a risolvere task complessi leggendo i file `SKILL.md`. Le 3 skill documentate nel progetto sono:
 
-### Aggiungere una nuova Skill (Competenza)
-Vuoi che l'agente impari a generare automaticamente dei grafici usando D3.js seguendo il tuo stile aziendale?
-1. Crea una cartella `.agents/skills/d3-chart-generator/`.
+1. **`angular-developer`**: Fornisce pattern architetturali reattivi per Angular 21 (uso esclusivo di Signals, Standalone Components, e workaround ESBuild per librerie UMD come Leaflet).
+2. **`llm-json-extraction`**: Playbook per l'integrazione con Google Gemini API. Definisce il System Prompt immutabile, lo schema Pydantic per i JSON Strutturati, e il contratto CSV→List per proteggere il token-buffer.
+3. **`spatial-data-mocking`**: Guida per il testing offline del frontend in isolamento dal backend. Insegna all'agente a innescare e governare i dati mockati geografici senza dipendere da FastAPI/Miniflux.
+
+---
+
+## Architettura degli Hooks di Validazione
+
+Gli script in `radar/.ecc/hooks/` funzionano similmente ai Git Hooks, ma scattano attorno alle modifiche prodotte dall'AI. **L'agente deve eseguirli manualmente** a chiusura delle operazioni sui file sorgenti codificati, dato che l'esecuzione automatica universale varia per harness.
+
+- **`pre-tool-use.py` (Bloccante, basato a pattern)**:
+  Esegue uno scan regex in memoria dell'input del tool. Blocca l'esecuzione se rileva leak di API Keys nel prompt, o se intercetta pattern distruttivi vietati (es. `rm -rf /` o `DROP TABLE`).
+  
+- **`post-tool-use.py` (Non Bloccante / Tentativo)**:
+  Eseguito sui file sorgente appena modificati. Tenta una scansione per Placeholder dimenticati (`TODO`, `FIXME`, `HACK`, `pass`). Lancia il linting (Ruff per Python, ESLint per TypeScript/JS) per validare la sintassi prima del commit. *Non* esegue formattazioni Prettier.
+
+---
+
+## Come Espandere l'Architettura ECC
+
+Il vantaggio di ECC è che la conoscenza cresce assieme al progetto. Puoi alterare il comportamento dell'Agente creando una nuova Skill.
+
+### Esempio Reale: Creare la skill `spatial-data-mocking`
+1. Crea una cartella `.agents/skills/spatial-data-mocking/`.
 2. All'interno crea un file `SKILL.md`.
-3. In cima al file inserisci un Frontmatter YAML con i trigger semantici:
+3. In cima al file inserisci un Frontmatter YAML (necessario all'harness per il trigger):
    ```yaml
    ---
-   name: d3-chart-generator
-   description: Genera grafici D3.js per la dashboard usando scale logaritmiche e stile Palantir. Usa questa skill quando ti viene richiesto di plottare serie temporali.
+   name: spatial-data-mocking
+   description: Playbook per il testing offline del frontend Angular 21 in totale isolamento dal backend Python. Definisce dati mockati spaziali.
    ---
    ```
-4. Sotto il YAML, scrivi in formato Markdown le istruzioni esatte, gli snippet di codice di base da copiare e i vincoli.
-5. Dal turno di chat successivo, l'agente leggerà automaticamente questo manuale ogni volta che capirà di dover creare un grafico!
-
-### Modificare le Regole Globali
-Se ti accorgi che l'agente commette ripetutamente un errore (es. usa `ng serve` invece del webserver di produzione), apri il file `AGENTS.md` nella radice.
-Aggiungi un nuovo blocco di regola, possibilmente in un alert di avviso:
-```markdown
-> [!CRITICAL]
-> ### ⛔ Divieto di uso di ng serve
-> È severamente vietato suggerire o lanciare `ng serve` in produzione. Il frontend deve sempre essere servito compilato staticamente dietro Nginx.
-```
-Questo diventerà *legge assoluta* per le invocazioni future.
-
-### Esecuzione degli Hook
-Prima di confermare modifiche drastiche, assicurati che la toolchain di validazione sia pulita.
-Se modifichi le regole di sicurezza, puoi lanciare lo script manualmente:
-```bash
-python .ecc/hooks/post-tool-use.py
-```
-Questo garantirà che le protezioni base contro placeholder e codice rotto siano attive e funzionanti.
+4. Sotto il YAML, scrivi in formato Markdown le istruzioni esatte, gli step da seguire nel servizio Angular (es. intercettazione token, iniettore stub).
+5. Dal momento in cui salvi il file, l'agente "si ricorderà" di consultare questa guida tecnica ogni volta che gli chiederai di testare la UI in locale.

@@ -253,7 +253,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Modificabile per restringere ad host specifici in prod
     allow_credentials=False,
-    allow_methods=["GET"],
+    allow_methods=["GET", "PATCH", "OPTIONS"],
     allow_headers=["*"],
 )
 

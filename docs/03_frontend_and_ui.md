@@ -1,76 +1,104 @@
 # 🎨 Frontend e Interfaccia Utente (UI)
 
-Il frontend di **Radar Informativo Globale** è una Single Page Application (SPA) costruita con **Angular 21** e **Standalone Components**, progettata per offrire un'esperienza visiva fluida e in tempo reale degna di un software di intelligence in stile Palantir.
+Il frontend di **Radar Informativo Globale** è una Single Page Application (SPA) costruita con **Angular 21 (Standalone)**, progettata per offrire un'esperienza in tempo reale in stile Palantir.
 
 ---
 
-## Lo Stack UI
+## 1. Stack e Compatibilità
 
-- **Framework**: Angular 21
-- **Mappa**: Leaflet 1.9 + plugin MarkerCluster
-- **Componenti**: PrimeNG 17 (Carosello, Sidebar, Dropdown)
-- **Stato (State Management)**: Segnali (`Signal`), `computed` e il moderno sistema `rxResource` di Angular.
-- **Styling**: SCSS (CSS nativo) basato su Variabili CSS, con design "Glassmorphism" (sfondi translucidi, blur). Nessun utility-first framework come Tailwind.
+L'ecosistema miscela versioni *cutting-edge* e dipendenze storiche stabili. A causa del rapido ciclo di rilascio di Angular, esiste un disallineamento volontario tra core e UI library:
 
----
-
-## 1. La Mappa Globale e il Clustering
-
-Il cuore visivo è il componente `RadarMapComponent` che disegna la plancia geografica. 
-La visualizzazione reagisce al livello di Zoom dell'utente.
-
-### Zoom OUT (Hatching delle Nazioni)
-A livelli di zoom distanti (Zoom < 5), i marker vengono nascosti. 
-La mappa disegna i confini fisici dei vari stati tramite file GeoJSON (`countries.geo.json`).
-I paesi che presentano degli allarmi (articoli registrati) vengono colorati usando un effetto di **Hatching SVG** (strisce diagonali) iniettato a runtime dalla direttiva `leaflet-hatch.directive.ts`. 
-
-### Zoom IN (Marker e Spiderfy)
-Aspirando a livelli di dettaglio maggiori (Zoom ≥ 5), compaiono i **Marker**. 
-- Se ci sono più notizie in un raggio ristretto, interviene **MarkerCluster**. 
-- Un singolo cluster raggruppa spazialmente le notizie raggruppandole in un'icona "ad anello": se il cluster contiene articoli di diverse categorie, vedrai anelli frammentati nei vari colori (es. rosso per Nucleare, verde per Ambiente) con un contatore centrale.
-- Se effettui uno zoom profondo, il cluster si "espande" in una struttura a ragnatela (Spiderfy), mostrando i pin individuali.
-
-> [!NOTE]
-> Per gestire l'allineamento dei bounding box di nazioni che attraversano la linea di cambio data (Antimeridiano, es. Stati Uniti o Russia), il codice imposta dei confini geografici *Mainland* pre-calcolati per evitare che la telecamera si blocchi.
+- **Core**: Angular `21.2.x` (Standalone Components, Signals, ESBuild).
+- **Mappa**: Leaflet `1.9.4` + `leaflet.markercluster 1.5.3`.
+- **UI Kit**: PrimeNG `17.18.x` + Angular CDK `17.3.x`. (Il mismatch di major version con Angular 21 è gestito installando in modalità non restrittiva).
+- **Styling**: SCSS puro. Nessun framework utility-first (es. Tailwind).
 
 ---
 
-## 2. Il Sistema dei Colori (10 Categorie Geopolitiche)
+## 2. Component Tree e Architettura Reattiva
 
-L'intero frontend si appoggia su un rigoroso vocabolario visivo a 10 categorie per decodificare gli eventi a colpo d'occhio. I colori sono centralizzati in `styles.scss` tramite variabili native CSS (es. `--color-nucleare`):
+Il frontend adotta un'architettura rigorosamente basata sui **Signals** di Angular.
 
-| Categoria | Colore | Significato |
-|-----------|--------|-------------|
-| ☢️ **Nucleare** | Rosso neon (`#ff4d4d`) | Centrali, Incidenti, Smaltimento. |
-| ⚡ **Energia** | Arancio (`#ffa64d`) | Oil & Gas, Rinnovabili. |
-| 🏗️ **Infrastrutture** | Grigio Blu (`#b3c6ff`) | Strade, Ponti, Dighe. |
-| 🌐 **Geopolitica** | Giallo (`#ffff66`) | Accordi di pace, Tensioni di confine. |
-| 💰 **Economia** | Verde Brillante (`#66ff66`) | Mercati, Materie prime, Sanzioni. |
-| 💻 **Tecnologia** | Ciano (`#4dffff`) | Data center, IA, Cyberattacchi. |
-| 🚀 **Spazio** | Viola/Rosa (`#ff66ff`) | Satelliti, Lanci, Ricerca spaziale. |
-| 🌲 **Ambiente** | Verde Smeraldo (`#00cc99`) | Alluvioni, Siccità, Incendi. |
-| 🏥 **Salute** | Bianco Puro (`#ffffff`) | Pandemie, Crisi sanitarie. |
-| 🛡️ **Sicurezza** | Rosso Scuro (`#cc0000`) | Eserciti, Ribellioni, Attentati. |
+```text
+App (app.component.ts)
+├── RadarToolbarComponent (filtri, date picker, country select)
+├── RadarMapComponent (Leaflet, GeoJSON, clustering, hatching)
+│   └── leaflet-hatch.directive.ts (SVG pattern injection)
+└── RadarSidebarComponent (carosello PrimeNG, article cards)
+
+Servizi e Dati:
+├── StateService (Single Source of Truth, gestisce i Signal)
+├── ArticleService (Chiamate HTTP reali a FastAPI)
+└── ArticleMockService (Dati spaziali fittizi di fallback)
+```
+
+### Gestione dello Stato (State Management)
+L'intera UI è guidata dal `StateService`:
+- **`rxResource`**: Effettua chiamate asincrone all'API per recuperare i dati. Reagisce ai cambi di parametro (data).
+- **`computed`**: Crea proiezioni istantanee. I filtri selezionati dall'utente (Sentiment, Categorie multiple) vengono applicati sul client, rigenerando la lista articoli e i totali per paese senza ricaricare l'API.
+- **Signals UI**: Proprietà come l'articolo attualmente selezionato o lo stato di espansione della sidebar risiedono come segnali nel componente genitore `App`.
+- **Mock Fallback**: In assenza del backend, è possibile iniettare dati offline tramite `ArticleMockService` per operare e testare UI/Mappa spaziale in isolamento.
 
 ---
 
-## 3. L'Interfaccia Utente
+## 3. Workaround Critico Leaflet + ESBuild
 
-### Toolbar Superiore (Glassmorphism)
-Sospesa sopra la mappa, permette di filtrare i dati visualizzati:
-- Selezione per data (Calendario).
-- Selezione per Sentiment (Positivo, Negativo, Neutrale).
-- Selezione Rapida per Paese (Drop-down).
-- Filtri per Categoria (Chip/Badge).
+> [!WARNING]
+> Angular 21 utilizza **ESBuild** di default. La libreria `leaflet.markercluster` è un modulo UMD progettato per iniettare i suoi metodi nel namespace globale `window.L`. Eseguire `import 'leaflet.markercluster'` in un componente Typescript causa la rottura del collegamento: Leaflet e il plugin vivono in due context separati.
 
-### Split-Screen Sidebar
-Cliccando su un paese o su un cluster della mappa, l'interfaccia si suddivide automaticamente in un rapporto 70/30 (Mappa a sinistra, Sidebar a destra). 
+**Soluzione Architetturale adottata:**
+1. I file `.js` e `.css` di Leaflet e MarkerCluster sono caricati staticamente nell'array `scripts[]` e `styles[]` del file `angular.json`.
+2. All'interno di `RadarMapComponent`, la libreria viene intercettata globalmente con:
+   `const L = (window as any).L;`
+Nessun `import * as L from 'leaflet'` è consentito nel codice.
 
-La Sidebar ospita un **Carosello (PrimeNG)** che permette di scorrere orizzontalmente/verticalmente gli articoli, visualizzando:
-- Il grado di rilevanza dell'articolo (Stelle o Gauge).
-- Il Badge colorato del sentiment.
-- Il Box con le **Entità Infrastrutturali** coinvolte e le **Aziende**.
-- Il link sorgente ("Leggi la fonte originale").
+---
 
-> [!TIP]
-> Tutti i box informativi (come la dicitura della testata d'origine) utilizzano regole `flexbox` con troncamento visivo (`white-space: nowrap`, `overflow: hidden`, `text-overflow: ellipsis`) per garantire che i testi lunghi estratti dal RSS non spezzino l'allineamento dei pulsanti laterali.
+## 4. Motore Geografico e Clustering
+
+L'engine mappa fonde poligoni (Nazioni) e punti spaziali (Articoli). Il comportamento di default di MarkerCluster è stato disabilitato per lasciare spazio a un'implementazione UX custom:
+
+### Bounding Box e GeoJSON (Zoom < 5)
+I confini mondiali (GeoJSON in batch) vengono disegnati all'avvio. 
+Se una nazione possiede articoli, subisce l'effetto **Hatching SVG** (strisce diagonali) applicato dinamicamente.
+*Nota Trans-Antimeridiano*: Per stati come `US` e `RU` i cui territori attraversano la linea di cambio data (creando bounding box larghi quanto l'intero globo), la telecamera utilizza coordinate *Mainland* pre-calcolate staticamente per evitare glitch visivi nel `fitBounds`. I limiti zoom bloccano la mappa: `minZoom: 2.2`.
+
+### Clustering Custom e Dummy Markers (Zoom > 5)
+Il sistema instanzia **10 MarkerClusterGroup separati**, uno per ogni macro-categoria geopolitica.
+- **Raggio compatto**: Il cluster è stretto (`maxClusterRadius: 40`).
+- **Ancoraggio**: Avviene sulle coordinate mediate per la nazione, per evitare sovrapposizioni.
+- **Dummy Marker**: Per non appesantire la mappa, la logica inietta coordinate invisibili (`isDummy: true`) costringendo il cluster a posizionarsi dove desiderato spazialmente.
+- **Spiderfy Manuale**: Lo spiderfy automatico al max zoom è disabilitato (`spiderfyOnMaxZoom: false`). Al click, la mappa zooma dinamicamente al livello 6 (`flyTo`) ed esegue l'espansione ad albero spaziale.
+- **Root Marker**: Anche dopo lo spiderfy o per notizie singole (count=1), viene sempre generato e mantenuto un "pallino" cluster visibile, garantendo coerenza estetica (mai usare icone "nude").
+
+---
+
+## 5. UI e Interazione (Split-Screen)
+
+```mermaid
+sequenceDiagram
+    User->>Toolbar/Mappa: Click Nazione o Cluster
+    Toolbar/Mappa->>App: Emette Evento (onCountryClick / onClusterClick)
+    App->>Sidebar: Apre Sidebar (Split-Screen 70/30)
+    App->>Mappa: Esegue focus (fitBounds, maxZoom: 4)
+    Sidebar->>Carousel: Seleziona Indice
+    Carousel->>DOM: Resize altezza via id="article-card-{id}"
+```
+
+### Carosello PrimeNG
+Il componente laterale mostra le schede. Per prevenire race conditions del DOM all'avvio (tipiche di PrimeNG con i Signal), il dimensionamento dinamico in altezza ricerca esattamente l'ID `article-card-{id}` anziché usare la classe generica `.p-carousel-item-active`.
+
+### Troncamento Testi e Metadati
+Titoli di testate lunghi sono vincolati via layout **Flexbox** rigido:
+`flex: 1`, `min-width: 0` per il contenitore testo, `flex-shrink: 0`, `white-space: nowrap` per il link sorgente laterale.
+I feed in arrivo da Miniflux subiscono un cleanup Regex nel component (`.replace(/^Feed:\s*/i, '')`) per pulizia visiva.
+
+### PATCH Ottimistico (Read Status)
+Il click sul toggle Letto/Non Letto implementa un pattern **Optimistic Update**:
+1. Il Signal UI viene istantaneamente aggiornato (per feedback immediato).
+2. Viene lanciata la chiamata asincrona `PATCH /api/articles/...`.
+3. In caso di errore API (es. offline), interviene un Rollback automatico.
+*Nota:* L'attuale UI è priva di debounce; richieste ripetute e asincrone possono fallire in caso di risposte server fuori ordine.
+
+### Legenda Interattiva
+Una legenda orizzontale in assoluto posizionata al centro del footer (`bottom: 20px; left: 50%`) decodifica le 10 categorie geopolitiche. Sfoggia effetti Glassmorphism con cerchi luminosi dettati da un `box-shadow` del colore associato.

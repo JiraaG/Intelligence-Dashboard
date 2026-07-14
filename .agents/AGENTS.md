@@ -74,6 +74,12 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
    * Il Dockerfile del frontend DEVE utilizzare un approccio multi-stage per garantire una distribuzione totalmente plug-and-play. La fase `builder` (basata su `node`) compilerà il codice, mentre la fase finale copierà solo la cartella `dist/` compilata all'interno del web server Nginx. L'utente finale non dovrà mai installare Node.js né eseguire `npm run build` manualmente. Qualsiasi modifica al codice Angular del frontend richiede unicamente la ricostruzione del container (`docker compose up --build -d radar-frontend`) affinché Nginx possa servire la versione aggiornata.
 7. **Risoluzione DNS Dinamica in Nginx (Prevenzione 502 Bad Gateway):**
    * Per evitare errori `502 Bad Gateway` a seguito di riavvii dei container o riassegnazioni di IP nella rete bridge, `nginx.conf` deve utilizzare un resolver interno (`resolver 127.0.0.11 valid=10s;`) ed una variabile locale per il `proxy_pass` (es. `set $backend_upstream http://radar-backend:8000; proxy_pass $backend_upstream$request_uri;`). Questo costringe Nginx a risolvere l'IP a runtime anziché solo all'avvio.
+8. **Riproducibilità Frontend (`npm ci`):**
+   * Nel `Dockerfile` del frontend Angular, l'installazione delle dipendenze nello stage builder deve sempre avvenire tramite `npm ci --legacy-peer-deps` per garantire build riproducibili. È vietato l'uso di `npm install`.
+9. **Sicurezza Immagini (No `latest`):**
+   * È severamente vietato l'utilizzo del tag `latest` per le immagini di base nei `docker-compose.yml` e nei `Dockerfile` (es. `miniflux/miniflux:latest`). Le versioni devono sempre essere bloccate (pinnate) a una major/minor specifica (es. `2.3.2`) per prevenire rotture distruttive da aggiornamenti silenti.
+10. **Coerenza Healthcheck (Alpine Linux):**
+    * Gli script di healthcheck definiti nei Dockerfile e nel docker-compose devono utilizzare eseguibili realmente disponibili nell'immagine di base. Ad esempio, per immagini basate su Alpine (come Nginx), è obbligatorio usare `wget` invece di `curl` per evitare che il container venga marchiato costantemente come `unhealthy`.
 
 ---
 
@@ -90,9 +96,9 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 
 > [!NOTE]
 > ### 🗺️ Regole di Visualizzazione Mappa e Clustering
-> 1. **Clustering a Icona Composita (Anello per Categoria)**: Un singolo `L.markerClusterGroup` raggruppa spazialmente tutti i marker a coordinate reali (nessun offset geografico). L'icona del cluster è una scomposizione ad anello: categoria singola = pallino colorato 40×40 con conteggio; multi-categoria = anello 60×60 con sub-dot radiali colorati per categoria + conteggio totale centrale. `maxClusterRadius: 100`, `disableClusteringAtZoom: 12`, `spiderfyOnMaxZoom: true`.
-> 2. **Spiderfy Anticipato a Grafo**: A zoom ≥ 12 il cluster si espande automaticamente in marker individuali collegati al centro da linee radiali (struttura a grafo). Un marker di ancoraggio centrale persiste visibile durante l'espansione. Il click su un sub-dot categoria emette solo gli articoli di quella categoria.
-> 3. **Notizia Singola in Pallino**: Anche una notizia singola (count=1) viene renderizzata dentro un pallino cluster (mai icona nuda). L'ancoraggio è sempre centrato sulla coordinata reale.
+> 1. **Clustering Avanzato e Dummy Marker**: Un singolo `L.markerClusterGroup` raggruppa spazialmente gli articoli. Per forzare il corretto raggruppamento spaziale per nazione senza mostrare punti reali ridondanti, vengono impiegati marker invisibili (`isDummy: true`).
+> 2. **Impostazioni MarkerCluster e Spiderfy Custom**: Il raggio di clusterizzazione è stretto (`maxClusterRadius: 40`). Lo spiderfy automatico è disabilitato (`spiderfyOnMaxZoom: false`). La frammentazione dei cluster avviene tramite una logica custom (click e flyTo allo zoom 6).
+> 3. **Root Marker e Notizia Singola**: Durante l'espansione del cluster viene mantenuto un "root marker" centrale. Anche una notizia singola (count=1) viene renderizzata dentro un pallino cluster (mai icona nuda). L'ancoraggio usa le coordinate mediate per paese.
 > 4. **Estensione Bounding Box per Stati Trans-Antimeridiano**: Nel calcolo dello zoom di focus per nazioni con territori oltre la linea di cambio data (Stati Uniti `US` e Russia `RU`), per garantire la validità del bounding box ed evitare comportamenti bloccanti, utilizzare bounding box statici Mainland hardcoded:
 >    * `US`: `L.latLngBounds(L.latLng(24.396308, -125.0), L.latLng(49.384358, -66.93457))`
 >    * `RU`: `L.latLngBounds(L.latLng(41.1856, 19.6389), L.latLng(81.8587, 169.0))`

@@ -77,7 +77,7 @@ services:
     networks:
       - radar-network
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://127.0.0.1:80/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -86,7 +86,7 @@ services:
 
   # ─── 4. MINIFLUX (Aggregatore RSS) ──────────────────────────────────────────
   radar-miniflux:
-    image: miniflux/miniflux:latest
+    image: miniflux/miniflux:2.3.2
     container_name: radar-miniflux
     restart: unless-stopped
     ports:

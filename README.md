@@ -1,15 +1,12 @@
 # Radar Informativo Globale
 
-> **Intelligence Dashboard** — A self-hosted, Docker-containerized geopolitical intelligence dashboard that aggregates RSS feeds, enriches them via Google Gemini LLM, and displays results on an interactive 2D dark map (Palantir-style).
+> **Intelligence Dashboard** — Un'applicazione web self-hosted e containerizzata per l'aggregazione di feed RSS e il loro arricchimento semantico via LLM. Il sistema espone localmente il frontend sulla porta `80` e l'interfaccia Miniflux sulla porta `8080`. Sebbene l'infrastruttura sia eseguita in locale tramite Docker, il funzionamento richiede l'accesso a servizi esterni: fonti RSS, Google Gemini API per il reasoning e Carto per il rendering delle tile geografiche.
 
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Angular](https://img.shields.io/badge/Angular-21.2-DD0031?logo=angular&logoColor=white)](https://angular.dev/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-4_services-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
-[![Zero Config](https://img.shields.io/badge/Deployment-100%25_Plug_&_Play-success?logo=rocket&logoColor=white)](#)
-[![Gemini](https://img.shields.io/badge/LLM-Gemma_4_31B-4285F4?logo=google&logoColor=white)](https://aistudio.google.com/)
-[![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
 ---
 
@@ -18,59 +15,87 @@ Questo progetto è stato ingegnerizzato per essere **completamente indipendente*
 
 ---
 
-## Vision & Purpose
+## 🏗️ Architettura a Colpo d'Occhio
 
-**Radar Informativo Globale** transforms raw RSS news feeds into structured, geo-referenced intelligence entries. The pipeline:
+```mermaid
+flowchart LR
+    Browser([Browser]) <-->|Porta 80| Nginx[Nginx / Angular]
+    Browser -->|Tile Esterni| Carto[(Carto Map)]
+    
+    Nginx <-->|/api/| FastAPI[FastAPI Backend]
+    
+    FastAPI -->|Lettura/Scrittura| PG[(PostgreSQL)]
+    FastAPI -->|Scrittura| Vault[(Vault Obsidian)]
+    
+    FastAPI <-->|REST| Miniflux[Miniflux]
+    Miniflux -->|Fetch Esterno| RSS[(Feed RSS)]
+    
+    FastAPI <-->|Generazione JSON| Gemini([Google Gemini API])
+```
 
-1. **Ingestion** — Miniflux polls configured RSS feeds ogni 15 minuti.
-2. **Enrichment** — Google Gemini LLM (Gemma 4 31B) classifica ogni articolo restituendo dati strutturati (JSON): nazione, coordinate, categoria, sentiment, pertinenza e società coinvolte.
-3. **Persistence** — I dati vengono archiviati su PostgreSQL (driver puramente asincrono) e fisicamente esportati su file system in un vault compatibile con Obsidian Markdown.
-4. **Visualization** — Il frontend (Angular 21) disegna una mappa interattiva a tema scuro, utilizzando tecniche avanzate di rendering visivo per mostrare allerte geografiche e raggruppare visivamente gli eventi critici (MarkerCluster).
+---
+
+## 🛠️ Stack Tecnologico
+
+| Componente | Versione / Tag | Fonte di Verità |
+|---|---|---|
+| **Python** | `3.12-slim` | `radar/backend/Dockerfile` |
+| **Node (Build)** | `22` | `radar/frontend/Dockerfile` |
+| **Angular** | `21.2` | `radar/frontend/package.json` |
+| **Nginx** | `1.27-alpine` | `radar/frontend/Dockerfile` |
+| **PostgreSQL** | `15` | `docker-compose.yml` |
+| **Miniflux** | `2.3.2` | `docker-compose.yml` |
+
+*Nota: Le versioni dell'ambiente Node utilizzano ora `npm ci` garantendo build immutabili bit-a-bit basate sul package-lock.*
 
 ---
 
 ## 📚 Documentazione del Progetto
 
-Per evitare un file gigantesco, la documentazione è stata suddivisa per aree tematiche. 
-Di seguito trovi i link ai file specifici, dove puoi trovare ogni dettaglio tecnico, architetturale e le guide pratiche di setup:
-
+La documentazione è stata suddivisa per aree tematiche. 
 * 🚀 **[Guida all'Avvio (Getting Started)](docs/01_getting_started.md)** 
-  * Prerequisiti, variabili `.env`, installazione via Docker Compose, gestione feed Miniflux.
 * ⚙️ **[Architettura e Backend](docs/02_architecture_and_backend.md)**
-  * Spiegazione della Pipeline a 3 Layer (Extraction, Classification, Commit), flussi di salvataggio, interazione DB.
 * 🎨 **[Frontend e UI (Interfaccia)](docs/03_frontend_and_ui.md)**
-  * Logiche Angular, Design System a 10 colori, regole per la Mappa Globale, Clustering, componenti interattivi.
 * 🧠 **[Il Framework ECC (Everything Claude Code)](docs/04_ecc_framework.md)**
-  * Spiegazione dell'architettura di agent orchestration alla base di questo progetto, file di configurazione (`.ecc`, `.agents`), gestione delle Rules, Hooks e come aggiungere nuove Skills all'IA.
+* 📰 **[Fonti RSS Suggerite](RSS.txt)**: Lista dei feed testati per l'importazione.
 
 ---
 
-## Struttura Rapida delle Directory
+## 🗂️ Struttura delle Directory
 
-```
+```text
 Dashboard finance/                           
-├── docs/                                    # Documentazione dettagliata
+├── docs/                                    # Manuali architetturali e di setup
 │   ├── 01_getting_started.md
 │   ├── 02_architecture_and_backend.md
 │   ├── 03_frontend_and_ui.md
 │   └── 04_ecc_framework.md
-├── .agents/                                 # Competenze apprese dall'Agente IA (Skills)
+├── RSS.txt                                  # Catalogo feed RSS consigliati
+├── .agents/                                 # ECC Global Guardrails
+│   ├── AGENTS.md                            # Magna Carta del progetto
+│   └── skills/                              # Competenze globali
 ├── README.md                                # ← Questo file
 │
 └── radar/                                   # Repository Monorepo
-    ├── backend/                             # Python 3.12 (FastAPI)
-    ├── frontend/                            # Angular 21 (Nginx)
-    ├── vault/                               # Dati Markdown Obsidian
-    ├── .ecc/                                # Regole rigide dell'architettura (Hooks/Rules)
-    └── docker-compose.yml                   # Avvio unificato dell'intero stack
+    ├── backend/                             
+    │   ├── app/
+    │   │   ├── core/                        # Configurazione, DB, Logging
+    │   │   ├── extraction/                  # Miniflux client, Parser
+    │   │   ├── classification/              # Gemini client, Prompts
+    │   │   └── commit/                      # DB Commit, Vault Factory
+    │   └── Dockerfile
+    ├── frontend/                            
+    │   ├── src/app/
+    │   │   ├── components/                  # RadarMap, Sidebar, Toolbar
+    │   │   ├── services/                    # StateService, ArticleService
+    │   │   ├── models/                      # Interfacce TypeScript
+    │   │   └── shared/                      # Direttive (es. hatching)
+    │   ├── angular.json                     # Configurazione build Angular
+    │   └── Dockerfile
+    ├── vault/                               # Dati Markdown generati (ignorato da Git)
+    ├── .ecc/                                # ECC Local Workspace
+    │   ├── rules/                           # Regole frontend/backend/docker
+    │   ├── hooks/                           # Script pre/post esecuzione
+    │   └── skills/
+    └── docker-compose.yml                   # Topologia dei 4 container
 ```
-
----
-
-## Roadmap e Manutenzione
-
-La repository viene costantemente aggiornata per migliorare l'affidabilità delle pipeline LLM (tramite prompt engineering e fallback robusti) e affinare l'estetica Palantir-like dell'interfaccia. 
-Se intendi contribuire allo sviluppo tramite Intelligenza Artificiale, **ti invitiamo caldamente a leggere prima la sezione [ECC Framework](docs/04_ecc_framework.md)** per familiarizzare con le regole e i vincoli di progetto imposti nella directory `.ecc/`.
-
-## Licenza
-Distribuito sotto licenza MIT. Vedi il file `LICENSE` per ulteriori informazioni.

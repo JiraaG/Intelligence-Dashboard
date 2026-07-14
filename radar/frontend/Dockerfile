@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Installa le dipendenze usando legacy-peer-deps come richiesto dalle regole ECC
 COPY package*.json ./
-RUN npm install --legacy-peer-deps
+RUN npm ci --legacy-peer-deps
 
 # Copia il resto del codice e compila
 COPY . .
