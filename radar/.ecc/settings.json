@@ -119,13 +119,16 @@
     },
     "geo-data-architect": {
       "file": ".ecc/agents/geo-data-architect.md",
-      "scope": ["backend/app/models/**", "backend/app/db/**"],
-      "model": "sonnet"
+      "scope": ["backend/app/core/database.py", "backend/app/commit/**", "backend/migrations/**"],
+      "model": "sonnet",
+      "notes": "Post-restore: DDL vive in core/database.py bootstrap. migrations/ esiste solo dopo Phase 1."
     },
     "angular-map-expert": {
       "file": ".ecc/agents/angular-map-expert.md",
       "scope": ["frontend/**"],
-      "model": "sonnet"
+      "exclude": ["frontend/src/app/components/radar-sidebar/**"],
+      "model": "sonnet",
+      "notes": "Sidebar freeze: non editare radar-sidebar. Read/unread via state.service + radar-map."
     }
   }
 }

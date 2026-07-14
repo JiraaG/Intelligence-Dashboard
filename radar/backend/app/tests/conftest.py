@@ -1,17 +1,31 @@
 import os
 import sys
 
-# Aggiunge la directory app al PYTHONPATH se necessario
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+import pytest
 
-# Configura mock environment variables per evitare KeyError durante gli import nei test,
-# tranne quando stiamo eseguendo i test live di integrazione
-is_live_test = any("test_integration_live" in arg or "test_production_pipeline" in arg for arg in sys.argv)
+# Aggiunge la directory backend al PYTHONPATH se necessario (pytest.ini pythonpath=backend)
+_backend_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+if _backend_root not in sys.path:
+    sys.path.insert(0, _backend_root)
 
-if not is_live_test:
-    os.environ["DATABASE_URL"] = "postgresql://mock_user:mock_password@mock-host:5432/mock-db"
-    os.environ["GEMINI_API_KEY"] = "mock-gemini-key"
-    os.environ["GOOGLE_API_KEY"] = "mock-google-key"
-    os.environ["MINIFLUX_API_URL"] = "http://mock-miniflux"
-    os.environ["MINIFLUX_API_KEY"] = "mock-miniflux-key"
-    os.environ["OBSIDIAN_VAULT_PATH"] = "/mock/vault"
+# Mock env per unit/integration: evita ValueError su import di app.core.config.
+# I test live richiedono variabili reali e RUN_LIVE_TESTS=1.
+_run_live = os.environ.get("RUN_LIVE_TESTS") == "1"
+
+if not _run_live:
+    os.environ.setdefault("DATABASE_URL", "postgresql://mock_user:mock_password@mock-host:5432/mock-db")
+    os.environ.setdefault("GEMINI_API_KEY", "mock-gemini-key")
+    os.environ.setdefault("GOOGLE_API_KEY", "mock-google-key")
+    os.environ.setdefault("MINIFLUX_API_URL", "http://mock-miniflux")
+    os.environ.setdefault("MINIFLUX_API_KEY", "mock-miniflux-key")
+    os.environ.setdefault("OBSIDIAN_VAULT_PATH", "/mock/vault")
+
+
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    """Fail live tests unless RUN_LIVE_TESTS=1 is explicitly set."""
+    if item.get_closest_marker("live") is not None:
+        if os.environ.get("RUN_LIVE_TESTS") != "1":
+            pytest.fail(
+                "Live tests are gated: set RUN_LIVE_TESTS=1 to run "
+                f"'{item.nodeid}'. Default suite uses -m 'not live'."
+            )

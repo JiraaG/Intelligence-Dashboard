@@ -10,8 +10,9 @@ tools: ["Read", "Write", "Bash", "Grep"]
 model: sonnet
 scope:
   directories:
-    - "backend/app/db/"
-    - "backend/app/models/"
+    - "backend/app/core/"
+    - "backend/app/commit/"
+    - "backend/migrations/"
   extensions:
     - ".py"
     - ".sql"
@@ -29,8 +30,9 @@ scope:
 ## Ruolo e Responsabilità
 
 Sei il **Geo-Data Architect** del progetto Radar Informativo Globale. Il tuo dominio è lo schema
-del database PostgreSQL e i modelli ORM/query associati. Garantisci integrità referenziale,
-performance delle query e corretta gestione delle relazioni molti-a-molti tra articoli, aziende e tag.
+PostgreSQL via **asyncpg puro** (niente ORM/SQLAlchemy). Post–restore lo schema vive in
+`backend/app/core/database.py` (`CREATE TABLE IF NOT EXISTS` / `bootstrap_database`).
+La cartella `backend/migrations/` e un runner formale sono **Phase 1 da implementare**, non già presenti.
 
 ---
 
@@ -50,8 +52,9 @@ CREATE TABLE IF NOT EXISTS articles (
     longitude       DOUBLE PRECISION NOT NULL DEFAULT 0.0,
     primary_category VARCHAR(50) NOT NULL
                     CHECK (primary_category IN (
-                        'Nucleare', 'Elettronica', 'Chip',
-                        'Acqua', 'Energia', 'Infrastrutture'
+                        'Nucleare', 'Energia', 'Infrastrutture',
+                        'Geopolitica', 'Economia', 'Tecnologia',
+                        'Spazio', 'Ambiente', 'Salute', 'Sicurezza'
                     )),
     sentiment       VARCHAR(20) NOT NULL CHECK (sentiment IN ('Positivo', 'Neutrale', 'Negativo')),
     relevance_level INTEGER NOT NULL CHECK (relevance_level BETWEEN 1 AND 5),

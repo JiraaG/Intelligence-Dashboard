@@ -97,15 +97,17 @@ class GeopoliticalArticleSchema(BaseModel):
     country_code: str = Field(description="Codice nazione ISO Alpha-2 (es. IT, US, CN, DE)")
     latitude: float = Field(description="Latitudine decimale. Se nazione generica: centroide nazionale")
     longitude: float = Field(description="Longitudine decimale. Se nazione generica: centroide nazionale")
-    companies_involved: List[str] = Field(description="Lista nomi aziende coinvolte. Lista vuota se nessuna")
-    tags: List[str] = Field(description="Tag tematici multipli (es. ['Nucleare', 'IAEA', 'Sicurezza'])")
-    primary_category: Literal[
-        "Nucleare", "Elettronica", "Chip", "Acqua", "Energia", "Infrastrutture"
-    ] = Field(description="UNA SOLA categoria principale. Determina icona e colore sulla mappa")
+    companies_involved: str = Field(description="Aziende separate da virgola; 'Nessuno' se nessuna")
+    tags: str = Field(description="Tag separati da virgola; il primo deve essere la primary_category")
+    primary_category: str = Field(
+        description="Una di: Nucleare, Energia, Infrastrutture, Geopolitica, Economia, Tecnologia, Spazio, Ambiente, Salute, Sicurezza"
+    )
     sentiment: Literal["Positivo", "Neutrale", "Negativo"] = Field(description="Sentiment strategico legato alla notizia.")
-    infrastructural_entities: List[str] = Field(description="Elenco di asset o infrastrutture fisiche citate.")
+    infrastructural_entities: str = Field(description="Asset fisici separati da virgola; 'Nessuno' se nessuno")
     relevance_level: int = Field(description="Grado di rilevanza geopolitica da 1 a 5.", ge=1, le=5)
 ```
+
+> Post-restore: questi campi sono `str` CSV in `validator.py`. Non ripristinare `List[str]`. Il FE può ricevere array da `array_agg` SQL — non confondere i layer.
 
 ### 4. Gestione Errori a Tre Livelli
 

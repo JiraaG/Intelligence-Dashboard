@@ -76,11 +76,11 @@ class GeopoliticalArticleSchema(BaseModel):
     longitude: float = Field(
         description="Longitudine geografica in gradi decimali. Stessa regola della latitudine."
     )
-    companies_involved: List[str] = Field(
-        description="Elenco delle aziende o corporazioni industriali menzionate. Array vuoto [] se nessuna."
+    companies_involved: str = Field(
+        description="Elenco aziende separate da virgola. Scrivi 'Nessuno' se nessuna."
     )
-    tags: List[str] = Field(
-        description="Lista di tag semantici estratti. Il primo tag deve essere uguale alla primary_category."
+    tags: str = Field(
+        description="Tag semantici separati da virgola. Il primo tag deve essere uguale alla primary_category."
     )
     primary_category: Literal[
         "Nucleare", "Energia", "Infrastrutture",
@@ -92,8 +92,8 @@ class GeopoliticalArticleSchema(BaseModel):
     sentiment: Literal["Positivo", "Neutrale", "Negativo"] = Field(
         description="Sentiment strategico legato alla notizia."
     )
-    infrastructural_entities: List[str] = Field(
-        description="Elenco di asset o infrastrutture fisiche citate (es. dighe, porti, fabbriche specificate)."
+    infrastructural_entities: str = Field(
+        description="Asset fisici separati da virgola. Scrivi 'Nessuno' se nessuno."
     )
     relevance_level: int = Field(
         description="Grado di rilevanza geopolitica dell'articolo da 1 a 5.",
@@ -101,6 +101,8 @@ class GeopoliticalArticleSchema(BaseModel):
         le=5
     )
 ```
+
+> **Importante:** nello schema Pydantic i campi lista sono `str` CSV. Il modello TypeScript FE può usare `string[]` dopo `array_agg` — non unificare forzando `List[str]` nel validator.
 
 ---
 

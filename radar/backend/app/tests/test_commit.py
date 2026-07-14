@@ -39,11 +39,11 @@ def test_get_article_file_path() -> None:
         country_code="UA",
         latitude=47.5083,
         longitude=34.3981,
-        companies_involved=["Energoatom"],
-        tags=["Nucleare", "Ucraina"],
+        companies_involved="Energoatom",
+        tags="Nucleare, Ucraina",
         primary_category="Nucleare",
         sentiment="Neutrale",
-        infrastructural_entities=["Centrale Zaporizhzhia"],
+        infrastructural_entities="Centrale Zaporizhzhia",
         relevance_level=4
     )
     
@@ -68,11 +68,11 @@ def test_generate_markdown_content() -> None:
         country_code="AZ",
         latitude=40.14,
         longitude=47.57,
-        companies_involved=["TAP AG", "SOCAR"],
-        tags=["Energia", "Pipeline"],
+        companies_involved="TAP AG, SOCAR",
+        tags="Energia, Pipeline",
         primary_category="Energia",
         sentiment="Positivo",
-        infrastructural_entities=["Gasdotto TAP"],
+        infrastructural_entities="Gasdotto TAP",
         relevance_level=4
     )
     
@@ -143,11 +143,11 @@ async def test_commit_article_to_db_success() -> None:
         country_code="DE",
         latitude=51.0,
         longitude=13.0,
-        companies_involved=["TSMC"],
-        tags=["Chip"],
-        primary_category="Chip",
+        companies_involved="TSMC",
+        tags="Tecnologia",
+        primary_category="Tecnologia",
         sentiment="Positivo",
-        infrastructural_entities=[],
+        infrastructural_entities="Nessuno",
         relevance_level=3
     )
     
@@ -196,11 +196,11 @@ async def test_commit_article_to_db_conflict_fallback() -> None:
         country_code="DE",
         latitude=51.0,
         longitude=13.0,
-        companies_involved=["TSMC"],
-        tags=[],
-        primary_category="Chip",
+        companies_involved="TSMC",
+        tags="Nessuno",
+        primary_category="Tecnologia",
         sentiment="Positivo",
-        infrastructural_entities=[],
+        infrastructural_entities="Nessuno",
         relevance_level=3
     )
     

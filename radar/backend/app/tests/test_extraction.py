@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import ANY, AsyncMock, patch
 import httpx
 from app.extraction.parser import strip_html_tags
 from app.extraction.client import MinifluxClient
@@ -69,10 +69,16 @@ async def test_miniflux_client_fetch_unread() -> None:
         
         entries = await client.fetch_unread_entries(limit=10)
         
-        # Verifica URL e parametri
+        # Verifica URL e parametri (published_after è dinamico: now - 48h)
         mock_get.assert_called_once_with(
             "http://mock-miniflux/v1/entries",
-            params={"status": "unread", "limit": 10},
+            params={
+                "status": "unread",
+                "limit": 10,
+                "order": "published_at",
+                "direction": "desc",
+                "published_after": ANY,
+            },
             headers={"X-Auth-Token": "mock_key", "Content-Type": "application/json"}
         )
         assert len(entries) == 1

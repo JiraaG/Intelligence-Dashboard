@@ -12,6 +12,8 @@ model: sonnet
 scope:
   directories:
     - "frontend/"
+  exclude:
+    - "frontend/src/app/components/radar-sidebar/"
   extensions:
     - ".ts"
     - ".html"
@@ -27,7 +29,11 @@ scope:
 - Non aggiungere dipendenze npm non approvate senza documentare il motivo.
 - Non scaricare `countries.geo.json` da CDN esterni: usa sempre il file locale in `assets/data/`.
 
----
+### Sidebar freeze (obbligatorio)
+
+- **NON** aprire/modificare `components/radar-sidebar/**`.
+- Conservare `p-carousel` e altezza dinamica esistente; vietato `app-article-list`.
+- Fix `.marker-read` / read-status: solo `state.service.ts` + `radar-map` (e test correlati).
 
 ## Ruolo e Responsabilità
 
@@ -302,7 +308,8 @@ const categoryClusterGroups = new Map<string, any>();
 const categories = Object.keys(CATEGORY_CSS_VARS);
 for (const cat of categories) {
   const cg = L.markerClusterGroup({
-    maxClusterRadius: 200,            // previene duplicati stessa categoria
+    maxClusterRadius: 40,             // allineato a radar-map.component.ts
+    spiderfyOnMaxZoom: false,         // espansione custom
     showCoverageOnHover: false,
     disableClusteringAtZoom: 18,      // zero icone nude
     spiderfyOnMaxZoom: true,
@@ -351,7 +358,8 @@ if (targetGroup) {
 **Vantaggi dell'architettura:**
 - Spiderfy **nativamente per-categoria** + filtro esplicito doppia sicurezza
 - Spiderfy origin **corretto**: cluster center = media coordinate offset = centro icona
-- `maxClusterRadius: 200` → mai duplicati stessa categoria nello stesso hub
+- `maxClusterRadius: 40` → match codice attuale
+- `spiderfyOnMaxZoom: false` → non spiderfy automatico legacy
 - `disableClusteringAtZoom: 18` → zero icone nude, solo spiderfy mostra icone
 
 **In `angular.json` → `projects.radar-frontend.architect.build.options`:**
@@ -504,7 +512,8 @@ cd frontend && npx tsc --noEmit
 - **BLOCCA** se: colori hardcoded diversi dalla palette Palantir definita
 - **BLOCCA** se: `import * as L from 'leaflet'` o `import 'leaflet.markercluster'` nei componenti (causa TypeError con esbuild)
 - **AVVISA** se: manca la transizione CSS per split-screen
-- **AVVISA** se: `maxClusterRadius` ≠ 200 o `disableClusteringAtZoom` ≠ 18
+- **AVVISA** se: `maxClusterRadius` ≠ 40 o `spiderfyOnMaxZoom` ≠ false
+- **BLOCCA** se: modifiche a `radar-sidebar/**` o introduzione di `app-article-list`
 - **AVVISA** se: offset CSS/iconAnchor invece di offset geografici sui marker
 - **AVVISA** se: filtro categoria assente nel `clusterclick` handler
 - **AVVISA** se: marker senza gruppo target (categoria non riconosciuta)

@@ -1,54 +1,66 @@
-# Consolidation Implementation Plan
+﻿# Consolidation Implementation Plan
 
 This plan addresses the production blockers found during the code and architecture review. Execute phases in order. Do not release a later phase while an earlier acceptance gate is failing.
 
+**Progress (audit codice 2026-07-14, post–branch restore):** Phase **0 DONE**. Phases **1–6 NOT STARTED** in current sources (pre-restore work was lost; see [`Implementation_Plan_Execution.md`](Implementation_Plan_Execution.md) sezione A vs B). Resume at Phase 1. Sidebar remains frozen; read/unread `.marker-read` remains in scope via `state.service` + `radar-map` only.
+
 ## Scope And Exit Criteria
+
+### Frozen: radar-sidebar (non-negotiable)
+
+Do **not** modify, restyle, refactor, replace, or add specs for `radar/frontend/src/app/components/radar-sidebar/` (including `p-carousel`, `updateCarouselHeight`, markup, SCSS, or a11y inside the sidebar). Do **not** introduce `article-list` or infinite-scroll replacements for the carousel.
+
+**Exception kept in scope:** read/unread sync (`.marker-read` no-op). Fix only via `state.service.ts` and `radar-map.component.ts` — the sidebar already calls `toggleRead` → `StateService` and must keep working without editing sidebar files.
+
+### Exit criteria
 
 - [ ] All externally supplied RSS and LLM fields are validated, bounded, and cannot alter paths, article identity, SQL data, YAML frontmatter, or DOM markup.
 - [ ] An article is marked read in Miniflux only after its PostgreSQL record and Vault projection are recoverably committed.
 - [ ] Quotas count every Gemini attempt across retries and process replicas.
 - [ ] The API, worker, database, Miniflux, and frontend have explicit readiness, bounded resources, recoverable state, and documented operations.
-- [ ] The dashboard stays responsive with 10,000 articles and a large cluster never creates unbounded Leaflet markers or DOM cards.
+- [ ] The dashboard stays responsive with 10,000 articles and a large cluster never creates unbounded Leaflet markers. (Sidebar DOM card bounding is out of scope.)
+- [ ] Read-status toggles update map marker `.marker-read` without a full cluster rebuild; concurrent toggles converge on the final server state.
 - [ ] Documentation, ECC guardrails, test suite, and deployed behavior describe the same system.
 
 ## Phase 0 - Freeze Risky Deployments And Establish A Baseline
 
+**Status:** DONE (2026-07-14) on post-restore branch.
+
 ### Files to add
 
-- [ ] `radar/pytest.ini`
-- [ ] `radar/frontend/src/app/testing/leaflet.stub.ts`
-- [ ] `radar/frontend/src/app/testing/leaflet.stub.spec.ts`
+- [x] `radar/pytest.ini`
+- [x] `radar/frontend/src/app/testing/leaflet.stub.ts`
+- [x] `radar/frontend/src/app/testing/leaflet.stub.spec.ts`
 
 ### Files to modify
 
-- [ ] `radar/backend/app/tests/test_integration_live.py`
-- [ ] `radar/backend/scripts/test_production_pipeline.py`
-- [ ] `radar/backend/app/test_rate_limiter.py`
-- [ ] `radar/backend/app/test_string_lists.py`
-- [ ] `radar/backend/app/test_500_bot.py`
-- [ ] `radar/backend/app/test_no_schema.py`
-- [ ] `radar/backend/app/test_exact.py`
-- [ ] `radar/backend/app/test_500_debug.py`
-- [ ] `radar/backend/app/test_500.py`
-- [ ] `radar/frontend/src/app/app.spec.ts`
-- [ ] `radar/frontend/package.json`
+- [x] `radar/backend/app/tests/test_integration_live.py`
+- [x] `radar/backend/scripts/test_production_pipeline.py`
+- [x] Diagnostics moved to `radar/backend/scripts/diagnostics/` (removed from `radar/backend/app/test_*.py`)
+- [x] `radar/frontend/src/app/app.spec.ts`
+- [x] `radar/frontend/package.json`
+- [x] Fixture alignment: `test_classification.py`, `test_commit.py`, `test_pipeline_smoke.py`, `test_extraction.py`
 
 ### Changes
 
-1. Add `unit`, `integration`, and `live` pytest markers. Configure the default test command to run only `not live`, and fail a live test unless `RUN_LIVE_TESTS=1` is explicitly set.
-2. Move ad-hoc Gemini diagnostic files out of pytest discovery, for example to `radar/backend/scripts/diagnostics/`. Do not import them from a test module.
-3. Replace the live E2E fixed URL, record, and Vault filename with a run-unique identifier and isolated test database/Vault. Never delete an arbitrary production record during a test.
-4. Replace the generated Angular title assertion with behavior tests. Provide `HttpClientTesting`, a typed Leaflet global stub, and fixture data. Test map destruction, error state, read-status ordering, and bounded cluster rendering.
-5. Add explicit frontend scripts: `typecheck`, `test:ci`, `lint`, and `build:ci`. `test:ci` must use `ng test --watch=false`.
+1. [x] Add `unit`, `integration`, and `live` pytest markers. Configure the default test command to run only `not live`, and fail a live test unless `RUN_LIVE_TESTS=1` is explicitly set.
+2. [x] Move ad-hoc Gemini diagnostic files out of pytest discovery, for example to `radar/backend/scripts/diagnostics/`. Do not import them from a test module.
+3. [x] Replace the live E2E fixed URL, record, and Vault filename with a run-unique identifier and isolated test database/Vault. Never delete an arbitrary production record during a test.
+4. [x] Replace the generated Angular title assertion with behavior tests. Provide `HttpClientTesting`, a typed Leaflet global stub, and fixture data. Test map destruction, error state, read-status ordering, and bounded cluster rendering.
+5. [x] Add explicit frontend scripts: `typecheck`, `test:ci`, `lint`, and `build:ci`. `test:ci` must use `ng test --watch=false`.
 
 ### Acceptance gate
 
 ```text
 cd radar/frontend && npm run typecheck && npm run test:ci && npm run build:ci
-cd radar/backend/app && python -m pytest -m "not live"
+cd radar && python -m pytest -m "not live"
 ```
 
+**Status (2026-07-14):** gate verde — frontend 10 passed; backend 34 passed / 3 live deselected. Docker smoke + prova vault/Miniflux (4 unread) OK.
+
 ## Phase 1 - Eliminate Data-Integrity And Input-Boundary Failures
+
+**Status:** NOT STARTED after restore — re-implement from this checklist.
 
 ### Files to add
 
@@ -100,6 +112,8 @@ cd radar/backend/app && python -m pytest -m "not live"
 
 ## Phase 2 - Make The Worker Cancellable, Bounded, And Quota-Correct
 
+**Status:** NOT STARTED after restore — ingestion still in `main.py` with `TaskGroup`; no `worker.py` / quota ledger / Compose worker.
+
 ### Files to add
 
 - [ ] `radar/backend/app/worker.py`
@@ -136,6 +150,8 @@ cd radar/backend/app && python -m pytest -m "not live"
 - [ ] A 10,000-entry Miniflux response never creates 10,000 runnable tasks at once.
 
 ## Phase 3 - Secure And Operate The Container Stack
+
+**Status:** NOT STARTED after restore — single `radar-network`, combined `/health`, no `ops/` backup scripts, CORS/`ports` still pre-hardening.
 
 ### Files to add
 
@@ -181,21 +197,19 @@ Run a restore drill in a disposable deployment before declaring this phase compl
 
 ## Phase 4 - Stabilize The Frontend Lifecycle And Security Boundary
 
+**Status:** NOT STARTED after restore — XSS HTML markers, in-place `is_read`, silent mock fallback, no DestroyRef / MOCK_MODE / map specs. Sidebar frozen (Change 5 cancelled). Read/unread fix remains mandatory (Change 7).
+
 ### Files to add
 
 - [ ] `radar/frontend/src/app/models/article.dto.ts`
 - [ ] `radar/frontend/src/app/services/mock-mode.token.ts`
 - [ ] `radar/frontend/src/app/components/radar-map/radar-map.component.spec.ts`
-- [ ] `radar/frontend/src/app/components/radar-sidebar/radar-sidebar.component.spec.ts`
 
 ### Files to modify
 
 - [ ] `radar/frontend/src/app/components/radar-map/radar-map.component.ts`
 - [ ] `radar/frontend/src/app/components/radar-map/radar-map.component.html`
 - [ ] `radar/frontend/src/app/components/radar-map/radar-map.component.scss`
-- [ ] `radar/frontend/src/app/components/radar-sidebar/radar-sidebar.component.ts`
-- [ ] `radar/frontend/src/app/components/radar-sidebar/radar-sidebar.component.html`
-- [ ] `radar/frontend/src/app/components/radar-sidebar/radar-sidebar.component.scss`
 - [ ] `radar/frontend/src/app/components/radar-toolbar/radar-toolbar.component.html`
 - [ ] `radar/frontend/src/app/components/radar-toolbar/radar-toolbar.component.scss`
 - [ ] `radar/frontend/src/app/services/article.service.ts`
@@ -212,30 +226,28 @@ Run a restore drill in a disposable deployment before declaring this phase compl
 2. Retrieve `window.L` only after browser initialization through a typed guard. Present a controlled map-unavailable state if global scripts fail. Remove `any` marker extensions in favor of a typed marker metadata interface.
 3. Use `DestroyRef`/`takeUntilDestroyed` for the GeoJSON request. Retain and cancel every animation frame, timeout, interval, and Leaflet callback during destroy. Make navigation completion idempotent: one terminal event, one fallback timer, listener removal before delayed spiderfy, and reconciliation of deferred article/focus updates.
 4. Remove the redundant hatch directive or add a stored `MutationObserver` and destroy cleanup. Keep a single SVG-pattern owner and correct the sixth-line typo plus the representation of categories seven through ten.
-5. Remove the carousel-height polling interval. Use a component-scoped `viewChild` plus `ResizeObserver` or `afterNextRender`; clear all resources when sidebar state changes or the component is destroyed. Do not query global document selectors or dispatch global resize events.
+5. ~~Carousel-height ResizeObserver~~ — **cancelled (sidebar freeze).**
 6. Make mock data an explicit development-only injection token. An API error must remain visible to the user, preserve the requested date, and never silently switch a production session to synthetic data.
-7. Serialize read-status writes per article with a mutation version. Apply a response or rollback only if it belongs to the most recent mutation. Return the canonical article ID/state/version from the backend.
+7. Serialize read-status writes per article with a mutation version. Apply a response or rollback only if it belongs to the most recent mutation. Return the canonical article ID/state/version from the backend. Use immutable article updates in `state.service` so map markers receive `.marker-read` without editing the sidebar.
 8. Choose and document one state policy: Signals own UI state; RxJS may exist only at the `HttpClient` transport adapter, or replace GET resources with Angular `httpResource`. The current claim of no RxJS is false because `Observable`, `catchError`, and `rxResource` are used.
-9. Restore a single responsive split-screen rule, add a container `ResizeObserver` to call `map.invalidateSize()` after transitions, and provide mobile layouts. Remove desktop-only minimum widths, hidden overflow traps, and focus-outline removal without a `:focus-visible` replacement.
-10. Replace clickable `div`/`span` controls with buttons or equivalent keyboard-complete controls. Add labels, focus management, Escape behavior, `aria-expanded`, and accessible close text.
+9. Restore a single responsive split-screen rule via shell/map (`map.invalidateSize()` after transitions) and provide mobile layouts **without modifying `radar-sidebar` files**. Remove desktop-only minimum widths and focus-outline removal without a `:focus-visible` replacement on non-sidebar surfaces.
+10. Replace clickable `div`/`span` controls with buttons on toolbar / country UI / map chrome only — **not** inside the frozen sidebar.
 
 ### Required tests
 
 - [ ] A malicious title cannot create attributes, elements, or executable DOM.
 - [ ] Destroying a map cancels GeoJSON, animation frames, timeouts, and spiderfy work.
-- [ ] Closing an empty cluster cannot leave an interval or observer alive.
-- [ ] Two rapid read toggles converge on the final server state.
-- [ ] Keyboard-only users can open/close the country UI and activate category controls.
+- [ ] Two rapid read toggles converge on the final server state; toggling read updates `.marker-read` on the map marker without a full cluster rebuild.
+- [ ] Keyboard-only users can open/close the country UI and activate toolbar category controls (sidebar controls out of scope).
 
 ## Phase 5 - Scale The Query And Map Model
+
+**Status:** NOT STARTED after restore — unpaginated `/api/articles`, Cartesian join + `array_agg`, one marker per article. Change 5 (`article-list`) cancelled — keep `p-carousel`.
 
 ### Files to add
 
 - [ ] `radar/backend/app/tests/test_articles_pagination.py`
 - [ ] `radar/frontend/src/app/models/map-summary.model.ts`
-- [ ] `radar/frontend/src/app/components/article-list/article-list.component.ts`
-- [ ] `radar/frontend/src/app/components/article-list/article-list.component.html`
-- [ ] `radar/frontend/src/app/components/article-list/article-list.component.scss`
 
 ### Files to modify
 
@@ -245,8 +257,6 @@ Run a restore drill in a disposable deployment before declaring this phase compl
 - [ ] `radar/frontend/src/app/services/article.service.ts`
 - [ ] `radar/frontend/src/app/services/state.service.ts`
 - [ ] `radar/frontend/src/app/components/radar-map/radar-map.component.ts`
-- [ ] `radar/frontend/src/app/components/radar-sidebar/radar-sidebar.component.ts`
-- [ ] `radar/frontend/src/app/components/radar-sidebar/radar-sidebar.component.html`
 - [ ] `radar/frontend/src/app/app.ts`
 
 ### Changes
@@ -254,17 +264,19 @@ Run a restore drill in a disposable deployment before declaring this phase compl
 1. Add a paginated, cursor-based article endpoint with a stable order and filters for date, country, category, sentiment, and relevance. Return `items`, `next_cursor`, and `total`; impose a server-side maximum page size.
 2. Add a map-summary endpoint that returns country/category aggregates and validated representative coordinates. Do not send all article records merely to draw a map.
 3. Rewrite the current Cartesian join aggregation in `/api/articles` using lateral aggregates or pre-aggregated subqueries. Add and verify indexes for the actual date/filter/order access patterns with `EXPLAIN (ANALYZE, BUFFERS)` against a representative dataset.
-4. Render bounded aggregate markers rather than one Leaflet marker per article. If MarkerCluster remains, use `addLayers` and `chunkedLoading`; do not rebuild geometry for a read-status-only update.
-5. Replace the unbounded PrimeNG carousel with a paginated detail/list view that renders only a bounded page. Keep article IDs in map/cluster state and fetch the selected page on demand.
+4. Render bounded aggregate markers rather than one Leaflet marker per article. If MarkerCluster remains, use `addLayers` and `chunkedLoading`; do not rebuild geometry for a read-status-only update (supports the read/unread marker fix).
+5. ~~Replace PrimeNG carousel with `article-list`~~ — **cancelled (sidebar freeze).** Keep existing `p-carousel`.
 6. Establish a clear geographic contract: use validated event coordinates where available; only aggregate to a country centroid when the product explicitly requests country-level rendering. Include zero latitude/longitude values by checking finite numeric bounds, not truthiness.
 
 ### Performance gate
 
 - [ ] Seed 10,000 articles across at least 100 countries and all categories.
-- [ ] Initial map render, date change, read toggle, country focus, and large-cluster opening have defined latency budgets and no long task above 50 ms in the normal interaction path.
+- [ ] Initial map render, date change, read toggle, country focus, and large-cluster opening have defined latency budgets and no long task above 50 ms in the normal interaction path (Leaflet path; sidebar DOM out of scope).
 - [ ] Browser memory returns close to baseline after repeated filter/open/close cycles.
 
 ## Phase 6 - Align Governance, Documentation, And Operations
+
+**Status:** NOT STARTED — run only after Phases 1–5 gates are green on the post-restore codebase.
 
 ### Files to modify
 

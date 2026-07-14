@@ -5,7 +5,6 @@ Include i test per la validazione degli endpoint REST di FastAPI con filtri avan
 """
 
 import pytest
-from pydantic import ValidationError
 from unittest.mock import AsyncMock, MagicMock, patch
 import asyncpg
 
@@ -35,21 +34,21 @@ def test_geopolitical_schema_valid_article():
         "country_code": "DE",
         "latitude": 51.1657,
         "longitude": 10.4515,
-        "companies_involved": ["TSMC", "Infineon"],
-        "tags": ["Chip", "Semiconduttori"],
-        "primary_category": "Chip",
+        "companies_involved": "TSMC, Infineon",
+        "tags": "Tecnologia, Semiconduttori",
+        "primary_category": "Tecnologia",
         "sentiment": "Positivo",
-        "infrastructural_entities": ["Fabbrica TSMC"],
+        "infrastructural_entities": "Fabbrica TSMC",
         "relevance_level": 3
     }
     article = GeopoliticalArticleSchema(**data)
     assert article.country_code == "DE"
-    assert article.primary_category == "Chip"
+    assert article.primary_category == "Tecnologia"
     assert article.latitude == 51.1657
 
 
 def test_geopolitical_schema_rejects_invalid_category():
-    """GeopoliticalArticleSchema deve rifiutare una categoria non nell'enum."""
+    """GeopoliticalArticleSchema deve normalizzare una categoria non valida a Tecnologia."""
     from app.main import GeopoliticalArticleSchema
 
     data = {
@@ -61,15 +60,15 @@ def test_geopolitical_schema_rejects_invalid_category():
         "country_code": "IT",
         "latitude": 41.8719,
         "longitude": 12.5674,
-        "companies_involved": [],
-        "tags": ["Test"],
-        "primary_category": "CATEGORIA_NON_ESISTENTE",  # Valore invalido
+        "companies_involved": "Nessuno",
+        "tags": "Test",
+        "primary_category": "CATEGORIA_NON_ESISTENTE",  # Valore invalido → fallback
         "sentiment": "Neutrale",
-        "infrastructural_entities": [],
+        "infrastructural_entities": "Nessuno",
         "relevance_level": 2
     }
-    with pytest.raises(ValidationError):
-        GeopoliticalArticleSchema(**data)
+    article = GeopoliticalArticleSchema(**data)
+    assert article.primary_category == "Tecnologia"
 
 
 # ─── Test 3: Funzione strip_html ─────────────────────────────────────────────

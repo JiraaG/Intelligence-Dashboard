@@ -5,6 +5,8 @@ description: >
   Definisce il set di dati mockati, le istruzioni per attivare/disattivare il mock service,
   e i checklist visivi per validare cluster, split-screen, hatching SVG e carousel PrimeNG
   senza necessità del backend attivo o di dati reali da Miniflux/Gemini.
+  **Sidebar freeze:** validare il carosello in sola osservazione — non modificare
+  `radar-sidebar/**` né sostituire `p-carousel` con `article-list`.
 when_to_use:
   - Sviluppo UI/UX offline prima che il backend sia operativo
   - Test di regressione visiva delle funzionalità della mappa

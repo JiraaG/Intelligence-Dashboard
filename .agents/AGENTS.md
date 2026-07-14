@@ -15,12 +15,20 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 * **Database:** PostgreSQL 15 (`radar-db`). Accesso tramite driver asincrono `asyncpg` puro.
 * **Feed Source:** Miniflux REST API.
 * **Frontend:** Angular 21 (Standalone Components).
-* **Container:** Docker + docker-compose (servizi: `radar-db`, `radar-backend`, `radar-frontend`, `radar-miniflux`).
+* **Container:** Docker + docker-compose (servizi: `radar-db`, `radar-backend`, `radar-frontend`, `radar-miniflux`). Nessun `radar-worker` finché Phase 2 non lo introduce.
 * **Web Server:** Nginx (Alpine) per servire Angular e proxying `/api/`.
+* **Piani operativi:** [`Implementation_Plan.md`](../Implementation_Plan.md) + [`Implementation_Plan_Execution.md`](../Implementation_Plan_Execution.md). Post–branch restore (2026-07-14): **Phase 0 DONE**; fasi **1–6 NON presenti** nel codice (migrazioni/outbox/worker/edge-network/hardening FE ancora da rifare).
 
 ---
 
 ## 2. Vincoli di Produzione Cruciali (Radar Specific)
+
+> [!CRITICAL]
+> ### ⛔ Sidebar freeze (non negoziabile)
+> Non modificare, restyle, refactor o sostituire `radar/frontend/src/app/components/radar-sidebar/` (TS/HTML/SCSS/spec).
+> Conservare `p-carousel` e `updateCarouselHeight` con `document.getElementById('article-card-' + id)`.
+> Vietato introdurre `app-article-list`, infinite scroll o ResizeObserver “migliorativi” sul carosello.
+> Bug **letta/non letta** (`.marker-read`): fix solo in `state.service.ts` + `radar-map.component.ts`, senza toccare la sidebar.
 
 > [!CRITICAL]
 > ### ⛔ Divieto Assoluto di Placeholder o "TODO"
@@ -96,8 +104,8 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 
 > [!NOTE]
 > ### 🗺️ Regole di Visualizzazione Mappa e Clustering
-> 1. **Clustering Avanzato e Dummy Marker**: Un singolo `L.markerClusterGroup` raggruppa spazialmente gli articoli. Per forzare il corretto raggruppamento spaziale per nazione senza mostrare punti reali ridondanti, vengono impiegati marker invisibili (`isDummy: true`).
-> 2. **Impostazioni MarkerCluster e Spiderfy Custom**: Il raggio di clusterizzazione è stretto (`maxClusterRadius: 40`). Lo spiderfy automatico è disabilitato (`spiderfyOnMaxZoom: false`). La frammentazione dei cluster avviene tramite una logica custom (click e flyTo allo zoom 6).
+> 1. **Clustering per categoria**: un `L.markerClusterGroup` **per** `primary_category` raggruppa spazialmente gli articoli. Per forzare il corretto raggruppamento spaziale per nazione senza mostrare punti reali ridondanti, vengono impiegati marker invisibili (`isDummy: true`).
+> 2. **Impostazioni MarkerCluster e Spiderfy Custom**: Il raggio di clusterizzazione è stretto (`maxClusterRadius: 40`). Lo spiderfy automatico è disabilitato (`spiderfyOnMaxZoom: false`). La frammentazione dei cluster avviene tramite una logica custom (click e flyTo allo zoom 6). Non “allineare” a valori legacy 200/true.
 > 3. **Root Marker e Notizia Singola**: Durante l'espansione del cluster viene mantenuto un "root marker" centrale. Anche una notizia singola (count=1) viene renderizzata dentro un pallino cluster (mai icona nuda). L'ancoraggio usa le coordinate mediate per paese.
 > 4. **Estensione Bounding Box per Stati Trans-Antimeridiano**: Nel calcolo dello zoom di focus per nazioni con territori oltre la linea di cambio data (Stati Uniti `US` e Russia `RU`), per garantire la validità del bounding box ed evitare comportamenti bloccanti, utilizzare bounding box statici Mainland hardcoded:
 >    * `US`: `L.latLngBounds(L.latLng(24.396308, -125.0), L.latLng(49.384358, -66.93457))`

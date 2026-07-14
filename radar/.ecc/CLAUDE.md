@@ -12,6 +12,15 @@
 li arricchisce semanticamente via Google Gemini API e li visualizza su una mappa 2D interattiva
 in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categoria geopolitica).
 
+### Vincoli post–branch restore (2026-07-14)
+
+- **Phase 0 DONE**; fasi **1–6 NOT STARTED** nel tree attuale. Vedi `Implementation_Plan.md` / `Implementation_Plan_Execution.md`.
+- **Non assumere** `worker.py`, Compose `radar-worker`, cartella `migrations/`, reti `edge`/`data`, `/health/live|/ready`, o `article-list` come già presenti.
+- Pipeline ancora in `backend/app/main.py` (`run_pipeline_loop` + `TaskGroup`); DDL ancora via `bootstrap_database()` / `CREATE TABLE IF NOT EXISTS`.
+- **Sidebar freeze:** non modificare `frontend/src/app/components/radar-sidebar/**`; tenere `p-carousel` + altezza via `article-card-{id}`; vietato `app-article-list`.
+- Bug **read/unread** (`.marker-read`): solo `state.service.ts` + `radar-map.component.ts`.
+- Pydantic: `companies_involved` / `tags` / `infrastructural_entities` sono **`str` CSV** (non `List[str]`). Il modello FE può ancora usare `string[]` dopo `array_agg` API — non confondere i due.
+
 ---
 
 ## Stack Tecnologico Ufficiale
@@ -25,7 +34,7 @@ in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categ
 | Frontend    | Angular 21 (Standalone Components)      | Signals, lazy loading                       |
 | UI Library  | PrimeNG 17+                             | p-sidebar, p-carousel, p-calendar           |
 | Mappa       | Leaflet + CartoDB Dark Positron          | GeoJSON locale in assets/data/             |
-| Container   | Docker + docker-compose                  | Tre servizi isolati su rete interna         |
+| Container   | Docker + docker-compose                  | Quattro servizi su `radar-network` (no worker finché Phase 2) |
 | Web Server  | Nginx (Alpine)                          | Serve build Angular, porta 80 esposta       |
 
 ---
@@ -143,11 +152,15 @@ docker compose logs -f radar-backend
 # Accesso diretto al DB PostgreSQL
 docker compose exec radar-db psql -U radar_user -d radar_db
 
-# Esecuzione test backend
-docker compose exec radar-backend pytest /app/tests/ -v
+# Esecuzione test backend (da host, root radar/ — usa pytest.ini)
+cd radar && python -m pytest -m "not live" -q
+# oppure nel container montando il tree: working dir /radar, pythonpath backend
+
+# Frontend CI scripts (Phase 0)
+cd frontend && npm run typecheck && npm run test:ci && npm run build:ci
 
 # Build Angular manuale (fuori Docker) — output: dist/radar-frontend/browser/
-cd frontend && npm install && npm run build
+cd frontend && npm ci --legacy-peer-deps && npm run build
 
 # Avvio dev server Angular con hot-reload
 cd frontend && npm run start
@@ -194,11 +207,11 @@ Miniflux API (ogni 15 min)
 | Nuove feature UI o test offline      | `spatial-data-mocking`       |
 
 > **Note critiche per il frontend:**
-> - Il campo `infrastructural_entities: string[]` è obbligatorio in tutti i mock article e nel modello TypeScript `Article`.
-> - Il toggle mock/prod usa `const USE_MOCK` in `article.service.ts` — NON `environment.ts` (deprecato con esbuild).
-> - Il componente mappa espone tre output: `markerClicked`, `clusterClicked`, `countryClicked` (vedi PRD Fase 5).
-> - **⚠️ Leaflet + esbuild:** `leaflet.markercluster` è una libreria UMD che si aggancia a `window.L`. Con Angular 21 + esbuild NON usare `import 'leaflet.markercluster'` come side-effect import nel componente; il bundler crea un oggetto Leaflet separato e il plugin non si aggancia correttamente. Soluzione: caricare Leaflet e MarkerCluster come script globali in `angular.json` → `scripts[]`, e accedere via `const L = (window as any).L` nel componente. La direttiva `leaflet-hatch.directive.ts` usa questo pattern.
-> - **🗂️ Clustering a Icona Composita:** Singolo `L.markerClusterGroup` con `maxClusterRadius: 100`, `disableClusteringAtZoom: 12`, `spiderfyOnMaxZoom: true`. Icona ad anello (ring layout): categoria singola = pallino colorato, multi-categoria = scomposizione radiale con sub-dot per categoria + conteggio totale centrale. Nessun offset geografico (coordinate reali). Marker ancoraggio centrale persistente durante spiderfy. Click su sub-dot → filtra per categoria.
+> - Nei **mock FE** `infrastructural_entities` / `companies_involved` / `tags` restano tipicamente `string[]`. Nello **schema Pydantic** Gemini sono `str` CSV — non convertire il validator a `List[str]`.
+> - Mock/prod: oggi può esistere fallback silenzioso; Phase 4 introdurrà `MOCK_MODE` esplicito — non inventarlo come già fatto.
+> - Il componente mappa espone tre output: `markerClicked`, `clusterClicked`, `countryClicked`.
+> - **⚠️ Leaflet + esbuild:** caricare Leaflet e MarkerCluster come script globali in `angular.json` → `scripts[]`; accedere via `window.L`. Mai `import 'leaflet.markercluster'` nei componenti. Test: stub in `src/app/testing/leaflet.stub.ts`.
+> - **🗂️ Clustering attuale:** un `markerClusterGroup` **per categoria** con `maxClusterRadius: 40`, `spiderfyOnMaxZoom: false`. Non ripristinare i valori legacy 100/200 + spiderfy true / icona ad anello composita.
 
 ---
 

@@ -7,19 +7,20 @@
 
 ## Principio Architetturale Fondamentale
 
-Il sistema Radar è composto da **tre servizi Docker isolati** che comunicano su una rete virtuale
-interna. Nessun servizio è esposto direttamente all'host, eccetto il frontend (porta 80).
+Il sistema Radar è composto da **quattro servizi Docker** su una rete bridge interna
+`radar-network`. Nessun `radar-worker` separato finché Phase 2 non lo introduce.
+Il frontend espone la porta 80; Miniflux può esporre 8080 (da restringere in Phase 3).
 
 ```
 Internet → [Porta 80] → radar-frontend (Nginx)
                                 │
               rete interna radar-network
-                     ┌──────────┤
-                     │          │
-             radar-backend   radar-db
-             (Python API)  (PostgreSQL)
+                     ┌──────────┼──────────┐
+                     │          │          │
+             radar-backend   radar-db   radar-miniflux
 ```
 
+Phase 3 del Consolidation Plan introdurrà reti `edge`/`data` e hardening — **non** sono lo stato attuale.
 ---
 
 ## Regola 1: Quattro Servizi, Nomi Immutabili
@@ -32,7 +33,7 @@ Non rinominarli senza aggiornare anche le variabili d'ambiente e il codice Pytho
 | `radar-db`        | `postgres:15-alpine`   | Database PostgreSQL persistente       |
 | `radar-backend`   | Custom Python 3.12     | Demone pipeline + API REST FastAPI    |
 | `radar-frontend`  | Custom Node + Nginx    | Build Angular 21 + web server Nginx   |
-| `radar-miniflux`  | `miniflux/miniflux:latest` | Aggregatore RSS integrato nello stack |
+| `radar-miniflux`  | `miniflux/miniflux:2.3.2` | Aggregatore RSS integrato nello stack |
 
 ---
 
@@ -184,7 +185,7 @@ CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000
 FROM node:22-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm install --legacy-peer-deps
+RUN npm ci --legacy-peer-deps
 COPY . .
 RUN npm run build
 

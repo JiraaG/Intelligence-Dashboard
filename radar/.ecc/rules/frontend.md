@@ -5,6 +5,16 @@
 
 ---
 
+## Regola CRITICAL: Sidebar freeze (non negoziabile)
+
+- **VIETATO** modificare `src/app/components/radar-sidebar/**` (TS/HTML/SCSS/spec).
+- Conservare `p-carousel` e la logica esistente `updateCarouselHeight` / `article-card-{id}`.
+- **VIETATO** introdurre `app-article-list`, infinite scroll, o sostituire il polling altezza con ResizeObserver.
+- Fix **letta/non letta** (`.marker-read`): solo `services/state.service.ts` + `components/radar-map/**`.
+- Phase 4/5 UI: mappa, toolbar, state, shell — non la sidebar.
+
+---
+
 ## Regola 0: Struttura Build Angular 21 — Cartella `browser/` Obbligatoria
 
 > **⚠️ ATTENZIONE:** A partire da Angular 17+, il comando `ng build` produce un output **doppio livello**.
@@ -217,76 +227,26 @@ Il componente `p-sidebar` di PrimeNG può essere usato come wrapper UI.
 
 ---
 
-## Regola 7: Clustering a 6 Gruppi con Offset Geografici Progressivi
+## Regola 7: Clustering per categoria (allineato al codice attuale)
 
-Il clustering utilizza **6 `L.markerClusterGroup` indipendenti** (uno per `primary_category`).
-La separazione visiva è ottenuta tramite **offset geografici progressivi** applicati alle coordinate
-dei marker prima dell'aggiunta al cluster group.
+Il clustering utilizza un **`L.markerClusterGroup` per `primary_category`** (fino a 10 categorie).
+Parametri obbligatori (da `radar-map.component.ts`):
 
-**Architettura a 6 Gruppi con Offset Geografici:**
 ```typescript
-const GEO_DIRECTIONS: [number, number][] = [
-  [-1, -0.6], [1, -0.6], [-1, 0.6], [1, 0.6], [0, -1.2], [0, 1.2]
-];
-
-for (const cat of categories) {
-  const cg = L.markerClusterGroup({
-    maxClusterRadius: 200,
-    disableClusteringAtZoom: 18,
-    spiderfyOnMaxZoom: true,
-    spiderfyDistanceMultiplier: 4.0,
-    zoomToBoundsOnClick: false,       // toggle manuale (expand/collapse)
-    showCoverageOnHover: false,
-    iconCreateFunction: (cluster) => {
-      const count = cluster.getChildCount();
-      return L.divIcon({
-        html: `<div class="cluster-icon">${count}</div>`,
-        className: `radar-cluster cat-${cat.toLowerCase()}`,
-        iconSize: [52, 52],
-        iconAnchor: [26, 26]
-      });
-    }
-  });
-  cg.on('clusterclick', (e) => {
-    const cluster = e.layer;
-    // Toggle: se già spiderfied → collassa; altrimenti espandi
-    if (cluster._spiderfied) {
-      cluster.unspiderfy();
-      activeSpiderfiedCluster = null;
-      return;
-    }
-    if (activeSpiderfiedCluster && activeSpiderfiedCluster !== cluster) {
-      activeSpiderfiedCluster.unspiderfy();
-    }
-    cluster.spiderfy();
-    activeSpiderfiedCluster = cluster;
-    // Emit articoli filtrati per categoria
-    let arts = e.layer.getAllChildMarkers()
-      .map(m => m['articleData']).filter(Boolean);
-    arts = arts.filter(a => a.primary_category === cat);
-    if (arts.length > 0) clusterClicked.emit(arts);
-  });
-  map.addLayer(cg);
-}
-
-// In updateMapData — offset geografico progressivo (asintotico):
-const zoom = currentZoomLevel();
-const geoScale = 4.5 / Math.max(1, zoom - 1);
-const [dx, dy] = GEO_DIRECTIONS[catIdx];
-marker = L.marker([lat + dx * geoScale, lng + dy * geoScale], { icon });
+const cg = L.markerClusterGroup({
+  maxClusterRadius: 40,
+  spiderfyOnMaxZoom: false,
+  // ... iconCreateFunction / clusterclick custom del progetto
+});
 ```
 
+Non reintrodurre raggio 200, `spiderfyOnMaxZoom: true`, o `disableClusteringAtZoom: 18` come requisiti ECC.
+
 **Regole di calibrazione:**
-- `maxClusterRadius`: **200px** (previene duplicati stessa categoria nello stesso hub)
-- `disableClusteringAtZoom`: **18** (zero icone nude; solo spiderfy mostra icone)
-- `spiderfyOnMaxZoom`: **true** (espansione a grafo a zoom profondissimo)
-- `spiderfyDistanceMultiplier`: **2.2** (compatto, icone raccolte attorno al centro)
-- `zoomToBoundsOnClick`: **false** (toggle manuale + fitBounds con padding)
-- **Icon size dinamica**: `52 * min(3.0, 1.0 + (zoom-5)*0.15)` — da 52px a zoom 5 fino a 156px a zoom 18
-- **Offset geografico pixel-target**: `geoScale = (iconSize * 1.4) / (256 * 2^zoom / 360)` — gap 40% costante
-- **Focus con compensazione sidebar**: `fitBounds(clusterBounds, { paddingTopLeft: [300, 0], maxZoom: zoom+3 })` invece di `flyTo`
-- **Toggle click**: `cluster._spiderfied` — secondo click collassa
-- **Sidebar close**: `App.closeSidebar()` → `mapComponent.collapseAllGraphs()`
+- `maxClusterRadius`: **40px** (allineato a `radar-map.component.ts` post-restore)
+- `spiderfyOnMaxZoom`: **false** (espansione custom, non spiderfy automatico)
+- **Focus con compensazione sidebar**: `fitBounds` con padding lato sidebar
+- **Sidebar close**: `App.closeSidebar()` → `mapComponent.collapseAllGraphs()` (senza editare file sidebar)
 
 ---
 
@@ -316,12 +276,27 @@ A causa dei potenziali conflitti di compatibilità delle dipendenze tra Angular 
 
 **OBBLIGATORIO:**
 ```bash
+# Dockerfile stage builder — OBBLIGATORIO riproducibile
+RUN npm ci --legacy-peer-deps
+
+# Locale: aggiunta pacchetto one-off
 npm install <nome-pacchetto> --legacy-peer-deps
+```
+
+**VIETATO in Docker:**
+```dockerfile
+RUN npm install --legacy-peer-deps
+```
+
+**VIETATO senza `--legacy-peer-deps` quando richiesto dal lockfile:**
+```bash
+npm install <nome-pacchetto>
+npm ci
 ```
 
 Nel Dockerfile del frontend:
 ```dockerfile
-RUN npm install --legacy-peer-deps
+RUN npm ci --legacy-peer-deps
 ```
 
 **VIETATO:**
@@ -391,14 +366,16 @@ I tipi TypeScript vengono usati solo a compile-time, il runtime usa sempre `wind
 | URL CDN per GeoJSON                                   | Rompe l'offline, dipendenza esterna                 |
 | `BehaviorSubject` per stato UI                        | Usare Signals invece                                |
 | Colori hardcoded (es. `#ff0000`)                      | Devono usare CSS vars della palette                 |
-| `maxClusterRadius` diverso da 200                     | Previene duplicati stessa categoria nello stesso hub               |
+| `maxClusterRadius` diverso da 40                      | Deve matchare `radar-map.component.ts`                             |
+| `spiderfyOnMaxZoom` diverso da false                  | Espansione cluster custom; non spiderfy automatico legacy          |
+| `npm install`/`npm ci` Docker senza `--legacy-peer-deps` | Peer deps Angular 21 / PrimeNG                                  |
+| Modifiche a `radar-sidebar/**` o `app-article-list`   | Sidebar freeze — vedi Regola CRITICAL                              |
 | Modal al posto della sidebar split-screen             | Specifica fissa del PRD                             |
 | Testo placeholder statico in HTML                     | Viola la regola di completezza del codice           |
 | `COPY dist/[nome]/` senza `/browser` nel Dockerfile   | Angular 21 genera `dist/[nome]/browser/` — path errata causa Nginx 404 |
 | `npm install` o `npm ci` senza `--legacy-peer-deps`   | Causa fallimenti di installazione per conflitti di peer dependencies tra Angular 21 e librerie terze |
 | `import * as L from 'leaflet'` nel componente         | Con esbuild crea namespace separato, markercluster non funziona |
 | `import 'leaflet.markercluster'` side-effect nel componente | Il plugin non trova `window.L` e lancia TypeError  |
-| `disableClusteringAtZoom` diverso da 18                | Zero icone nude: solo spiderfy mostra icone (deep zoom)           |
 | `maxZoom` per fitBounds del focus maggiore di 4        | Lo zoom di focus risulterebbe troppo profondo        |
 | Zoom all'indietro senza `minZoom` o `maxBounds`       | Consente la navigazione verso aree nere / infinite  |
 | Legenda con `flex-wrap: wrap` senza nowrap/scroll     | Rischia di spezzarsi verticalmente su schermi piccoli|
