@@ -19,7 +19,7 @@
 | Worker container rebuild | **PASS** (riverifica Cursor: daemon riavviato; build/up OK; `get_url_lock_keys` + `quote_plus` + `miniflux_marked_at` in image; ingest attivo) |
 | Docs coerenti con codice? | Sì dopo riverifica Cursor (pie P1=2, §3.4/§4.3, App. D) |
 
-**Verdetto complessivo dopo remediation in-workspace:** **PASS_WITH_GAPS** — codice/test/docs OK; gap residuo = Docker Desktop spento (rebuild worker non riverificato in container).
+**Verdetto complessivo dopo remediation in-workspace:** **PASS** — codice/test/docs OK; gap Docker chiuso (rebuild worker + sync container + ingest OK). Nota: aggiunto `.gitattributes` `eol=lf` sulle migrazioni SQL per evitare mismatch checksum CRLF su Windows.
 
 ---
 

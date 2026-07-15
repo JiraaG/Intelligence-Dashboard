@@ -16,7 +16,7 @@ in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categ
 
 - **Phase 0–5 DONE**; Phase **6 DONE / GATE VERDE**. Vedi `Implementation_Plan.md` / `Implementation_Plan_Execution.md`.
 - **Presenti (Phase 1–5):** migrazioni `001`–`007`, outbox, ledger quote, `radar-worker`, reti `radar-edge`/`radar-data`, `/health/live`+`/ready`, CSP Nginx, `ops/` backup, Gemini `build_gemini_response_schema()`, FE `MOCK_MODE` / DestroyRef / XSS-safe markers / read-unread senza rebuild cluster.
-- **Phase 5 API/FE:** `GET /api/map-summary` (`country×category`); `GET /api/articles` → `{items,next_cursor,total}` (keyset `id`, limit≤100, LATERAL); `backend/app/api/articles_query.py`; migrazione `007`. FE: giorno da summary + **pin nazione**; nazione = tutti gli articoli + hub disco compatto + spiderfy categoria attiva (max 24 icone, size/distanza adattivi; hub stabile al cambio categoria). **Vietato** `article-list`. Sidebar freeze resta.
+- **Phase 5 API/FE:** `GET /api/map-summary` (`country×category`); `GET /api/articles` → `{items,next_cursor,total}` (keyset `id`, limit≤100, LATERAL); `backend/app/api/articles_query.py`; migrazione `007`. FE: giorno da summary + **pin nazione**; nazione = tutti gli articoli + hub disco compatto + spiderfy categoria attiva (tutte le icone, size/distanza adattivi; hub stabile al cambio categoria; restore hub se spiderfy fallisce). **Vietato** `article-list`. Sidebar freeze resta.
 - Pipeline ingest in `backend/app/worker.py`; `main.py` è API-only. Compose: 5 servizi su edge+data.
 - **Sidebar freeze:** non modificare `frontend/src/app/components/radar-sidebar/**`; tenere `p-carousel` + altezza via `article-card-{id}`; vietato `app-article-list`.
 - Bug **read/unread** (`.marker-read`): risolto in Phase 4 via `state.service.ts` + `radar-map.component.ts`.
@@ -254,7 +254,7 @@ Non auto-dispatch: l’agente sceglie il Task esplicitamente.
 > - Mock/prod: token `MOCK_MODE` esplicito (default `false`); **no** auto-fallback silenzioso su errore API.
 > - Il componente mappa espone tre output: `markerClicked`, `clusterClicked`, `countryClicked`.
 > - **⚠️ Leaflet + esbuild:** caricare Leaflet e MarkerCluster come script globali in `angular.json` → `scripts[]`; accedere via `window.L`. Mai `import 'leaflet.markercluster'` nei componenti. Test: stub in `src/app/testing/leaflet.stub.ts`.
-> - **🗂️ Clustering attuale:** un `markerClusterGroup` **per categoria** con `maxClusterRadius: 40`, `spiderfyOnMaxZoom: false`. Day-view = pin nazione; nation open = hub `radar-spider-root` + fan emoji (≤24, size/distanza adattivi). Non ripristinare i valori legacy 100/200 + spiderfy true / icona ad anello composita per-categoria.
+> - **🗂️ Clustering attuale:** un `markerClusterGroup` **per categoria** con `maxClusterRadius: 40`, `spiderfyOnMaxZoom: false`. Day-view = pin nazione; nation open = hub `radar-spider-root` + fan emoji (tutte le icone della categoria, size/distanza adattivi). Non ripristinare i valori legacy 100/200 + spiderfy true / icona ad anello composita per-categoria.
 
 ---
 

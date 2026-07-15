@@ -367,7 +367,7 @@ describe('RadarMapComponent (Phase 4)', () => {
 
     const spiderfyRoot = vi.spyOn(
       mapCmp as unknown as {
-        spiderfyAndCreateRoot: (...args: unknown[]) => void;
+        spiderfyAndCreateRoot: (...args: unknown[]) => boolean;
       },
       'spiderfyAndCreateRoot',
     );
@@ -376,6 +376,90 @@ describe('RadarMapComponent (Phase 4)', () => {
 
     // Only one category (first found), not all.
     expect(spiderfyRoot).toHaveBeenCalledTimes(1);
+  });
+
+  it('spiderfyAndCreateRoot expands every real marker (no hard cap / parking)', async () => {
+    const arts = Array.from({ length: 30 }, (_, i) =>
+      makeArticle({
+        id: i + 1,
+        title: `E${i}`,
+        primary_category: 'Energia',
+        country_code: 'DE',
+      }),
+    );
+    const countries: CountrySummary[] = [
+      { country_code: 'DE', categories: ['Energia'], article_count: 30 },
+    ];
+
+    const fixture = TestBed.createComponent(MapHostComponent);
+    fixture.componentInstance.articles = arts;
+    fixture.componentInstance.countries = countries;
+    fixture.detectChanges();
+    flushGeoJson();
+    await fixture.whenStable();
+
+    const mapCmp = getMapCmp(fixture);
+    (
+      mapCmp as unknown as {
+        updateMapData: (a: Article[], c: CountrySummary[], s?: unknown[]) => void;
+      }
+    ).updateMapData(arts, countries, []);
+
+    const mapInstance = (mapCmp as unknown as { map: StubMap }).map;
+    mapInstance.setView([51, 13], 6);
+
+    mapCmp.focusAndSpiderfyCategory('DE', 'Energia');
+
+    const energia = (
+      mapCmp as unknown as { categoryClusterGroups: Map<string, { getLayers: () => unknown[] }> }
+    ).categoryClusterGroups.get('Energia')!;
+    const real = energia
+      .getLayers()
+      .filter((m) => {
+        const am = m as { isDummy?: boolean; articleData?: Article };
+        return !am.isDummy && !!am.articleData;
+      });
+    expect(real.length).toBe(30);
+
+    const roots = (mapCmp as unknown as { activeRootMarkers: unknown[] }).activeRootMarkers;
+    expect(roots.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('restores nation hub when spiderfy cannot find a parent cluster', async () => {
+    const arts = [
+      makeArticle({ id: 1, title: 'E', primary_category: 'Energia', country_code: 'DE' }),
+    ];
+    const countries: CountrySummary[] = [
+      { country_code: 'DE', categories: ['Energia'], article_count: 1 },
+    ];
+
+    const fixture = TestBed.createComponent(MapHostComponent);
+    fixture.componentInstance.articles = arts;
+    fixture.componentInstance.countries = countries;
+    fixture.detectChanges();
+    flushGeoJson();
+    await fixture.whenStable();
+
+    const mapCmp = getMapCmp(fixture);
+    (
+      mapCmp as unknown as {
+        updateMapData: (a: Article[], c: CountrySummary[], s?: unknown[]) => void;
+      }
+    ).updateMapData(arts, countries, []);
+
+    const mapInstance = (mapCmp as unknown as { map: StubMap }).map;
+    mapInstance.setView([51, 13], 6);
+
+    vi.spyOn(
+      mapCmp as unknown as { spiderfyAndCreateRoot: (...args: unknown[]) => boolean },
+      'spiderfyAndCreateRoot',
+    ).mockReturnValue(false);
+
+    mapCmp.focusAndSpiderfyCategory('DE', 'Energia');
+
+    const hub = (mapCmp as unknown as { detailHubGroup: { getLayers: () => unknown[] } | null })
+      .detailHubGroup;
+    expect(hub?.getLayers().length ?? 0).toBeGreaterThanOrEqual(1);
   });
 
   it('day view places one country pin (not per-category balls) at the centroid', async () => {

@@ -149,6 +149,7 @@ export interface StubMarker {
   addTo(map: StubMap): StubMarker;
   getLatLng(): StubLatLng;
   getIcon(): unknown;
+  setIcon(icon: { html?: unknown }): StubMarker;
   setZIndexOffset(offset: number): StubMarker;
 }
 
@@ -348,6 +349,17 @@ function createMarker(
     },
     getIcon() {
       return options['icon'] ?? null;
+    },
+    setIcon(icon: { html?: unknown }) {
+      marker.options = { ...marker.options, icon };
+      if (icon?.html instanceof HTMLElement) {
+        marker._icon = icon.html;
+      } else if (typeof icon?.html === 'string' && icon.html) {
+        const el = document.createElement('div');
+        el.innerHTML = icon.html;
+        marker._icon = el;
+      }
+      return marker;
     },
     setZIndexOffset(offset) {
       marker.options = { ...marker.options, zIndexOffset: offset };

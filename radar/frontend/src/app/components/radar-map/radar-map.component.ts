@@ -136,12 +136,6 @@ export class RadarMapComponent implements AfterViewInit {
   /** Day-view / nation-hub pin pixel box (tip at bottom). */
   private readonly COUNTRY_PIN_SIZE = { w: 64, h: 76 } as const;
   /**
-   * Soft cap for one spiderfy fan. Beyond this: park extras (carousel still
-   * reaches them). Sized icons keep ≤ this count readable/clickable.
-   */
-  private readonly SPIDERFY_MAX_ICONS = 24;
-
-  /**
    * Pixel offsets kept for legacy cluster math; day/detail pins no longer
    * use CSS rings (they drift into neighbouring countries).
    */
@@ -165,9 +159,7 @@ export class RadarMapComponent implements AfterViewInit {
   private summaryMarkerGroup: Leaflet.LayerGroup | null = null;
   /** Nation open: single hub pin while spiderfy is collapsed. */
   private detailHubGroup: Leaflet.LayerGroup | null = null;
-  /** Layers removed temporarily so spiderfy stays ≤ SPIDERFY_MAX_ICONS. */
-  private spiderfyParked: { cg: MarkerClusterGroupLike; layers: ArticleMarker[] } | null = null;
-  /** When false, unspiderfy must not re-show the tall hub (avoids pin-grow on 2nd spiderfy). */
+  /** When false, unspiderfy must not re-show the hub (avoids pin-grow on 2nd spiderfy). */
   private restoreDetailHubOnUnspiderfy = true;
   private isNavigating = false;
   private navigatingTargetZoom = 0;
@@ -445,7 +437,6 @@ export class RadarMapComponent implements AfterViewInit {
           return;
         }
         this.clearRootMarkers();
-        this.restoreParkedSpiderfyLayers();
         if (this.L && this.articles().length > 0) {
           this.upsertDetailHubPin(this.L, this.articles());
         } else {
@@ -487,6 +478,8 @@ export class RadarMapComponent implements AfterViewInit {
               category: cat as PrimaryCategory,
               preserveZoom: true,
             });
+          } else {
+            this.restoreNationHubPin();
           }
           return;
         }
@@ -498,7 +491,9 @@ export class RadarMapComponent implements AfterViewInit {
         const gen = ++this.spiderfyGeneration;
 
         if (currentZoom >= targetZoom) {
-          this.spiderfyAndCreateRoot(cg, childMarkers, gen);
+          if (!this.spiderfyAndCreateRoot(cg, childMarkers, gen)) {
+            this.restoreNationHubPin();
+          }
           return;
         }
 
@@ -512,11 +507,15 @@ export class RadarMapComponent implements AfterViewInit {
               this.finishNavigating();
               return;
             }
-            this.spiderfyAndCreateRoot(cg, childMarkers, gen);
+            if (!this.spiderfyAndCreateRoot(cg, childMarkers, gen)) {
+              this.restoreNationHubPin();
+            }
             this.finishNavigating();
+            this.map?.off('zoomend', onZoomEnd);
           }, 250);
         };
         this.map.once('zoomend', onZoomEnd);
+        this.scheduleTimeout(onZoomEnd, 1200);
       });
 
       this.categoryClusterGroups.set(cat, cg);
@@ -551,7 +550,9 @@ export class RadarMapComponent implements AfterViewInit {
     if (n <= 8) return 3.2;
     if (n <= 14) return 2.7;
     if (n <= 20) return 2.3;
-    return 2.0;
+    if (n <= 32) return 1.9;
+    if (n <= 48) return 1.6;
+    return 1.4;
   }
 
   /** Pixel box for spiderfy emoji icons — shrinks as the fan grows. */
@@ -560,74 +561,83 @@ export class RadarMapComponent implements AfterViewInit {
     if (n <= 8) return 30;
     if (n <= 14) return 26;
     if (n <= 20) return 22;
-    return 20;
+    if (n <= 32) return 18;
+    if (n <= 48) return 16;
+    return 14;
   }
 
-  private pickSpiderfyMarkers(real: ArticleMarker[]): ArticleMarker[] {
-    if (real.length <= this.SPIDERFY_MAX_ICONS) return real;
-    const focusId = this.pendingHighlightArticle?.id;
-    const focus =
-      focusId != null
-        ? real.find((m) => m.articleData && m.articleData.id === focusId)
-        : undefined;
-    const rest = real.filter((m) => m !== focus);
-    if (focus) {
-      return [focus, ...rest.slice(0, this.SPIDERFY_MAX_ICONS - 1)];
+  /** Restore nation hub after a failed spiderfy (never leave a blank map). */
+  private restoreNationHubPin(): void {
+    this.restoreDetailHubOnUnspiderfy = true;
+    this.clearRootMarkers();
+    if (this.L && this.articles().length > 0) {
+      this.upsertDetailHubPin(this.L, this.articles());
     }
-    return real.slice(0, this.SPIDERFY_MAX_ICONS);
   }
 
-  private restoreParkedSpiderfyLayers(): void {
-    if (!this.spiderfyParked) return;
-    for (const layer of this.spiderfyParked.layers) {
-      this.spiderfyParked.cg.addLayer(layer);
-    }
-    this.spiderfyParked = null;
-  }
-
+  /**
+   * Expand all real article markers in the group via MarkerCluster spiderfy.
+   * Returns false if spiderfy could not start — caller must restore the hub pin.
+   */
   private spiderfyAndCreateRoot(
     cg: MarkerClusterGroupLike,
     childMarkers: ArticleMarker[],
     generation: number,
-  ): void {
-    if (this.destroyed || !this.map || !this.L) return;
-    if (generation !== this.spiderfyGeneration) return;
-    if (!childMarkers || childMarkers.length === 0) return;
-
-    this.restoreParkedSpiderfyLayers();
+  ): boolean {
+    if (this.destroyed || !this.map || !this.L) return false;
+    if (generation !== this.spiderfyGeneration) return false;
+    if (!childMarkers || childMarkers.length === 0) return false;
 
     const realMarkers = childMarkers.filter(
       (m) => !m.isDummy && !m.isSummary && !!m.articleData,
     );
-    if (realMarkers.length === 0) return;
+    if (realMarkers.length === 0) return false;
 
-    const newParent = cg.getVisibleParent(realMarkers[0]) as
+    // Prefer a marker that still has a cluster parent (first may be orphaned after races).
+    let newParent:
       | (Leaflet.Marker & { spiderfy?: () => void })
       | null
       | undefined;
-
-    if (!newParent || typeof newParent.spiderfy !== 'function') return;
-
-    const picked = this.pickSpiderfyMarkers(realMarkers);
-    const parked = realMarkers.filter((m) => !picked.includes(m));
-    if (parked.length > 0) {
-      for (const m of parked) {
-        cg.removeLayer(m);
+    for (const m of realMarkers) {
+      const parent = cg.getVisibleParent(m) as
+        | (Leaflet.Marker & { spiderfy?: () => void })
+        | null
+        | undefined;
+      if (parent && typeof parent.spiderfy === 'function') {
+        newParent = parent;
+        break;
       }
-      this.spiderfyParked = { cg, layers: parked };
     }
+    if (!newParent || typeof newParent.spiderfy !== 'function') {
+      if (typeof cg.refreshClusters === 'function') {
+        cg.refreshClusters();
+      }
+      for (const m of realMarkers) {
+        const parent = cg.getVisibleParent(m) as
+          | (Leaflet.Marker & { spiderfy?: () => void })
+          | null
+          | undefined;
+        if (parent && typeof parent.spiderfy === 'function') {
+          newParent = parent;
+          break;
+        }
+      }
+    }
+    if (!newParent || typeof newParent.spiderfy !== 'function') return false;
 
+    const n = realMarkers.length;
     if (cg.options) {
-      cg.options.spiderfyDistanceMultiplier = this.spiderfyDistanceForCount(picked.length);
+      cg.options.spiderfyDistanceMultiplier = this.spiderfyDistanceForCount(n);
     }
 
-    const iconPx = this.spiderfyIconSizeForCount(picked.length);
-    for (const m of picked) {
-      if (m.articleData) {
+    const iconPx = this.spiderfyIconSizeForCount(n);
+    for (const m of realMarkers) {
+      if (m.articleData && typeof m.setIcon === 'function') {
         m.setIcon(this.createSafeMarkerIcon(this.L, m.articleData, iconPx));
       }
     }
 
+    // Only clear hub once spiderfy parent is confirmed — avoids blank map on failure.
     this.clearRootMarkers();
     this.clearDetailHubPin();
     this.restoreDetailHubOnUnspiderfy = false;
@@ -636,11 +646,7 @@ export class RadarMapComponent implements AfterViewInit {
       .map((m) => m.articleData)
       .filter((a): a is Article => !!a);
     // Compact disc (not the tall hub pin) so spider legs stay clear.
-    const rootIcon = this.createSpiderfyRootIcon(
-      this.L,
-      categoryArts,
-      parked.length > 0 ? picked.length : undefined,
-    );
+    const rootIcon = this.createSpiderfyRootIcon(this.L, categoryArts);
 
     const rootMarker = this.L.marker(newParent.getLatLng(), {
       icon: rootIcon,
@@ -659,11 +665,12 @@ export class RadarMapComponent implements AfterViewInit {
     this.activeRootMarkers.push(rootMarker);
     newParent.spiderfy();
 
-    for (const m of picked) {
+    for (const m of realMarkers) {
       if (typeof m.setZIndexOffset === 'function') {
         m.setZIndexOffset(1400);
       }
     }
+    return true;
   }
 
   private loadGeoJson(): void {
@@ -1009,12 +1016,10 @@ export class RadarMapComponent implements AfterViewInit {
   /**
    * Compact centered disc used as spiderfy root — tall hub pin would cover
    * northern spider legs (icons appear under the pin).
-   * @param visibleCap when set, core shows "visible/total" for capped spiderfy
    */
   private createSpiderfyRootIcon(
     L: LeafletGlobal,
     articles: Article[],
-    visibleCap?: number,
   ): Leaflet.DivIcon {
     const categories = new Map<string, number>();
     for (const a of articles) {
@@ -1040,14 +1045,7 @@ export class RadarMapComponent implements AfterViewInit {
 
     const root = document.createElement('div');
     root.className = 'radar-spider-root';
-    const label =
-      visibleCap != null && visibleCap < articles.length
-        ? `${visibleCap}/${articles.length}`
-        : String(articles.length);
-    root.title =
-      visibleCap != null && visibleCap < articles.length
-        ? `${visibleCap} icone visibili di ${articles.length} (carosello per le altre)`
-        : `${articles.length} notizie`;
+    root.title = `${articles.length} notizie`;
 
     const ring = document.createElement('div');
     ring.className = 'radar-spider-root__ring';
@@ -1055,7 +1053,7 @@ export class RadarMapComponent implements AfterViewInit {
 
     const core = document.createElement('div');
     core.className = 'radar-spider-root__core';
-    core.textContent = label;
+    core.textContent = String(articles.length);
 
     root.append(ring, core);
 
@@ -1135,7 +1133,6 @@ export class RadarMapComponent implements AfterViewInit {
     // icons missing from the pane while layers remain in the group.
     this.spiderfyGeneration++;
     this.clearRootMarkers();
-    this.restoreParkedSpiderfyLayers();
     this.categoryClusterGroups.forEach((cg) => {
       const spiderfiedCluster = cg._spiderfied;
       if (spiderfiedCluster && typeof spiderfiedCluster.unspiderfy === 'function') {
@@ -1315,7 +1312,6 @@ export class RadarMapComponent implements AfterViewInit {
 
     this.spiderfyGeneration++;
     this.clearRootMarkers();
-    this.restoreParkedSpiderfyLayers();
     this.restoreDetailHubOnUnspiderfy = restoreHub;
 
     this.categoryClusterGroups.forEach((cg) => {
@@ -1365,18 +1361,30 @@ export class RadarMapComponent implements AfterViewInit {
 
     const firstMarker = countryMarkers[0];
     const parent = cg.getVisibleParent(firstMarker);
-    if (!parent) return;
+    if (!parent) {
+      if (typeof cg.refreshClusters === 'function') {
+        cg.refreshClusters();
+      }
+      const retryParent = cg.getVisibleParent(firstMarker);
+      if (!retryParent) {
+        this.restoreNationHubPin();
+        return;
+      }
+    }
 
     const currentZoom = this.map.getZoom();
     const targetZoom = 6;
-    const latLng = typeof parent.getLatLng === 'function'
-      ? parent.getLatLng()
+    const visibleParent = cg.getVisibleParent(firstMarker) ?? firstMarker;
+    const latLng = typeof visibleParent.getLatLng === 'function'
+      ? visibleParent.getLatLng()
       : firstMarker.getLatLng();
     const gen = ++this.spiderfyGeneration;
 
     // Detail zoom already (markers visible): spiderfy in place — never fitBounds/dezoom.
     if (currentZoom >= 5) {
-      this.spiderfyAndCreateRoot(cg, countryMarkers, gen);
+      if (!this.spiderfyAndCreateRoot(cg, countryMarkers, gen)) {
+        this.restoreNationHubPin();
+      }
       return;
     }
 
@@ -1393,7 +1401,9 @@ export class RadarMapComponent implements AfterViewInit {
           this.finishNavigating();
           return;
         }
-        this.spiderfyAndCreateRoot(cg, countryMarkers, gen);
+        if (!this.spiderfyAndCreateRoot(cg, countryMarkers, gen)) {
+          this.restoreNationHubPin();
+        }
         this.finishNavigating();
         this.map?.off('zoomend', cleanup);
         this.map?.off('moveend', cleanup);
@@ -1474,15 +1484,6 @@ export class RadarMapComponent implements AfterViewInit {
       return;
     }
 
-    // Article parked outside capped spiderfy fan — reopen fan including it.
-    const parkedHit = this.spiderfyParked?.layers.some(
-      (m) => m.articleData && m.articleData.id === article.id,
-    );
-    if (parkedHit && article.country_code && article.primary_category) {
-      this.focusAndSpiderfyCategory(article.country_code, article.primary_category);
-      return;
-    }
-
     if (retries > 0) {
       this.scheduleTimeout(() => this.applyHighlight(retries - 1), 150);
     }
@@ -1499,7 +1500,6 @@ export class RadarMapComponent implements AfterViewInit {
     }
     this.clearPendingTimeouts();
     this.clearRootMarkers();
-    this.restoreParkedSpiderfyLayers();
     this.map?.remove();
     this.map = null;
   }
