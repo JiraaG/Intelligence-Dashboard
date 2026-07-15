@@ -1,0 +1,2 @@
+# Keep SQL migrations byte-stable across Windows/macOS/Linux (checksum gate).
+radar/backend/migrations/*.sql text eol=lf
