@@ -10,7 +10,8 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-5_services-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 
-**Stato piani (2026-07-15):** Phase **0–5 DONE**. Phase **6 DONE / GATE VERDE** (working tree ancora da commit su richiesta).  
+**Stato piani (2026-07-15):** Phase **0–5 DONE**. Phase **6 DONE / GATE VERDE**.  
+**ECC expansion wiring DONE** (hooks/rules Cursor + skill dominio Radar) — working tree da commit su richiesta.  
 Sorgente di verità avanzamento: [`Implementation_Plan.md`](Implementation_Plan.md) + [`Implementation_Plan_Execution.md`](Implementation_Plan_Execution.md).  
 **Sidebar freeze:** non modificare `radar/frontend/src/app/components/radar-sidebar/`.
 
@@ -28,6 +29,19 @@ Apri **http://localhost/**. Dettagli env, health e Miniflux: [docs/01_getting_st
 
 La build frontend richiede l’asset GeoJSON `radar/frontend/src/assets/data/countries.geo.json` (gitignored). Provisioning: [`ASSET_LICENSE.md`](radar/frontend/src/assets/data/ASSET_LICENSE.md) + `npm run verify-geojson:fetch` (Docker lo esegue in build).
 
+### Verifica locale (allineata a CI)
+
+SoT: [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (Node 22 / Python 3.12 in CI). Il job `secret-scan` gira solo in CI (best-effort).
+
+```bash
+# Backend — da radar/
+# PowerShell: $env:PYTHONPATH="backend"
+PYTHONPATH=backend python -m pytest -m "not live" -q
+
+# Frontend — da radar/frontend/ (dopo npm ci --legacy-peer-deps)
+npm run verify-geojson:fetch && npm run typecheck && npm run test:ci && npm run build:ci
+```
+
 ---
 
 ## Architettura
@@ -39,8 +53,8 @@ flowchart LR
   User((User))
   subgraph edge["radar-edge"]
     FE[radar-frontend :80]
-    API[radar-backend]
   end
+  API[radar-backend<br/>edge + data]
   subgraph dataNet["radar-data"]
     W[radar-worker]
     DB[(radar-db)]
@@ -58,6 +72,7 @@ flowchart LR
   W --- MF
   W -->|structured output| Gemini
   W --> Vault
+  API --> Vault
   MF --- DB
   MF -->|fetch| RSS
 ```
@@ -65,7 +80,7 @@ flowchart LR
 | Servizio | Ruolo | Porta host (base) |
 |----------|--------|-------------------|
 | `radar-frontend` | Nginx + SPA Angular | **80** |
-| `radar-backend` | FastAPI (API + health) | nessuna (solo edge) |
+| `radar-backend` | FastAPI (API + health) | nessuna (raggiungibile via Nginx su edge; anche su `radar-data`) |
 | `radar-worker` | Polling Miniflux + LLM + commit/outbox | nessuna |
 | `radar-db` | PostgreSQL 15 | nessuna |
 | `radar-miniflux` | Aggregatore RSS | nessuna (usa overlay lan/hardened) |
@@ -96,7 +111,7 @@ Build FE Docker: `npm ci --legacy-peer-deps` (peer matrix Angular/PrimeNG).
 | 01 | [docs/01_getting_started.md](docs/01_getting_started.md) | Installazione, `.env`, Docker, health, Miniflux |
 | 02 | [docs/02_architecture_and_backend.md](docs/02_architecture_and_backend.md) | Worker, migrazioni, API, quote, outbox |
 | 03 | [docs/03_frontend_and_ui.md](docs/03_frontend_and_ui.md) | Mappa, map-summary, `MOCK_MODE`, stato UI |
-| 04 | [docs/04_ecc_framework.md](docs/04_ecc_framework.md) | Panoramica harness ECC |
+| 04 | [docs/04_ecc_framework.md](docs/04_ecc_framework.md) | Harness ECC: `.agents` + `.ecc` + wiring Cursor |
 
 ### Ops e frontend
 
@@ -117,19 +132,26 @@ Build FE Docker: `npm ci --legacy-peer-deps` (peer matrix Angular/PrimeNG).
 
 ### Governance agenti (ECC)
 
-| Documento | Ruolo |
-|-----------|--------|
-| [.agents/AGENTS.md](.agents/AGENTS.md) | Guardrail globali |
-| [radar/.ecc/CLAUDE.md](radar/.ecc/CLAUDE.md) | Entry-point locale |
-| [radar/.ecc/rules/](radar/.ecc/rules/) | Rules path-scoped |
-| [radar/.ecc/agents/](radar/.ecc/agents/) | Profili specializzati |
-| [.agents/skills/](.agents/skills/) | Skills globali |
+| Documento / path | Ruolo |
+|------------------|--------|
+| [.agents/AGENTS.md](.agents/AGENTS.md) | Guardrail globali (Magna Carta) |
+| [.agents/skills/](.agents/skills/) | **SoT** playbook Cursor (incl. `radar-*`) |
+| [radar/.ecc/CLAUDE.md](radar/.ecc/CLAUDE.md) | Entry-point locale + skill map |
+| [radar/.ecc/rules/](radar/.ecc/rules/) | Rules path-scoped (SoT testo) |
+| [radar/.ecc/hooks/](radar/.ecc/hooks/) | Logica security/lint (pre/post) |
+| [radar/.ecc/agents/](radar/.ecc/agents/) | Profili Task (prompt manuale) |
+| [radar/.ecc/skills/](radar/.ecc/skills/) | Mirror flat delle skill |
+| [.cursor/hooks.json](.cursor/hooks.json) | Auto-wiring Cursor → adapters → `.ecc/hooks` |
+| [.cursor/rules/](.cursor/rules/) | Globs nativi → puntano a `.ecc/rules` |
+| [.cursor/commands/](.cursor/commands/) | Shortcut verify / smoke / lint |
 
-Dettaglio narrativo: [docs/04_ecc_framework.md](docs/04_ecc_framework.md).
+Panoramica: [docs/04_ecc_framework.md](docs/04_ecc_framework.md).  
+Manuale descrittivo: [`ecc_deep_dive_analysis_v2.md`](ecc_deep_dive_analysis_v2.md).  
+Handoff expansion (eseguito): [`ECC_Expansion_Handoff.md`](ECC_Expansion_Handoff.md).
 
 ### Archivio storico (non eseguire)
 
-Non sono checklist di implementazione: [`Fase2_Implementation_Plan.md`](Fase2_Implementation_Plan.md), [`plan.md`](plan.md), [`plan_backend_ecc.md`](plan_backend_ecc.md), [`plan_frontend_ecc.md`](plan_frontend_ecc.md), [`ecc_deep_dive_analysis.md`](ecc_deep_dive_analysis.md).  
+Non sono checklist di implementazione: [`Fase2_Implementation_Plan.md`](Fase2_Implementation_Plan.md), [`plan.md`](plan.md), [`plan_backend_ecc.md`](plan_backend_ecc.md), [`plan_frontend_ecc.md`](plan_frontend_ecc.md), [`ecc_deep_dive_analysis.md`](ecc_deep_dive_analysis.md) (V1 archivio).  
 In Execution, la sezione **A (pre-restore)** è solo storico — usare **§ B/C**.
 
 ---
@@ -143,11 +165,12 @@ Branch: `refactor/enterprise-consolidation`
 | Phase 0 | `0189359` | pytest markers / frontend CI baseline |
 | Phase 1 | `bff8abe` | migrations 001–002, outbox, Pydantic strict, vault atomico |
 | Phase 2 | `72851d7` | `radar-worker`, coda bounded, `llm_request_ledger` |
-| Phase 3 | `19c67f0` | edge/data, live/ready, CSP, ops |
+| Phase 3 | `19c67f0` | edge/data, live/ready, CSP, ops (+ schema sanitize Gemini) |
 | Phase 4 | `de9bd2f` | `MOCK_MODE`, XSS-safe markers, read-unread senza rebuild cluster |
 | Phase 5 | `1dfdf60` | map-summary + articles cursor; nation markers; spiderfy categoria |
+| Phase 6 | `56c2eff` | GATE VERDE: docs, GeoJSON fetch+verify, CI, runbook, hooks |
 
-Esempio: `git checkout 1dfdf60` (tip Phase 5). Dettaglio gate: [Implementation_Plan_Execution.md](Implementation_Plan_Execution.md).
+Esempio: `git checkout 56c2eff` (tip Phase 6 / GATE VERDE; tip successivo = ECC remediation). Dettaglio gate: [Implementation_Plan_Execution.md](Implementation_Plan_Execution.md).
 
 ---
 
@@ -166,7 +189,7 @@ Esempio: `git checkout 1dfdf60` (tip Phase 5). Dettaglio gate: [Implementation_P
 | `MOCK_MODE` | `radar/frontend/src/app/services/mock-mode.token.ts` |
 | GeoJSON pin / verify | `radar/frontend/src/assets/data/ASSET_LICENSE.md`, `radar/frontend/scripts/verify-geojson.mjs` |
 | Sidebar (**frozen**) | `radar/frontend/src/app/components/radar-sidebar/` |
-| ECC rules / hooks | `radar/.ecc/rules/`, `radar/.ecc/hooks/` |
+| ECC (SoT + wiring) | `.agents/`, `radar/.ecc/`, `.cursor/hooks.json`, `.cursor/rules/`, `.cursor/commands/` |
 | Env template | `radar/.env.example` |
 | CI | `.github/workflows/ci.yml` |
 
@@ -195,10 +218,13 @@ Dashboard finance/
 ├── docs/                              # Manuali operatori 01–04
 ├── Implementation_Plan.md             # Piano master Phase 0–6
 ├── Implementation_Plan_Execution.md
+├── ecc_deep_dive_analysis_v2.md       # Manuale ECC (descrizione)
+├── ECC_Expansion_Handoff.md           # Handoff wiring/skills (eseguito)
 ├── RSS.txt
 ├── LICENSE
 ├── .github/workflows/ci.yml
-├── .agents/                           # AGENTS.md + skills globali
+├── .agents/                           # AGENTS.md + skills SoT (incl. radar-*)
+├── .cursor/                           # hooks.json + adapters, rules/*.mdc, commands
 └── radar/
     ├── docker-compose.yml             # 5 servizi, edge + data
     ├── docker-compose.hardened.yml
@@ -220,5 +246,5 @@ Dashboard finance/
     │   ├── src/app/services/          # StateService, ArticleService, MOCK_MODE
     │   └── src/assets/data/           # GeoJSON locale + ASSET_LICENSE.md
     ├── vault/                         # Markdown generati (gitignored)
-    └── .ecc/                          # rules, agents, hooks, skills
+    └── .ecc/                          # CLAUDE, settings, rules, agents, hooks, skills mirror
 ```

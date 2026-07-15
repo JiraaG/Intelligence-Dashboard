@@ -1,7 +1,12 @@
 # Documentazione Tecnica di Analisi: Everything Claude Code (ECC) & Radar Informativo Globale
+
+> **⚠️ ARCHIVIO (V1)** — Non usare come sorgente di verità.  
+> **Manuale corrente:** [`ecc_deep_dive_analysis_v2.md`](ecc_deep_dive_analysis_v2.md) (2026-07-15, post Phase 6 + ECC remediation).  
+> Questa V1 contiene esempi stale (categorie Chip/Acqua, List[str], split 70/30, ingest in main.py).
+
 > **Autore:** Senior AI Reverse Engineer & Software Architect  
 > **Destinazione Workspace:** `c:/Users/lucag/Documents/Dashboard finance/ecc_deep_dive_analysis.md`  
-> **Stato:** Versione Finale - Documentazione Completa  
+> **Stato:** Versione 1 — Documentazione storica (pre–consolidation / pre–GATE VERDE)
 
 ---
 

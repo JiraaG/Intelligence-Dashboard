@@ -79,7 +79,7 @@
   },
 
   "hooks": {
-    "notes": "Nessuna auto-registrazione harness in questo file. Default operativo = esecuzione MANUALE di hooks/pre-tool-use.py e hooks/post-tool-use.py (vedi AGENTS.md §6 e docs/04_ecc_framework.md). Auto-hook dipende dall'harness esterno se/quando configurato."
+    "notes": "Logica SoT = hooks/pre-tool-use.py + post-tool-use.py. Auto-wiring Cursor = repo-root .cursor/hooks.json (+ .cursor/hooks/*-adapter.py). Questo settings.json NON registra Cursor. Fallback manuale: eseguire gli script Python direttamente (AGENTS.md §6, docs/04_ecc_framework.md)."
   },
 
   "contextScope": {

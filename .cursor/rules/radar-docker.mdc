@@ -1,0 +1,12 @@
+---
+description: Radar Docker/Compose path-scoped rules (SoT in radar/.ecc/rules/docker.md)
+globs: radar/**/Dockerfile,radar/**/Dockerfile.*,radar/docker-compose*.yml,radar/docker-compose*.yaml,**/docker-compose*.yml
+alwaysApply: false
+---
+
+# Docker rules (pointer)
+
+**Source of truth:** `radar/.ecc/rules/docker.md`
+
+Before editing Dockerfiles or Compose files for Radar, read that file and follow it.
+Do not invent alternate Docker conventions here — this rule only scopes the SoT into Cursor.

@@ -108,7 +108,7 @@ docker compose exec radar-db psql -U radar_user -d radar_db -c "\dt"
 | `GET /health` (host `:80`) | Healthcheck Nginx frontend | Sì (container FE) |
 | `GET /health/live` (API) | Processo API su | Sì (healthcheck backend) |
 | `GET /health/ready` (API) | Pool + migrazioni + heartbeat worker | No (ops; 503 tipico ai primi secondi) |
-| `GET /health` (API `:8000`) | Alias di live | — |
+| `GET /health` (API, solo in-container `:8000`) | Alias di live | — |
 
 ---
 

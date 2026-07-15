@@ -260,6 +260,19 @@ Sidebar freeze: zero touch `radar-sidebar/**`.
 
 ---
 
+### ECC expansion wiring — DONE (2026-07-15)
+
+Harness Cursor + skill dominio selettive. Sorgente: `ECC_Expansion_Handoff.md`. **Nessun nuovo SHA inventato** — commit solo su richiesta utente.
+
+- [x] **P0:** `.cursor/hooks.json` + adapters → `radar/.ecc/hooks/*.py`; smoke allow/deny secret; `.cursor/rules/radar-*.mdc` globs → `.ecc/rules`; AGENTS/docs/04/`hooks.notes` allineati
+- [x] **P1:** skill `radar-sidebar-freeze`, `radar-api-contract`, `radar-docker-ops`, `radar-geojson-assets`, `radar-quota-ledger` + mirror `.ecc` + skill map CLAUDE
+- [x] **P2:** commands `radar-verify` / `radar-smoke` / `radar-lint` + nota spawn profili in CLAUDE
+- [x] Checklist handoff §7; sidebar freeze invariato
+
+Manuale: `ecc_deep_dive_analysis_v2.md` (stato wiring aggiornato).
+
+---
+
 ### Phase 6 — Governance, docs, ops — DONE / GATE VERDE (2026-07-15)
 
 **Metodo:** audit incongruenze → Blocchi A→D → polish tipografico/Mermaid/indici docs. Sidebar freeze invariato. **Commit solo su richiesta.**

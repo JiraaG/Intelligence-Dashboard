@@ -68,10 +68,11 @@ Offline: `{ provide: MOCK_MODE, useValue: true }`. Errori API restano visibili â
 
 ## Leaflet + ESBuild
 
-1. JS/CSS Leaflet e MarkerCluster in `angular.json` `scripts[]` / `styles[]`
-2. Nel componente: `const L = (window as any).L`
-3. Vietato `import 'leaflet.markercluster'` nei componenti
-4. Test: stub `src/app/testing/leaflet.stub.ts`
+1. JS Leaflet e MarkerCluster in `angular.json` `scripts[]` â†’ `window.L`
+2. CSS Leaflet/MarkerCluster via `@import` in `src/styles.scss` (incluso da `angular.json` `styles[]`)
+3. Nel componente: `const L = (window as any).L`
+4. Vietato `import 'leaflet.markercluster'` nei componenti
+5. Test: stub `src/app/testing/leaflet.stub.ts`
 
 ---
 

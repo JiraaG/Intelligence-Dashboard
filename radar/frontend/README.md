@@ -13,13 +13,13 @@ SPA Angular 21 del monorepo `radar/`. Documentazione di prodotto: [docs/03_front
 
 | Comando | Uso |
 |---------|-----|
-| `npm start` | Dev server `http://localhost:4200` (proxy: `proxy.conf.json` → API) |
+| `npm start` | Dev server `http://localhost:4200` (proxy `proxy.conf.json` → `localhost:8000`). Con solo Compose base l’API non è pubblicata sull’host: pubblica `:8000`, oppure uvicorn locale, oppure CORS (`CORS_ALLOW_ORIGINS=http://localhost:4200`) contro un API raggiungibile. Stack Docker UI: `http://localhost/` |
 | `npm run verify-geojson` | Verifica SHA/schema asset GeoJSON (fail se manca) |
 | `npm run verify-geojson:fetch` | Download pinnato + verify |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run test:ci` | Unit test senza watch |
 | `npm run build:ci` | Fetch/verify GeoJSON + build production |
-| `npm run lint` | Prettier check |
+| `npm run lint` | Prettier check (locale; **non** eseguito in CI) |
 | `npm run build` | Build locale (`prebuild` = verify senza fetch) |
 
 Installazione dipendenze (come in Docker):

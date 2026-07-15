@@ -1,0 +1,13 @@
+---
+description: Radar frontend path-scoped rules (SoT in radar/.ecc/rules/frontend.md)
+globs: radar/frontend/**
+alwaysApply: false
+---
+
+# Frontend rules (pointer)
+
+**Source of truth:** `radar/.ecc/rules/frontend.md`
+
+Before editing any file under `radar/frontend/**`, read that file and follow it.
+**Sidebar freeze:** never modify `radar/frontend/src/app/components/radar-sidebar/**`.
+Do not invent alternate frontend conventions here — this rule only scopes the SoT into Cursor.

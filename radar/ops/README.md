@@ -21,7 +21,7 @@ Remote / internet exposure: put a TLS reverse proxy with auth and ACLs in front 
 | Probe | Path | Meaning | Compose uses it? |
 |-------|------|---------|------------------|
 | **Liveness** | `GET /health/live` | Process up | Yes — `radar-backend` healthcheck; frontend `depends_on` this |
-| **Readiness** | `GET /health/ready` | Pool + migrations + worker heartbeat + outbox health | No — ops/load-balancer only |
+| **Readiness** | `GET /health/ready` | Pool + migrations (`004_+`) + worker heartbeat freshness; outbox counts are reported but non-gating | No — ops/load-balancer only |
 
 On first boot, `/health/ready` may return **503** for ~30–90s until the worker leader writes a heartbeat. The UI on `:80` can still load; do not gate Nginx on ready.
 

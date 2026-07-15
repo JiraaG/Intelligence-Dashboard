@@ -223,15 +223,31 @@ Miniflux API (ogni 15 min)
 
 ## Skill Map — Quale Skill Usare per Quale File
 
+> **SoT playbook Cursor** = `.agents/skills/*/SKILL.md`. Mirror flat: `radar/.ecc/skills/<name>.md` (sync dopo edit SoT).
+
 | File(s)                              | Skill da caricare            |
 |--------------------------------------|------------------------------|
 | `backend/app/worker.py` + `classification/**` | `llm-json-extraction` |
-| `backend/app/main.py`                | Regola: `rules/backend.md` (API-only) |
+| `classification/quota.py`, ledger SQL | `radar-quota-ledger` |
+| `backend/app/main.py`, articles query, FE `article.service*` | `radar-api-contract` |
 | `backend/app/*.py`                   | Regola: `rules/backend.md`   |
 | `frontend/src/**/*.ts`               | Regola: `rules/frontend.md` + `angular-developer` |
 | `frontend/src/**/*.html`             | Regola: `rules/frontend.md` + `angular-developer` |
-| `docker-compose.yml`, `Dockerfile`   | Regola: `rules/docker.md`    |
+| UI laterale / carousel / read-unread | `radar-sidebar-freeze` (+ freeze AGENTS) |
+| `assets/data`, verify-geojson, FE Dockerfile GeoJSON | `radar-geojson-assets` |
+| `docker-compose.yml`, `Dockerfile`   | Regola: `rules/docker.md` + `radar-docker-ops` |
 | Nuove feature UI o test offline      | `spatial-data-mocking`       |
+
+### Commands / profili (P2 minimo)
+
+Shortcut Markdown: `.cursor/commands/radar-verify.md`, `radar-smoke.md`, `radar-lint.md`.
+
+Quando spawnare Task con profilo ECC (prompt da `radar/.ecc/agents/`):
+- **angular-map-expert** — mappa Leaflet/cluster/overlay (non sidebar)
+- **pipeline-engineer** — worker, classification, commit/outbox
+- **geo-data-architect** — GeoJSON assets, verify script, bounds
+
+Non auto-dispatch: l’agente sceglie il Task esplicitamente.
 
 > **Note critiche per il frontend:**
 > - Nei **mock FE** `infrastructural_entities` / `companies_involved` / `tags` restano tipicamente `string[]`. Nello **schema Pydantic** Gemini sono `str` CSV — non convertire il validator a `List[str]`.

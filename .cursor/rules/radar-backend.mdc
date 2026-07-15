@@ -1,0 +1,12 @@
+---
+description: Radar backend path-scoped rules (SoT in radar/.ecc/rules/backend.md)
+globs: radar/backend/**
+alwaysApply: false
+---
+
+# Backend rules (pointer)
+
+**Source of truth:** `radar/.ecc/rules/backend.md`
+
+Before editing any file under `radar/backend/**`, read that file and follow it.
+Do not invent alternate backend conventions here — this rule only scopes the SoT into Cursor.

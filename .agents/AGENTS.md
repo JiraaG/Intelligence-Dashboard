@@ -134,8 +134,9 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 > Non è necessario spingere la struttura ad albero su Git, in quanto il modulo di backend (`router.py`) si occupa di ricreare dinamicamente (`os.makedirs`) tutte le categorie e sottocartelle all'arrivo del primo articolo.
 
 > [!IMPORTANT]
-> ### Esecuzione Manuale degli Hook
-> Prima di dare per completato un file di codice o una modifica strutturale, l'agente deve verificare la conformità eseguendo manualmente gli script presenti in `radar/.ecc/hooks/`:
-> 1. **Pre-Tool-Use Scan:** Usare [pre-tool-use.py](file:///c:/Users/lucag/Documents/Dashboard%20finance/radar/.ecc/hooks/pre-tool-use.py) per scansionare l'input del tool alla ricerca di leak di chiavi segrete, pattern di codice vietati o comandi distruttivi.
-> 2. **Post-Tool-Use Linting:** Eseguire [post-tool-use.py](radar/.ecc/hooks/post-tool-use.py) per controlli qualità (ruff per Python, **prettier** per FE — allineato a `package.json` `lint`) e placeholder vietati. Fail-closed se il linter manca.
+> ### Hook Cursor (auto) + fallback manuale
+> **Default:** `.cursor/hooks.json` invoca adapter sottili in `.cursor/hooks/*-adapter.py` che delegano a `radar/.ecc/hooks/pre-tool-use.py` e `post-tool-use.py` (`preToolUse`, `postToolUse`, `afterFileEdit`). La logica security/lint resta solo in `radar/.ecc/hooks/*.py`.
+> **Fallback manuale** (harness senza auto-hook, debug, CI locale):
+> 1. **Pre-Tool-Use Scan:** [pre-tool-use.py](../radar/.ecc/hooks/pre-tool-use.py) — secret, path vietati, comandi pericolosi, domain whitelist.
+> 2. **Post-Tool-Use Linting:** [post-tool-use.py](../radar/.ecc/hooks/post-tool-use.py) — ruff (`.py`), **prettier** (FE), placeholder soft-warn; fail-closed se il linter manca.
 
