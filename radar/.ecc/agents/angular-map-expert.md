@@ -5,7 +5,8 @@ description: >
   Responsabile dell'estetica Palantir (mappa scura Leaflet, tile CartoDB Dark Positron),
   dell'integrazione PrimeNG (p-sidebar, p-carousel, p-calendar), della gestione offline
   dei poligoni SVG tramite GeoJSON locale, del pattern hatching SVG in zoom-out, della
-  dissolvenza CSS in zoom-in e del layout split-screen 70/30. Usa esclusivamente Angular 21
+  dissolvenza CSS in zoom-in e del layout split-screen overlay full-bleed (mappa 100vw;
+  sidebar sopra). Usa esclusivamente Angular 21
   con Standalone Components e Signals. Non tocca mai il backend Python né i file Docker.
 tools: ["Read", "Write", "Bash", "Grep", "Glob"]
 model: sonnet
@@ -34,6 +35,9 @@ scope:
 - **NON** aprire/modificare `components/radar-sidebar/**`.
 - Conservare `p-carousel` e altezza dinamica esistente; vietato `app-article-list`.
 - Fix `.marker-read` / read-status: solo `state.service.ts` + `radar-map` (e test correlati).
+- **Phase 4 DONE:** XSS-safe markers, `MOCK_MODE` token (no silent fallback), DestroyRef,
+  geometry fingerprint (no `clearLayers` su solo `is_read`), hatch owner = `getOrCreateComboPattern`
+  (niente `appLeafletHatch`), overlay full-bleed + `invalidateSize`.
 
 ## Ruolo e Responsabilità
 
@@ -193,40 +197,23 @@ function createHatchPattern(categoryColor: string, patternId: string): string {
 }
 ```
 
-### Layout Split-Screen 70/30
+### Layout Split-Screen (overlay full-bleed — Phase 4)
 
 ```scss
-// Stato base: mappa full-screen
+// Stato base e split: mappa sempre full-bleed; sidebar disegna sopra (non restringere la mappa)
 .map-container {
   width: 100vw;
   height: 100vh;
-  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-}
-
-// Stato split: mappa al 70%, sidebar al 30%
-.map-container.split-active {
-  width: 70vw;
-  margin-left: 30vw;  // Sidebar occupa il lato sinistro
-}
-
-.radar-sidebar {
   position: fixed;
-  left: 0;
   top: 0;
-  width: 30vw;
-  height: 100vh;
-  background: rgba(10, 10, 15, 0.95);
-  backdrop-filter: blur(12px);
-  border-right: 1px solid rgba(0, 212, 255, 0.15);
-  transform: translateX(-100%);
-  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 1000;
+  right: 0;
 }
 
-.radar-sidebar.open {
-  transform: translateX(0);
+.map-container.split-active {
+  width: 100vw; // overlay — non calc(100vw - sidebar)
 }
+
+// Dopo open/close sidebar e resize: App chiama map.invalidateSize() (senza editare sidebar)
 ```
 
 ### Icone Tematiche per Categoria

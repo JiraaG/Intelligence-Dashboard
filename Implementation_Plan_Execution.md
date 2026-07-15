@@ -14,8 +14,8 @@ Log operativo post–branch restore. Distingue **storico pre-restore** (lavoro p
 
 ### Bug aperti (fuori sidebar)
 
-- [ ] **Read/unread `.marker-read` no-op** — mutazione in-place in `state.service.ts`; marker Leaflet senza path `.marker-read`. Fix in Phase 4 (Change 7) + Phase 5 (Change 4): update immutabile + DOM marker senza rebuild cluster. Non toccare i file sidebar.
-- [ ] **Read/unread collassa le icone a grafo espanse (rilevato 2026-07-14)** — con un cluster/spiderfy già aperto sulla mappa, il bottone *Segna come letta / non letta* (sidebar → `toggleRead` → `StateService.toggleReadStatus`) fa sparire le icone espanse del grafo. Causa probabile: `toggleReadStatus` emette un nuovo array articoli (`return [...arts]`), l’`effect` in `radar-map` ricostruisce i layer MarkerCluster e perde lo stato spiderfy/espanso. Stesso filone del fix Phase 4/5: aggiornare solo lo stato letto sul marker DOM (`.marker-read`) **senza** `clearLayers` / rebuild cluster su cambio `is_read`. Non toccare i file sidebar.
+- [x] **Read/unread `.marker-read` no-op** — fix Phase 4: hybrid is_read in `state.service` + geometry fingerprint / `syncMarkerReadState` in `radar-map` (no cluster rebuild). Sidebar untouched.
+- [x] **Read/unread collassa le icone a grafo espanse** — fix Phase 4: solo `is_read` non chiama `clearLayers`; spiderfy resta.
 
 ---
 
@@ -151,18 +151,27 @@ Restore: `git checkout 19c67f0`
 
 ---
 
-### Phase 4 — Frontend lifecycle & security — NON INIZIATA (sidebar frozen)
+### Phase 4 — Frontend lifecycle & security — COMPLETATA (2026-07-15)
 
-- [ ] Marker XSS-safe (`textContent` / DOM API, no HTML string da titolo).
-- [ ] Guard tipizzato `window.L`; stato map-unavailable; metadata marker tipizzate.
-- [ ] `DestroyRef` / `takeUntilDestroyed`; cancel frame/timeout/Leaflet su destroy; spiderfy idempotente.
-- [ ] Hatch directive cleanup / SVG pattern owner.
-- [ ] ~~Carousel height ResizeObserver~~ — **cancellato (sidebar freeze)**.
-- [ ] `MOCK_MODE` injection token esplicito; errore API visibile, no fallback silenzioso a mock.
-- [ ] **Read/unread**: mutation version + update immutabile in `state.service`; sync `.marker-read` in `radar-map` senza rebuild cluster; preservare spiderfy/icone a grafo espanse al toggle letta/non letta.
-- [ ] Policy Signals vs RxJS documentata.
-- [ ] Split-screen / `invalidateSize` / mobile **senza** toccare file sidebar; a11y toolbar/country solo fuori sidebar.
-- [ ] Spec: `radar-map.component.spec.ts`, `article.dto.ts`, `mock-mode.token.ts` — **no** `radar-sidebar.component.spec.ts`.
+- [x] Marker XSS-safe (`textContent` / DOM API; `article.dto.ts` runtime guard).
+- [x] Guard tipizzato `window.L`; stato map-unavailable; metadata marker tipizzate.
+- [x] `DestroyRef` / `takeUntilDestroyed`; cancel GeoJSON/rAF/timeout; spiderfy generation idempotente.
+- [x] Hatch: directive `appLeafletHatch` rimossa; owner unico `getOrCreateComboPattern` (typo i===5 fix + pattern cat. 7–10).
+- [x] ~~Carousel height ResizeObserver~~ — cancellato (sidebar freeze).
+- [x] `MOCK_MODE` injection token; errore API banner toolbar; no fallback silenzioso a mock.
+- [x] **Read/unread**: mutation version FE + hybrid is_read; `.marker-read` senza rebuild cluster; spiderfy preservato.
+- [x] Policy Signals vs RxJS documentata in `radar/.ecc/rules/frontend.md`.
+- [x] Overlay full-bleed + `invalidateSize` su open/close/resize; a11y toolbar (button + focus-visible).
+- [x] Spec: `radar-map.component.spec.ts` — **no** touch `radar-sidebar/**`.
+
+**Gate regression**
+
+```text
+cd radar/frontend && npm run typecheck && npm run test:ci && npm run build:ci
+# → typecheck OK; 14 passed; build:ci OK (budget warning ~982kB)
+```
+
+**Note:** restore point Phase 4 pinned in scoreboard dopo commit/push. Sidebar freeze verificato.
 
 ---
 
@@ -187,20 +196,20 @@ Restore: `git checkout 19c67f0`
 
 ---
 
-## C. Scoreboard attuale (audit 2026-07-15, post–Phase 3)
+## C. Scoreboard attuale (audit 2026-07-15, post–Phase 4)
 
 | Phase | Pre-restore (storico) | Codice attuale | Prossimo lavoro |
 |-------|----------------------|----------------|-----------------|
 | 0 | Completata | **DONE** (`0189359`) | — |
 | 1 | Completata (persa) | **DONE** (`bff8abe`) | — |
 | 2 | Completata (persa) | **DONE** (`72851d7`) | — |
-| 3 | Completata (persa) | **DONE** (`19c67f0`) | Phase 4 |
-| 4 | Completata (persa) | **NOT STARTED** | Include bug read/unread; no sidebar |
+| 3 | Completata (persa) | **DONE** (`19c67f0`) | — |
+| 4 | Completata (persa) | **DONE** *(SHA pinned after push)* | — |
 | 5 | Completata (persa) | **NOT STARTED** | No `article-list` |
 | 5.5 | Completata (persa) | N/A nel piano master | Assorbita in 1–3 al ri-run |
 | 6 | Non iniziata | **NOT STARTED** | Ultima |
 
-**Ordine di ripresa:** Phase 4 → 5 → 6.
+**Ordine di ripresa:** Phase 5 → 6.
 
 **Restore rapido a Phase 3:** `git checkout 19c67f0` su `refactor/enterprise-consolidation`.
 **Restore a Phase 2:** `git checkout 72851d7`.

@@ -17,7 +17,7 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 * **Frontend:** Angular 21 (Standalone Components).
 * **Container:** Docker + docker-compose (servizi: `radar-db`, `radar-backend`, `radar-worker`, `radar-frontend`, `radar-miniflux`) su reti `radar-edge` + `radar-data` (Phase 3). Ingestione solo in `radar-worker`.
 * **Web Server:** Nginx (Alpine) per servire Angular e proxying `/api/`.
-* **Piani operativi:** [`Implementation_Plan.md`](../Implementation_Plan.md) + [`Implementation_Plan_Execution.md`](../Implementation_Plan_Execution.md). Post–branch restore (2026-07-15): **Phase 0–3 DONE** (incluso fix schema Gemini `additional_properties`); fasi **4–6 NON presenti** nel codice (read/unread FE, pagination, governance completa).
+* **Piani operativi:** [`Implementation_Plan.md`](../Implementation_Plan.md) + [`Implementation_Plan_Execution.md`](../Implementation_Plan_Execution.md). Post–branch restore (2026-07-15): **Phase 0–4 DONE**; fasi **5–6 NON presenti** nel codice (pagination/map-summary, governance completa).
 
 ---
 
@@ -29,6 +29,7 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 > Conservare `p-carousel` e `updateCarouselHeight` con `document.getElementById('article-card-' + id)`.
 > Vietato introdurre `app-article-list`, infinite scroll o ResizeObserver “migliorativi” sul carosello.
 > Bug **letta/non letta** (`.marker-read`): fix solo in `state.service.ts` + `radar-map.component.ts`, senza toccare la sidebar.
+> **Phase 4 DONE:** `MOCK_MODE` esplicito (no fallback silenzioso), marker XSS-safe, DestroyRef, fingerprint geometry (no rebuild cluster su solo `is_read`).
 
 > [!CRITICAL]
 > ### ⛔ Divieto Assoluto di Placeholder o "TODO"
@@ -83,7 +84,7 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 7. **Risoluzione DNS Dinamica in Nginx (Prevenzione 502 Bad Gateway):**
    * Per evitare errori `502 Bad Gateway` a seguito di riavvii dei container o riassegnazioni di IP nella rete bridge, `nginx.conf` deve utilizzare un resolver interno (`resolver 127.0.0.11 valid=10s;`) ed una variabile locale per il `proxy_pass` (es. `set $backend_upstream http://radar-backend:8000; proxy_pass $backend_upstream$request_uri;`). Questo costringe Nginx a risolvere l'IP a runtime anziché solo all'avvio.
 8. **Riproducibilità Frontend (`npm ci`):**
-   * Nel `Dockerfile` del frontend Angular, l'installazione delle dipendenze nello stage builder deve avvenire tramite `npm ci --legacy-peer-deps` finché la matrix Angular/CDK/PrimeNG non è allineata (Phase 4/6). È vietato l'uso di `npm install`.
+   * Nel `Dockerfile` del frontend Angular, l'installazione delle dipendenze nello stage builder deve avvenire tramite `npm ci --legacy-peer-deps` finché la matrix Angular/CDK/PrimeNG non è allineata (Phase 6). È vietato l'uso di `npm install`.
 9. **Sicurezza Immagini (No `latest`):**
    * È severamente vietato l'utilizzo del tag `latest` per le immagini di base nei `docker-compose.yml` e nei `Dockerfile` (es. `miniflux/miniflux:latest`). Le versioni devono sempre essere bloccate (pinnate) a una major/minor specifica (es. `2.3.2`) per prevenire rotture distruttive da aggiornamenti silenti. Digest SHA: opzionale / Phase 6 — non richiesto per il path ready-to-run.
 10. **Coerenza Healthcheck (Alpine Linux):**

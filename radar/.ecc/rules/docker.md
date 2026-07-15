@@ -24,7 +24,7 @@ Internet/LAN → [Porta 80] → radar-frontend (Nginx) ──radar-edge──→
 ```
 
 Phase 3 DONE: edge/data, `/health/live`+`/ready`, CSP, ops backup, soft hardening.
-Digest pin immagini e drop `--legacy-peer-deps` restano Phase 6 / allineamento Angular.
+Phase 4 DONE: frontend lifecycle/security (non tocca Compose). Digest pin immagini e drop `--legacy-peer-deps` restano Phase 6 / allineamento Angular.
 ---
 
 ## Regola 1: Cinque Servizi, Nomi Immutabili

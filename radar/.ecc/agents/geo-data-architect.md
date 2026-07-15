@@ -39,6 +39,7 @@ Migrazioni attuali: `001_initial.sql`, `002_pipeline_outbox_and_quotas.sql` (`ar
 `003_quota_ledger.sql`, `004_worker_heartbeat.sql`, `005_quota_ledger_align.sql`,
 `006_quota_ledger_legacy_nulls.sql`.
 Phase 2 DONE (worker, `llm_request_ledger`). Phase 3 DONE (heartbeat, edge/data, `/health/live`+`/ready`).
+Phase 4 DONE (FE lifecycle/security — non tocca schema SQL).
 
 ---
 

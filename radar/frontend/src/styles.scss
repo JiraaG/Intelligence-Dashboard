@@ -217,7 +217,9 @@ html, body {
   }
 }
 
-/* ─── STRUTTURA LAYOUT E TRANSISIONI SPLIT-SCREEN (Regola 6) ──────────────── */
+/* ─── STRUTTURA LAYOUT E TRANSISIONI SPLIT-SCREEN ─────────────────────────── */
+/* Phase 4: overlay full-bleed (map always 100vw). Sidebar paints above the map.
+   Do not restore calc(100vw - sidebar) 70/30 shrink here — invalidateSize on open/close. */
 
 .map-container {
   position: fixed;
@@ -225,13 +227,21 @@ html, body {
   right: 0;
   width: 100vw;
   height: 100vh;
-  transition: width var(--transition-medium);
   z-index: 1;
 
   &.split-active {
-    width: calc(100vw - var(--sidebar-width));
-    @media (max-width: 1024px) {
-      width: calc(100vw - var(--sidebar-min-width));
-    }
+    width: 100vw;
   }
+}
+
+/* Non-sidebar focus-visible (toolbar / map chrome). Sidebar styles are frozen. */
+button:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--color-border-accent);
+  outline-offset: 2px;
+}
+
+.marker-icon.marker-read {
+  opacity: 0.45;
+  filter: grayscale(0.55);
 }

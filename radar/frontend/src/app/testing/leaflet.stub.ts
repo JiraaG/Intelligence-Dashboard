@@ -132,6 +132,7 @@ export interface StubMap {
   getContainer(): HTMLElement;
   flyTo(latlng: StubLatLng | [number, number], zoom: number, _opts?: unknown): StubMap;
   fitBounds(_bounds: StubLatLngBounds, _opts?: unknown): StubMap;
+  invalidateSize(_opts?: unknown): StubMap;
   remove(): void;
 }
 
@@ -285,6 +286,9 @@ function createMap(id: string | HTMLElement, options: Record<string, unknown> = 
     fitBounds(_bounds, _opts) {
       return mapObj;
     },
+    invalidateSize(_opts?: Record<string, unknown>) {
+      return mapObj;
+    },
     remove() {
       mapObj._removed = true;
       layers.length = 0;
@@ -300,10 +304,17 @@ function createMarker(
 ): StubMarker {
   const events = createEventTarget();
   const resolved = resolveLatLng(latlng);
+  const iconOpt = options['icon'] as { html?: unknown } | undefined;
+  let iconEl: HTMLElement = document.createElement('div');
+  if (iconOpt?.html instanceof HTMLElement) {
+    iconEl = iconOpt.html;
+  } else if (typeof iconOpt?.html === 'string' && iconOpt.html) {
+    iconEl.innerHTML = iconOpt.html;
+  }
   const marker: StubMarker = {
     options,
     _latlng: resolved,
-    _icon: document.createElement('div'),
+    _icon: iconEl,
     on(event, handler) {
       events.on(event, handler);
       return marker;

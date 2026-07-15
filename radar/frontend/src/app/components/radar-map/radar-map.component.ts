@@ -1,39 +1,76 @@
 import {
-  Component, AfterViewInit, OnDestroy, input, output,
+  Component, AfterViewInit, DestroyRef, input, output,
   signal, computed, effect, inject
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
+import { Subscription } from 'rxjs';
 import type * as Leaflet from 'leaflet';
-
-const L = (window as any).L;
 import { Article, CountrySummary } from '../../models/article.model';
-import { LeafletHatchDirective } from '../../shared/directives/leaflet-hatch.directive';
+
+/** Minimal MarkerCluster group shape from the global UMD plugin (window.L). */
+interface MarkerClusterGroupLike {
+  addLayer(layer: Leaflet.Layer): this;
+  clearLayers(): this;
+  getLayers(): Leaflet.Layer[];
+  getAllChildMarkers(): Leaflet.Marker[];
+  getVisibleParent(marker: Leaflet.Marker): Leaflet.Marker | null;
+  on(type: string, fn: Leaflet.LeafletEventHandlerFn): this;
+  addTo(map: Leaflet.Map): this;
+  _spiderfied?: { unspiderfy?: () => void } | null;
+}
+
+interface MarkerClusterLike extends Leaflet.Marker {
+  getAllChildMarkers(): Leaflet.Marker[];
+}
+
+/** Leaflet global from angular.json scripts[] + markercluster plugin. */
+type LeafletGlobal = typeof import('leaflet') & {
+  markerClusterGroup: (options?: Record<string, unknown>) => MarkerClusterGroupLike;
+};
+
+interface ArticleMarkerMeta {
+  articleData?: Article;
+  realLatLng?: Leaflet.LatLng;
+  isDummy?: boolean;
+}
+
+type ArticleMarker = Leaflet.Marker & ArticleMarkerMeta & {
+  _icon?: HTMLElement | null;
+};
+
+function getLeaflet(): LeafletGlobal | null {
+  const L = (window as unknown as { L?: LeafletGlobal }).L;
+  if (!L || typeof L.map !== 'function' || typeof L.markerClusterGroup !== 'function') {
+    return null;
+  }
+  return L;
+}
 
 @Component({
   selector: 'app-radar-map',
   standalone: true,
-  imports: [CommonModule, LeafletHatchDirective],
+  imports: [CommonModule],
   templateUrl: './radar-map.component.html',
   styleUrl: './radar-map.component.scss'
 })
-export class RadarMapComponent implements AfterViewInit, OnDestroy {
+export class RadarMapComponent implements AfterViewInit {
   private readonly http = inject(HttpClient);
+  private readonly destroyRef = inject(DestroyRef);
 
-  // Input
   articles         = input.required<Article[]>();
   countries        = input.required<CountrySummary[]>();
   focusCountryCode = input<string | null>(null);
 
-  // Output
   markerClicked  = output<Article>();
   clusterClicked = output<Article[]>();
   countryClicked = output<Article[]>();
 
-  // Stato zoom e caricamento GeoJSON
   currentZoomLevel = signal<number>(3);
   isZoomedOut      = computed(() => this.currentZoomLevel() < 5);
   isParsingGeoJson = signal<boolean>(true);
+  mapUnavailable   = signal<boolean>(false);
 
   private readonly CATEGORY_ICONS: Record<string, string> = {
     'Nucleare':       '☢️',
@@ -87,38 +124,137 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
     'Sicurezza':      [28, -20]
   };
 
-  private map!: Leaflet.Map;
-  private categoryClusterGroups = new Map<string, any>();
+  private map: Leaflet.Map | null = null;
+  private L: LeafletGlobal | null = null;
+  private categoryClusterGroups = new Map<string, MarkerClusterGroupLike>();
   private isNavigating = false;
-  private navigatingTargetZoom = 0;               
-  private geoJsonLayerGroup = L.layerGroup();
+  private navigatingTargetZoom = 0;
+  private geoJsonLayerGroup: Leaflet.LayerGroup | null = null;
   private countryLayersMap = new Map<string, Leaflet.Path[]>();
-  
   private activeRootMarkers: Leaflet.Marker[] = [];
+  private lastGeometryFingerprint = '';
+  private destroyed = false;
+  private geoJsonSub: Subscription | null = null;
+  private geoJsonRafId: number | null = null;
+  private pendingTimeouts = new Set<ReturnType<typeof setTimeout>>();
+  private highlightedMarker: ArticleMarker | null = null;
+  private pendingHighlightArticle: Article | null = null;
+  private spiderfyGeneration = 0;
 
   constructor() {
     effect(() => {
       const arts = this.articles();
       const ctrs = this.countries();
-      if (this.map && !this.isParsingGeoJson() && !this.isNavigating) {
-        this.updateMapData(arts, ctrs);
+      if (!this.map || this.isParsingGeoJson() || this.isNavigating || this.destroyed) {
+        return;
       }
+      const fingerprint = this.geometryFingerprint(arts);
+      if (fingerprint === this.lastGeometryFingerprint) {
+        this.syncMarkerReadState(arts);
+        return;
+      }
+      this.updateMapData(arts, ctrs);
     });
 
     effect(() => {
       const code = this.focusCountryCode();
-      if (code && this.map && !this.isParsingGeoJson() && !this.isNavigating) {
+      if (code && this.map && !this.isParsingGeoJson() && !this.isNavigating && !this.destroyed) {
         this.focusOnCountry(code);
       }
     });
+
+    this.destroyRef.onDestroy(() => this.teardown());
   }
 
   ngAfterViewInit(): void {
     this.initMap();
-    this.loadGeoJson();
+    if (!this.mapUnavailable()) {
+      this.loadGeoJson();
+    }
+  }
+
+  /** Call after sidebar open/close or window resize (overlay full-bleed layout). */
+  public invalidateSize(): void {
+    this.map?.invalidateSize({ animate: false });
+  }
+
+  private scheduleTimeout(fn: () => void, ms: number): void {
+    const id = setTimeout(() => {
+      this.pendingTimeouts.delete(id);
+      if (!this.destroyed) fn();
+    }, ms);
+    this.pendingTimeouts.add(id);
+  }
+
+  private clearPendingTimeouts(): void {
+    this.pendingTimeouts.forEach((id) => clearTimeout(id));
+    this.pendingTimeouts.clear();
+  }
+
+  private geometryFingerprint(articles: Article[]): string {
+    return articles
+      .map((a) => `${a.id}|${a.primary_category}|${a.country_code}|${a.latitude}|${a.longitude}`)
+      .sort()
+      .join(';');
+  }
+
+  private createSafeMarkerIcon(
+    L: LeafletGlobal,
+    article: Article,
+    ox: number,
+    oy: number,
+  ): Leaflet.DivIcon {
+    const emoji = this.CATEGORY_ICONS[article.primary_category] ?? '📍';
+    const el = document.createElement('div');
+    el.className = 'marker-icon';
+    el.style.fontSize = '24px';
+    el.style.lineHeight = '44px';
+    el.style.textAlign = 'center';
+    el.title = article.title;
+    el.textContent = emoji;
+    if (article.is_read) {
+      el.classList.add('marker-read');
+    }
+
+    return L.divIcon({
+      html: el,
+      className: `marker-${article.primary_category.toLowerCase()}`,
+      iconSize: [44, 44],
+      iconAnchor: [22 - ox, 22 - oy],
+    });
+  }
+
+  private syncMarkerReadState(articles: Article[]): void {
+    const byId = new Map(articles.map((a) => [a.id, a]));
+    this.categoryClusterGroups.forEach((cg) => {
+      for (const layer of cg.getLayers()) {
+        const marker = layer as ArticleMarker;
+        if (marker.isDummy || !marker.articleData) continue;
+        const latest = byId.get(marker.articleData.id);
+        if (!latest) continue;
+        marker.articleData.is_read = latest.is_read;
+        const iconEl = marker._icon;
+        if (iconEl) {
+          iconEl.classList.toggle('marker-read', !!latest.is_read);
+          const inner = iconEl.querySelector('.marker-icon');
+          if (inner) {
+            inner.classList.toggle('marker-read', !!latest.is_read);
+          }
+        }
+      }
+    });
   }
 
   private initMap(): void {
+    const L = getLeaflet();
+    if (!L) {
+      this.mapUnavailable.set(true);
+      this.isParsingGeoJson.set(false);
+      return;
+    }
+    this.L = L;
+    this.mapUnavailable.set(false);
+
     this.map = L.map('radar-map', {
       center: [20, 0],
       zoom: 3,
@@ -129,9 +265,11 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
       attributionControl: true
     });
 
-    // Se l'utente clicca su un punto vuoto della mappa, chiudiamo tutti i grafi e la sidebar.
-    this.map.on('click', (e: any) => {
-      if (e.originalEvent && (e.originalEvent as any)._radarHandled) return;
+    this.geoJsonLayerGroup = L.layerGroup();
+
+    this.map.on('click', (e: Leaflet.LeafletMouseEvent) => {
+      const original = e.originalEvent as (Event & { _radarHandled?: boolean }) | undefined;
+      if (original?._radarHandled) return;
       this.collapseAllGraphs(true);
     });
 
@@ -153,30 +291,31 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
 
     const categories = Object.keys(this.CATEGORY_CSS_VARS);
     for (const cat of categories) {
-      const cssVar = this.CATEGORY_CSS_VARS[cat];
       const catClass = `cat-${cat.toLowerCase()}`;
 
       const cg = L.markerClusterGroup({
-        maxClusterRadius: 40,            
+        maxClusterRadius: 40,
         showCoverageOnHover: false,
-        spiderfyOnMaxZoom: false,        
+        spiderfyOnMaxZoom: false,
         zoomToBoundsOnClick: false,
-        spiderfyDistanceMultiplier: 2.8, 
-        iconCreateFunction: (cluster: any) => {
-          const childMarkers = cluster.getAllChildMarkers();
-          
-          const realCount = childMarkers.filter((m: any) => !m['isDummy']).length;
-          if (realCount === 0) return L.divIcon({ className: 'hidden', iconSize: [0,0] });
+        spiderfyDistanceMultiplier: 2.8,
+        iconCreateFunction: (cluster: MarkerClusterLike) => {
+          const childMarkers = cluster.getAllChildMarkers() as ArticleMarker[];
+          const realCount = childMarkers.filter((m) => !m.isDummy).length;
+          if (realCount === 0) return L.divIcon({ className: 'hidden', iconSize: [0, 0] });
 
           const zoom = this.map ? this.map.getZoom() : 3;
           const iconScale = Math.max(1.0, Math.min(3.0, 1.0 + (zoom - 5) * 0.15));
           const iconPx = Math.round(52 * iconScale);
           const half = Math.round(iconPx / 2);
-          
           const [ox, oy] = this.UI_OFFSETS[cat] || [0, 0];
 
+          const clusterEl = document.createElement('div');
+          clusterEl.className = 'cluster-icon';
+          clusterEl.textContent = String(realCount);
+
           return L.divIcon({
-            html: `<div class="cluster-icon">${realCount}</div>`,
+            html: clusterEl,
             className: `radar-cluster ${catClass}`,
             iconSize: [iconPx, iconPx],
             iconAnchor: [half - (ox * iconScale), half - (oy * iconScale)]
@@ -184,24 +323,23 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
         }
       });
 
-      // GARANZIA: Se Leaflet interviene in autonomia a chiudere i nodi (es: per zoom), 
-      // spazziamo via i dummy clone per evitare l'effetto "fantasma intoccabile".
       cg.on('unspiderfied', () => {
         this.clearRootMarkers();
       });
 
-      cg.on('clusterclick', (e: any) => {
-        if (e.originalEvent) {
-          e.originalEvent.preventDefault();
-          L.DomEvent.stopPropagation(e.originalEvent);
-          (e.originalEvent as any)._radarHandled = true;
+      cg.on('clusterclick', (e: Leaflet.LeafletEvent) => {
+        if (this.destroyed || !this.map || !this.L) return;
+        const clusterEvent = e as Leaflet.LeafletMouseEvent & { layer: MarkerClusterLike };
+        if (clusterEvent.originalEvent) {
+          clusterEvent.originalEvent.preventDefault();
+          this.L.DomEvent.stopPropagation(clusterEvent.originalEvent);
+          (clusterEvent.originalEvent as Event & { _radarHandled?: boolean })._radarHandled = true;
         }
 
-        const cluster = e.layer;
-        const childMarkers: Leaflet.Marker[] = cluster.getAllChildMarkers();
-        
-        const isAlreadyOpen = (cg as any)._spiderfied === cluster;
-        
+        const cluster = clusterEvent.layer;
+        const childMarkers = cluster.getAllChildMarkers() as ArticleMarker[];
+        const isAlreadyOpen = cg._spiderfied === cluster;
+
         this.collapseAllGraphs();
 
         if (isAlreadyOpen) {
@@ -209,18 +347,19 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
           return;
         }
 
-        let arts: Article[] = childMarkers
-          .filter((m: any) => !m['isDummy'])
-          .map((m: any) => m['articleData'] as Article)
-          .filter(Boolean);
+        const arts = childMarkers
+          .filter((m) => !m.isDummy)
+          .map((m) => m.articleData)
+          .filter((a): a is Article => !!a);
 
         if (arts.length > 0) this.clusterClicked.emit(arts);
 
         const currentZoom = this.map.getZoom();
-        const targetZoom = 6; 
+        const targetZoom = 6;
+        const gen = ++this.spiderfyGeneration;
 
         if (currentZoom >= targetZoom) {
-          this.spiderfyAndCreateRoot(cg, childMarkers);
+          this.spiderfyAndCreateRoot(cg, childMarkers, gen);
           return;
         }
 
@@ -228,20 +367,23 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
         this.navigatingTargetZoom = targetZoom;
         this.map.flyTo(cluster.getLatLng(), targetZoom, { animate: true, duration: 0.6 });
 
-        this.map.once('zoomend', () => {
-          setTimeout(() => {
-            this.spiderfyAndCreateRoot(cg, childMarkers);
+        const onZoomEnd = () => {
+          this.scheduleTimeout(() => {
+            if (this.destroyed || gen !== this.spiderfyGeneration) return;
+            this.spiderfyAndCreateRoot(cg, childMarkers, gen);
             this.isNavigating = false;
           }, 250);
-        });
+        };
+        this.map.once('zoomend', onZoomEnd);
       });
 
       this.categoryClusterGroups.set(cat, cg);
-      this.map.addLayer(cg);
+      this.map.addLayer(cg as unknown as Leaflet.Layer);
     }
     this.geoJsonLayerGroup.addTo(this.map);
 
     this.map.on('zoomend', () => {
+      if (this.destroyed || !this.map) return;
       const zoom = this.map.getZoom();
       this.currentZoomLevel.set(zoom);
       this.refreshHatchingStyles();
@@ -253,45 +395,55 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
   }
 
   private clearRootMarkers(): void {
-    // Eliminiamo dalla mappa tutti i pallini radice clone "fantasma" rimasti in sospeso
-    this.activeRootMarkers.forEach(m => {
-      if (this.map.hasLayer(m)) this.map.removeLayer(m);
+    if (!this.map) return;
+    this.activeRootMarkers.forEach((m) => {
+      if (this.map!.hasLayer(m)) this.map!.removeLayer(m);
     });
     this.activeRootMarkers = [];
   }
 
-  private spiderfyAndCreateRoot(cg: any, childMarkers: any[]): void {
+  private spiderfyAndCreateRoot(
+    cg: MarkerClusterGroupLike,
+    childMarkers: ArticleMarker[],
+    generation: number,
+  ): void {
+    if (this.destroyed || !this.map || !this.L) return;
+    if (generation !== this.spiderfyGeneration) return;
     if (!childMarkers || childMarkers.length === 0) return;
-    const newParent = cg.getVisibleParent(childMarkers[0]);
-    
+
+    const newParent = cg.getVisibleParent(childMarkers[0]) as
+      | (Leaflet.Marker & { spiderfy?: () => void })
+      | null
+      | undefined;
+
     if (newParent && typeof newParent.spiderfy === 'function') {
-      
-      // Assicuriamoci che non ci siano vecchi cloni attivi (risolve bug di persistenza clicks)
       this.clearRootMarkers();
 
       const rootIcon = newParent.getIcon();
-      const rootMarker = L.marker(newParent.getLatLng(), {
+      const rootMarker = this.L.marker(newParent.getLatLng(), {
         icon: rootIcon,
         interactive: true,
-        zIndexOffset: 1000 
+        zIndexOffset: 1000
       }).addTo(this.map);
-      
-      rootMarker.on('click', (e: any) => {
+
+      rootMarker.on('click', (e: Leaflet.LeafletMouseEvent) => {
         if (e.originalEvent) {
-          (e.originalEvent as any)._radarHandled = true;
+          (e.originalEvent as Event & { _radarHandled?: boolean })._radarHandled = true;
         }
-        L.DomEvent.stopPropagation(e);
-        this.collapseAllGraphs(true); 
+        this.L!.DomEvent.stopPropagation(e);
+        this.collapseAllGraphs(true);
       });
 
       this.activeRootMarkers.push(rootMarker);
-      
       newParent.spiderfy();
     }
   }
 
   private loadGeoJson(): void {
-    this.http.get<GeoJSON.FeatureCollection>('assets/data/countries.geo.json')
+    this.geoJsonSub?.unsubscribe();
+    this.geoJsonSub = this.http
+      .get<GeoJSON.FeatureCollection>('assets/data/countries.geo.json')
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (geoData) => this.parseGeoJsonIncremental(geoData),
         error: (err) => {
@@ -302,11 +454,23 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
   }
 
   private parseGeoJsonIncremental(geoData: GeoJSON.FeatureCollection): void {
+    const L = this.L;
+    if (!L || !this.geoJsonLayerGroup || this.destroyed) {
+      this.isParsingGeoJson.set(false);
+      return;
+    }
+
     const features = geoData.features;
     let index = 0;
     const batchSize = 15;
 
     const processBatch = () => {
+      this.geoJsonRafId = null;
+      if (this.destroyed || !this.L || !this.geoJsonLayerGroup) {
+        this.isParsingGeoJson.set(false);
+        return;
+      }
+
       const end = Math.min(index + batchSize, features.length);
       for (let i = index; i < end; i++) {
         const feature = features[i];
@@ -327,16 +491,15 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
           })
         });
 
-        layer.on('click', (e: any) => {
+        layer.on('click', (e: Leaflet.LeafletMouseEvent) => {
           if (this.isZoomedOut()) {
-            // Impediamo alla mappa di far scattare il suo "click a vuoto" in background
             if (e.originalEvent) {
               L.DomEvent.stopPropagation(e.originalEvent);
             }
-            const countryArts = this.articles().filter(a => a.country_code === code);
+            const countryArts = this.articles().filter((a) => a.country_code === code);
             if (countryArts.length > 0) {
               if (e.originalEvent) {
-                (e.originalEvent as any)._radarHandled = true;
+                (e.originalEvent as Event & { _radarHandled?: boolean })._radarHandled = true;
               }
               this.countryClicked.emit(countryArts);
             }
@@ -345,7 +508,7 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
 
         layer.addTo(this.geoJsonLayerGroup);
 
-        layer.eachLayer((subLayer: any) => {
+        layer.eachLayer((subLayer: Leaflet.Layer) => {
           if (subLayer instanceof L.Path) {
             const list = this.countryLayersMap.get(code) || [];
             list.push(subLayer);
@@ -356,24 +519,25 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
 
       index = end;
       if (index < features.length) {
-        requestAnimationFrame(processBatch);
+        this.geoJsonRafId = requestAnimationFrame(processBatch);
       } else {
         this.isParsingGeoJson.set(false);
         this.refreshHatchingStyles();
       }
     };
 
-    requestAnimationFrame(processBatch);
+    this.geoJsonRafId = requestAnimationFrame(processBatch);
   }
 
   private refreshHatchingStyles(): void {
+    if (!this.map) return;
     const ctrs = this.countries();
     const zoomedOut = this.currentZoomLevel() < 5;
 
-    const svg = this.map ? this.map.getContainer().querySelector('.leaflet-overlay-pane svg') : null;
-    let defs: SVGElement | null = null;
+    const svg = this.map.getContainer().querySelector('.leaflet-overlay-pane svg');
+    let defs: SVGDefsElement | null = null;
     if (svg) {
-      defs = svg.querySelector('defs') as SVGElement;
+      defs = svg.querySelector('defs');
       if (!defs) {
         defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
         svg.insertBefore(defs, svg.firstChild);
@@ -382,9 +546,9 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
 
     const baseUrl = window.location.href.split('#')[0];
     this.countryLayersMap.forEach((layers, code) => {
-      const summary = ctrs.find(c => c.country_code === code);
+      const summary = ctrs.find((c) => c.country_code === code);
 
-      layers.forEach(layer => {
+      layers.forEach((layer) => {
         if (zoomedOut && summary?.categories?.length && defs) {
           const patternId = this.getOrCreateComboPattern(summary.categories, defs);
           layer.setStyle({
@@ -408,11 +572,12 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  private getOrCreateComboPattern(categories: string[], defs: SVGElement): string {
+  /** Single SVG-pattern owner for country hatching (categories 1–10). */
+  private getOrCreateComboPattern(categories: string[], defs: SVGDefsElement): string {
     if (!categories || categories.length === 0) return '';
 
     const sortedCats = [...categories].sort();
-    const id = 'hatch-grid-' + sortedCats.map(c => c.toLowerCase().replace(/ /g, '-')).join('-');
+    const id = 'hatch-grid-' + sortedCats.map((c) => c.toLowerCase().replace(/ /g, '-')).join('-');
 
     if (defs.querySelector(`#${id}`)) return id;
 
@@ -439,91 +604,49 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
       return `var(${cssVar})`;
     };
 
-    if (sortedCats.length === 1) {
-      const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line1.setAttribute('x1', '0'); line1.setAttribute('y1', '24');
-      line1.setAttribute('x2', '24'); line1.setAttribute('y2', '0');
-      line1.setAttribute('stroke', getColorVar(sortedCats[0]));
-      line1.setAttribute('stroke-width', strokeWidth);
-      line1.setAttribute('opacity', strokeOpacity);
-      pattern.appendChild(line1);
+    const appendLine = (
+      x1: string, y1: string, x2: string, y2: string, strokeColor: string,
+    ): void => {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', x1);
+      line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2);
+      line.setAttribute('y2', y2);
+      line.setAttribute('stroke', strokeColor);
+      line.setAttribute('stroke-width', strokeWidth);
+      line.setAttribute('opacity', strokeOpacity);
+      pattern.appendChild(line);
+    };
 
-      const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line2.setAttribute('x1', '0'); line2.setAttribute('y1', '0');
-      line2.setAttribute('x2', '24'); line2.setAttribute('y2', '24');
-      line2.setAttribute('stroke', getColorVar(sortedCats[0]));
-      line2.setAttribute('stroke-width', strokeWidth);
-      line2.setAttribute('opacity', strokeOpacity);
-      pattern.appendChild(line2);
+    if (sortedCats.length === 1) {
+      appendLine('0', '24', '24', '0', getColorVar(sortedCats[0]));
+      appendLine('0', '0', '24', '24', getColorVar(sortedCats[0]));
     } else {
       for (let i = 0; i < sortedCats.length; i++) {
-        const cat = sortedCats[i];
-        const strokeColor = getColorVar(cat);
-
+        const strokeColor = getColorVar(sortedCats[i]);
         if (i === 0) {
-          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-          line.setAttribute('x1', '0'); line.setAttribute('y1', '24');
-          line.setAttribute('x2', '24'); line.setAttribute('y2', '0');
-          line.setAttribute('stroke', strokeColor);
-          line.setAttribute('stroke-width', strokeWidth);
-          line.setAttribute('opacity', strokeOpacity);
-          pattern.appendChild(line);
+          appendLine('0', '24', '24', '0', strokeColor);
         } else if (i === 1) {
-          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-          line.setAttribute('x1', '0'); line.setAttribute('y1', '0');
-          line.setAttribute('x2', '24'); line.setAttribute('y2', '24');
-          line.setAttribute('stroke', strokeColor);
-          line.setAttribute('stroke-width', strokeWidth);
-          line.setAttribute('opacity', strokeOpacity);
-          pattern.appendChild(line);
+          appendLine('0', '0', '24', '24', strokeColor);
         } else if (i === 2) {
-          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-          line.setAttribute('x1', '0'); line.setAttribute('y1', '12');
-          line.setAttribute('x2', '24'); line.setAttribute('y2', '12');
-          line.setAttribute('stroke', strokeColor);
-          line.setAttribute('stroke-width', strokeWidth);
-          line.setAttribute('opacity', strokeOpacity);
-          pattern.appendChild(line);
+          appendLine('0', '12', '24', '12', strokeColor);
         } else if (i === 3) {
-          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-          line.setAttribute('x1', '12'); line.setAttribute('y1', '0');
-          line.setAttribute('x2', '12'); line.setAttribute('y2', '24');
-          line.setAttribute('stroke', strokeColor);
-          line.setAttribute('stroke-width', strokeWidth);
-          line.setAttribute('opacity', strokeOpacity);
-          pattern.appendChild(line);
+          appendLine('12', '0', '12', '24', strokeColor);
         } else if (i === 4) {
-          const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-          line1.setAttribute('x1', '0'); line1.setAttribute('y1', '12');
-          line1.setAttribute('x2', '12'); line1.setAttribute('y2', '0');
-          line1.setAttribute('stroke', strokeColor);
-          line1.setAttribute('stroke-width', strokeWidth);
-          line1.setAttribute('opacity', strokeOpacity);
-          pattern.appendChild(line1);
-
-          const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-          line2.setAttribute('x1', '12'); line2.setAttribute('y1', '24');
-          line2.setAttribute('x2', '24'); line2.setAttribute('y2', '12');
-          line2.setAttribute('stroke', strokeColor);
-          line2.setAttribute('stroke-width', strokeWidth);
-          line2.setAttribute('opacity', strokeOpacity);
-          pattern.appendChild(line2);
+          appendLine('0', '12', '12', '0', strokeColor);
+          appendLine('12', '24', '24', '12', strokeColor);
         } else if (i === 5) {
-          const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-          line1.setAttribute('x1', '12'); line1.setAttribute('y1', '0');
-          line1.setAttribute('x2', '24'); line1.setAttribute('y2', '12');
-          line1.setAttribute('stroke', strokeColor);
-          line1.setAttribute('stroke-width', strokeWidth);
-          line1.setAttribute('opacity', strokeOpacity);
-          pattern.appendChild(line1);
-
-          const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-          line2.setAttribute('x1', '0'); line1.setAttribute('y1', '12');
-          line2.setAttribute('x2', '12'); line2.setAttribute('y2', '24');
-          line2.setAttribute('stroke', strokeColor);
-          line2.setAttribute('stroke-width', strokeWidth);
-          line2.setAttribute('opacity', strokeOpacity);
-          pattern.appendChild(line2);
+          appendLine('12', '0', '24', '12', strokeColor);
+          appendLine('0', '12', '12', '24', strokeColor);
+        } else if (i === 6) {
+          appendLine('0', '6', '24', '6', strokeColor);
+        } else if (i === 7) {
+          appendLine('0', '18', '24', '18', strokeColor);
+        } else if (i === 8) {
+          appendLine('6', '0', '6', '24', strokeColor);
+        } else {
+          // i === 9 (10th category) and any further
+          appendLine('18', '0', '18', '24', strokeColor);
         }
       }
     }
@@ -533,8 +656,8 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
   }
 
   private focusOnCountry(code: string): void {
-    if (!this.map) return;
-    if (this.isNavigating) return;
+    const L = this.L;
+    if (!this.map || !L || this.isNavigating || this.destroyed) return;
 
     let bounds: Leaflet.LatLngBounds | null = null;
 
@@ -546,9 +669,10 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
       const layers = this.countryLayersMap.get(code);
       if (layers && layers.length > 0) {
         const b = L.latLngBounds([]);
-        layers.forEach(layer => {
-          if (typeof (layer as any).getBounds === 'function') {
-            b.extend((layer as any).getBounds());
+        layers.forEach((layer) => {
+          const withBounds = layer as Leaflet.Path & { getBounds?: () => Leaflet.LatLngBounds };
+          if (typeof withBounds.getBounds === 'function') {
+            b.extend(withBounds.getBounds());
           }
         });
         if (b.isValid()) bounds = b;
@@ -562,23 +686,29 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
         animate: true,
         duration: 1.0
       });
-      
+
+      let cleaned = false;
       const cleanup = () => {
+        if (cleaned || this.destroyed) return;
+        cleaned = true;
         this.isNavigating = false;
-        this.map.off('zoomend', cleanup);
-        this.map.off('moveend', cleanup);
+        this.map?.off('zoomend', cleanup);
+        this.map?.off('moveend', cleanup);
       };
-      
+
       this.map.once('zoomend', cleanup);
       this.map.once('moveend', cleanup);
-      setTimeout(cleanup, 1500);
+      this.scheduleTimeout(cleanup, 1500);
     }
   }
 
   private updateMapData(articles: Article[], countries: CountrySummary[]): void {
-    this.categoryClusterGroups.forEach(group => group.clearLayers());
-    const countryCenters = new Map<string, { latSum: number, lngSum: number, count: number }>();
-    
+    const L = this.L;
+    if (!L || !this.map) return;
+
+    this.categoryClusterGroups.forEach((group) => group.clearLayers());
+    const countryCenters = new Map<string, { latSum: number; lngSum: number; count: number }>();
+
     for (const article of articles) {
       if (article.latitude && article.longitude) {
         const code = article.country_code || 'XX';
@@ -597,35 +727,27 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
       const code = article.country_code || 'XX';
       if (code === 'XX') continue;
       const center = countryCenters.get(code);
-      
-      if (!center) continue; 
-      
-      let baseLat = center.latSum / center.count;
-      let baseLng = center.lngSum / center.count;
+      if (!center) continue;
+
+      const baseLat = center.latSum / center.count;
+      const baseLng = center.lngSum / center.count;
       const realLatLng = L.latLng(baseLat, baseLng);
 
       const cat = article.primary_category;
       const [ox, oy] = this.UI_OFFSETS[cat] || [0, 0];
-      
+
       populatedSpots.add(`${code}_${cat}`);
 
-      const emoji = this.CATEGORY_ICONS[cat] ?? '📍';
-      const icon = L.divIcon({
-        html: `<div class="marker-icon" style="font-size: 24px; line-height: 44px; text-align: center;" title="${article.title}">${emoji}</div>`,
-        className: `marker-${cat.toLowerCase()}`,
-        iconSize: [44, 44],
-        iconAnchor: [22 - ox, 22 - oy] 
-      });
+      const icon = this.createSafeMarkerIcon(L, article, ox, oy);
+      const marker = L.marker([baseLat, baseLng], { icon }) as ArticleMarker;
+      marker.articleData = article;
+      marker.realLatLng = realLatLng;
+      marker.isDummy = false;
 
-      const marker = L.marker([baseLat, baseLng], { icon });
-      (marker as any)['articleData'] = article;
-      (marker as any)['realLatLng'] = realLatLng;
-      (marker as any)['isDummy'] = false;
-      
-      marker.on('click', (e: any) => {
+      marker.on('click', (e: Leaflet.LeafletMouseEvent) => {
         if (e.originalEvent) {
           L.DomEvent.stopPropagation(e.originalEvent);
-          (e.originalEvent as any)._radarHandled = true;
+          (e.originalEvent as Event & { _radarHandled?: boolean })._radarHandled = true;
         }
         this.markerClicked.emit(article);
       });
@@ -634,36 +756,42 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
       if (targetGroup) targetGroup.addLayer(marker);
     }
 
-    populatedSpots.forEach(spot => {
+    populatedSpots.forEach((spot) => {
       const [code, cat] = spot.split('_');
       const center = countryCenters.get(code)!;
-      let baseLat = center.latSum / center.count;
-      let baseLng = center.lngSum / center.count;
+      const baseLat = center.latSum / center.count;
+      const baseLng = center.lngSum / center.count;
 
       const invisibleIcon = L.divIcon({
         html: '',
         className: '',
-        iconSize: [0, 0], 
+        iconSize: [0, 0],
         iconAnchor: [0, 0]
       });
 
-      const dummyMarker = L.marker([baseLat, baseLng], { icon: invisibleIcon, interactive: false });
-      (dummyMarker as any)['isDummy'] = true;
-      
+      const dummyMarker = L.marker([baseLat, baseLng], {
+        icon: invisibleIcon,
+        interactive: false
+      }) as ArticleMarker;
+      dummyMarker.isDummy = true;
+
       const targetGroup = this.categoryClusterGroups.get(cat);
       if (targetGroup) targetGroup.addLayer(dummyMarker);
     });
 
+    this.lastGeometryFingerprint = this.geometryFingerprint(articles);
     this.refreshHatchingStyles();
+    void countries;
   }
 
   collapseAllGraphs(emitClose: boolean = false): void {
     if (!this.map) return;
-    
+
+    this.spiderfyGeneration++;
     this.clearRootMarkers();
-    
-    this.categoryClusterGroups.forEach(cg => {
-      const spiderfiedCluster = (cg as any)._spiderfied;
+
+    this.categoryClusterGroups.forEach((cg) => {
+      const spiderfiedCluster = cg._spiderfied;
       if (spiderfiedCluster && typeof spiderfiedCluster.unspiderfy === 'function') {
         spiderfiedCluster.unspiderfy();
       }
@@ -675,12 +803,14 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
   }
 
   public focusAndSpiderfyCategory(countryCode: string, category: string): void {
-    if (!this.map) return;
+    if (!this.map || this.destroyed) return;
     const cg = this.categoryClusterGroups.get(category);
     if (!cg) return;
 
-    const allMarkers = cg.getLayers();
-    const countryMarkers = allMarkers.filter((m: any) => m.articleData && m.articleData.country_code === countryCode);
+    const allMarkers = cg.getLayers() as ArticleMarker[];
+    const countryMarkers = allMarkers.filter(
+      (m) => m.articleData && m.articleData.country_code === countryCode,
+    );
 
     if (countryMarkers.length === 0) return;
 
@@ -688,16 +818,17 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
 
     const firstMarker = countryMarkers[0];
     const parent = cg.getVisibleParent(firstMarker);
-
     if (!parent) return;
 
     const currentZoom = this.map.getZoom();
     const targetZoom = 6;
-    
-    const latLng = typeof parent.getLatLng === 'function' ? parent.getLatLng() : firstMarker.getLatLng();
+    const latLng = typeof parent.getLatLng === 'function'
+      ? parent.getLatLng()
+      : firstMarker.getLatLng();
+    const gen = ++this.spiderfyGeneration;
 
     if (currentZoom >= targetZoom) {
-      this.spiderfyAndCreateRoot(cg, countryMarkers);
+      this.spiderfyAndCreateRoot(cg, countryMarkers, gen);
       return;
     }
 
@@ -705,22 +836,26 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
     this.navigatingTargetZoom = targetZoom;
     this.map.flyTo(latLng, targetZoom, { animate: true, duration: 0.6 });
 
+    let cleaned = false;
     const cleanup = () => {
-      setTimeout(() => {
-        this.spiderfyAndCreateRoot(cg, countryMarkers);
+      if (cleaned) return;
+      cleaned = true;
+      this.scheduleTimeout(() => {
+        if (this.destroyed || gen !== this.spiderfyGeneration) {
+          this.isNavigating = false;
+          return;
+        }
+        this.spiderfyAndCreateRoot(cg, countryMarkers, gen);
         this.isNavigating = false;
-        this.map.off('zoomend', cleanup);
-        this.map.off('moveend', cleanup);
+        this.map?.off('zoomend', cleanup);
+        this.map?.off('moveend', cleanup);
       }, 250);
     };
 
     this.map.once('zoomend', cleanup);
     this.map.once('moveend', cleanup);
-    setTimeout(cleanup, 1200);
+    this.scheduleTimeout(cleanup, 1200);
   }
-
-  private highlightedMarker: any = null;
-  private pendingHighlightArticle: Article | null = null;
 
   public highlightMarkerForArticle(article: Article | null): void {
     if (this.highlightedMarker) {
@@ -729,26 +864,26 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
         iconDiv.classList.remove('marker-highlight');
       }
       if (this.highlightedMarker.setZIndexOffset) {
-         this.highlightedMarker.setZIndexOffset(0);
+        this.highlightedMarker.setZIndexOffset(0);
       }
       this.highlightedMarker = null;
     }
     this.pendingHighlightArticle = article;
-    
+
     if (article) {
       this.applyHighlight(20);
     }
   }
 
   private applyHighlight(retries: number): void {
-    if (!this.pendingHighlightArticle) return;
+    if (!this.pendingHighlightArticle || this.destroyed) return;
     const article = this.pendingHighlightArticle;
 
-    let targetMarker: any = null;
+    let targetMarker: ArticleMarker | null = null;
     const cg = this.categoryClusterGroups.get(article.primary_category);
     if (cg) {
-      const markers = cg.getLayers();
-      targetMarker = markers.find((m: any) => m.articleData && m.articleData.id === article.id);
+      const markers = cg.getLayers() as ArticleMarker[];
+      targetMarker = markers.find((m) => m.articleData && m.articleData.id === article.id) ?? null;
     }
 
     if (targetMarker) {
@@ -757,21 +892,28 @@ export class RadarMapComponent implements AfterViewInit, OnDestroy {
         iconDiv.classList.add('marker-highlight');
         this.highlightedMarker = targetMarker;
         if (targetMarker.setZIndexOffset) {
-           targetMarker.setZIndexOffset(1000);
+          targetMarker.setZIndexOffset(1000);
         }
       } else if (retries > 0) {
-        setTimeout(() => {
-          this.applyHighlight(retries - 1);
-        }, 150);
+        this.scheduleTimeout(() => this.applyHighlight(retries - 1), 150);
       }
     } else if (retries > 0) {
-      setTimeout(() => {
-        this.applyHighlight(retries - 1);
-      }, 150);
+      this.scheduleTimeout(() => this.applyHighlight(retries - 1), 150);
     }
   }
 
-  ngOnDestroy(): void {
+  private teardown(): void {
+    this.destroyed = true;
+    this.spiderfyGeneration++;
+    this.geoJsonSub?.unsubscribe();
+    this.geoJsonSub = null;
+    if (this.geoJsonRafId !== null) {
+      cancelAnimationFrame(this.geoJsonRafId);
+      this.geoJsonRafId = null;
+    }
+    this.clearPendingTimeouts();
+    this.clearRootMarkers();
     this.map?.remove();
+    this.map = null;
   }
 }

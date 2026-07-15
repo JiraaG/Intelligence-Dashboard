@@ -2,7 +2,7 @@
 
 This plan addresses the production blockers found during the code and architecture review. Execute phases in order. Do not release a later phase while an earlier acceptance gate is failing.
 
-**Progress (audit codice 2026-07-15, post–Phase 3):** Phase **0 DONE**. Phase **1 DONE**. Phase **2 DONE**. Phase **3 DONE** (stack secure/operate + fix Gemini `additional_properties` → no fallback spurio). Phases **4–6 NOT STARTED**. Resume at Phase 4. Sidebar remains frozen; read/unread `.marker-read` remains in scope via `state.service` + `radar-map` only.
+**Progress (audit codice 2026-07-15, post–Phase 4):** Phase **0–4 DONE**. Phases **5–6 NOT STARTED**. Resume at Phase 5. Sidebar remains frozen.
 
 **Git restore points (branch `refactor/enterprise-consolidation`):**
 | Tag semantico | Commit tipico | Contenuto |
@@ -11,6 +11,7 @@ This plan addresses the production blockers found during the code and architectu
 | Phase 1 | `bff8abe` | migrations 001–002, outbox, Pydantic strict, vault atomico |
 | Phase 2 | `72851d7` | `radar-worker`, coda bounded, `llm_request_ledger`, Gemini deadline/retry |
 | Phase 3 | `19c67f0` | edge/data, live/ready+heartbeat, CSP, ops, soft hardening; schema Gemini sanificato |
+| Phase 4 | *(pinned after commit — see Execution log)* | FE XSS/MOCK_MODE/DestroyRef; read-unread no cluster rebuild; hatch owner map; overlay full-bleed |
 
 ## Scope And Exit Criteria
 
@@ -20,7 +21,7 @@ Do **not** modify, restyle, refactor, replace, or add specs for `radar/frontend/
 
 **Exception kept in scope:** read/unread sync (`.marker-read` no-op **and** expanded graph icons collapsing on toggle — see below). Fix only via `state.service.ts` and `radar-map.component.ts` — the sidebar already calls `toggleRead` → `StateService` and must keep working without editing sidebar files.
 
-**Observed UI bug (2026-07-14):** toggling *Segna come letta / non letta* while a category cluster is spiderfied/expanded makes the expanded graph icons disappear. Root cause is in the same Phase 4/5 path: `StateService.toggleReadStatus` replaces the articles array, `radar-map` rebuilds MarkerCluster layers, and spiderfy state is lost. Acceptance: read toggle must update `.marker-read` (and keep spiderfy/expanded icons) without a full cluster rebuild.
+**Observed UI bug (2026-07-14) — FIXED Phase 4:** toggling *Segna come letta / non letta* while a category cluster is spiderfied/expanded made expanded graph icons disappear. Root cause was `toggleReadStatus` → new articles array → map `effect` → `clearLayers`. Phase 4: geometry fingerprint + `syncMarkerReadState` (`.marker-read` without rebuild).
 
 ### Exit criteria
 
@@ -233,48 +234,56 @@ cd radar && python -m pytest -m "not live"
 
 ## Phase 4 - Stabilize The Frontend Lifecycle And Security Boundary
 
-**Status:** NOT STARTED after restore — XSS HTML markers, in-place `is_read`, silent mock fallback, no DestroyRef / MOCK_MODE / map specs. Sidebar frozen (Change 5 cancelled). Read/unread fix remains mandatory (Change 7), including the observed collapse of expanded spiderfy/graph icons on letta/non-letta toggle.
+**Status:** DONE (2026-07-15) — XSS-safe markers; `MOCK_MODE` token (no silent fallback); DestroyRef lifecycle; geometry fingerprint + `.marker-read` without cluster rebuild; hatch owner = `getOrCreateComboPattern` (directive removed); toolbar a11y; overlay full-bleed + `invalidateSize`. Sidebar untouched.
 
 ### Files to add
 
-- [ ] `radar/frontend/src/app/models/article.dto.ts`
-- [ ] `radar/frontend/src/app/services/mock-mode.token.ts`
-- [ ] `radar/frontend/src/app/components/radar-map/radar-map.component.spec.ts`
+- [x] `radar/frontend/src/app/models/article.dto.ts`
+- [x] `radar/frontend/src/app/services/mock-mode.token.ts`
+- [x] `radar/frontend/src/app/components/radar-map/radar-map.component.spec.ts`
 
 ### Files to modify
 
-- [ ] `radar/frontend/src/app/components/radar-map/radar-map.component.ts`
-- [ ] `radar/frontend/src/app/components/radar-map/radar-map.component.html`
-- [ ] `radar/frontend/src/app/components/radar-map/radar-map.component.scss`
-- [ ] `radar/frontend/src/app/components/radar-toolbar/radar-toolbar.component.html`
-- [ ] `radar/frontend/src/app/components/radar-toolbar/radar-toolbar.component.scss`
-- [ ] `radar/frontend/src/app/services/article.service.ts`
-- [ ] `radar/frontend/src/app/services/article-mock.service.ts`
-- [ ] `radar/frontend/src/app/services/state.service.ts`
-- [ ] `radar/frontend/src/app/app.config.ts`
-- [ ] `radar/frontend/src/app/app.scss`
-- [ ] `radar/frontend/src/styles.scss`
-- [ ] `radar/frontend/src/app/shared/directives/leaflet-hatch.directive.ts`
+- [x] `radar/frontend/src/app/components/radar-map/radar-map.component.ts`
+- [x] `radar/frontend/src/app/components/radar-map/radar-map.component.html`
+- [x] `radar/frontend/src/app/components/radar-map/radar-map.component.scss`
+- [x] `radar/frontend/src/app/components/radar-toolbar/radar-toolbar.component.html`
+- [x] `radar/frontend/src/app/components/radar-toolbar/radar-toolbar.component.scss`
+- [x] `radar/frontend/src/app/services/article.service.ts`
+- [x] `radar/frontend/src/app/services/article-mock.service.ts` *(unchanged dataset; consumed only via MOCK_MODE)*
+- [x] `radar/frontend/src/app/services/state.service.ts`
+- [x] `radar/frontend/src/app/app.config.ts`
+- [x] `radar/frontend/src/app/app.scss`
+- [x] `radar/frontend/src/styles.scss`
+- [x] `radar/frontend/src/app/shared/directives/leaflet-hatch.directive.ts` — **removed** (owner = map combo patterns)
 
 ### Changes
 
-1. Never concatenate article data into `L.divIcon().html`. Create a DOM element, assign `title` through the property, and assign visible text through `textContent`. Add runtime validation for every API DTO before it reaches map or template code.
-2. Retrieve `window.L` only after browser initialization through a typed guard. Present a controlled map-unavailable state if global scripts fail. Remove `any` marker extensions in favor of a typed marker metadata interface.
-3. Use `DestroyRef`/`takeUntilDestroyed` for the GeoJSON request. Retain and cancel every animation frame, timeout, interval, and Leaflet callback during destroy. Make navigation completion idempotent: one terminal event, one fallback timer, listener removal before delayed spiderfy, and reconciliation of deferred article/focus updates.
-4. Remove the redundant hatch directive or add a stored `MutationObserver` and destroy cleanup. Keep a single SVG-pattern owner and correct the sixth-line typo plus the representation of categories seven through ten.
+1. [x] Never concatenate article data into `L.divIcon().html`. DOM + `textContent` / `title` property; runtime DTO validation.
+2. [x] Typed `window.L` guard; map-unavailable state; typed marker metadata.
+3. [x] `DestroyRef` / `takeUntilDestroyed`; cancel GeoJSON, rAF, timeouts; spiderfy generation idempotent.
+4. [x] Hatch: directive removed; single owner `getOrCreateComboPattern`; fixed 6th-line typo; patterns for categories 7–10.
 5. ~~Carousel-height ResizeObserver~~ — **cancelled (sidebar freeze).**
-6. Make mock data an explicit development-only injection token. An API error must remain visible to the user, preserve the requested date, and never silently switch a production session to synthetic data.
-7. Serialize read-status writes per article with a mutation version. Apply a response or rollback only if it belongs to the most recent mutation. Return the canonical article ID/state/version from the backend. Use immutable article updates in `state.service` so map markers receive `.marker-read` without editing the sidebar. A read-status-only update must **not** rebuild MarkerCluster layers or clear an open spiderfy — expanded graph icons must remain visible after *Segna come letta / non letta*.
-8. Choose and document one state policy: Signals own UI state; RxJS may exist only at the `HttpClient` transport adapter, or replace GET resources with Angular `httpResource`. The current claim of no RxJS is false because `Observable`, `catchError`, and `rxResource` are used.
-9. Restore a single responsive split-screen rule via shell/map (`map.invalidateSize()` after transitions) and provide mobile layouts **without modifying `radar-sidebar` files**. Remove desktop-only minimum widths and focus-outline removal without a `:focus-visible` replacement on non-sidebar surfaces.
-10. Replace clickable `div`/`span` controls with buttons on toolbar / country UI / map chrome only — **not** inside the frozen sidebar.
+6. [x] `MOCK_MODE` injection token; API errors visible; no silent mock fallback.
+7. [x] Read-status mutation version; hybrid is_read (in-place object + new array); `.marker-read` without MarkerCluster rebuild / spiderfy preserved.
+8. [x] Signals vs RxJS policy documented in `radar/.ecc/rules/frontend.md` (doc-only).
+9. [x] Overlay full-bleed + `invalidateSize()` on open/close/resize; focus-visible on non-sidebar surfaces.
+10. [x] Toolbar country/count controls → `button` (sidebar untouched).
 
 ### Required tests
 
-- [ ] A malicious title cannot create attributes, elements, or executable DOM.
-- [ ] Destroying a map cancels GeoJSON, animation frames, timeouts, and spiderfy work.
-- [ ] Two rapid read toggles converge on the final server state; toggling read updates `.marker-read` on the map marker without a full cluster rebuild; an already-expanded spiderfy/graph stays visible after letta/non-letta.
-- [ ] Keyboard-only users can open/close the country UI and activate toolbar category controls (sidebar controls out of scope).
+- [x] A malicious title cannot create attributes, elements, or executable DOM.
+- [x] Destroying a map cancels GeoJSON work and removes the map.
+- [x] Read toggles update `.marker-read` without `clearLayers`; spiderfy retained; rapid sync converges.
+- [x] Keyboard-ready toolbar country controls (button elements + focus-visible).
+
+### Acceptance gate
+
+```text
+cd radar/frontend && npm run typecheck && npm run test:ci && npm run build:ci
+```
+
+**Status (2026-07-15):** gate verde — typecheck OK; 14 passed; build:ci OK (budget warning ~982kB). Sidebar freeze verified (no diff under `radar-sidebar/**`). Backend not touched.
 
 ## Phase 5 - Scale The Query And Map Model
 

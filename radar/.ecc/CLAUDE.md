@@ -14,12 +14,12 @@ in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categ
 
 ### Vincoli post–branch restore (2026-07-15)
 
-- **Phase 0–3 DONE**; fasi **4–6 NOT STARTED**. Vedi `Implementation_Plan.md` / `Implementation_Plan_Execution.md`.
-- **Presenti (Phase 1–3):** migrazioni `001`–`006`, outbox, ledger quote, `radar-worker`, reti `radar-edge`/`radar-data`, `/health/live`+`/ready`, CSP Nginx, `ops/` backup, Gemini `build_gemini_response_schema()` (no `additional_properties`).
-- **Non assumere** `article-list`, DestroyRef map cleanup, pagination cursor (Phase 4–5). Sidebar freeze resta.
+- **Phase 0–4 DONE**; fasi **5–6 NOT STARTED**. Vedi `Implementation_Plan.md` / `Implementation_Plan_Execution.md`.
+- **Presenti (Phase 1–4):** migrazioni `001`–`006`, outbox, ledger quote, `radar-worker`, reti `radar-edge`/`radar-data`, `/health/live`+`/ready`, CSP Nginx, `ops/` backup, Gemini `build_gemini_response_schema()`, FE `MOCK_MODE` / DestroyRef / XSS-safe markers / read-unread senza rebuild cluster.
+- **Non assumere** `article-list`, pagination cursor, map-summary (Phase 5). Sidebar freeze resta.
 - Pipeline ingest in `backend/app/worker.py`; `main.py` è API-only. Compose: 5 servizi su edge+data.
 - **Sidebar freeze:** non modificare `frontend/src/app/components/radar-sidebar/**`; tenere `p-carousel` + altezza via `article-card-{id}`; vietato `app-article-list`.
-- Bug **read/unread** (`.marker-read`): solo `state.service.ts` + `radar-map.component.ts`.
+- Bug **read/unread** (`.marker-read`): risolto in Phase 4 via `state.service.ts` + `radar-map.component.ts`.
 - Pydantic: `companies_involved` / `tags` / `infrastructural_entities` sono **`str` CSV** (non `List[str]`). Nessun campo `reasoning`; `ConfigDict(strict=True, extra="forbid")`. Il modello FE può ancora usare `string[]` dopo `array_agg` API — non confondere i due.
 
 ---
@@ -56,16 +56,19 @@ radar/
 │   ├── migrations/                # SQL ordinato — source of truth schema
 │   │   ├── 001_initial.sql
 │   │   ├── 002_pipeline_outbox_and_quotas.sql
-│   │   └── 003_quota_ledger.sql
+│   │   ├── 003_quota_ledger.sql
+│   │   ├── 004_worker_heartbeat.sql
+│   │   └── 005–006 (ledger/legacy alignment)
 │   └── app/
 │       ├── __init__.py
 │       ├── main.py                # FastAPI API-only (pool + migrations + REST)
 │       ├── worker.py              # Ingest daemon (coda bounded, advisory lock)
 │       ├── requirements.txt
-│       ├── core/                  # Configurazione, DB pool asyncpg, logging centralizzato
+│       ├── core/                  # Configurazione, DB pool asyncpg, logging, heartbeat
 │       │   ├── config.py          # Variabili d'ambiente bounded; knobs worker + Gemini timeout
 │       │   ├── database.py        # init_pool(), bootstrap_database() → run_migrations()
 │       │   ├── migrations.py      # schema_migrations + checksum SHA-256; applica SQL ordinato
+│       │   ├── heartbeat.py       # worker heartbeat per /health/ready
 │       │   └── logging.py         # setup_logging() con fallback se logs/ non scrivibile
 │       ├── extraction/            # Layer E: fetch Miniflux + HTML sanitize + dedup check
 │       │   ├── client.py          # MinifluxClient (httpx async, lifespan, byte limits, retry)
@@ -87,16 +90,17 @@ radar/
 ├── frontend/                      # Angular 21 SPA — già inizializzato
 │   ├── src/
 │   │   ├── app/                   # Standalone components + Signals
-│   │   │   ├── models/            # Article, CountrySummary, ArticleFilters (TypeScript)
-│   │   │   ├── services/          # ArticleService + ArticleMockService
-│   │   │   └── components/        # radar-map, radar-toolbar, radar-sidebar
+│   │   │   ├── models/            # Article, article.dto (runtime guard), CountrySummary
+│   │   │   ├── services/          # ArticleService + ArticleMockService + MOCK_MODE token + StateService
+│   │   │   └── components/        # radar-map, radar-toolbar, radar-sidebar (FROZEN)
 │   │   ├── assets/
 │   │   │   └── data/              # countries.geo.json (offline, NON scaricare da CDN)
 │   │   └── styles.scss            # Design System Palantir (CSS custom properties)
-│   ├── proxy.conf.json            # Proxy dev → localhost:8000 (ng serve + USE_MOCK=false)
+│   ├── proxy.conf.json            # Proxy dev → localhost:8000 (ng serve)
 │   ├── Dockerfile
 │   └── nginx.conf
-├── docker-compose.yml
+├── ops/                           # backup/restore Postgres + README
+├── docker-compose.yml             # + hardened.yml / lan.yml
 ├── .env                           # NON committare — valori reali
 ├── .env.example                   # Template documentativo (committato in Git)
 └── .gitignore
@@ -216,7 +220,7 @@ Miniflux API (ogni 15 min)
 
 > **Note critiche per il frontend:**
 > - Nei **mock FE** `infrastructural_entities` / `companies_involved` / `tags` restano tipicamente `string[]`. Nello **schema Pydantic** Gemini sono `str` CSV — non convertire il validator a `List[str]`.
-> - Mock/prod: oggi può esistere fallback silenzioso; Phase 4 introdurrà `MOCK_MODE` esplicito — non inventarlo come già fatto.
+> - Mock/prod: token `MOCK_MODE` esplicito (default `false`); **no** auto-fallback silenzioso su errore API.
 > - Il componente mappa espone tre output: `markerClicked`, `clusterClicked`, `countryClicked`.
 > - **⚠️ Leaflet + esbuild:** caricare Leaflet e MarkerCluster come script globali in `angular.json` → `scripts[]`; accedere via `window.L`. Mai `import 'leaflet.markercluster'` nei componenti. Test: stub in `src/app/testing/leaflet.stub.ts`.
 > - **🗂️ Clustering attuale:** un `markerClusterGroup` **per categoria** con `maxClusterRadius: 40`, `spiderfyOnMaxZoom: false`. Non ripristinare i valori legacy 100/200 + spiderfy true / icona ad anello composita.

@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, computed, inject, signal, viewChild, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { StateService } from './services/state.service';
 import { Article, ArticleFilters } from './models/article.model';
@@ -26,19 +26,32 @@ export class App {
   articleCount = computed(() => this.state.articles().length);
   isMapSplit   = computed(() => this.isSidebarOpen());
 
+  @HostListener('window:resize')
+  onWindowResize(): void {
+    this.mapComponent()?.invalidateSize();
+  }
+
+  private scheduleInvalidateSize(): void {
+    // After CSS transition / layout — overlay full-bleed still needs Leaflet resize.
+    requestAnimationFrame(() => {
+      this.mapComponent()?.invalidateSize();
+      setTimeout(() => this.mapComponent()?.invalidateSize(), 360);
+    });
+  }
+
   onFiltersChange(f: ArticleFilters): void {
     this.closeSidebar();
     this.focusCountryCode.set(null);
-    this.state.filters.set(f); 
+    this.state.filters.set(f);
   }
 
   onMarkerClick(article: Article): void {
     this.selectedArticle.set(article);
     this.clusterArticles.set([article]);
     this.isSidebarOpen.set(true);
+    this.scheduleInvalidateSize();
   }
 
-  // MODIFICA: Se arriva un array vuoto, chiudiamo la sidebar
   onClusterClick(articles: Article[]): void {
     if (!articles || articles.length === 0) {
       this.closeSidebar();
@@ -47,6 +60,7 @@ export class App {
     this.selectedArticle.set(articles[0]);
     this.clusterArticles.set(articles);
     this.isSidebarOpen.set(true);
+    this.scheduleInvalidateSize();
   }
 
   onCountryClick(articles: Article[]): void {
@@ -55,6 +69,7 @@ export class App {
       this.clusterArticles.set(articles);
       this.isSidebarOpen.set(true);
       this.focusCountryCode.set(articles[0].country_code);
+      this.scheduleInvalidateSize();
     }
   }
 
@@ -64,6 +79,7 @@ export class App {
       this.selectedArticle.set(countryArts[0]);
       this.clusterArticles.set(countryArts);
       this.isSidebarOpen.set(true);
+      this.scheduleInvalidateSize();
     }
     this.focusCountryCode.set(countryCode);
   }
@@ -74,6 +90,7 @@ export class App {
     this.clusterArticles.set([]);
     this.focusCountryCode.set(null);
     this.mapComponent()?.collapseAllGraphs();
+    this.scheduleInvalidateSize();
   }
 
   onSidebarCategoryClick(category: string): void {

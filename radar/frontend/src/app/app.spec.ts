@@ -8,12 +8,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from './app';
 import { Article, ArticleFilters, CountrySummary } from './models/article.model';
-import { ArticleService, useMockSignal } from './services/article.service';
+import { ArticleService } from './services/article.service';
 import { StateService } from './services/state.service';
 import { RadarMapComponent } from './components/radar-map/radar-map.component';
 import { RadarToolbarComponent } from './components/radar-toolbar/radar-toolbar.component';
 import { RadarSidebarComponent } from './components/radar-sidebar/radar-sidebar.component';
 import { installLeafletStub, type StubClusterGroup, type StubMap } from './testing/leaflet.stub';
+import { MOCK_MODE } from './services/mock-mode.token';
 
 const FIXTURE_DATE = '2026-07-14';
 
@@ -98,6 +99,7 @@ class ToolbarStubComponent {
   articles = input<Article[]>([]);
   articleCount = input(0);
   isLoading = input(false);
+  apiError = input(false);
   filtersChange = output<ArticleFilters>();
   countrySelected = output<string>();
 }
@@ -135,6 +137,9 @@ class MapStubComponent {
     /* no-op stub */
   }
   highlightMarkerForArticle(_article: Article | null): void {
+    /* no-op stub */
+  }
+  invalidateSize(): void {
     /* no-op stub */
   }
 }
@@ -191,7 +196,6 @@ function createStateStub(initial: Article[] = FIXTURE_ARTICLES, error: unknown =
 describe('App / map behavior', () => {
   beforeEach(() => {
     installLeafletStub();
-    useMockSignal.set(false);
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
       cb(0);
       return 0;
@@ -199,7 +203,6 @@ describe('App / map behavior', () => {
   });
 
   afterEach(() => {
-    useMockSignal.set(false);
     vi.unstubAllGlobals();
     TestBed.resetTestingModule();
     installLeafletStub();
@@ -343,6 +346,7 @@ describe('App / map behavior', () => {
           provideHttpClientTesting(),
           importProvidersFrom(NoopAnimationsModule),
           { provide: StateService, useValue: stateStub },
+          { provide: MOCK_MODE, useValue: false },
           {
             provide: ArticleService,
             useValue: {

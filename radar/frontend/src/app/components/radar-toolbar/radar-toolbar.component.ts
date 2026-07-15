@@ -18,6 +18,7 @@ export class RadarToolbarComponent {
   articleCount = input<number>(0);
   readCount    = computed(() => this.articles().filter(a => a.is_read).length);
   isLoading    = input<boolean>(false);
+  apiError     = input<boolean>(false);
 
   filtersChange   = output<ArticleFilters>();
   countrySelected = output<string>();

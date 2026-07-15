@@ -28,21 +28,24 @@ Carica questa skill ogni volta che:
 
 ## Come Funziona
 
-Il mock service sostituisce il `ArticleApiService` reale iniettando dati statici pre-compilati.
+Il mock service sostituisce le chiamate HTTP reali iniettando dati statici pre-compilati.
 L'interfaccia Angular non sa la differenza: riceve lo stesso tipo di dato `Article[]` sia
 in modalità mock che in modalità produzione.
 
-Il toggle mock/produzione avviene tramite il segnale di stato globale `useMockSignal` in `article.service.ts`. Se il backend API risponde con un errore, il frontend attiva automaticamente l'auto-fallback trasparente impostando il segnale a `true`.
+**Phase 4:** il toggle è l'injection token esplicito `MOCK_MODE` (`services/mock-mode.token.ts`).
+Default `false` in `app.config.ts`. Per offline/demo, fornire `{ provide: MOCK_MODE, useValue: true }`.
+**Vietato** l'auto-fallback silenzioso su mock in caso di errore API: l'errore resta visibile
+(`StateService.error` → banner toolbar).
 
 ```typescript
-// frontend/src/app/services/article.service.ts
-import { signal } from '@angular/core';
-
-// Segnale globale esportato per riflettere lo stato del fallback offline (true = dati mockati)
-export const useMockSignal = signal<boolean>(false);
+// frontend/src/app/services/mock-mode.token.ts
+export const MOCK_MODE = new InjectionToken<boolean>('MOCK_MODE', {
+  providedIn: 'root',
+  factory: () => false,
+});
 ```
 
-> **Nota:** In produzione o durante lo sviluppo locale con backend attivo, la chiamata HTTP tenta prima il backend reale e ripiega sui dati mockati solo in caso di fallimento di rete.
+> **Nota:** In produzione il token è `false`. Un fallimento di rete/API non attiva i mock.
 
 ---
 
@@ -218,61 +221,46 @@ export class ArticleMockService {
 }
 ```
 
-### Step 2: Dependency Injection con Auto-Fallback
+### Step 2: Dependency Injection con `MOCK_MODE` (no silent fallback)
 
 ```typescript
 // frontend/src/app/services/article.service.ts
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { Observable, map, of } from 'rxjs';
 import { Article, CountrySummary, ArticleFilters } from '../models/article.model';
+import { parseArticlesDto } from '../models/article.dto';
 import { ArticleMockService } from './article-mock.service';
-
-export const useMockSignal = signal<boolean>(false);
+import { MOCK_MODE } from './mock-mode.token';
 
 @Injectable({ providedIn: 'root' })
 export class ArticleService {
   private readonly http = inject(HttpClient);
   private readonly mock = inject(ArticleMockService);
+  private readonly mockMode = inject(MOCK_MODE);
 
   getArticles(filters: ArticleFilters): Observable<Article[]> {
-    if (useMockSignal()) {
+    if (this.mockMode) {
       return this.mock.getArticles(filters.date);
     }
-    let params = new HttpParams().set('date', filters.date);
-    if (filters.sentiment) params = params.set('sentiment', filters.sentiment);
-    if (filters.relevance_level != null) {
-      params = params.set('relevance_level', filters.relevance_level.toString());
-    }
-    return this.http.get<Article[]>('/api/articles', { params }).pipe(
-      catchError((err) => {
-        console.warn('[ArticleService] Errore API backend. Attivazione auto-fallback sui dati mock:', err);
-        useMockSignal.set(true);
-        return this.mock.getArticles(filters.date);
-      })
+    const params = new HttpParams().set('date', filters.date);
+    return this.http.get<unknown>('/api/articles', { params }).pipe(
+      map((payload) => parseArticlesDto(payload)),
     );
   }
 
   getCountries(filters: ArticleFilters): Observable<CountrySummary[]> {
-    if (useMockSignal()) {
+    if (this.mockMode) {
       return this.mock.getCountries(filters.date);
     }
-    let params = new HttpParams().set('date', filters.date);
-    if (filters.sentiment) params = params.set('sentiment', filters.sentiment);
-    if (filters.relevance_level != null) {
-      params = params.set('relevance_level', filters.relevance_level.toString());
-    }
-    return this.http.get<CountrySummary[]>('/api/countries', { params }).pipe(
-      catchError((err) => {
-        console.warn('[ArticleService] Errore API backend. Attivazione auto-fallback sui dati mock:', err);
-        useMockSignal.set(true);
-        return this.mock.getCountries(filters.date);
-      })
-    );
+    const params = new HttpParams().set('date', filters.date);
+    return this.http.get<CountrySummary[]>('/api/countries', { params });
   }
 }
 ```
+
+Offline: in `app.config.ts` (o TestBed) fornire `{ provide: MOCK_MODE, useValue: true }`.
+Produzione: `{ provide: MOCK_MODE, useValue: false }` — errori API restano in `StateService.error()`.
 
 ---
 

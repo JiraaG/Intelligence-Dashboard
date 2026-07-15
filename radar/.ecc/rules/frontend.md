@@ -98,6 +98,11 @@ export class AppModule { }
 Non usare `BehaviorSubject`, `Subject` o `EventEmitter` per lo stato UI globale.
 Usare esclusivamente `signal()`, `computed()` e `effect()` di Angular 21.
 
+**Policy Phase 4 (Signals vs RxJS):**
+- **Signals** possiedono lo stato UI (`StateService`, input/output componenti, filtri).
+- **RxJS** è ammesso solo come adapter di trasporto HttpClient (`Observable`, `rxResource`, operatori HTTP).
+- Non introdurre `BehaviorSubject` per stato locale. Un eventuale passaggio a `httpResource` è deferito (Phase 5/6).
+
 **OBBLIGATORIO:**
 ```typescript
 // Stato reattivo con Signals
@@ -117,6 +122,14 @@ articlesByCountry = computed(() => groupArticlesByCountry(this.articles()));
 // NO: RxJS subject per stato locale (usa Signals invece)
 private selectedArticle$ = new BehaviorSubject<Article | null>(null);
 ```
+
+---
+
+## Regola 2b: MOCK_MODE esplicito (Phase 4)
+
+Mock dati solo via injection token `MOCK_MODE` (`services/mock-mode.token.ts`).
+Default produzione: `false`. **Vietato** `catchError` che attiva mock silenziosamente.
+Errore API → `StateService.error` / banner toolbar; data richiesta preservata.
 
 ---
 
@@ -213,14 +226,15 @@ La transizione tra le due modalità DEVE essere fluida (non un toggle istantaneo
 
 ---
 
-## Regola 6: Layout Split-Screen 70/30
+## Regola 6: Layout Split-Screen (overlay full-bleed — Phase 4)
 
 Il layout split-screen è obbligatorio per la visualizzazione delle notizie.
 Non usare modal, overlay o tooltip: usare la sidebar laterale sinistra.
 
 - **Stato idle**: mappa = 100% larghezza
-- **Stato attivo** (marker cliccato): sidebar = 30% sinistra, mappa = 70% destra
-- **Transizione**: cubic-bezier per smoothness, durata 350ms
+- **Stato attivo** (marker cliccato): sidebar aperta **sopra** la mappa; la mappa resta **100vw** (overlay full-bleed). Non restringere la mappa con `calc(100vw - sidebar)` in Phase 4.
+- Dopo open/close sidebar e su `window.resize`, chiamare `map.invalidateSize()` dal shell (`App`), senza modificare file sidebar.
+- **Transizione sidebar**: cubic-bezier, durata ~350ms (stile esistente sidebar — freeze)
 
 La sidebar è implementata con CSS puro + classe Angular attivata via Signal.
 Il componente `p-sidebar` di PrimeNG può essere usato come wrapper UI.

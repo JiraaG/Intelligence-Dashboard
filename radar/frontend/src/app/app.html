@@ -3,6 +3,7 @@
   [articles]="state.articles()"
   [articleCount]="articleCount()"
   [isLoading]="state.isLoading()"
+  [apiError]="!!state.error()"
   (filtersChange)="onFiltersChange($event)"
   (countrySelected)="onToolbarCountrySelect($event)">
 </app-radar-toolbar>

@@ -41,29 +41,44 @@
   <div class="article-count-container"
        (mouseenter)="isTooltipHovered.set(true)"
        (mouseleave)="isTooltipHovered.set(false)">
-    <div class="article-count" (click)="toggleTooltip($event)">
+    <button
+      type="button"
+      class="article-count"
+      (click)="toggleTooltip($event)"
+      [attr.aria-expanded]="isTooltipVisible()"
+      aria-haspopup="true">
       NOTIZIE LETTE/TROVATE: <strong>{{ readCount() }}/{{ articleCount() }}</strong>
-    </div>
+    </button>
 
     <!-- Hover/Click countries tooltip -->
-    <div class="countries-tooltip" *ngIf="isTooltipVisible() && countriesList().length > 0">
+    <div class="countries-tooltip" *ngIf="isTooltipVisible() && countriesList().length > 0" role="listbox">
       <div class="tooltip-header">
         <span class="tooltip-title">Nazioni Coinvolte</span>
-        <button class="tooltip-close-btn" (click)="closeTooltip($event)">✕</button>
+        <button type="button" class="tooltip-close-btn" (click)="closeTooltip($event)" aria-label="Chiudi">✕</button>
       </div>
       <div class="tooltip-list">
-        <div class="tooltip-row clickable" *ngFor="let c of countriesList()" (click)="selectCountry(c.code, $event)">
+        <button
+          type="button"
+          class="tooltip-row clickable"
+          *ngFor="let c of countriesList()"
+          (click)="selectCountry(c.code, $event)"
+          role="option">
           <span class="country-flag">{{ getFlagEmoji(c.code) }}</span>
           <span class="country-name">{{ c.name }}</span>
           <span class="country-badge">{{ c.readCount }}/{{ c.count }}</span>
-        </div>
+        </button>
       </div>
     </div>
   </div>
+
+  @if (apiError()) {
+    <div class="api-error-banner" role="alert">
+      Errore API — dati non disponibili
+    </div>
+  }
 
   <!-- Progress Bar per stato caricamento asincrono -->
   <div class="loader-wrapper" *ngIf="isLoading()">
     <p-progressBar mode="indeterminate" styleClass="radar-progress-bar"></p-progressBar>
   </div>
 </div>
-

@@ -128,7 +128,7 @@
       "scope": ["frontend/**"],
       "exclude": ["frontend/src/app/components/radar-sidebar/**"],
       "model": "sonnet",
-      "notes": "Sidebar freeze: non editare radar-sidebar. Read/unread via state.service + radar-map."
+      "notes": "Sidebar freeze: non editare radar-sidebar. Phase 4 DONE: MOCK_MODE, XSS-safe markers, DestroyRef, read-unread senza rebuild cluster (state.service + radar-map)."
     }
   }
 }

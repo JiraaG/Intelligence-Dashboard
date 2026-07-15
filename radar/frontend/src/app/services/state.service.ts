@@ -1,39 +1,37 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { ArticleService } from './article.service';
-import { ArticleFilters, CountrySummary } from '../models/article.model';
+import { ArticleFilters, CountrySummary, PrimaryCategory } from '../models/article.model';
 
 @Injectable({ providedIn: 'root' })
 export class StateService {
   private readonly articleService = inject(ArticleService);
 
-  // Filtri centralizzati come Signal
+  /** Per-article mutation counter — only the latest toggle may apply response/rollback. */
+  private readonly readMutationVersion = new Map<number, number>();
+
   readonly filters = signal<ArticleFilters>({
     date: new Date().toISOString().split('T')[0],
     sentiment: [],
-    categories: []
+    categories: [],
   });
 
-  // Resource per gli articoli (ri-esegue la chiamata HTTP solo quando cambia la data)
   readonly articlesResource = rxResource({
     params: () => ({ date: this.filters().date }),
-    stream: (p) => this.articleService.getArticles({ date: p.params.date })
+    stream: (p) => this.articleService.getArticles({ date: p.params.date }),
   });
 
-  // Segnale degli articoli filtrati client-side in tempo reale (multiscelta)
   readonly articles = computed(() => {
     const raw = this.articlesResource.value() ?? [];
     const activeFilters = this.filters();
 
-    return raw.filter(art => {
-      // Filtro sentiment multiplo (se vuoto, lascia passare tutto)
+    return raw.filter((art) => {
       if (activeFilters.sentiment && activeFilters.sentiment.length > 0) {
         if (!activeFilters.sentiment.includes(art.sentiment)) {
           return false;
         }
       }
 
-      // Filtro categorie multiplo (se vuoto, lascia passare tutto)
       if (activeFilters.categories && activeFilters.categories.length > 0) {
         if (!activeFilters.categories.includes(art.primary_category)) {
           return false;
@@ -44,7 +42,6 @@ export class StateService {
     });
   });
 
-  // Calcolo dinamico e reattivo dei sommari nazionali in base agli articoli filtrati correnti
   readonly countries = computed(() => {
     const arts = this.articles();
     const grouped = new Map<string, { cats: Set<string>; count: number }>();
@@ -60,8 +57,8 @@ export class StateService {
     grouped.forEach((v, k) => {
       result.push({
         country_code: k,
-        categories: Array.from(v.cats) as any[],
-        article_count: v.count
+        categories: Array.from(v.cats) as PrimaryCategory[],
+        article_count: v.count,
       });
     });
     return result;
@@ -70,32 +67,48 @@ export class StateService {
   readonly isLoading = computed(() => this.articlesResource.isLoading());
   readonly error = computed(() => this.articlesResource.error());
 
+  /**
+   * Hybrid update for sidebar freeze compatibility:
+   * mutate `is_read` on the existing object (sidebar holds the same refs) and
+   * return a new array so toolbar computed signals refresh.
+   */
   toggleReadStatus(articleId: number, isRead: boolean): void {
-    // Aggiornamento ottimistico dell'interfaccia
-    this.articlesResource.value.update(arts => {
+    const version = (this.readMutationVersion.get(articleId) ?? 0) + 1;
+    this.readMutationVersion.set(articleId, version);
+
+    this.articlesResource.value.update((arts) => {
       if (!arts) return arts;
-      const target = arts.find(a => a.id === articleId);
-      if (target) {
-        target.is_read = isRead; // Mutazione in-place per aggiornare i reference nella sidebar
-      }
-      return [...arts]; // Nuovo array per scatenare i computed signal (es. toolbar)
+      return arts.map((a) => {
+        if (a.id !== articleId) return a;
+        a.is_read = isRead;
+        return a;
+      });
     });
 
-    // Sincronizzazione in background col backend
     this.articleService.updateReadStatus(articleId, isRead).subscribe({
+      next: (res) => {
+        if (this.readMutationVersion.get(articleId) !== version) return;
+        this.articlesResource.value.update((arts) => {
+          if (!arts) return arts;
+          return arts.map((a) => {
+            if (a.id !== articleId) return a;
+            a.is_read = res.is_read;
+            return a;
+          });
+        });
+      },
       error: (err) => {
         console.error('[StateService] Impossibile aggiornare lo stato letto/non letto:', err);
-        // Rollback ottimistico
-        this.articlesResource.value.update(arts => {
+        if (this.readMutationVersion.get(articleId) !== version) return;
+        this.articlesResource.value.update((arts) => {
           if (!arts) return arts;
-          const target = arts.find(a => a.id === articleId);
-          if (target) {
-            target.is_read = !isRead;
-          }
-          return [...arts];
+          return arts.map((a) => {
+            if (a.id !== articleId) return a;
+            a.is_read = !isRead;
+            return a;
+          });
         });
-      }
+      },
     });
   }
 }
-
