@@ -152,7 +152,7 @@ async def test_vault_failure_then_reconcile_without_premature_mark_read(tmp_path
     mock_conn_ok = MagicMock()
     mock_conn_ok.fetchrow = AsyncMock(return_value=claimed_ok)
     mock_conn_ok.execute = AsyncMock()
-    mock_conn_ok.fetch = AsyncMock(return_value=[failed_row])
+    mock_conn_ok.fetch = AsyncMock(side_effect=[[failed_row], []])
     pool_ok = _make_pool(mock_conn_ok)
 
     miniflux2 = MagicMock()

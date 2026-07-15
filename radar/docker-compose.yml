@@ -73,8 +73,7 @@ services:
     env_file:
       - .env
     environment:
-      # DATABASE_URL combines vars; $ in passwords must be escaped as $$ in Compose.
-      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@radar-db:5432/${POSTGRES_DB}"
+      POSTGRES_HOST: "radar-db"
       OBSIDIAN_VAULT_PATH: "/app/vault"
     volumes:
       - ./vault:/app/vault
@@ -119,7 +118,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@radar-db:5432/${POSTGRES_DB}"
+      POSTGRES_HOST: "radar-db"
       OBSIDIAN_VAULT_PATH: "/app/vault"
     volumes:
       - ./vault:/app/vault

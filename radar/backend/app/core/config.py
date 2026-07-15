@@ -7,6 +7,7 @@ from datetime import timezone as dt_timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dotenv import load_dotenv
+from urllib.parse import quote_plus
 
 load_dotenv()
 
@@ -93,7 +94,10 @@ pg_pass = _env_str("POSTGRES_PASSWORD", _DEFAULT_PG_PASSWORD) or _DEFAULT_PG_PAS
 pg_db = _env_str("POSTGRES_DB", "radar_db") or "radar_db"
 pg_host = _env_str("POSTGRES_HOST", "localhost") or "localhost"
 pg_port = _env_str("POSTGRES_PORT", "5432") or "5432"
-_default_db_url = f"postgresql://{pg_user}:{pg_pass}@{pg_host}:{pg_port}/{pg_db}"
+_default_db_url = (
+    f"postgresql://{quote_plus(pg_user)}:{quote_plus(pg_pass)}"
+    f"@{pg_host}:{pg_port}/{pg_db}"
+)
 
 DATABASE_URL = _env_str("DATABASE_URL", _default_db_url) or _default_db_url
 OBSIDIAN_VAULT_PATH = _env_str("OBSIDIAN_VAULT_PATH", "/app/vault") or "/app/vault"

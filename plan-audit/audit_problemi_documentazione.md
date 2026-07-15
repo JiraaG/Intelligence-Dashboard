@@ -142,15 +142,16 @@ flowchart LR
 ## 2.1 Sintesi conteggi OPEN
 
 ```mermaid
-pie title Problematiche OPEN da remediation (post FASE 0 / v2.2)
-    "P0 OPEN codice" : 2
-    "P1 OPEN codice" : 5
+pie title Problematiche OPEN da remediation (post T-P0-01..T-P1-02)
+    "P0 OPEN codice" : 1
+    "P1 OPEN codice" : 2
     "P2 OPEN codice" : 8
     "Docs FIXED / non riaprire" : 12
     "Aree PASS (non toccare)" : 14
 ```
 
-> **v2.1→v2.2 (FASE 0):** `T-DOC-01` CLOSED — `radar/.ecc/CLAUDE.md` allineato Gate Verde (grep legacy = 0). Restano solo **15 ticket codice OPEN**. Dettaglio → **APPENDICE F** + `audit_problemi_documentazione_risoluzione.md`.
+> **v2.1→v2.2 (FASE 0):** `T-DOC-01` CLOSED — `radar/.ecc/CLAUDE.md` allineato Gate Verde (grep legacy = 0).  
+> **Post-remediation 2026-07-15:** T-P0-01 + T-P1-03 + T-P1-01 + T-P1-02 **DONE** → restano **11 ticket codice OPEN** (P0=1, P1=2, P2=8). Snapshot FASE 0 era 15. Dettaglio → **APPENDICE F** + `audit_problemi_documentazione_risoluzione.md` §3.
 
 ## 2.2 P0 — OPEN (fix obbligatorio)
 
@@ -163,9 +164,9 @@ pie title Problematiche OPEN da remediation (post FASE 0 / v2.2)
 
 | ID | Titolo | File chiave | Finding |
 |----|--------|-------------|---------|
-| **T-P1-01** | `DATABASE_URL` senza `quote_plus` | `core/config.py#L91-L98`, Compose L76–77 | BE-AUD-002, INF-AUD-01 |
-| **T-P1-02** | Race TOCTOU dedup multi-consumer | `worker.py#L208-L251` | BE-AUD-003 |
-| **T-P1-03** | Mark-read post-`completed` non ritentabile | `commit/outbox.py#L170-L185` | BE-AUD-004 |
+| **T-P1-01** | ~~`DATABASE_URL` senza `quote_plus`~~ → **DONE** (`quote_plus` + Compose `POSTGRES_HOST`) | `core/config.py`, Compose `POSTGRES_HOST` | BE-AUD-002, INF-AUD-01 |
+| **T-P1-02** | ~~Race TOCTOU dedup multi-consumer~~ → **DONE** (`pg_advisory_lock` per-URL) | `worker.py` | BE-AUD-003 |
+| **T-P1-03** | ~~Mark-read post-`completed` non ritentabile~~ → **DONE** (miniflux_marked_at + retry) | `commit/outbox.py` (`reconcile` + `_update_miniflux_marked_at`) | BE-AUD-004 |
 | **T-P1-04** | Errore nation-fetch senza banner toolbar | `state.service.ts#L99-L127`, `app.ts#L122-L125` | FE-AUD-001 |
 | **T-P1-05** | Nginx frontend come root | `frontend/Dockerfile`, `nginx.conf` | INF-AUD-02 *(scratch=P2; elevato a P1 — vedi App. F §F.2; alternativa: documentare eccezione SoT)* |
 
@@ -326,6 +327,8 @@ Select-String -Path backend/scripts/**/*.py -Pattern "ClassificationClient\(\)|_
 
 ## 3.3 T-P1-01 — Password speciali in DATABASE_URL
 
+> **Stato:** **DONE** (2026-07-15). Riproduzione sotto = **AS-IS pre-fix**. POST-FIX: `quote_plus` su user/password in `config.py`; Compose backend/worker usa `POSTGRES_HOST=radar-db` (niente `DATABASE_URL` grezzo). Vedi §4.2, App. D, `audit_remediation_T-P1-01.md`.
+
 ```powershell
 cd radar
 $env:PYTHONPATH = "backend"
@@ -335,14 +338,16 @@ $env:POSTGRES_PASSWORD = "p@ss:w/rd#1"
 python -c "from app.core.config import DATABASE_URL; print(DATABASE_URL)"
 ```
 
-**Sintomo BUG:** URL contiene `p@ss:w/rd#1` grezzo (parser asyncpg può fallire).  
-**POST-FIX:** segmenti user/password con `%40`, `%3A`, `%2F`, `%23`.
+**Sintomo BUG (storico):** URL contiene `p@ss:w/rd#1` grezzo (parser asyncpg può fallire).  
+**POST-FIX:** segmenti user/password con `%40`, `%3A`, `%2F`, `%23`; Script F e `test_database_url.py` verdi.
 
-Nota Compose: se `DATABASE_URL` è impostato in `docker-compose.yml` via interpolazione grezza, **bypassa** `config.py`. Verificare entrambi.
+**Nota Compose (post-fix):** backend/worker non impostano più `DATABASE_URL` interpolato. Se si reintroduce un override manuale in `.env`, deve essere già percent-encoded. Miniflux resta su URL grezzo (non usa `config.py`).
 
 ---
 
 ## 3.4 T-P1-02 — Race TOCTOU multi-consumer
+
+> **Stato:** **DONE** (2026-07-15). Riproduzione sotto = contesto FASE 3. POST-FIX: `pg_advisory_lock(ns, hash(url))` session-level in `process_single_entry` (namespace `777666555` ≠ leadership). Vedi §4.3, App. D, `audit_remediation_T-P1-02.md`.
 
 Precondizioni: `WORKER_ENTRY_CONCURRENCY >= 2` (default 4).
 
@@ -355,32 +360,26 @@ WHERE created_at > NOW() - INTERVAL '15 minutes'
 GROUP BY 1,2 ORDER BY 3 DESC;"
 ```
 
-**Sintomo BUG:** due `complete` Gemini vicini per stesso URL / due attempt classify nonostante un solo article.  
-**POST-FIX:** al più una classify per URL sotto advisory lock (o serializzazione).
+**Sintomo BUG (storico):** due `complete` Gemini vicini per stesso URL / due attempt classify nonostante un solo article.  
+**POST-FIX:** al più una classify per URL sotto advisory lock (serializzazione); `test_worker_concurrency.py` verde.
 
 ---
 
 ## 3.5 T-P1-03 — Mark-read fallito dopo completed
 
-Evidenza nel codice (commento esplicito del problema):
+> **Stato:** **DONE** (2026-07-15). Snippet sotto = **AS-IS pre-fix** (storico FASE 3). POST-FIX: `miniflux_marked_at` + 2ª SELECT in `reconcile_outbox` + `_update_miniflux_marked_at`. Vedi §4.4, App. D, `audit_remediation_T-P1-03.md`.
 
-```170:185:radar/backend/app/commit/outbox.py
-    async with pool.acquire() as conn:
-        await _mark_completed(conn, outbox_id)
+Evidenza AS-IS (commento che descriveva il bug):
 
-    entry_id = claimed["miniflux_entry_id"]
-    if entry_id is not None and miniflux_client is not None:
-        try:
-            await miniflux_client.mark_as_read([int(entry_id)])
-        except Exception as mark_err:
-            # Vault already durable; mark-read can retry on next reconcile via completed rows...
-            # Completed rows are not re-processed. Log and leave Miniflux unread for ops visibility.
-            logger.warning(
-                "Outbox id=%s completed ma mark-read Miniflux fallito (entry_id=%s): %s",
-                ...
+```python
+# PRE-FIX (storico): mark_as_read falliva → status=completed, ma reconcile
+# selezionava solo pending/failed → forever-unread senza retry.
+await miniflux_client.mark_as_read([int(entry_id)])
+# except: log warning; completed rows not re-processed
 ```
 
-**Riproduzione:** mock/fault Miniflux mark-read dopo vault write; verificare che `reconcile_outbox` selezioni solo `pending`/`failed`.
+**Riproduzione (storica):** mock/fault Miniflux mark-read dopo vault write; `reconcile_outbox` non ritentava.  
+**POST-FIX:** `WHERE status='completed' AND miniflux_marked_at IS NULL AND miniflux_entry_id IS NOT NULL` → retry solo mark-read.
 
 ---
 
@@ -497,14 +496,14 @@ Se `outbox_status is None`: risolvere path con `get_article_file_path` / query a
 **Non** usare `outbox_status in ("completed", None)` senza questo check.
 
 ### Criteri di accettazione
-- [ ] Duplicato + `completed` → mark-read
-- [ ] Duplicato + `pending`/`failed`/`writing` → **no** mark-read
-- [ ] Duplicato + `NULL` senza vault → **no** mark-read
-- [ ] (Se estensione) Duplicato + `NULL` con vault file → mark-read + log legacy
-- [ ] `pytest -m "not live"` verde + `tests/test_worker_gate.py` (casi sopra)
-- [ ] Nessun ADJUST cieco `None → mark-read`
-- [ ] Skill/rules BE non contraddicono (mark-read dopo vault)
-- [ ] Handoff T-P1-03 annotato (retry mark-read post-completed)
+- [x] Duplicato + `completed` → mark-read
+- [x] Duplicato + `pending`/`failed`/`writing` → **no** mark-read
+- [x] Duplicato + `NULL` senza vault → **no** mark-read
+- [x] (Se estensione) Duplicato + `NULL` con vault file → mark-read + log legacy
+- [x] `pytest -m "not live"` verde + `tests/test_worker_gate.py` (casi sopra)
+- [x] Nessun ADJUST cieco `None → mark-read`
+- [x] Skill/rules BE non contraddicono (mark-read dopo vault)
+- [x] Handoff T-P1-03 annotato (retry mark-read post-completed) — poi chiuso in App. D / §11 risoluzione
 
 ### Skill da rileggere prima del fix
 `.agents/skills/llm-json-extraction/SKILL.md` (flusso commit+outbox), `radar/.ecc/rules/backend.md`.  
@@ -529,29 +528,27 @@ Report: `audit_remediation_T-P0-01.md`.
 +)
 ```
 
-### Compose (consigliato)
-Preferire **non** forzare `DATABASE_URL` grezzo; passare `POSTGRES_HOST=radar-db` e lasciare costruire l’URL all’app. Se si mantiene Compose URL, documentare che la password deve essere già percent-encoded **oppure** alfanumerica senza `@:/#%`.
-
-Miniflux (`DATABASE_URL=postgres://...`) non usa `config.py`: password speciali richiedono encoding manuale o policy alfanumerica.
+### Compose (POST-FIX T-P1-01)
+Backend/worker: **non** forzare `DATABASE_URL` grezzo; `POSTGRES_HOST=radar-db` e URL costruito in `config.py` con `quote_plus`.  
+Miniflux (`DATABASE_URL=postgres://...`) non usa `config.py`: password speciali → encoding manuale o policy alfanumerica (documentato in `.env.example`).
 
 ### Criteri
-- [ ] Password con `@` funziona in boot locale
-- [ ] `.env.example` aggiornato con nota encoding
-- [ ] Nessun secret committato
+- [x] Password con `@` funziona in boot locale (Script F + `test_database_url.py`)
+- [x] `.env.example` aggiornato con nota encoding (+ Miniflux)
+- [x] Nessun secret committato
+- [x] Compose backend/worker: niente `DATABASE_URL` grezzo; `POSTGRES_HOST=radar-db`
 
 ---
 
 ## 4.3 T-P1-02 — Advisory lock per-URL
 
-### Approccio consigliato
-`pg_advisory_lock(hash(source_url))` intorno a: dedup → (opz. classify) → commit. Unlock in `finally`.
-
-Alternativa più semplice ma più lenta: serializzare classify+commit (`WORKER_ENTRY_CONCURRENCY=1`) — accettabile solo come mitigo temporaneo.
+### Approccio (POST-FIX)
+`pg_advisory_lock($1, $2)` con `key1=777666555` (namespace URL) e `key2=sha256(url)[:4]` signed; scope: dedup → classify → commit (+ outbox). Unlock in `finally` sulla stessa connessione di sessione. Non riusa `WORKER_ADVISORY_LOCK_KEY` (forma a 1 argomento).
 
 ### Criteri
-- [ ] Due consumer stesso URL → una sola chiamata Gemini
-- [ ] Lock rilasciato anche su exception / CancelledError (re-raise dopo unlock)
-- [ ] Non usare lo stesso lock key del leadership worker
+- [x] Due consumer stesso URL → una sola chiamata Gemini (`test_worker_concurrency.py`)
+- [x] Lock rilasciato anche su exception / CancelledError (re-raise dopo unlock in `finally`)
+- [x] Non usare lo stesso lock key del leadership worker
 
 ---
 
@@ -573,9 +570,9 @@ ALTER TABLE article_outbox
 Salvare `last_error = 'vault_ok mark_read_pending: ...'` e estendere la SELECT di reconcile. Meno pulito; ok solo come hotfix.
 
 ### Criteri
-- [ ] Fallimento mark-read non lascia entry forever-unread senza retry
-- [ ] Vault non viene riscritto inutilmente
-- [ ] Test outbox/reconcile aggiornati
+- [x] Fallimento mark-read non lascia entry forever-unread senza retry
+- [x] Vault non viene riscritto inutilmente
+- [x] Test outbox/reconcile aggiornati (`test_outbox_mark_read_retry.py`)
 
 ---
 
@@ -941,7 +938,9 @@ Usa questa checklist a ogni sessione di remediation.
 | Data | Ticket | Autore (umano/LLM) | Commit (se richiesto) | Note |
 |------|--------|--------------------|------------------------|------|
 | 2026-07-15 | T-P0-01 | Antigravity + Cursor verify | No (su richiesta utente) | Gate in workspace principale: `completed`→mark-read; pending/failed/writing→skip; NULL→vault `Path.is_file`. Test `test_worker_gate.py` 4/4; pytest not live 111; worker rebuild. ADJUST cieco REJECT. Next: T-P1-03. |
-| | T-P1-01 | | | |
+| 2026-07-15 | T-P1-03 | Antigravity + Cursor verify | No (su richiesta utente) | Migrazione 008 + backfill; `outbox.py` retry completed unmarked; `test_outbox_mark_read_retry.py` 2/2; pytest not live 113/113; DB/worker sync OK. Docs drift (conteggi/handoff) allineati post PASS_WITH_GAPS. Next: T-P1-01. |
+| 2026-07-15 | T-P1-01 | Antigravity + Cursor verify | No (su richiesta utente) | `quote_plus` in `config.py`; Compose backend/worker → `POSTGRES_HOST` (no `DATABASE_URL` grezzo); `.env.example` + Miniflux note; `test_database_url.py` 1/1; pytest not live 114/114; Script F OK; container printenv/health OK. Next: T-P1-02. |
+| 2026-07-15 | T-P1-02 | Antigravity + Cursor verify | No (su richiesta utente) | `pg_advisory_lock(ns, hash)` per-URL in `process_single_entry`; `test_worker_concurrency.py` 1/1; pytest not live 115/115; ruff OK. Docker rebuild **GAP** (daemon spento). Next: T-P0-02. |
 | | … | | | |
 
 ---
@@ -968,7 +967,7 @@ Questa appendice chiude i dubbi lasciati aperti tra consolidamento v2.0 e le fon
 | Fonte scratch | Finding | Pri scratch | Ticket manuale | Pri manuale | Note |
 |---------------|---------|-------------|----------------|-------------|------|
 | `backend_audit.md` | BE-AUD-001 | P0 | T-P0-01 | P0 | Allineato |
-| `backend_audit.md` | BE-AUD-002 | P1 | T-P1-01 | P1 | Merge con INF-AUD-01 |
+| `backend_audit.md` | BE-AUD-002 | P1 | T-P1-01 | P1 | **DONE** — merge INF-AUD-01; `quote_plus` + Compose `POSTGRES_HOST` |
 | `backend_audit.md` | BE-AUD-003 | P1 | T-P1-02 | P1 | Allineato |
 | `backend_audit.md` | BE-AUD-004 | P1 | T-P1-03 | P1 | Dipende da T-P0-01 (FASE 4) |
 | `backend_audit.md` | BE-AUD-005 | P1 | T-P0-02 | **P0↑** | Elevato — §F.2 |
@@ -976,7 +975,7 @@ Questa appendice chiude i dubbi lasciati aperti tra consolidamento v2.0 e le fon
 | `backend_audit.md` | BE-AUD-007…010 | P2 | T-P2-01…04 | P2 | Allineato |
 | `frontend_audit.md` | FE-AUD-001 | P1 | T-P1-04 | P1 | Allineato (FE-MK-02) |
 | `frontend_audit.md` | FE-AUD-002…005 | P2 | T-P2-05…08 | P2 | Allineato |
-| `infra_audit.md` | INF-AUD-01 | P1 | T-P1-01 | P1 | Dedup con BE-AUD-002 |
+| `infra_audit.md` | INF-AUD-01 | P1 | T-P1-01 | P1 | **DONE** — dedup BE-AUD-002 |
 | `infra_audit.md` | INF-AUD-02 | P2 | T-P1-05 | **P1↑** | Elevato — §F.2 |
 | Check docs v2.1 | CLAUDE.md stale | — | **T-DOC-01** | P1 docs → **CLOSED** v2.2 | Sintomi legacy assenti su disco (FASE 0) |
 
@@ -1024,7 +1023,7 @@ Un LLM **non** deve “riabbassare” queste priorità senza decisione umana esp
 | FASE 3 non ha sezioni dedicate ai P2 | Intenzionale: P2 usano tabella §4.8 + Script M; priorità bassa |
 | FASE 3 non ha playbook T-DOC-01 | **Mitigato v2.2:** T-DOC-01 CLOSED; playbook F.6 resta come regression check |
 | Nessun test automatico già scritto per T-P0-01 | Script G + **obbligatorio** `tests/test_worker_gate.py` col fix (casi completed/pending/failed/NULL±vault) — vedi `audit_remediation_T-P0-01.md` §4 |
-| Compose `DATABASE_URL` bypassa `quote_plus` anche post T-P1-01 su config.py | §4.2 lo dice: serve anche Compose/`.env` — non dimenticare path Docker |
+| Compose `DATABASE_URL` bypassa `quote_plus` anche post fix su `config.py` | **Chiuso in T-P1-01:** Compose backend/worker usano `POSTGRES_HOST`; `.env.example` senza `DATABASE_URL` default. Miniflux resta ops-only. |
 
 ## F.6 Playbook T-DOC-01 (`CLAUDE.md`) — CLOSED + regression check
 
@@ -1063,12 +1062,11 @@ SoT: audit_problemi_documentazione.md v2.2 + APPENDICE F.
 Stato ticket operativo: audit_problemi_documentazione_risoluzione.md §3.
 Preferisci .agents/AGENTS.md + radar/.ecc/rules/*.md (T-DOC-01 CLOSED).
 Vincoli: sidebar freeze; main.py API-only; asyncpg; window.L; no commit senza richiesta.
-Ticket OPEN in ordine FASE 4 (rispettare dipendenza T-P0-01 → T-P1-03).
+Ticket OPEN in ordine FASE 4 (T-P0-01, T-P1-03, T-P1-01, T-P1-02 DONE; prossimo T-P0-02 → T-P1-04 → …).
 Un ticket per turno: riproduci → fix → gate FASE 5 → marca DONE in risoluzione §3.
 Priorità elevate T-P0-02 / T-P1-05 sono intenzionali (App. F §F.2).
 ```
 
 ---
 
-**Esito check definitivo:** il manuale è **coerente** con `scratch/*_audit.md` e `scratch/*_rules.md`. I dubbi di v2.0 sono **chiusi**. Docs: **T-DOC-01 CLOSED** (FASE 0). Restano **15 ticket codice OPEN** per FASE 3–5.
-)
+**Esito check definitivo:** il manuale è **coerente** con `scratch/*_audit.md` e `scratch/*_rules.md`. I dubbi di v2.0 sono **chiusi**. Docs: **T-DOC-01 CLOSED** (FASE 0). Snapshot FASE 0: 15 OPEN; **post T-P0-01+T-P1-03+T-P1-01+T-P1-02: 11 ticket codice OPEN** (SoT = risoluzione §3).

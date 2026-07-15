@@ -8,8 +8,10 @@ session-level PostgreSQL advisory lock, and bounded graceful shutdown.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import signal
+import struct
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -85,6 +87,14 @@ def build_worker_semaphores(
         asyncio.Semaphore(db_concurrency),
         asyncio.Semaphore(gemini_concurrency),
     )
+
+
+def get_url_lock_keys(url: str) -> tuple[int, int]:
+    """Generate a stable 2-argument advisory lock key (namespace, url_hash) for pg_advisory_lock."""
+    ns = 777_666_555
+    h = hashlib.sha256(url.encode("utf-8")).digest()
+    url_hash = struct.unpack("!i", h[:4])[0]
+    return ns, url_hash
 
 
 async def try_acquire_advisory_lock(conn: asyncpg.Connection, key: int) -> bool:
@@ -205,175 +215,187 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
     published_date = entry.published_at
     feed_title = entry.feed_title
 
+    lock_acquired = False
+    lock_ns, lock_key = get_url_lock_keys(source_url)
+
     try:
         async with state.db_sem:
             async with state.db_pool.acquire() as conn:
-                is_dup = await is_article_duplicate(conn, source_url)
-
-        if is_dup:
-            # T-P0-01: mark-read only if vault durable (outbox completed)
-            # or legacy NULL outbox with vault file present — never blind mark-read.
-            async with state.db_sem:
-                async with state.db_pool.acquire() as conn:
-                    row = await conn.fetchrow(
-                        """
-                        SELECT
-                            o.status AS outbox_status,
-                            a.primary_category,
-                            a.country_code,
-                            a.published_at,
-                            a.title,
-                            a.source_url
-                        FROM articles a
-                        LEFT JOIN article_outbox o ON o.article_id = a.id
-                        WHERE a.source_url = $1
-                        """,
-                        source_url,
-                    )
-
-            if row is None:
-                logger.warning(
-                    "Duplicato rilevato per '%s' ma non trovato nel DB: skip mark-read.",
-                    title[:50],
-                )
-                return True
-
-            outbox_status = row["outbox_status"]
-
-            if outbox_status == "completed":
-                logger.info(
-                    "Duplicato con vault completed: mark-read Miniflux per '%s'.",
-                    title[:50],
-                )
-                await state.miniflux_client.mark_as_read([entry_id])
-            elif outbox_status in ("pending", "failed", "writing"):
-                logger.warning(
-                    "Duplicato DB ma outbox status=%r per '%s': skip mark-read; "
-                    "attendo reconcile.",
-                    outbox_status,
-                    title[:50],
-                )
-            else:
-                # outbox_status is None (legacy / no outbox row)
-                from pathlib import Path
-
-                from app.classification.validator import GeopoliticalArticleSchema
-
-                pub_date = row["published_at"]
-                pub_date_str = (
-                    pub_date.isoformat()
-                    if hasattr(pub_date, "isoformat")
-                    else str(pub_date)
-                )
-
-                temp_schema = GeopoliticalArticleSchema(
-                    title=row["title"],
-                    summary="dummy",
-                    published_at=pub_date_str,
-                    source_url=row["source_url"],
-                    country_code=row["country_code"],
-                    latitude=0.0,
-                    longitude=0.0,
-                    companies_involved="Nessuno",
-                    tags=f"{row['primary_category']}, dummy",
-                    primary_category=row["primary_category"],
-                    sentiment="Neutrale",
-                    infrastructural_entities="Nessuno",
-                    relevance_level=3,
-                )
                 try:
-                    vault_path = get_article_file_path(
-                        temp_schema, vault_path=OBSIDIAN_VAULT_PATH
-                    )
-                    file_exists = await asyncio.to_thread(Path(vault_path).is_file)
-                except Exception as path_err:
-                    logger.error(
-                        "Errore durante il calcolo/verifica del path del Vault "
-                        "per il duplicato '%s': %s",
-                        title[:50],
-                        path_err,
-                    )
-                    file_exists = False
+                    await conn.execute("SELECT pg_advisory_lock($1, $2)", lock_ns, lock_key)
+                    lock_acquired = True
 
-                if file_exists:
+                    is_dup = await is_article_duplicate(conn, source_url)
+
+                    if is_dup:
+                        # T-P0-01: mark-read only if vault durable (outbox completed)
+                        # or legacy NULL outbox with vault file present — never blind mark-read.
+                        row = await conn.fetchrow(
+                            """
+                            SELECT
+                                o.status AS outbox_status,
+                                a.primary_category,
+                                a.country_code,
+                                a.published_at,
+                                a.title,
+                                a.source_url
+                            FROM articles a
+                            LEFT JOIN article_outbox o ON o.article_id = a.id
+                            WHERE a.source_url = $1
+                            """,
+                            source_url,
+                        )
+
+                        if row is None:
+                            logger.warning(
+                                "Duplicato rilevato per '%s' ma non trovato nel DB: skip mark-read.",
+                                title[:50],
+                            )
+                            return True
+
+                        outbox_status = row["outbox_status"]
+
+                        if outbox_status == "completed":
+                            logger.info(
+                                "Duplicato con vault completed: mark-read Miniflux per '%s'.",
+                                title[:50],
+                            )
+                            await state.miniflux_client.mark_as_read([entry_id])
+                        elif outbox_status in ("pending", "failed", "writing"):
+                            logger.warning(
+                                "Duplicato DB ma outbox status=%r per '%s': skip mark-read; "
+                                "attendo reconcile.",
+                                outbox_status,
+                                title[:50],
+                            )
+                        else:
+                            # outbox_status is None (legacy / no outbox row)
+                            from pathlib import Path
+
+                            from app.classification.validator import GeopoliticalArticleSchema
+
+                            pub_date = row["published_at"]
+                            pub_date_str = (
+                                pub_date.isoformat()
+                                if hasattr(pub_date, "isoformat")
+                                else str(pub_date)
+                            )
+
+                            temp_schema = GeopoliticalArticleSchema(
+                                title=row["title"],
+                                summary="dummy",
+                                published_at=pub_date_str,
+                                source_url=row["source_url"],
+                                country_code=row["country_code"],
+                                latitude=0.0,
+                                longitude=0.0,
+                                companies_involved="Nessuno",
+                                tags=f"{row['primary_category']}, dummy",
+                                primary_category=row["primary_category"],
+                                sentiment="Neutrale",
+                                infrastructural_entities="Nessuno",
+                                relevance_level=3,
+                            )
+                            try:
+                                vault_path = get_article_file_path(
+                                    temp_schema, vault_path=OBSIDIAN_VAULT_PATH
+                                )
+                                file_exists = await asyncio.to_thread(Path(vault_path).is_file)
+                            except Exception as path_err:
+                                logger.error(
+                                    "Errore durante il calcolo/verifica del path del Vault "
+                                    "per il duplicato '%s': %s",
+                                    title[:50],
+                                    path_err,
+                                )
+                                file_exists = False
+
+                            if file_exists:
+                                logger.info(
+                                    "Duplicato legacy: file Vault presente. "
+                                    "Marcatura come letto su Miniflux per '%s'.",
+                                    title[:50],
+                                )
+                                await state.miniflux_client.mark_as_read([entry_id])
+                            else:
+                                logger.warning(
+                                    "Duplicato DB legacy ma file Vault mancante per '%s': "
+                                    "skip mark-read.",
+                                    title[:50],
+                                )
+                        return True
+
+                    async with state.parse_sem:
+                        clean_content = strip_html_tags(entry.content)
+
+                    async with state.gemini_sem:
+                        extracted_article = await state.classification_client.classify_article(
+                            title=title,
+                            content=clean_content,
+                            url=source_url,
+                            date=published_date,
+                        )
+
+                    extracted_article = extracted_article.model_copy(
+                        update={
+                            "source_url": source_url,
+                            "published_at": published_date,
+                        }
+                    )
+
+                    md_content = generate_markdown_content(extracted_article)
+                    file_path = get_article_file_path(extracted_article, vault_path=OBSIDIAN_VAULT_PATH)
+
+                    article_id = await commit_article_to_db(
+                        conn,
+                        extracted_article,
+                        feed_title,
+                        outbox_target_path=file_path,
+                        outbox_payload=md_content,
+                        miniflux_entry_id=entry_id,
+                    )
+
+                    outbox_row = await conn.fetchrow(
+                        """
+                        SELECT id, article_id, target_path, payload, payload_checksum,
+                               attempt_count, miniflux_entry_id, status
+                        FROM article_outbox
+                        WHERE article_id = $1
+                          AND status IN ('pending', 'failed')
+                        """,
+                        article_id,
+                    )
+
+                    if outbox_row is not None:
+                        ok = await process_outbox_row(
+                            state.db_pool, outbox_row, state.miniflux_client
+                        )
+                        if not ok:
+                            logger.error(
+                                "Commit DB riuscito ma Vault/outbox fallito per article_id=%s; "
+                                "verrà riconciliato al prossimo ciclo.",
+                                article_id,
+                            )
+                            return False
+
                     logger.info(
-                        "Duplicato legacy: file Vault presente. "
-                        "Marcatura come letto su Miniflux per '%s'.",
-                        title[:50],
+                        "Articolo elaborato e committato correttamente [ID=%s]: '%s'",
+                        article_id,
+                        extracted_article.title[:50],
                     )
-                    await state.miniflux_client.mark_as_read([entry_id])
-                else:
-                    logger.warning(
-                        "Duplicato DB legacy ma file Vault mancante per '%s': "
-                        "skip mark-read.",
-                        title[:50],
-                    )
-            return True
+                    return True
 
-        async with state.parse_sem:
-            clean_content = strip_html_tags(entry.content)
-
-        async with state.gemini_sem:
-            extracted_article = await state.classification_client.classify_article(
-                title=title,
-                content=clean_content,
-                url=source_url,
-                date=published_date,
-            )
-
-        extracted_article = extracted_article.model_copy(
-            update={
-                "source_url": source_url,
-                "published_at": published_date,
-            }
-        )
-
-        md_content = generate_markdown_content(extracted_article)
-        file_path = get_article_file_path(extracted_article, vault_path=OBSIDIAN_VAULT_PATH)
-
-        async with state.db_sem:
-            async with state.db_pool.acquire() as conn:
-                article_id = await commit_article_to_db(
-                    conn,
-                    extracted_article,
-                    feed_title,
-                    outbox_target_path=file_path,
-                    outbox_payload=md_content,
-                    miniflux_entry_id=entry_id,
-                )
-
-        async with state.db_sem:
-            async with state.db_pool.acquire() as conn:
-                outbox_row = await conn.fetchrow(
-                    """
-                    SELECT id, article_id, target_path, payload, payload_checksum,
-                           attempt_count, miniflux_entry_id, status
-                    FROM article_outbox
-                    WHERE article_id = $1
-                      AND status IN ('pending', 'failed')
-                    """,
-                    article_id,
-                )
-
-        if outbox_row is not None:
-            async with state.db_sem:
-                ok = await process_outbox_row(
-                    state.db_pool, outbox_row, state.miniflux_client
-                )
-            if not ok:
-                logger.error(
-                    "Commit DB riuscito ma Vault/outbox fallito per article_id=%s; "
-                    "verrà riconciliato al prossimo ciclo.",
-                    article_id,
-                )
-                return False
-
-        logger.info(
-            "Articolo elaborato e committato correttamente [ID=%s]: '%s'",
-            article_id,
-            extracted_article.title[:50],
-        )
-        return True
+                finally:
+                    if lock_acquired:
+                        try:
+                            await conn.execute("SELECT pg_advisory_unlock($1, $2)", lock_ns, lock_key)
+                            logger.debug("Advisory lock rilasciato per URL: %s", source_url)
+                        except Exception as unlock_err:
+                            logger.warning(
+                                "Rilascio advisory lock fallito per URL %s: %s",
+                                source_url,
+                                unlock_err,
+                            )
 
     except asyncio.CancelledError:
         raise

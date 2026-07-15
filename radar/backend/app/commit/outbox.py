@@ -51,6 +51,10 @@ async def enqueue_outbox_row(
                 WHEN article_outbox.status = 'completed' THEN article_outbox.last_error
                 ELSE NULL
             END,
+            miniflux_marked_at = CASE
+                WHEN article_outbox.status = 'completed' THEN article_outbox.miniflux_marked_at
+                ELSE NULL
+            END,
             miniflux_entry_id = COALESCE(EXCLUDED.miniflux_entry_id, article_outbox.miniflux_entry_id),
             updated_at = NOW()
         """,
@@ -102,7 +106,20 @@ async def _mark_completed(conn: asyncpg.Connection, outbox_id: int) -> None:
         """
         UPDATE article_outbox
         SET status = 'completed',
+            miniflux_marked_at = NULL,
             last_error = NULL,
+            updated_at = NOW()
+        WHERE id = $1
+        """,
+        outbox_id,
+    )
+
+
+async def _update_miniflux_marked_at(conn: asyncpg.Connection, outbox_id: int) -> None:
+    await conn.execute(
+        """
+        UPDATE article_outbox
+        SET miniflux_marked_at = NOW(),
             updated_at = NOW()
         WHERE id = $1
         """,
@@ -174,9 +191,10 @@ async def process_outbox_row(
     if entry_id is not None and miniflux_client is not None:
         try:
             await miniflux_client.mark_as_read([int(entry_id)])
+            async with pool.acquire() as conn:
+                await _update_miniflux_marked_at(conn, outbox_id)
         except Exception as mark_err:
-            # Vault already durable; mark-read can retry on next reconcile via completed rows...
-            # Completed rows are not re-processed. Log and leave Miniflux unread for ops visibility.
+            # Vault already durable; leave miniflux_marked_at NULL so reconcile_outbox retries mark-read.
             logger.warning(
                 "Outbox id=%s completed ma mark-read Miniflux fallito (entry_id=%s): %s",
                 outbox_id,
@@ -198,7 +216,7 @@ async def reconcile_outbox(
     miniflux_client: Optional["MinifluxClient"] = None,
 ) -> dict[str, int]:
     """
-    Reconcile pending / failed / stale-writing outbox rows.
+    Reconcile pending / failed / stale-writing outbox rows, and retry failed Miniflux mark-read for completed rows.
     Call on startup and before every Miniflux fetch.
     """
     stats = {"reset_stale": 0, "attempted": 0, "succeeded": 0, "failed": 0}
@@ -215,6 +233,17 @@ async def reconcile_outbox(
             LIMIT 200
             """
         )
+        completed_rows = await conn.fetch(
+            """
+            SELECT id, article_id, miniflux_entry_id
+            FROM article_outbox
+            WHERE status = 'completed'
+              AND miniflux_marked_at IS NULL
+              AND miniflux_entry_id IS NOT NULL
+            ORDER BY updated_at ASC
+            LIMIT 200
+            """
+        )
 
     if stats["reset_stale"]:
         logger.info("Outbox: resettate %d righe writing stale", stats["reset_stale"])
@@ -226,6 +255,31 @@ async def reconcile_outbox(
             stats["succeeded"] += 1
         else:
             stats["failed"] += 1
+
+    for row in completed_rows:
+        outbox_id = row["id"]
+        entry_id = row["miniflux_entry_id"]
+        if miniflux_client is not None:
+            stats["attempted"] += 1
+            try:
+                await miniflux_client.mark_as_read([int(entry_id)])
+                async with pool.acquire() as conn:
+                    await _update_miniflux_marked_at(conn, outbox_id)
+                stats["succeeded"] += 1
+                logger.info(
+                    "Outbox retry mark-read completato per id=%s article_id=%s (entry_id=%s)",
+                    outbox_id,
+                    row["article_id"],
+                    entry_id,
+                )
+            except Exception as retry_err:
+                stats["failed"] += 1
+                logger.warning(
+                    "Outbox retry mark-read fallito per id=%s (entry_id=%s): %s",
+                    outbox_id,
+                    entry_id,
+                    retry_err,
+                )
 
     if stats["attempted"]:
         logger.info(

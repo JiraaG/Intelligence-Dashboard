@@ -6,7 +6,7 @@
 * **Manuale operativo di riferimento:** `audit_problemi_documentazione.md` (v2.2 · FASI 0–2 + APPENDICE F)
 * **Gate Progetto:** Phase 6 / Gate Verde (Stato post-branch restore)
 * **Stato Fase 0:** **FASE 0 DONE DEFINITIVA**
-* **Remediation codice:** T-P0-01 **DONE** (verificato in questo workspace 2026-07-15); resto OPEN
+* **Remediation codice:** T-P0-01 **DONE**, T-P1-03 **DONE**, T-P1-01 **DONE**, T-P1-02 **DONE** (2026-07-15); resto OPEN; prossimo **T-P0-02**
 * **SoT stato ticket:** questo file §3 (stati `OPEN` / `DONE` / `CLOSED`). Playbook riprodurre/fix/gate = manuale FASI 3–5. Dopo ogni fix aggiornare §3 qui e la matrice FASE 2 del manuale.
 
 ### Definition of Done FASE 0 (firmata)
@@ -43,8 +43,8 @@ SoT: audit_problemi_documentazione.md v2.2 + APPENDICE F.
 Stato ticket operativo: audit_problemi_documentazione_risoluzione.md §3.
 radar/.ecc/CLAUDE.md è allineato Gate Verde (T-DOC-01 CLOSED); preferisci comunque .agents/AGENTS.md + radar/.ecc/rules/*.md come guardrail.
 Vincoli: sidebar freeze; main.py API-only; asyncpg; window.L; no commit senza richiesta.
-Ticket OPEN in ordine FASE 4 (rispettare dipendenza T-P0-01 → T-P1-03).
-Un ticket per turno: riproduci → fix → gate FASE 5 → marca DONE in risoluzione §3 e aggiorna manuale FASE 2.
+Ticket OPEN in ordine FASE 4 (T-P0-01, T-P1-03, T-P1-01, T-P1-02 DONE; prossimo T-P0-02).
+Ticket per turno: riproduci → fix → gate FASE 5 → marca DONE in risoluzione §3 e aggiorna manuale FASE 2.
 Priorità elevate T-P0-02 / T-P1-05 sono intenzionali (App. F §F.2).
 ```
 
@@ -143,7 +143,7 @@ Se già nel DB (Duplicato)
 | Classe | Count |
 |--------|------:|
 | P0 OPEN codice | 1 (T-P0-02; T-P0-01 DONE) |
-| P1 OPEN codice | 5 |
+| P1 OPEN codice | 2 (T-P1-03, T-P1-01, T-P1-02 DONE; restano T-P1-04/05) |
 | P2 OPEN codice | 8 |
 | Docs OPEN residui | 0 |
 | Docs FIXED / non riaprire | 12 (11 storici + T-DOC-01) |
@@ -157,9 +157,9 @@ Se già nel DB (Duplicato)
 | :--- | :--- | :---: | :--- | :---: | :---: | :--- |
 | **T-P0-01** | BE-AUD-001 | P0 | `backend/app/worker.py` (ramo `is_dup`) | **DONE** | — | Gate outbox completed + vault-check NULL. Test `test_worker_gate.py`. Vedi §8.1 + `audit_remediation_T-P0-01.md`. |
 | **T-P0-02** | BE-AUD-005/006 | P0 | `backend/scripts/**` | OPEN | — | `ClassificationClient()` vuoto + `_wait_for_rate_limit` rimosso. |
-| **T-P1-01** | BE-AUD-002, INF-AUD-01 | P1 | `core/config.py#L91-L98`, Compose L76–77 | OPEN | — | `DATABASE_URL` senza `quote_plus` (anche path Compose). |
-| **T-P1-02** | BE-AUD-003 | P1 | `worker.py#L208-L251` | OPEN | — | Race TOCTOU multi-consumer; serve lock per-URL (≠ leadership lock). |
-| **T-P1-03** | BE-AUD-004 | P1 | `commit/outbox.py#L170-L185` | OPEN | **T-P0-01** | Mark-read post-`completed` non ritentabile; reconcile ignora `completed`. |
+| **T-P1-01** | BE-AUD-002, INF-AUD-01 | P1 | `core/config.py` (`quote_plus`) + Compose `POSTGRES_HOST` | **DONE** | — | Credenziali encoded via `quote_plus`; niente `DATABASE_URL` grezzo su backend/worker. Vedi §12 + `audit_remediation_T-P1-01.md`. |
+| **T-P1-02** | BE-AUD-003 | P1 | `worker.py` | **DONE** | — | Race TOCTOU multi-consumer; pg_advisory_lock per-URL. Vedi §13 + `audit_remediation_T-P1-02.md`. |
+| **T-P1-03** | BE-AUD-004 | P1 | `commit/outbox.py` (`reconcile_outbox` + `_update_miniflux_marked_at`) | **DONE** | **T-P0-01** | Mark-read post-`completed` ritentabile via `miniflux_marked_at` (migrazione 008). Vedi §8.2 + `audit_remediation_T-P1-03.md`. |
 | **T-P1-04** | FE-AUD-001 | P1 | `state.service.ts#L99-L127`, `app.ts#L122-L125` | OPEN | — | Errore nation-fetch chiude sidebar senza banner/`detailError`. |
 | **T-P1-05** | INF-AUD-02 | P1 | `frontend/Dockerfile`, `nginx.conf` | OPEN | — | Nginx root / porta 80. Path: USER nginx+8080 **oppure** eccezione SoT in `docker.md`. |
 | **T-DOC-01** | Check docs v2.1 | P1 Docs | `radar/.ecc/CLAUDE.md` | **CLOSED** | — | Sintomi legacy (Phase 0–2 / `radar-network`) **non più presenti** su disco (verifica FASE 0). File allineato Gate Verde. |
@@ -192,11 +192,11 @@ Se già nel DB (Duplicato)
 
 Ordine FASE 4 (T-DOC-01 escluso: già CLOSED):
 
-1. **`T-P0-01`** — Gate duplicato (as-is senza gate).
-2. **`T-P1-03`** — Retry mark-read (dipende da T-P0-01; dopo il gate il retry resta necessario — F.3).
-3. **`T-P1-01`** — `DATABASE_URL` `quote_plus` (+ Compose/`.env`).
-4. **`T-P1-02`** — Advisory lock per-URL.
-5. **`T-P0-02`** — Script diagnostici.
+1. **`T-P0-01`** — Gate duplicato — **DONE**
+2. **`T-P1-03`** — Retry mark-read — **DONE**
+3. **`T-P1-01`** — `DATABASE_URL` `quote_plus` (+ Compose/`.env`) — **DONE**
+4. **`T-P1-02`** — Advisory lock per-URL — **DONE**
+5. **`T-P0-02`** — Script diagnostici. (prossimo)
 6. **`T-P1-04`** — Banner nation-open / `detailError`.
 7. **`T-P1-05`** — Nginx non-root **oppure** eccezione SoT.
 8. **P2 in blocco** (`T-P2-01` → `T-P2-08`).
@@ -230,7 +230,7 @@ Deferred infra (digest pin, `--legacy-peer-deps`) ≠ FAIL — non aprire ticket
 
 ### 7.1 Letture e evidenze
 * Manuale v2.1→v2.2, scratch×6, AGENTS.md, `.ecc/rules/*`, `runbook.md`, `CLAUDE.md`.
-* Spot-check codice (FASE 0 + verifica aggiuntiva): `worker.py` L213–219 (T-P0-01 CONFIRMED); `config.py` L91–98 + Compose L76–77 (T-P1-01); `outbox.py` L170–185 (T-P1-03); `state.service.ts` / `app.ts` (T-P1-04); script `ClassificationClient` (T-P0-02); Dockerfile/nginx (T-P1-05); `CLAUDE.md` Gate Verde (T-DOC-01 CLOSED).
+* Spot-check codice (FASE 0 + verifica aggiuntiva): `worker.py` gate T-P0-01 DONE; `config.py` `quote_plus` + Compose `POSTGRES_HOST` (T-P1-01 DONE); `outbox.py` retry `miniflux_marked_at` (T-P1-03 DONE); `state.service.ts` / `app.ts` (T-P1-04 OPEN); script `ClassificationClient` (T-P0-02 OPEN); Dockerfile/nginx (T-P1-05 OPEN); `CLAUDE.md` Gate Verde (T-DOC-01 CLOSED).
 * P2 spot-check: T-P2-01/02/05 CONFIRMED; T-P2-06 WEAK (difesa in profondità); T-P2-08 path residuo da verificare prima del delete.
 
 ### 7.2 Multi-agente (FASE 0 iniziale + verifica chiusura)
@@ -267,7 +267,7 @@ Select-String -Path "radar\.ecc\CLAUDE.md" -Pattern "radar-network|Phase 0–2|P
 - ADJUST cieco `in ("completed", None)` **RIFIUTATO** (prevenzione silent gaps).
 - Implementato Vault-Check per articoli legacy (NULL outbox status): il worker recupera i metadati dell'articolo dal DB, ricostruisce il percorso atteso del Vault tramite `get_article_file_path()` ed esegue `mark_as_read` solo se il file esiste fisicamente sul disco (`asyncio.to_thread` per `Path.is_file()`).
 - In caso di outbox `pending`, `failed` o `writing`, il mark-read viene saltato (`skip`) stampando un warning, in attesa che la riconciliazione dell'outbox (`reconcile_outbox`) ne completi l'elaborazione.
-- **Handoff T-P1-03:** Riconciliazione/retry di `mark-read` post-outbox completed resta necessaria e deve essere implementata come da specifica (ticket T-P1-03).
+- **Handoff T-P1-03:** **SODDISFATTO** — vedi §8.2 / §11 (retry `miniflux_marked_at` + migrazione 008).
 
 **FASE 5 (validazione) — riverifica workspace principale 2026-07-15 ~20:23:**
 - `radar/backend/app/tests/test_worker_gate.py` presente in-repo (non solo worktree Antigravity).
@@ -277,6 +277,27 @@ Select-String -Path "radar\.ecc\CLAUDE.md" -Pattern "radar-network|Phase 0–2|P
 - `docker compose build/up radar-worker` → gate presente nel container (`outbox_status` / vault-check).
 - Script G: molte righe `articles` senza outbox (`status` NULL) — atteso legacy; gate le gestisce con vault-check.
 - Nota ops: fetch Miniflux può fallire con `MAX_MINIFLUX_RESPONSE_BYTES` (fuori scope T-P0-01).
+
+### 8.2 T-P1-03 — Retry mark-read post-completed
+
+| Campo | Valore |
+|-------|--------|
+| Stato | **DONE** — FASE 3/4/5 completate. |
+| Report | `audit_remediation_T-P1-03.md` |
+| Codice | Migrazione 008, helper e query in `radar/backend/app/commit/outbox.py`, test in `tests/test_outbox_mark_read_retry.py` |
+
+**FASE 3 (riproduzione):** CONFIRMED — In caso di errore Miniflux dopo Vault scritto con successo, la riga outbox passava a completed, ma senza retry la riga veniva esclusa dai successivi reconcile (poiché status IN ('pending', 'failed')).
+
+**FASE 4 (design & implementazione):**
+- Creata migrazione 008 con aggiunta colonna `miniflux_marked_at` e backfill integrato per gli articoli completed storici.
+- Aggiornato `enqueue_outbox_row` per preservare/azzerare `miniflux_marked_at` on conflict.
+- Aggiornato `process_outbox_row` per impostare `miniflux_marked_at = NOW()` su successo di mark-read.
+- Aggiornato `reconcile_outbox` per effettuare una seconda SELECT che recupera solo le righe completed non marcate in Miniflux ed effettua solo il retry mark-read, senza mai riscrivere il Vault.
+
+**FASE 5 (validazione):**
+- Creato `tests/test_outbox_mark_read_retry.py` che valida l'isolamento del Vault durante i retry e la corretta marcatura del timestamp.
+- Ruff e pytest not live 113/113 passed.
+- Eseguito rebuild di `radar-worker` ed esecuzione migrazione 008 sul DB PostgreSQL verificata con successo.
 
 ---
 
@@ -309,4 +330,43 @@ Select-String -Path "radar\.ecc\CLAUDE.md" -Pattern "radar-network|Phase 0–2|P
 - Walkthrough iniziale: **falso positivo** sul tree principale (fix assente); portato qui, testati, worker rebuild.
 - Gate: `completed` → mark-read; `pending|failed|writing` → skip; `NULL` → vault `Path.is_file`.
 - Gate FASE 5: ruff OK; `test_worker_gate` 4/4; pytest not live 111; container `GATE_PRESENT_IN_CONTAINER=OK`.
-- **Handoff:** **T-P1-03** — retry mark-read post-`completed` (`outbox.py` reconcile oggi non riprocessa completed).
+- **Handoff (storico):** T-P1-03 — poi chiuso in §11.
+
+---
+
+## 11. Esito Remediation Ticket T-P1-03
+
+**T-P1-03 DONE — PASS_WITH_GAPS chiusi in docs** (verificato nel workspace `Dashboard finance`, non solo nel worktree Antigravity).
+
+- Walkthrough: implementazione migrazione 008, logica `outbox.py` con colonna `miniflux_marked_at` e backfill, test dedicati completati con successo.
+- Gate FASE 5 (riverifica Cursor): ruff OK; `test_outbox_mark_read_retry` 2/2; pytest not live 113/113; DB 937/937 completed marked; worker container sync OK.
+- Drift docs (conteggi P1, handoff §10, cite linee) allineati post-verifica.
+- **Handoff (storico):** **T-P1-01** — poi chiuso in §12.
+
+---
+
+## 12. Esito Remediation Ticket T-P1-01
+
+**T-P1-01 DONE — PASS** (verificato nel workspace `Dashboard finance` e nei container).
+
+- Configurazione: aggiunto `quote_plus` per Postgres user e password in `config.py` per supportare credenziali speciali (es. `@`, `:`, `/`, `#`).
+- Compose: rimosso `DATABASE_URL` da `radar-backend` e `radar-worker`, sostituendolo con `POSTGRES_HOST: radar-db`.
+- .env.example: rimosso `DATABASE_URL` di default e aggiunta nota di avviso per manual override e Miniflux.
+- Gate FASE 5: ruff OK; test `test_database_url.py` 1/1; pytest not live 114/114; Script F superato; container build/up ed esecuzione di printenv confermano che il bypass dell'URL grezzo è rimosso e `POSTGRES_HOST` è configurato.
+- Riverifica Cursor: codice/Docker confermati; drift manuale (pie P1, App. D, §4.2) allineato.
+- **Handoff:** **T-P1-02** (storico) — poi chiuso in §13.
+
+---
+
+## 13. Esito Remediation Ticket T-P1-02
+
+**T-P1-02 DONE — PASS_WITH_GAPS** (verificato Cursor nel workspace `Dashboard finance`; Docker daemon assente).
+
+- Lock: `pg_advisory_lock` a due argomenti (namespace `777666555` + hash SHA-256 32-bit URL) in `process_single_entry`.
+- CancelledError: unlock in `finally` sulla stessa connessione; poi re-raise.
+- Concorrenza: `test_worker_concurrency.py` serializza 2 task stesso URL → 1 classify + 1 commit.
+- Gate FASE 5 (riverifica): ruff OK; concurrency 1/1; gate 4/4; pytest not live **115/115**.
+- Gap: Docker Desktop spento → rebuild/`grep` container **non** riverificabili finché il daemon non riparte.
+- Nota design accettata: connessione (+ `db_sem`) tenuta per tutta la classify Gemini (session lock); pool `max_size=10`, entry/db concurrency default 4.
+- **Handoff:** **T-P0-02** — script diagnostici / `ClassificationClient()`.
+

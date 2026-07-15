@@ -74,12 +74,15 @@ Script G: numerosi `articles` con outbox NULL (legacy) — gestiti dal vault-che
 
 | Item | Severità | Note |
 |------|----------|------|
-| T-P1-03 retry mark-read post-completed | **P1 next** | Dipendenza soddisfatta; implementare subito |
+| T-P1-03 retry mark-read post-completed | **DONE** | Migrazione 008 + reconcile retry; vedi `audit_remediation_T-P1-03.md` |
+| T-P1-01 DATABASE_URL quote_plus | **DONE** | `quote_plus` + Compose `POSTGRES_HOST`; vedi `audit_remediation_T-P1-01.md` |
+| T-P1-02 TOCTOU / advisory lock per-URL | **DONE** | Vedi `audit_remediation_T-P1-02.md` |
+| T-P0-02 Script diagnostici ClassificationClient | **P0 next** | Prompt: `audit_prompt_T-P0-02.md` (da creare) |
 | Miniflux `MAX_MINIFLUX_RESPONSE_BYTES` | Ops | Worker log: corpo risposta > 5MB → fetch fallisce; fuori T-P0-01 |
 | Permission denied `logs/` in container | Ops | Solo console logging; non blocca gate |
 | Backfill outbox completed per legacy | Perfect | Riduce dipendenza da vault-check path reconstruction |
 
-**Handoff one-liner T-P1-03:** *Dopo T-P0-01, implementare retry mark-read per outbox `completed` con mark-read fallito (`outbox.py` reconcile oggi ignora completed).*
+**Handoff one-liner T-P0-02:** *Script diagnostici: `ClassificationClient()` senza pool + `_wait_for_rate_limit` rimosso — riparare o deprecare.*
 
 ---
 
