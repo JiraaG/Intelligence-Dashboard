@@ -235,7 +235,8 @@ Fix: `invalidateSize` senza `setView` inutile; invalidate **prima** dello spider
 - [x] Truncate carosello nazione a 50
 - [x] Fetch solo `country×category` al click nazione
 
-**Restore point Phase 5:** pinned in scoreboard below after commit on `refactor/enterprise-consolidation`.
+**Restore point Phase 5:** `1dfdf60` (`feat(phase5): map-summary + paged articles, nation detail markers, stable spiderfy`) su `refactor/enterprise-consolidation`.
+Restore: `git checkout 1dfdf60`
 
 ---
 
@@ -257,13 +258,13 @@ Fix: `invalidateSize` senza `setView` inutile; invalidate **prima** dello spider
 | 2 | Completata (persa) | **DONE** (`72851d7`) | — |
 | 3 | Completata (persa) | **DONE** (`19c67f0`) | — |
 | 4 | Completata (persa) | **DONE** (`de9bd2f`) | — |
-| 5 | Completata (persa) | **DONE** *(SHA pinned after commit)* | Residuali opzionali → Phase 6 |
+| 5 | Completata (persa) | **DONE** (`1dfdf60`) | Residuali opzionali → Phase 6 |
 | 5.5 | Completata (persa) | N/A nel piano master | Assorbita in 1–3 al ri-run |
 | 6 | Non iniziata | **NOT STARTED** | Ultima |
 
 **Ordine:** Phase 6.
 
-**Restore rapido a Phase 5:** `git checkout <Phase5-SHA>` su `refactor/enterprise-consolidation` (SHA in scoreboard dopo pin).
+**Restore rapido a Phase 5:** `git checkout 1dfdf60` su `refactor/enterprise-consolidation`.
 **Restore rapido a Phase 4:** `git checkout de9bd2f` su `refactor/enterprise-consolidation`.
 **Restore rapido a Phase 3:** `git checkout 19c67f0` su `refactor/enterprise-consolidation`.
 **Restore a Phase 2:** `git checkout 72851d7`.

@@ -12,7 +12,7 @@ This plan addresses the production blockers found during the code and architectu
 | Phase 2 | `72851d7` | `radar-worker`, coda bounded, `llm_request_ledger`, Gemini deadline/retry |
 | Phase 3 | `19c67f0` | edge/data, live/ready+heartbeat, CSP, ops, soft hardening; schema Gemini sanificato |
 | Phase 4 | `de9bd2f` | FE XSS/MOCK_MODE/DestroyRef; read-unread no cluster rebuild; hatch owner map; overlay full-bleed |
-| Phase 5 | *(pin after commit — see Execution log)* | map-summary + articles cursor/LATERAL; nation detail markers; spiderfy category-aligned |
+| Phase 5 | `1dfdf60` | map-summary + articles cursor/LATERAL; nation detail markers; spiderfy category-aligned |
 
 ## Scope And Exit Criteria
 
@@ -376,7 +376,8 @@ cd radar/frontend && npm run typecheck && npm run test:ci && npm run build:ci
 ```
 
 **Status (2026-07-15):** gate verde locale — pytest `not live` OK; FE typecheck + test:ci (18) + build:ci OK; Docker FE/BE healthy; migrazione `007` applicata. Residuali non bloccanti: seed EXPLAIN su DB isolato, smoke toggle letta manuale.
-**Restore point Phase 5:** pinned in `Implementation_Plan_Execution.md` scoreboard after commit on `refactor/enterprise-consolidation`.
+**Restore point Phase 5:** `1dfdf60` (`feat(phase5): map-summary + paged articles...`) su `refactor/enterprise-consolidation`.
+Restore: `git checkout 1dfdf60`
 
 ## Phase 6 - Align Governance, Documentation, And Operations
 
