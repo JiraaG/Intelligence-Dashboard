@@ -16,7 +16,7 @@
 | ruff | PASS |
 | pytest `test_worker_concurrency.py` | **1/1 PASS** |
 | pytest `-m "not live"` | **115 passed** |
-| Worker container rebuild | Tentato (Fallito: Docker Desktop daemon non attivo sul sistema Windows dell'utente, segnalato come GAP infrastrutturale esterno). |
+| Worker container rebuild | **PASS** (riverifica Cursor: daemon riavviato; build/up OK; `get_url_lock_keys` + `quote_plus` + `miniflux_marked_at` in image; ingest attivo) |
 | Docs coerenti con codice? | Sì dopo riverifica Cursor (pie P1=2, §3.4/§4.3, App. D) |
 
 **Verdetto complessivo dopo remediation in-workspace:** **PASS_WITH_GAPS** — codice/test/docs OK; gap residuo = Docker Desktop spento (rebuild worker non riverificato in container).
