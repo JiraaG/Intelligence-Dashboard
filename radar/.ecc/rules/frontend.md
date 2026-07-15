@@ -247,11 +247,15 @@ Il componente `p-sidebar` di PrimeNG può essere usato come wrapper UI.
 
 ## Regola 7: Clustering per categoria + map-summary (Phase 5)
 
-**Day open (Phase 5):** la mappa si dipinge da `GET /api/map-summary` (righe `country_code × primary_category` + count/read + lat/lon finite). Niente `Article[]` globale del giorno. Hatching da categorie aggregate per paese (zoom &lt; 5). A zoom ≥ 5: **pallini numerati** da summary (cluster per categoria, count = `article_count`); click pallino/cluster → fetch nazione + sidebar (stesso path nation open).
+**Day open (Phase 5):** la mappa si dipinge da `GET /api/map-summary` (righe `country_code × primary_category` + count/read + lat/lon finite). Niente `Article[]` globale del giorno. Hatching da categorie aggregate per paese (zoom &lt; 5). A zoom ≥ 5: **un pin nazione** (conteggio + anello conic categorie) — non pallini numerati per-categoria. Click pin → fetch nazione + sidebar (`preserveZoom: true`, niente dezoom). Click poligono/toolbar → nation open + `fitBounds` (`maxZoom: 4`).
 
-**Nation open:** `GET /api/articles?date&country` (envelope `{items,next_cursor,total}`, page ≤100; FE concatena tutte le pagine) → carosello = **tutte** le notizie della nazione (sort categoria + pill `findIndex` invariati in sidebar). Sulla mappa si materializzano i marker articolo **solo** per il paese aperto. Spiderfy: categoria del pallino / pill / articolo attivo carosello — **non** tutte le categorie; allo scroll carosello nella stessa categoria solo highlight (`lastSpiderfyKey`), niente `collapseAllGraphs`. Close/cambio paese: clear detail markers; tornano i pallini summary.
+**Nation open:** `GET /api/articles?date&country` (envelope `{items,next_cursor,total}`, page ≤100; FE concatena tutte le pagine) → carosello = **tutte** le notizie della nazione (sort categoria + pill `findIndex` invariati in sidebar). Sulla mappa: marker articolo **solo** per il paese aperto + **hub disco compatto** (`radar-spider-root`, stesso stile del root spiderfy). Spiderfy: sola categoria del pallino / pill / articolo attivo carosello — **non** tutte; allo scroll stessa categoria solo highlight (`lastSpiderfyKey`). Fan: max **24** icone (park extras); size emoji + `spiderfyDistanceMultiplier` adattivi al conteggio. Close/cambio paese: clear detail markers; tornano i pin summary.
 
 **InvalidateSize / spiderfy race:** dopo open nazione, `invalidateSize` **prima** di `focusAndSpiderfyCategory`; `invalidateSize` usa `pan: false` e `setView` solo se la camera è driftata (setView mid-spiderfy svuota il pane MarkerCluster).
+
+**Hub root lifecycle:** su cambio categoria, `collapseAllGraphs(false, false)` setta `restoreDetailHubOnUnspiderfy = false`. Il handler `unspiderfied` **non** deve `clearRootMarkers` / ripristinare hub in quel caso (altrimenti l’`unspiderfy` asincrono del fan precedente cancella il nuovo root). Solo chiusura reale (`restoreHub: true`) ripristina l’hub.
+
+**Focus camera:** `armSkipCountryFit` **solo** con `preserveZoom` (pin summary). Poligono/toolbar: `fitBounds`. Stesso `focusCountryCode` di nuovo → `refocusCountry(code)` (il signal non ri-triggera).
 
 **VIETATO:** `article-list` / infinite scroll in sidebar; truncare il carosello nazione a N arbitrario come regola UX; modificare `radar-sidebar/**`.
 
@@ -262,7 +266,7 @@ Parametri obbligatori (da `radar-map.component.ts`):
 const cg = L.markerClusterGroup({
   maxClusterRadius: 40,
   spiderfyOnMaxZoom: false,
-  // ... iconCreateFunction / clusterclick custom del progetto
+  // iconCreateFunction: hidden 0×0 — day pins + nation hub disc own the chrome
 });
 ```
 
@@ -271,7 +275,8 @@ Non reintrodurre raggio 200, `spiderfyOnMaxZoom: true`, o `disableClusteringAtZo
 **Regole di calibrazione:**
 - `maxClusterRadius`: **40px** (allineato a `radar-map.component.ts` post-restore)
 - `spiderfyOnMaxZoom`: **false** (espansione custom, non spiderfy automatico)
-- **Focus con compensazione sidebar**: `fitBounds` con padding lato sidebar
+- Spiderfy fan: `SPIDERFY_MAX_ICONS = 24`; distanza/size adattivi (`spiderfyDistanceForCount` / `spiderfyIconSizeForCount`)
+- **Focus:** pin summary = preserveZoom; poligono/toolbar = `fitBounds` maxZoom 4; US/RU bounds hardcoded
 - **Sidebar close**: `App.closeSidebar()` → `mapComponent.collapseAllGraphs()` (senza editare file sidebar)
 - **Read/unread**: fingerprint + `syncMarkerReadState` — no `clearLayers` su solo `is_read`
 

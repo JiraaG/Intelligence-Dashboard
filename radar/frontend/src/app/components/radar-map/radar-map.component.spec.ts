@@ -377,4 +377,55 @@ describe('RadarMapComponent (Phase 4)', () => {
     // Only one category (first found), not all.
     expect(spiderfyRoot).toHaveBeenCalledTimes(1);
   });
+
+  it('day view places one country pin (not per-category balls) at the centroid', async () => {
+    const summary = [
+      {
+        country_code: 'BE',
+        primary_category: 'Economia' as const,
+        article_count: 3,
+        read_count: 0,
+        latitude: 50.85,
+        longitude: 4.35,
+      },
+      {
+        country_code: 'BE',
+        primary_category: 'Tecnologia' as const,
+        article_count: 2,
+        read_count: 0,
+        latitude: 50.85,
+        longitude: 4.35,
+      },
+      {
+        country_code: 'FR',
+        primary_category: 'Geopolitica' as const,
+        article_count: 4,
+        read_count: 1,
+        latitude: 46.2,
+        longitude: 2.2,
+      },
+    ];
+
+    const fixture = TestBed.createComponent(MapHostComponent);
+    fixture.detectChanges();
+    flushGeoJson();
+    await fixture.whenStable();
+
+    const mapCmp = getMapCmp(fixture);
+    (
+      mapCmp as unknown as {
+        updateMapData: (a: Article[], c: CountrySummary[], s?: unknown[]) => void;
+      }
+    ).updateMapData([], [], summary);
+
+    const group = (
+      mapCmp as unknown as { summaryMarkerGroup: { getLayers(): unknown[] } }
+    ).summaryMarkerGroup;
+    expect(group.getLayers().length).toBe(2);
+
+    const offsets = (
+      mapCmp as unknown as { UI_OFFSETS: Record<string, [number, number]> }
+    ).UI_OFFSETS;
+    expect(offsets['Nucleare']).toEqual([34, 0]);
+  });
 });

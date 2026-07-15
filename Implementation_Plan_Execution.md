@@ -186,10 +186,11 @@ cd radar/frontend && npm run typecheck && npm run test:ci && npm run build:ci
 
 - Apertura giorno → `GET /api/map-summary` (hatching + count `country×category` + pallini zoom ≥ 5); niente `Article[]` globale.
 - Click nazione / toolbar → fetch **tutti** gli articoli `date+country` (page HTTP ≤100, FE concatena); carosello nazione completo.
-- Pallino summary → nazione + sidebar filtrata categoria + spiderfy categoria (no dezoom).
+- Pallino/pin summary → nazione + sidebar filtrata categoria + spiderfy categoria (`preserveZoom`).
 - Open nazione senza categoria → spiderfy **solo** categoria dell’articolo attivo nel carosello.
-- Scroll carosello stessa categoria → highlight only (`lastSpiderfyKey`); cambio categoria → spiderfy.
-- Close: clear detail markers; summary resta.
+- Scroll carosello stessa categoria → highlight only (`lastSpiderfyKey`); cambio categoria → spiderfy (hub root stabile).
+- Poligono/toolbar → nation open + `fitBounds` (`maxZoom: 4`); ri-click stesso paese → `refocusCountry`.
+- Close: clear detail markers; summary pins restano.
 - Seed gate: SQL sintetico 10k/1 day — **non** pipeline Miniflux/Gemini (script pronto; EXPLAIN residuale).
 - Breaking API; SQL LATERAL; finite lat/lon; MOCK_MODE; sidebar freeze.
 
@@ -231,6 +232,17 @@ Fix: `invalidateSize` senza `setView` inutile; invalidate **prima** dello spider
 
 - Open nazione → spiderfy sola categoria dell’articolo carosello (sort categoria).
 - Scroll stessa categoria → `lastSpiderfyKey` skip collapse; cambio categoria / pill → spiderfy.
+
+**Map UX harden — hub + fan (2026-07-15)**
+
+Sintomi: hub spariva al cambio categoria carosello/pill; fan troppo denso / icone grandi; focus nazione inconsistente dopo il primo click.
+
+Fix:
+- `unspiderfied` no-op se `restoreDetailHubOnUnspiderfy === false` (non wipe del root mid-transition).
+- Nation hub = disco compatto `radar-spider-root` (stesso chrome del root spiderfy).
+- Fan: `SPIDERFY_MAX_ICONS = 24`; `spiderfyIconSizeForCount` + `spiderfyDistanceForCount` adattivi.
+- `armSkipCountryFit` solo con `preserveZoom`; `refocusCountry` per stesso codice; poligono click sempre emette.
+- Docs ECC: `docs/03_frontend_and_ui.md`, `radar/.ecc/rules/frontend.md` Regola 7, `.agents/AGENTS.md`, README FE.
 
 **Non fare**
 

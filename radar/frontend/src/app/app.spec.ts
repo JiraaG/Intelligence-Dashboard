@@ -141,6 +141,12 @@ class MapStubComponent {
   focusAndSpiderfyCountry(_countryCode: string): void {
     /* no-op stub */
   }
+  armSkipCountryFit(): void {
+    /* no-op stub */
+  }
+  refocusCountry(_code: string): void {
+    /* no-op stub */
+  }
   highlightMarkerForArticle(_article: Article | null): void {
     /* no-op stub */
   }

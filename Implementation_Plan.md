@@ -298,13 +298,14 @@ Restore: `git checkout de9bd2f`
 **Product contract (locked — overrides earlier “limit 50 detail” draft):**
 
 ```text
-DAY OPEN     → GET /api/map-summary  → hatching + numbered pallini (zoom ≥ 5)
-COUNTRY / TOOLBAR → ALL articles date+country → full-nation carousel
-PALLINO summary (country×category) → nation fetch, sidebar filtered to category,
-  spiderfy that category, no dezoom (armSkipCountryFit)
+DAY OPEN     → GET /api/map-summary  → hatching + country pin (zoom ≥ 5)
+COUNTRY / TOOLBAR → ALL articles date+country → full-nation carousel + fitBounds
+PALLINO/PIN summary → nation fetch, sidebar filtered to category,
+  spiderfy that category, preserveZoom (armSkipCountryFit)
 NATION OPEN (no category) → spiderfy only the carousel-active category
 CAROUSEL SCROLL → highlight article; spiderfy only when category changes
-CLOSE        → clear detailArticles → summary pallini return
+  (hub root must survive category switch — no clearRoot on stale unspiderfy)
+CLOSE        → clear detailArticles → summary pins return
 ```
 
 Do **not** truncate the nation carousel at 50. HTTP page size may be ≤100 for transport; FE concatenates pages until `next_cursor` is null. Do **not** fetch only `country×category` on nation click (breaks category index). Sidebar freeze unchanged.
@@ -353,7 +354,7 @@ Do **not** truncate the nation carousel at 50. HTTP page size may be ≤100 for 
 1. [x] Paginated `/api/articles` with filters `date` (required), `country`, `category`, `sentiment`, `relevance_level`, `cursor`, `limit` (cap 100). Response `{ items, next_cursor, total }`. Companies/tags via LATERAL.
 2. [x] `GET /api/map-summary?date=…` → rows `country_code × primary_category` with counts + finite lat/lon.
 3. [x] Indexes migration `007`; seed script `seed_perf_articles.py` (EXPLAIN residual / optional on isolated DB).
-4. [x] **Map UX:** day = summary hatching + numbered pallini; nation open = detail markers only for that country; category pallino / pill / active carousel category → `focusAndSpiderfyCategory`; carousel same-category scroll does **not** collapse/reopen spiderfy (`lastSpiderfyKey`); multi-pallino race fixed (`invalidateSize` before spiderfy, `pendingGeometryRefresh`).
+4. [x] **Map UX:** day = summary hatching + country pins; nation open = detail markers only for that country + compact hub disc; category pin / pill / active carousel category → `focusAndSpiderfyCategory`; carousel same-category scroll does **not** collapse/reopen spiderfy (`lastSpiderfyKey`); multi-pin race fixed (`invalidateSize` before spiderfy, `pendingGeometryRefresh`); hub survives category switch (`unspiderfied` no-op when `restoreDetailHubOnUnspiderfy` is false); spiderfy fan ≤24 with adaptive icon size/distance.
 5. [x] ~~`article-list`~~ — **cancelled (sidebar freeze).**
 6. [x] Geographic contract: finite bounds BE+FE.
 7. [x] Seed script isolated to DB — no vault write, no Miniflux mark-read.

@@ -158,6 +158,7 @@ export interface StubClusterGroup {
   _layers: unknown[];
   on(event: string, handler: StubEventHandler): StubClusterGroup;
   addLayer(layer: unknown): StubClusterGroup;
+  removeLayer(layer: unknown): StubClusterGroup;
   clearLayers(): StubClusterGroup;
   getLayers(): unknown[];
   getAllChildMarkers(): unknown[];
@@ -369,6 +370,11 @@ function createClusterGroup(options: Record<string, unknown> = {}): StubClusterG
     },
     addLayer(layer) {
       layers.push(layer);
+      return group;
+    },
+    removeLayer(layer) {
+      const idx = layers.indexOf(layer);
+      if (idx >= 0) layers.splice(idx, 1);
       return group;
     },
     clearLayers() {

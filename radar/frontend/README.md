@@ -36,6 +36,8 @@ npm ci --legacy-peer-deps
 - Leaflet solo via `window.L` (`angular.json` scripts); stub test in `src/app/testing/leaflet.stub.ts`
 - Mock solo con token `MOCK_MODE` (`useValue: true`) — mai fallback silenzioso su errore API
 - Cluster: `maxClusterRadius: 40`, `spiderfyOnMaxZoom: false`
+- Nation spiderfy: hub disco compatto (`radar-spider-root`); max **24** icone/fan con size+distanza adattivi; extras nel carosello
+- Focus: pin summary = `preserveZoom`; poligono/toolbar = `fitBounds` (`maxZoom: 4`); `refocusCountry` se stesso codice
 
 ## Docker
 

@@ -108,9 +108,13 @@ export class App {
       // Category pallino → carousel on that category only; polygon/toolbar → full nation.
       this.clusterArticles.set(focusList);
       this.isSidebarOpen.set(true);
-      // Skip fitBounds maxZoom 4 (hides markers via zoom-out-mode). Spiderfy path
-      // flyTo zoom 6 when needed so icons expand for the active category.
-      this.mapComponent()?.armSkipCountryFit();
+      // Summary/pallino path: keep camera. Polygon/toolbar: fitBounds to the nation.
+      if (open.preserveZoom) {
+        this.mapComponent()?.armSkipCountryFit();
+      } else if (this.focusCountryCode() === open.countryCode) {
+        // Same code again: signal would not re-fire — force fitBounds.
+        this.mapComponent()?.refocusCountry(open.countryCode);
+      }
       this.focusCountryCode.set(open.countryCode);
 
       // Spiderfy only the category of the article on screen (not every category).
