@@ -10,7 +10,7 @@ This plan addresses the production blockers found during the code and architectu
 | Phase 0 | `0189359` | pytest markers / frontend CI baseline |
 | Phase 1 | `bff8abe` | migrations 001–002, outbox, Pydantic strict, vault atomico |
 | Phase 2 | `72851d7` | `radar-worker`, coda bounded, `llm_request_ledger`, Gemini deadline/retry |
-| Phase 3 | *(SHA di questo commit feat(phase3) — pinnato subito dopo)* | edge/data, live/ready+heartbeat, CSP, ops, soft hardening; schema Gemini sanificato |
+| Phase 3 | `19c67f0` | edge/data, live/ready+heartbeat, CSP, ops, soft hardening; schema Gemini sanificato |
 
 ## Scope And Exit Criteria
 

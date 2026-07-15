@@ -146,7 +146,8 @@ cd radar && docker compose config -q   # (+ hardened, lan)
 - [x] Riavvio verificato (`compose down` + `up -d`): tutti healthy; `/health/live`+`/ready` 200; Traceback=0; Miniflux unpublished.
 - [x] Re-ingest post-fix schema: niente fallback spurio su lotto di prova; Miniflux fetch 48h + classificazione IT OK.
 
-**Restore point Phase 3:** commit `feat(phase3): ...` su `refactor/enterprise-consolidation` — SHA nella tabella restore di `Implementation_Plan.md` / scoreboard (docs pin successivo se necessario).
+**Restore point Phase 3:** `19c67f0` (`feat(phase3): secure Compose stack...`) su `refactor/enterprise-consolidation`.
+Restore: `git checkout 19c67f0`
 
 ---
 
@@ -193,10 +194,13 @@ cd radar && docker compose config -q   # (+ hardened, lan)
 | 0 | Completata | **DONE** (`0189359`) | — |
 | 1 | Completata (persa) | **DONE** (`bff8abe`) | — |
 | 2 | Completata (persa) | **DONE** (`72851d7`) | — |
-| 3 | Completata (persa) | **DONE** (feat phase3 + schema Gemini; SHA in tabella restore) | Phase 4 |
+| 3 | Completata (persa) | **DONE** (`19c67f0`) | Phase 4 |
 | 4 | Completata (persa) | **NOT STARTED** | Include bug read/unread; no sidebar |
 | 5 | Completata (persa) | **NOT STARTED** | No `article-list` |
 | 5.5 | Completata (persa) | N/A nel piano master | Assorbita in 1–3 al ri-run |
 | 6 | Non iniziata | **NOT STARTED** | Ultima |
 
-**Ordine di ripresa:** Phase 4 → 5 → 6 (dopo conferma smoke Compose Phase 3).
+**Ordine di ripresa:** Phase 4 → 5 → 6.
+
+**Restore rapido a Phase 3:** `git checkout 19c67f0` su `refactor/enterprise-consolidation`.
+**Restore a Phase 2:** `git checkout 72851d7`.
