@@ -410,6 +410,36 @@ describe('App / map behavior', () => {
       expect(app.clusterArticles()).toEqual([]);
     });
 
+    it('auto-marks unread article as read when carousel active article changes', () => {
+      const fixture = TestBed.createComponent(App);
+      const app = fixture.componentInstance;
+      fixture.detectChanges();
+      const spy = vi.spyOn(app.state, 'toggleReadStatus');
+
+      app.onActiveArticleChanged({ ...FIXTURE_ARTICLES[0], is_read: false });
+      expect(spy).toHaveBeenCalledWith(1, true);
+    });
+
+    it('does not call toggle when active article is already read', () => {
+      const fixture = TestBed.createComponent(App);
+      const app = fixture.componentInstance;
+      fixture.detectChanges();
+      const spy = vi.spyOn(app.state, 'toggleReadStatus');
+
+      app.onActiveArticleChanged({ ...FIXTURE_ARTICLES[1], is_read: true });
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('ignores null active article for auto-read', () => {
+      const fixture = TestBed.createComponent(App);
+      const app = fixture.componentInstance;
+      fixture.detectChanges();
+      const spy = vi.spyOn(app.state, 'toggleReadStatus');
+
+      app.onActiveArticleChanged(null);
+      expect(spy).not.toHaveBeenCalled();
+    });
+
     it('exposes error state from StateService to the shell', async () => {
       TestBed.resetTestingModule();
       installLeafletStub();

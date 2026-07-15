@@ -162,6 +162,10 @@ export class App {
 
   onActiveArticleChanged(article: Article | null): void {
     this.mapComponent()?.highlightMarkerForArticle(article);
+    // Carousel (or single-card) focus: auto-mark as read; manual toggle in sidebar still works.
+    if (article && !article.is_read) {
+      this.state.toggleReadStatus(article.id, true);
+    }
     // Spiderfy only when the visible category changes — not on every carousel slide.
     if (!article?.country_code || !article.primary_category) return;
     const countryCode = this.focusCountryCode() ?? article.country_code;

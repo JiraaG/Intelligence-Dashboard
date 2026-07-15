@@ -84,7 +84,7 @@ Un `markerClusterGroup` **per ciascuna delle 10 categorie**:
 - `spiderfyOnMaxZoom: false` (espansione custom / flyTo)
 - Non ripristinare raggio 200 o spiderfy automatico legacy
 
-Read/unread: fingerprint geometria + `syncMarkerReadState` — toggle `is_read` **non** deve `clearLayers` (icone spiderfy restano). Logica in `state.service.ts` + `radar-map.component.ts`, non nella sidebar.
+Read/unread: fingerprint geometria + `syncMarkerReadState` — toggle `is_read` **non** deve `clearLayers` (icone spiderfy restano). Logica in `state.service.ts` + `radar-map.component.ts`, non nella sidebar. Auto-mark come letta: in `app.ts` su `activeArticleChanged` (scroll carosello / card attiva) se `!is_read`; il toggle manuale in sidebar resta invariato.
 
 ---
 
