@@ -11,7 +11,7 @@ This plan addresses the production blockers found during the code and architectu
 | Phase 1 | `bff8abe` | migrations 001–002, outbox, Pydantic strict, vault atomico |
 | Phase 2 | `72851d7` | `radar-worker`, coda bounded, `llm_request_ledger`, Gemini deadline/retry |
 | Phase 3 | `19c67f0` | edge/data, live/ready+heartbeat, CSP, ops, soft hardening; schema Gemini sanificato |
-| Phase 4 | *(pinned after commit — see Execution log)* | FE XSS/MOCK_MODE/DestroyRef; read-unread no cluster rebuild; hatch owner map; overlay full-bleed |
+| Phase 4 | `de9bd2f` | FE XSS/MOCK_MODE/DestroyRef; read-unread no cluster rebuild; hatch owner map; overlay full-bleed |
 
 ## Scope And Exit Criteria
 
@@ -284,6 +284,8 @@ cd radar/frontend && npm run typecheck && npm run test:ci && npm run build:ci
 ```
 
 **Status (2026-07-15):** gate verde — typecheck OK; 14 passed; build:ci OK (budget warning ~982kB). Sidebar freeze verified (no diff under `radar-sidebar/**`). Backend not touched.
+**Restore point Phase 4:** `de9bd2f` (`feat(phase4): stabilize frontend lifecycle...`) su `refactor/enterprise-consolidation`.
+Restore: `git checkout de9bd2f`
 
 ## Phase 5 - Scale The Query And Map Model
 

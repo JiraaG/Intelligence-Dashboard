@@ -171,7 +171,7 @@ cd radar/frontend && npm run typecheck && npm run test:ci && npm run build:ci
 # → typecheck OK; 14 passed; build:ci OK (budget warning ~982kB)
 ```
 
-**Note:** restore point Phase 4 pinned in scoreboard dopo commit/push. Sidebar freeze verificato.
+**Note:** Restore point Phase 4: `de9bd2f`. Restore: `git checkout de9bd2f` su `refactor/enterprise-consolidation`. Sidebar freeze verificato.
 
 ---
 
@@ -204,12 +204,13 @@ cd radar/frontend && npm run typecheck && npm run test:ci && npm run build:ci
 | 1 | Completata (persa) | **DONE** (`bff8abe`) | — |
 | 2 | Completata (persa) | **DONE** (`72851d7`) | — |
 | 3 | Completata (persa) | **DONE** (`19c67f0`) | — |
-| 4 | Completata (persa) | **DONE** *(SHA pinned after push)* | — |
+| 4 | Completata (persa) | **DONE** (`de9bd2f`) | — |
 | 5 | Completata (persa) | **NOT STARTED** | No `article-list` |
 | 5.5 | Completata (persa) | N/A nel piano master | Assorbita in 1–3 al ri-run |
 | 6 | Non iniziata | **NOT STARTED** | Ultima |
 
 **Ordine di ripresa:** Phase 5 → 6.
 
+**Restore rapido a Phase 4:** `git checkout de9bd2f` su `refactor/enterprise-consolidation`.
 **Restore rapido a Phase 3:** `git checkout 19c67f0` su `refactor/enterprise-consolidation`.
 **Restore a Phase 2:** `git checkout 72851d7`.
