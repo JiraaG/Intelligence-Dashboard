@@ -211,11 +211,103 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                 is_dup = await is_article_duplicate(conn, source_url)
 
         if is_dup:
-            logger.info(
-                "Articolo duplicato rilevato: '%s'. Marcatura come letto su Miniflux...",
-                title[:50],
-            )
-            await state.miniflux_client.mark_as_read([entry_id])
+            # T-P0-01: mark-read only if vault durable (outbox completed)
+            # or legacy NULL outbox with vault file present — never blind mark-read.
+            async with state.db_sem:
+                async with state.db_pool.acquire() as conn:
+                    row = await conn.fetchrow(
+                        """
+                        SELECT
+                            o.status AS outbox_status,
+                            a.primary_category,
+                            a.country_code,
+                            a.published_at,
+                            a.title,
+                            a.source_url
+                        FROM articles a
+                        LEFT JOIN article_outbox o ON o.article_id = a.id
+                        WHERE a.source_url = $1
+                        """,
+                        source_url,
+                    )
+
+            if row is None:
+                logger.warning(
+                    "Duplicato rilevato per '%s' ma non trovato nel DB: skip mark-read.",
+                    title[:50],
+                )
+                return True
+
+            outbox_status = row["outbox_status"]
+
+            if outbox_status == "completed":
+                logger.info(
+                    "Duplicato con vault completed: mark-read Miniflux per '%s'.",
+                    title[:50],
+                )
+                await state.miniflux_client.mark_as_read([entry_id])
+            elif outbox_status in ("pending", "failed", "writing"):
+                logger.warning(
+                    "Duplicato DB ma outbox status=%r per '%s': skip mark-read; "
+                    "attendo reconcile.",
+                    outbox_status,
+                    title[:50],
+                )
+            else:
+                # outbox_status is None (legacy / no outbox row)
+                from pathlib import Path
+
+                from app.classification.validator import GeopoliticalArticleSchema
+
+                pub_date = row["published_at"]
+                pub_date_str = (
+                    pub_date.isoformat()
+                    if hasattr(pub_date, "isoformat")
+                    else str(pub_date)
+                )
+
+                temp_schema = GeopoliticalArticleSchema(
+                    title=row["title"],
+                    summary="dummy",
+                    published_at=pub_date_str,
+                    source_url=row["source_url"],
+                    country_code=row["country_code"],
+                    latitude=0.0,
+                    longitude=0.0,
+                    companies_involved="Nessuno",
+                    tags=f"{row['primary_category']}, dummy",
+                    primary_category=row["primary_category"],
+                    sentiment="Neutrale",
+                    infrastructural_entities="Nessuno",
+                    relevance_level=3,
+                )
+                try:
+                    vault_path = get_article_file_path(
+                        temp_schema, vault_path=OBSIDIAN_VAULT_PATH
+                    )
+                    file_exists = await asyncio.to_thread(Path(vault_path).is_file)
+                except Exception as path_err:
+                    logger.error(
+                        "Errore durante il calcolo/verifica del path del Vault "
+                        "per il duplicato '%s': %s",
+                        title[:50],
+                        path_err,
+                    )
+                    file_exists = False
+
+                if file_exists:
+                    logger.info(
+                        "Duplicato legacy: file Vault presente. "
+                        "Marcatura come letto su Miniflux per '%s'.",
+                        title[:50],
+                    )
+                    await state.miniflux_client.mark_as_read([entry_id])
+                else:
+                    logger.warning(
+                        "Duplicato DB legacy ma file Vault mancante per '%s': "
+                        "skip mark-read.",
+                        title[:50],
+                    )
             return True
 
         async with state.parse_sem:

@@ -156,7 +156,7 @@ pie title Problematiche OPEN da remediation (post FASE 0 / v2.2)
 
 | ID | Titolo | File chiave | Finding audit |
 |----|--------|-------------|----------------|
-| **T-P0-01** | Mark-read su duplicato senza gate outbox `completed` | `backend/app/worker.py#L213-L219` | BE-AUD-001 |
+| **T-P0-01** | ~~Mark-read su duplicato senza gate~~ → **DONE** (gate outbox + vault-check NULL) | `backend/app/worker.py` ramo `is_dup` | BE-AUD-001 |
 | **T-P0-02** | Script diagnostici: `ClassificationClient()` + `_wait_for_rate_limit` | `backend/scripts/**` | BE-AUD-005/006 *(scratch=P1; elevato a P0 — vedi App. F §F.2)* |
 
 ## 2.3 P1 — OPEN
@@ -280,7 +280,12 @@ docker compose logs -f radar-worker
 Log: duplicato → mark-read; entry sparisce da Miniflux unread; file Vault assente o outbox ancora `pending`/`failed`.
 
 ### Sintomo POST-FIX
-Log: duplicato con `outbox status != completed` → **skip mark-read**; mark-read solo se `completed`.
+Log: duplicato con outbox `pending`/`failed`/`writing` → **skip mark-read** (attende `reconcile_outbox`).  
+Mark-read sul path duplicato **solo se** `outbox.status = completed`.  
+`NULL` (nessuna riga outbox = legacy/anomalia): **skip** di default; estensione ammessa = mark-read **solo se** il file vault atteso esiste (`Path.is_file`).  
+**Vietato:** `if status in ("completed", None)` senza vault-check (non chiude la repro legacy e viola vault-first).
+
+Audit dettagliato: `audit_remediation_T-P0-01.md`.
 
 ### Ispezione codice
 
@@ -441,9 +446,12 @@ Per ogni ticket: modifica **minima**, test, aggiorna riga stato in FASE 2 (OPEN�
 ## 4.1 T-P0-01 — Gate mark-read su duplicato
 
 ### Obiettivo
-Mark-read Miniflux sul path duplicato **solo se** `article_outbox.status = 'completed'` (vault durable). Altrimenti log warning e return (attendi reconcile).
+Mark-read Miniflux sul path duplicato **solo se** `article_outbox.status = 'completed'` (vault durable).  
+Per `pending`/`failed`/`writing`: log warning e return — **attendi `reconcile_outbox`** (nessun live-lock funzionale).  
+Per `NULL` (legacy senza riga outbox): **no** mark-read di default; estensione raccomandata = mark-read solo se il file vault esiste.  
+Dettaglio ADR + REJECT dell’ADJUST cieco: `audit_remediation_T-P0-01.md`.
 
-### Diff di riferimento
+### Diff di riferimento (minimo)
 
 ```diff
 --- a/radar/backend/app/worker.py
@@ -484,14 +492,23 @@ Mark-read Miniflux sul path duplicato **solo se** `article_outbox.status = 'comp
 +            return True
 ```
 
+### Estensione raccomandata (NULL + vault)
+Se `outbox_status is None`: risolvere path con `get_article_file_path` / query article e chiamare mark-read **solo se** `Path(...).is_file()`. Altrimenti skip.  
+**Non** usare `outbox_status in ("completed", None)` senza questo check.
+
 ### Criteri di accettazione
-- [ ] Duplicato + outbox `pending`/`failed`/`NULL` → **no** mark-read
 - [ ] Duplicato + `completed` → mark-read
-- [ ] `pytest -m "not live"` verde
-- [ ] Skill/rules BE non contraddicono (docs: mark-read dopo vault)
+- [ ] Duplicato + `pending`/`failed`/`writing` → **no** mark-read
+- [ ] Duplicato + `NULL` senza vault → **no** mark-read
+- [ ] (Se estensione) Duplicato + `NULL` con vault file → mark-read + log legacy
+- [ ] `pytest -m "not live"` verde + `tests/test_worker_gate.py` (casi sopra)
+- [ ] Nessun ADJUST cieco `None → mark-read`
+- [ ] Skill/rules BE non contraddicono (mark-read dopo vault)
+- [ ] Handoff T-P1-03 annotato (retry mark-read post-completed)
 
 ### Skill da rileggere prima del fix
-`.agents/skills/llm-json-extraction/SKILL.md` (flusso commit+outbox), `radar/.ecc/rules/backend.md`.
+`.agents/skills/llm-json-extraction/SKILL.md` (flusso commit+outbox), `radar/.ecc/rules/backend.md`.  
+Report: `audit_remediation_T-P0-01.md`.
 
 ---
 
@@ -923,7 +940,7 @@ Usa questa checklist a ogni sessione di remediation.
 
 | Data | Ticket | Autore (umano/LLM) | Commit (se richiesto) | Note |
 |------|--------|--------------------|------------------------|------|
-| _yyyy-mm-dd_ | T-P0-01 | | | |
+| 2026-07-15 | T-P0-01 | Antigravity + Cursor verify | No (su richiesta utente) | Gate in workspace principale: `completed`→mark-read; pending/failed/writing→skip; NULL→vault `Path.is_file`. Test `test_worker_gate.py` 4/4; pytest not live 111; worker rebuild. ADJUST cieco REJECT. Next: T-P1-03. |
 | | T-P1-01 | | | |
 | | … | | | |
 
@@ -983,6 +1000,8 @@ Un LLM **non** deve “riabbassare” queste priorità senza decisione umana esp
 | Script P0 o P1? | Elevazione documentata §F.2; ticket unico T-P0-02 |
 | Nginx P1 o P2? | Elevazione documentata; path alternativo = eccezione SoT |
 | T-P0-01 rende inutile T-P1-03? | **No.** Dopo il gate, senza retry reconcile le entry unread possono restare bloccate se Miniflux non rifetcha. Ordine FASE 4 aggiornato. |
+| ADJUST T-P0-01 `completed\|None`? | **REJECT.** Chiude il poll-spam legacy ma **non** la repro FASE 3 (article senza outbox) e viola vault-first. Policy: `== completed` + opzionale vault-check su NULL — vedi `audit_remediation_T-P0-01.md`. |
+| Live-lock se skip su pending? | **No** per path outbox: `reconcile_outbox` avanza vault→completed→mark-read. Poll-spam solo se vault fallisce per sempre (corretto). |
 | Finding docs 2.1–2.4 / 3.2–3.5 ancora OPEN? | **No** — riverificati FIXED (docker.md, settings.json, mirrors, angular-developer, AGENTS API, bounds, hooks/comandi) |
 | `settings.json` ancora incompleto? | **No** — allowlist Cursor tools + `raw.githubusercontent.com` + secret Gemini presenti |
 | Checklist BE-HR-03 (`img`) vs parser | FAIL soft confermato: `img` **non** in `content_ignored_tags` → T-P2-02 corretto; tag viene comunque rimosso come markup, rischio residuo = contenuto interno non-standard |
@@ -1004,7 +1023,7 @@ Un LLM **non** deve “riabbassare” queste priorità senza decisione umana esp
 |-----|-------------|
 | FASE 3 non ha sezioni dedicate ai P2 | Intenzionale: P2 usano tabella §4.8 + Script M; priorità bassa |
 | FASE 3 non ha playbook T-DOC-01 | **Mitigato v2.2:** T-DOC-01 CLOSED; playbook F.6 resta come regression check |
-| Nessun test automatico già scritto per T-P0-01 | Script G + raccomandazione pytest dedicato al gate; da aggiungere col fix |
+| Nessun test automatico già scritto per T-P0-01 | Script G + **obbligatorio** `tests/test_worker_gate.py` col fix (casi completed/pending/failed/NULL±vault) — vedi `audit_remediation_T-P0-01.md` §4 |
 | Compose `DATABASE_URL` bypassa `quote_plus` anche post T-P1-01 su config.py | §4.2 lo dice: serve anche Compose/`.env` — non dimenticare path Docker |
 
 ## F.6 Playbook T-DOC-01 (`CLAUDE.md`) — CLOSED + regression check

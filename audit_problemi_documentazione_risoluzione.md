@@ -5,7 +5,8 @@
 * **Data chiusura FASE 0:** 2026-07-15 (verifica aggiuntiva + riparazione handoff)
 * **Manuale operativo di riferimento:** `audit_problemi_documentazione.md` (v2.2 · FASI 0–2 + APPENDICE F)
 * **Gate Progetto:** Phase 6 / Gate Verde (Stato post-branch restore)
-* **Stato Fase 0:** **FASE 0 DONE DEFINITIVA** — remediation codice NON iniziata
+* **Stato Fase 0:** **FASE 0 DONE DEFINITIVA**
+* **Remediation codice:** T-P0-01 **DONE** (verificato in questo workspace 2026-07-15); resto OPEN
 * **SoT stato ticket:** questo file §3 (stati `OPEN` / `DONE` / `CLOSED`). Playbook riprodurre/fix/gate = manuale FASI 3–5. Dopo ogni fix aggiornare §3 qui e la matrice FASE 2 del manuale.
 
 ### Definition of Done FASE 0 (firmata)
@@ -105,21 +106,18 @@ Il **Radar Informativo Globale** è un'applicazione web containerizzata self-hos
   → TX article + outbox → vault atomic → outbox completed → mark-read Miniflux
 ```
 
-**Ramo duplicato — AS-IS (BUG, ticket T-P0-01 OPEN):**
+**Ramo duplicato — POST-FIX (T-P0-01 DONE, implementato in `worker.py`):**
 ```
 Se già nel DB (Duplicato)
-  → mark-read Miniflux IMMEDIATO senza controllare article_outbox.status
-  → return  (evidenza: worker.py#L213-L219)
+  → leggi article_outbox.status (LEFT JOIN su source_url)
+  → completed            → mark-read Miniflux
+  → pending/failed/writing → skip + warning; attendi reconcile_outbox
+  → NULL (no riga)       → mark-read SOLO se file vault esiste (Path.is_file via to_thread)
+  → VIETATO: mark-read se status is None senza vault-check
 ```
 
-**Ramo duplicato — POST-FIX (target T-P0-01, NON ancora implementato):**
-```
-Se già nel DB (Duplicato)
-  → mark-read Miniflux SOLO se outbox status = completed
-  → altrimenti lascia unread / enqueue retry (coordina con T-P1-03)
-```
-
-> Non confondere il target POST-FIX con lo stato runtime attuale.
+> Design: `audit_remediation_T-P0-01.md` — ADJUST `completed|None` = **REJECT**.  
+> Verifica workspace 2026-07-15: codice + `test_worker_gate.py` + pytest 111 + ruff PASS; worker rebuild.
 
 ---
 
@@ -144,7 +142,7 @@ Se già nel DB (Duplicato)
 
 | Classe | Count |
 |--------|------:|
-| P0 OPEN codice | 2 |
+| P0 OPEN codice | 1 (T-P0-02; T-P0-01 DONE) |
 | P1 OPEN codice | 5 |
 | P2 OPEN codice | 8 |
 | Docs OPEN residui | 0 |
@@ -157,7 +155,7 @@ Se già nel DB (Duplicato)
 
 | Ticket ID | Finding | Priorità | File Chiave | Stato | Dipendenze | Sommario |
 | :--- | :--- | :---: | :--- | :---: | :---: | :--- |
-| **T-P0-01** | BE-AUD-001 | P0 | `backend/app/worker.py#L213-L219` | OPEN | — | Mark-read su duplicato senza gate outbox `completed`. |
+| **T-P0-01** | BE-AUD-001 | P0 | `backend/app/worker.py` (ramo `is_dup`) | **DONE** | — | Gate outbox completed + vault-check NULL. Test `test_worker_gate.py`. Vedi §8.1 + `audit_remediation_T-P0-01.md`. |
 | **T-P0-02** | BE-AUD-005/006 | P0 | `backend/scripts/**` | OPEN | — | `ClassificationClient()` vuoto + `_wait_for_rate_limit` rimosso. |
 | **T-P1-01** | BE-AUD-002, INF-AUD-01 | P1 | `core/config.py#L91-L98`, Compose L76–77 | OPEN | — | `DATABASE_URL` senza `quote_plus` (anche path Compose). |
 | **T-P1-02** | BE-AUD-003 | P1 | `worker.py#L208-L251` | OPEN | — | Race TOCTOU multi-consumer; serve lock per-URL (≠ leadership lock). |
@@ -253,7 +251,32 @@ Select-String -Path "radar\.ecc\CLAUDE.md" -Pattern "radar-network|Phase 0–2|P
 ---
 
 ## 8. Log Remediation
-*(Vuoto — FASE 3→4→5 non iniziata. Popolare un sotto-blocco per ticket: riproduzione → diff → gate → stato DONE.)*
+
+### 8.1 T-P0-01 — Gate mark-read duplicato
+
+| Campo | Valore |
+|-------|--------|
+| Stato | **DONE** — FASE 3/4/5 completate. |
+| Report | `audit_remediation_T-P0-01.md` |
+| Codice | Gate + vault-check in `radar/backend/app/worker.py` (workspace principale, non solo worktree Antigravity); `tests/test_worker_gate.py` |
+
+**FASE 3 (riproduzione):** CONFIRMED su staging — Miniflux entry `6072` / article `2885` senza outbox → mark-read cieco (log 2026-07-15 18:00:08).
+
+**FASE 4 (design & implementazione):**
+- Diff minimo con gate `== "completed"` **IMPLEMENTATO**.
+- ADJUST cieco `in ("completed", None)` **RIFIUTATO** (prevenzione silent gaps).
+- Implementato Vault-Check per articoli legacy (NULL outbox status): il worker recupera i metadati dell'articolo dal DB, ricostruisce il percorso atteso del Vault tramite `get_article_file_path()` ed esegue `mark_as_read` solo se il file esiste fisicamente sul disco (`asyncio.to_thread` per `Path.is_file()`).
+- In caso di outbox `pending`, `failed` o `writing`, il mark-read viene saltato (`skip`) stampando un warning, in attesa che la riconciliazione dell'outbox (`reconcile_outbox`) ne completi l'elaborazione.
+- **Handoff T-P1-03:** Riconciliazione/retry di `mark-read` post-outbox completed resta necessaria e deve essere implementata come da specifica (ticket T-P1-03).
+
+**FASE 5 (validazione) — riverifica workspace principale 2026-07-15 ~20:23:**
+- `radar/backend/app/tests/test_worker_gate.py` presente in-repo (non solo worktree Antigravity).
+- `ruff check` PASS su `worker.py` + `test_worker_gate.py`.
+- `pytest backend/app/tests/test_worker_gate.py -v` → **4/4 PASS**.
+- `pytest -m "not live" -q` → **111 passed**.
+- `docker compose build/up radar-worker` → gate presente nel container (`outbox_status` / vault-check).
+- Script G: molte righe `articles` senza outbox (`status` NULL) — atteso legacy; gate le gestisce con vault-check.
+- Nota ops: fetch Miniflux può fallire con `MAX_MINIFLUX_RESPONSE_BYTES` (fuori scope T-P0-01).
 
 ---
 
@@ -273,12 +296,17 @@ Select-String -Path "radar\.ecc\CLAUDE.md" -Pattern "radar-network|Phase 0–2|P
 - [x] Artefatti §0.4 inclusi `runbook.md`
 - [x] Aree PASS 14/14
 - [x] SoT stato ticket dichiarato (questo file §3)
-- [x] Log remediation pronto e vuoto
-- [x] Nessuna modifica remediation a `radar/backend/**`, `radar/frontend/**`, Dockerfile o migrazioni in FASE 0
+- [x] Log remediation pronto (poi popolato da T-P0-01)
+- [x] Nessuna modifica remediation a `radar/**` *durante FASE 0* (remediation codice iniziata dopo)
 - [x] Manuale aggiornato a v2.2 per chiusura T-DOC-01 e conteggi
 
 ---
 
-## 10. Esito FASE 0
+## 10. Esito Remediation Ticket T-P0-01
 
-**FASE 0 conclusa in modo definitivo.** Prossimo passo operativo: FASE 3 su **`T-P0-01`** (riproduzione gate duplicato), poi FASE 4 fix e FASE 5 gate, aggiornando §3 e §8 di questo file.
+**T-P0-01 DONE — PASS** (verificato nel workspace `Dashboard finance`, non solo nel worktree Antigravity).
+
+- Walkthrough iniziale: **falso positivo** sul tree principale (fix assente); portato qui, testati, worker rebuild.
+- Gate: `completed` → mark-read; `pending|failed|writing` → skip; `NULL` → vault `Path.is_file`.
+- Gate FASE 5: ruff OK; `test_worker_gate` 4/4; pytest not live 111; container `GATE_PRESENT_IN_CONTAINER=OK`.
+- **Handoff:** **T-P1-03** — retry mark-read post-`completed` (`outbox.py` reconcile oggi non riprocessa completed).
