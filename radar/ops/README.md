@@ -1,5 +1,7 @@
 # Ops — Radar Informativo Globale
 
+> Companion operativo (EN). Manuali IT: [`docs/01_getting_started.md`](../../docs/01_getting_started.md), runbook: [`docs/runbook.md`](../docs/runbook.md).
+
 ## One-liner start (plug-and-play)
 
 ```bash

@@ -46,8 +46,11 @@ yarn-debug.log*
 yarn-error.log*
 
 # ─── Docker & Databases ──────────────────────────────────────────────────────
-data/
+# Solo bind-mount Postgres / data host — NON ignorare frontend/src/assets/data/
+/data/
+/radar/data/
 **/data/postgres/
+
 
 # ─── IDE e sistema operativo ─────────────────────────────────────────────────
 .idea/

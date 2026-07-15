@@ -5,60 +5,63 @@ Eseguito PRIMA di qualsiasi invocazione di tool da parte dell'agente.
 
 Pattern ECC: Security scanning e validazione input prima dell'azione.
 Rileva: path traversal, secret leak, accesso a file system vietati, comandi pericolosi.
+Phase 6: domain match == o endswith('.'+allowed) — no suffix spoof.
 """
 
-import sys
-import re
+from __future__ import annotations
+
 import json
-import os
+import re
+import sys
 
 
-# ── Percorsi assolutamente vietati ──────────────────────────────────────────
 FORBIDDEN_PATHS = [
-    r'\.ssh[/\\]',
-    r'\.env$',
-    r'\.gnupg[/\\]',
-    r'C:\\Windows\\',
-    r'/etc/passwd',
-    r'/etc/shadow',
-    r'/proc/',
-    r'AppData\\Roaming',
+    r"\.ssh[/\\]",
+    r"\.env$",
+    r"\.gnupg[/\\]",
+    r"C:\\Windows\\",
+    r"/etc/passwd",
+    r"/etc/shadow",
+    r"/proc/",
+    r"AppData\\Roaming",
 ]
 
-# ── Pattern di segreti da intercettare ──────────────────────────────────────
 SECRET_PATTERNS = [
-    r'AIza[0-9A-Za-z_-]{35}',          # Google API Key
-    r'sk-[A-Za-z0-9]{32,}',             # OpenAI API Key
-    r'ghp_[A-Za-z0-9]{36}',             # GitHub PAT
-    r'postgres://[^\s]+:[^\s]+@',        # PostgreSQL URL con credenziali
-    r'MINIFLUX_API_KEY\s*=\s*\S+',       # Miniflux key nel codice
+    r"AIza[0-9A-Za-z_-]{35}",
+    r"sk-[A-Za-z0-9]{32,}",
+    r"ghp_[A-Za-z0-9]{36}",
+    r"postgres://[^\s]+:[^\s]+@",
+    r"MINIFLUX_API_KEY\s*=\s*\S+",
+    r"GEMINI_API_KEY\s*=\s*\S+",
+    r"GOOGLE_API_KEY\s*=\s*\S+",
+    r"POSTGRES_PASSWORD\s*=\s*\S+",
 ]
 
-# ── Comandi di sistema pericolosi ───────────────────────────────────────────
 DANGEROUS_COMMANDS = [
-    r'\brm\s+-rf\s+/',
-    r'\bdrop\s+table\b',
-    r'\btruncate\s+table\b',
-    r'\bformat\s+[a-z]:\b',
-    r'\bdel\s+/[sf]\b',
-    r'curl\s+.*\|\s*(bash|sh|python)',  # Pipe curl to shell
+    r"\brm\s+-rf\s+/",
+    r"\bdrop\s+table\b",
+    r"\btruncate\s+table\b",
+    r"\bformat\s+[a-z]:\b",
+    r"\bdel\s+/[sf]\b",
+    r"curl\s+.*\|\s*(bash|sh|python)",
 ]
 
-# ── Domini di rete consentiti ────────────────────────────────────────────────
 ALLOWED_DOMAINS = [
-    'github.com',
-    'generativelanguage.googleapis.com',
-    'api.miniflux.app',
-    'pypi.org',
-    'npmjs.com',
-    'registry.hub.docker.com',
-    'fonts.googleapis.com',
-    'fonts.gstatic.com',
+    "github.com",
+    "raw.githubusercontent.com",
+    "generativelanguage.googleapis.com",
+    "api.miniflux.app",
+    "pypi.org",
+    "npmjs.com",
+    "registry.npmjs.org",
+    "registry.hub.docker.com",
+    "fonts.googleapis.com",
+    "fonts.gstatic.com",
+    "opendatacommons.org",
 ]
 
 
 def check_forbidden_paths(tool_input: str) -> list[str]:
-    """Rileva tentativi di accesso a percorsi vietati."""
     violations = []
     for pattern in FORBIDDEN_PATHS:
         if re.search(pattern, tool_input, re.IGNORECASE):
@@ -67,7 +70,6 @@ def check_forbidden_paths(tool_input: str) -> list[str]:
 
 
 def check_secret_patterns(tool_input: str) -> list[str]:
-    """Rileva segreti nel contenuto da scrivere."""
     violations = []
     for pattern in SECRET_PATTERNS:
         if re.search(pattern, tool_input):
@@ -76,7 +78,6 @@ def check_secret_patterns(tool_input: str) -> list[str]:
 
 
 def check_dangerous_commands(tool_input: str) -> list[str]:
-    """Rileva comandi potenzialmente distruttivi."""
     violations = []
     for pattern in DANGEROUS_COMMANDS:
         if re.search(pattern, tool_input, re.IGNORECASE):
@@ -84,50 +85,71 @@ def check_dangerous_commands(tool_input: str) -> list[str]:
     return violations
 
 
+def _normalize_host(host: str) -> str:
+    host = host.strip().lower()
+    if host.startswith("[") and "]" in host:
+        host = host[1 : host.index("]")]
+    else:
+        host = host.split("%", 1)[0]
+        if host.count(":") == 1:
+            host = host.rsplit(":", 1)[0]
+    if host.endswith("."):
+        host = host[:-1]
+    return host
+
+
+def domain_allowed(domain: str, allowed_domains: list[str]) -> bool:
+    """Accept only exact match or a proper subdomain of an allowlisted apex."""
+    domain = _normalize_host(domain)
+    if not domain or domain.startswith("."):
+        return False
+    for allowed in allowed_domains:
+        allowed_n = _normalize_host(allowed)
+        if not allowed_n:
+            continue
+        if domain == allowed_n or domain.endswith("." + allowed_n):
+            return True
+    return False
+
+
 def check_network_domains(tool_input: str) -> list[str]:
-    """Rileva chiamate a domini non in whitelist."""
     violations = []
-    urls = re.findall(r'https?://([^/\s"\']+)', tool_input)
+    urls = re.findall(r"https?://([^/\s\"']+)", tool_input)
     for url_domain in urls:
-        domain = url_domain.split(':')[0]  # Rimuovi porta
-        if not any(domain.endswith(allowed) for allowed in ALLOWED_DOMAINS):
+        domain = _normalize_host(url_domain)
+        if not domain_allowed(domain, ALLOWED_DOMAINS):
             violations.append(f"UNAUTHORIZED DOMAIN: '{domain}' non è in whitelist")
     return violations
 
 
-def main():
-    """Entry point del hook PreToolUse."""
+def main() -> None:
     try:
-        # Leggi l'input del tool da stdin (formato ECC: JSON)
         tool_data = json.loads(sys.stdin.read()) if not sys.stdin.isatty() else {}
-        tool_name = tool_data.get('tool_name', 'unknown')
-        tool_input_str = json.dumps(tool_data.get('tool_input', {}))
+        tool_name = tool_data.get("tool_name", "unknown")
+        tool_input_str = json.dumps(tool_data.get("tool_input", {}))
+    except (json.JSONDecodeError, OSError):
+        tool_input_str = sys.argv[1] if len(sys.argv) > 1 else ""
+        tool_name = "unknown"
 
-    except (json.JSONDecodeError, Exception):
-        # Se non c'è input strutturato, leggi come testo grezzo
-        tool_input_str = sys.argv[1] if len(sys.argv) > 1 else ''
-        tool_name = 'unknown'
-
-    all_violations = []
-
-    # Esegui tutti i controlli
+    all_violations: list[str] = []
     all_violations.extend(check_forbidden_paths(tool_input_str))
     all_violations.extend(check_secret_patterns(tool_input_str))
     all_violations.extend(check_dangerous_commands(tool_input_str))
 
-    # Controllo domini solo per tool di rete
-    if tool_name in ('run_command', 'execute_bash', 'read_url_content'):
+    if tool_name in ("run_command", "execute_bash", "Shell", "read_url_content", "WebFetch"):
         all_violations.extend(check_network_domains(tool_input_str))
 
     if all_violations:
-        print(f"[PreToolUse BLOCK] Hook ha bloccato l'esecuzione del tool '{tool_name}':", file=sys.stderr)
+        print(
+            f"[PreToolUse BLOCK] Hook ha bloccato l'esecuzione del tool '{tool_name}':",
+            file=sys.stderr,
+        )
         for v in all_violations:
             print(f"  ⛔ {v}", file=sys.stderr)
-        sys.exit(1)  # Exit code 1 = blocca l'esecuzione del tool
+        sys.exit(1)
 
-    # Tutto ok, lascia proseguire
     sys.exit(0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

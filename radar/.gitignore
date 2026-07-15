@@ -41,8 +41,15 @@ Thumbs.db
 *.swp
 *.swo
 
-# ─── GeoJSON (file grande, scaricato manualmente) ────────────────────────────
+# ─── GeoJSON ─────────────────────────────────────────────────────────────────
+# Phase 6: versionare o fetch deterministico + ASSET_LICENSE.md + verify script.
+# Finché non è tracciato in Git, resta ignorato (file ~14MB locale).
 frontend/src/assets/data/countries.geo.json
+# License e istruzioni devono restare tracciabili (non ignorare l'intera cartella).
+!frontend/src/assets/data/README_GEOJSON.txt
+!frontend/src/assets/data/README_DATA.md
+!frontend/src/assets/data/ASSET_LICENSE.md
+
 
 # ─── Log ─────────────────────────────────────────────────────────────────────
 *.log

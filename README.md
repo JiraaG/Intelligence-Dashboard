@@ -1,101 +1,224 @@
 # Radar Informativo Globale
 
-> **Intelligence Dashboard** — Un'applicazione web self-hosted e containerizzata per l'aggregazione di feed RSS e il loro arricchimento semantico via LLM. Il sistema espone localmente il frontend sulla porta `80` e l'interfaccia Miniflux sulla porta `8080`. Sebbene l'infrastruttura sia eseguita in locale tramite Docker, il funzionamento richiede l'accesso a servizi esterni: fonti RSS, Google Gemini API per il reasoning e Carto per il rendering delle tile geografiche.
+> **Intelligence Dashboard** — Applicazione web self-hosted e containerizzata: aggrega feed RSS (Miniflux), li arricchisce via Google Gemini e li visualizza su una mappa Leaflet.  
+> UI: `http://localhost/` (porta **80**). Miniflux admin **non** è pubblicato di default (overlay hardened/lan).  
+> Dipendenze esterne: feed RSS, Gemini API, tile Carto.
 
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Angular](https://img.shields.io/badge/Angular-21.2-DD0031?logo=angular&logoColor=white)](https://angular.dev/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![Docker](https://img.shields.io/badge/Docker-4_services-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Docker](https://img.shields.io/badge/Docker-5_services-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+
+**Stato piani (2026-07-15):** Phase **0–5 DONE**. Phase **6 DONE / GATE VERDE** (working tree ancora da commit su richiesta).  
+Sorgente di verità avanzamento: [`Implementation_Plan.md`](Implementation_Plan.md) + [`Implementation_Plan_Execution.md`](Implementation_Plan_Execution.md).  
+**Sidebar freeze:** non modificare `radar/frontend/src/app/components/radar-sidebar/`.
 
 ---
 
-## ⚡ Zero-Config & 100% Plug and Play
-Questo progetto è stato ingegnerizzato per essere **completamente indipendente** dall'host. Grazie a un'avanzata architettura Docker Multi-Stage, l'utente finale necessita **esclusivamente di Docker** installato. Nessun requisito per Node.js, Python o database locali. Basta un solo comando (`docker compose up --build -d`) e il sistema si auto-assembla, installando le dipendenze, pre-compilando il frontend Angular e servendolo tramite Nginx.
+## Avvio rapido
+
+```bash
+cd radar
+cp .env.example .env   # GEMINI_API_KEY, password DB/Miniflux (no `$` nelle password)
+docker compose up --build -d
+```
+
+Apri **http://localhost/**. Dettagli env, health e Miniflux: [docs/01_getting_started.md](docs/01_getting_started.md) e [radar/ops/README.md](radar/ops/README.md).
+
+La build frontend richiede l’asset GeoJSON `radar/frontend/src/assets/data/countries.geo.json` (gitignored). Provisioning: [`ASSET_LICENSE.md`](radar/frontend/src/assets/data/ASSET_LICENSE.md) + `npm run verify-geojson:fetch` (Docker lo esegue in build).
 
 ---
 
-## 🏗️ Architettura a Colpo d'Occhio
+## Architettura
+
+Cinque servizi Compose su due reti: **`radar-edge`** (browser ↔ Nginx ↔ API) e **`radar-data`** (API + worker + PostgreSQL + Miniflux). L’ingest vive solo in **`radar-worker`**; `main.py` è API-only. Il vault Obsidian è un bind-mount su disco, non un servizio di rete.
 
 ```mermaid
 flowchart LR
-    Browser([Browser]) <-->|Porta 80| Nginx[Nginx / Angular]
-    Browser -->|Tile Esterni| Carto[(Carto Map)]
-    
-    Nginx <-->|/api/| FastAPI[FastAPI Backend]
-    
-    FastAPI -->|Lettura/Scrittura| PG[(PostgreSQL)]
-    FastAPI -->|Scrittura| Vault[(Vault Obsidian)]
-    
-    FastAPI <-->|REST| Miniflux[Miniflux]
-    Miniflux -->|Fetch Esterno| RSS[(Feed RSS)]
-    
-    FastAPI <-->|Generazione JSON| Gemini([Google Gemini API])
+  User((User))
+  subgraph edge["radar-edge"]
+    FE[radar-frontend :80]
+    API[radar-backend]
+  end
+  subgraph dataNet["radar-data"]
+    W[radar-worker]
+    DB[(radar-db)]
+    MF[radar-miniflux]
+  end
+  Vault[(Vault Obsidian)]
+  Gemini([Google Gemini])
+  Carto[(Carto tiles)]
+  RSS[(Feed RSS)]
+  User -->|HTTP :80| FE
+  User -.->|tile| Carto
+  FE -->|/api proxy| API
+  API --- DB
+  W --- DB
+  W --- MF
+  W -->|structured output| Gemini
+  W --> Vault
+  MF --- DB
+  MF -->|fetch| RSS
 ```
 
+| Servizio | Ruolo | Porta host (base) |
+|----------|--------|-------------------|
+| `radar-frontend` | Nginx + SPA Angular | **80** |
+| `radar-backend` | FastAPI (API + health) | nessuna (solo edge) |
+| `radar-worker` | Polling Miniflux + LLM + commit/outbox | nessuna |
+| `radar-db` | PostgreSQL 15 | nessuna |
+| `radar-miniflux` | Aggregatore RSS | nessuna (usa overlay lan/hardened) |
+
 ---
 
-## 🛠️ Stack Tecnologico
+## Stack
 
-| Componente | Versione / Tag | Fonte di Verità |
+| Componente | Tag / versione | Fonte |
 |---|---|---|
-| **Python** | `3.12-slim` | `radar/backend/Dockerfile` |
-| **Node (Build)** | `22` | `radar/frontend/Dockerfile` |
-| **Angular** | `21.2` | `radar/frontend/package.json` |
-| **Nginx** | `1.27-alpine` | `radar/frontend/Dockerfile` |
-| **PostgreSQL** | `15` | `docker-compose.yml` |
-| **Miniflux** | `2.3.2` | `docker-compose.yml` |
+| Python | `3.12-slim` | `radar/backend/Dockerfile` |
+| Node (build) | `22` | `radar/frontend/Dockerfile` |
+| Angular | `21.2` | `radar/frontend/package.json` |
+| Nginx | `1.27-alpine` | `radar/frontend/Dockerfile` |
+| PostgreSQL | `15` | `radar/docker-compose.yml` |
+| Miniflux | `2.3.2` | `radar/docker-compose.yml` |
 
-*Nota: Le versioni dell'ambiente Node utilizzano ora `npm ci` garantendo build immutabili bit-a-bit basate sul package-lock.*
-
----
-
-## 📚 Documentazione del Progetto
-
-La documentazione è stata suddivisa per aree tematiche. 
-* 🚀 **[Guida all'Avvio (Getting Started)](docs/01_getting_started.md)** 
-* ⚙️ **[Architettura e Backend](docs/02_architecture_and_backend.md)**
-* 🎨 **[Frontend e UI (Interfaccia)](docs/03_frontend_and_ui.md)**
-* 🧠 **[Il Framework ECC (Everything Claude Code)](docs/04_ecc_framework.md)**
-* 📰 **[Fonti RSS Suggerite](RSS.txt)**: Lista dei feed testati per l'importazione.
+Build FE Docker: `npm ci --legacy-peer-deps` (peer matrix Angular/PrimeNG).
 
 ---
 
-## 🗂️ Struttura delle Directory
+## Documentazione
+
+### Manuali operatori (`docs/`)
+
+| # | Documento | Contenuto |
+|---|-----------|-----------|
+| 01 | [docs/01_getting_started.md](docs/01_getting_started.md) | Installazione, `.env`, Docker, health, Miniflux |
+| 02 | [docs/02_architecture_and_backend.md](docs/02_architecture_and_backend.md) | Worker, migrazioni, API, quote, outbox |
+| 03 | [docs/03_frontend_and_ui.md](docs/03_frontend_and_ui.md) | Mappa, map-summary, `MOCK_MODE`, stato UI |
+| 04 | [docs/04_ecc_framework.md](docs/04_ecc_framework.md) | Panoramica harness ECC |
+
+### Ops e frontend
+
+| Documento | Contenuto |
+|-----------|-----------|
+| [radar/ops/README.md](radar/ops/README.md) | Live/ready, overlay Miniflux, backup/restore |
+| [radar/docs/runbook.md](radar/docs/runbook.md) | Runbook ops / incident |
+| [radar/frontend/README.md](radar/frontend/README.md) | Dev/test/build frontend |
+| [RSS.txt](RSS.txt) | Feed RSS suggeriti |
+| [LICENSE](LICENSE) | Licenza del repository |
+
+### Piani attivi (enterprise consolidation)
+
+| Documento | Ruolo |
+|-----------|--------|
+| [Implementation_Plan.md](Implementation_Plan.md) | Piano master Phase 0–6 + restore SHA |
+| [Implementation_Plan_Execution.md](Implementation_Plan_Execution.md) | Scoreboard post-restore (avanzamento reale) |
+
+### Governance agenti (ECC)
+
+| Documento | Ruolo |
+|-----------|--------|
+| [.agents/AGENTS.md](.agents/AGENTS.md) | Guardrail globali |
+| [radar/.ecc/CLAUDE.md](radar/.ecc/CLAUDE.md) | Entry-point locale |
+| [radar/.ecc/rules/](radar/.ecc/rules/) | Rules path-scoped |
+| [radar/.ecc/agents/](radar/.ecc/agents/) | Profili specializzati |
+| [.agents/skills/](.agents/skills/) | Skills globali |
+
+Dettaglio narrativo: [docs/04_ecc_framework.md](docs/04_ecc_framework.md).
+
+### Archivio storico (non eseguire)
+
+Non sono checklist di implementazione: [`Fase2_Implementation_Plan.md`](Fase2_Implementation_Plan.md), [`plan.md`](plan.md), [`plan_backend_ecc.md`](plan_backend_ecc.md), [`plan_frontend_ecc.md`](plan_frontend_ecc.md), [`ecc_deep_dive_analysis.md`](ecc_deep_dive_analysis.md).  
+In Execution, la sezione **A (pre-restore)** è solo storico — usare **§ B/C**.
+
+---
+
+## Piani e restore points
+
+Branch: `refactor/enterprise-consolidation`
+
+| Tag | Commit | Contenuto |
+|-----|--------|-----------|
+| Phase 0 | `0189359` | pytest markers / frontend CI baseline |
+| Phase 1 | `bff8abe` | migrations 001–002, outbox, Pydantic strict, vault atomico |
+| Phase 2 | `72851d7` | `radar-worker`, coda bounded, `llm_request_ledger` |
+| Phase 3 | `19c67f0` | edge/data, live/ready, CSP, ops |
+| Phase 4 | `de9bd2f` | `MOCK_MODE`, XSS-safe markers, read-unread senza rebuild cluster |
+| Phase 5 | `1dfdf60` | map-summary + articles cursor; nation markers; spiderfy categoria |
+
+Esempio: `git checkout 1dfdf60` (tip Phase 5). Dettaglio gate: [Implementation_Plan_Execution.md](Implementation_Plan_Execution.md).
+
+---
+
+## Mappa piani → codice
+
+| Tema | Path |
+|------|------|
+| Worker ingest / quota | `radar/backend/app/worker.py`, `radar/backend/app/classification/quota.py` |
+| API FastAPI (no ingest) | `radar/backend/app/main.py` |
+| Migrazioni / outbox | `radar/backend/migrations/`, `radar/backend/app/core/migrations.py`, `radar/backend/app/commit/outbox.py` |
+| Query articles / map-summary | `radar/backend/app/api/articles_query.py` |
+| Compose + overlay | `radar/docker-compose.yml`, `radar/docker-compose.hardened.yml`, `radar/docker-compose.lan.yml` |
+| Ops backup/restore | `radar/ops/` |
+| Runbook | `radar/docs/runbook.md` |
+| Mappa / state / read-unread | `radar/frontend/src/app/components/radar-map/`, `radar/frontend/src/app/services/state.service.ts` |
+| `MOCK_MODE` | `radar/frontend/src/app/services/mock-mode.token.ts` |
+| GeoJSON pin / verify | `radar/frontend/src/assets/data/ASSET_LICENSE.md`, `radar/frontend/scripts/verify-geojson.mjs` |
+| Sidebar (**frozen**) | `radar/frontend/src/app/components/radar-sidebar/` |
+| ECC rules / hooks | `radar/.ecc/rules/`, `radar/.ecc/hooks/` |
+| Env template | `radar/.env.example` |
+| CI | `.github/workflows/ci.yml` |
+
+---
+
+## Contratto API (sintesi)
+
+| Metodo | Path | Note |
+|--------|------|------|
+| GET | `/health/live` | Liveness (Compose healthcheck) |
+| GET | `/health/ready` | Pool + migrazioni + heartbeat worker (ops; può 503 al boot) |
+| GET | `/health` | Alias di live (API); anche healthcheck Nginx FE su `:80` |
+| GET | `/api/articles` | Envelope `{items,next_cursor,total}` — `date` obbligatorio, `limit` ≤ 100 |
+| GET | `/api/map-summary` | Righe `country_code × primary_category` + count/lat/lon |
+| GET | `/api/countries` | Rollup paese (compat) |
+| PATCH | `/api/articles/{id}/read_status` | Body `{is_read}`; risposta `{status,is_read}` |
+
+Dettaglio: [docs/02_architecture_and_backend.md](docs/02_architecture_and_backend.md).
+
+---
+
+## Struttura repository
 
 ```text
-Dashboard finance/                           
-├── docs/                                    # Manuali architetturali e di setup
-│   ├── 01_getting_started.md
-│   ├── 02_architecture_and_backend.md
-│   ├── 03_frontend_and_ui.md
-│   └── 04_ecc_framework.md
-├── RSS.txt                                  # Catalogo feed RSS consigliati
-├── .agents/                                 # ECC Global Guardrails
-│   ├── AGENTS.md                            # Magna Carta del progetto
-│   └── skills/                              # Competenze globali
-├── README.md                                # ← Questo file
-│
-└── radar/                                   # Repository Monorepo
-    ├── backend/                             
-    │   ├── app/
-    │   │   ├── core/                        # Configurazione, DB, Logging
-    │   │   ├── extraction/                  # Miniflux client, Parser
-    │   │   ├── classification/              # Gemini client, Prompts
-    │   │   └── commit/                      # DB Commit, Vault Factory
-    │   └── Dockerfile
-    ├── frontend/                            
-    │   ├── src/app/
-    │   │   ├── components/                  # RadarMap, Sidebar, Toolbar
-    │   │   ├── services/                    # StateService, ArticleService
-    │   │   ├── models/                      # Interfacce TypeScript
-    │   │   └── shared/                      # Direttive (es. hatching)
-    │   ├── angular.json                     # Configurazione build Angular
-    │   └── Dockerfile
-    ├── vault/                               # Dati Markdown generati (ignorato da Git)
-    ├── .ecc/                                # ECC Local Workspace
-    │   ├── rules/                           # Regole frontend/backend/docker
-    │   ├── hooks/                           # Script pre/post esecuzione
-    │   └── skills/
-    └── docker-compose.yml                   # Topologia dei 4 container
+Dashboard finance/
+├── docs/                              # Manuali operatori 01–04
+├── Implementation_Plan.md             # Piano master Phase 0–6
+├── Implementation_Plan_Execution.md
+├── RSS.txt
+├── LICENSE
+├── .github/workflows/ci.yml
+├── .agents/                           # AGENTS.md + skills globali
+└── radar/
+    ├── docker-compose.yml             # 5 servizi, edge + data
+    ├── docker-compose.hardened.yml
+    ├── docker-compose.lan.yml
+    ├── .env.example
+    ├── ops/                           # backup/restore + README ops
+    ├── docs/runbook.md
+    ├── backend/
+    │   ├── migrations/                # 001–007
+    │   └── app/
+    │       ├── main.py                # API-only
+    │       ├── worker.py              # ingest
+    │       ├── api/                   # articles_query (Phase 5)
+    │       ├── core/ extraction/ classification/ commit/
+    │       └── tests/
+    ├── frontend/
+    │   ├── scripts/verify-geojson.mjs
+    │   ├── src/app/components/        # radar-map, toolbar, radar-sidebar (frozen)
+    │   ├── src/app/services/          # StateService, ArticleService, MOCK_MODE
+    │   └── src/assets/data/           # GeoJSON locale + ASSET_LICENSE.md
+    ├── vault/                         # Markdown generati (gitignored)
+    └── .ecc/                          # rules, agents, hooks, skills
 ```

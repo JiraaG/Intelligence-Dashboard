@@ -14,7 +14,7 @@ in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categ
 
 ### Vincoli post–branch restore (2026-07-15)
 
-- **Phase 0–5 DONE**; Phase **6 NOT STARTED**. Vedi `Implementation_Plan.md` / `Implementation_Plan_Execution.md`.
+- **Phase 0–5 DONE**; Phase **6 DONE / GATE VERDE**. Vedi `Implementation_Plan.md` / `Implementation_Plan_Execution.md`.
 - **Presenti (Phase 1–5):** migrazioni `001`–`007`, outbox, ledger quote, `radar-worker`, reti `radar-edge`/`radar-data`, `/health/live`+`/ready`, CSP Nginx, `ops/` backup, Gemini `build_gemini_response_schema()`, FE `MOCK_MODE` / DestroyRef / XSS-safe markers / read-unread senza rebuild cluster.
 - **Phase 5 API/FE:** `GET /api/map-summary` (`country×category`); `GET /api/articles` → `{items,next_cursor,total}` (keyset `id`, limit≤100, LATERAL); `backend/app/api/articles_query.py`; migrazione `007`. FE: giorno da summary + pallini; nazione = tutti gli articoli + marker solo paese; spiderfy allineato alla **categoria attiva** carosello/pill (no flicker allo scroll stessa categoria). **Vietato** `article-list`. Sidebar freeze resta.
 - Pipeline ingest in `backend/app/worker.py`; `main.py` è API-only. Compose: 5 servizi su edge+data.
@@ -163,8 +163,9 @@ docker compose up radar-db radar-backend
 # Rebuild frontend dopo modifiche Angular (compilazione locale + docker build)
 cd frontend && npm run build && cd .. && docker compose build radar-frontend && docker compose up -d radar-frontend
 
-# Logs in tempo reale del backend (pipeline)
+# Logs in tempo reale (API vs ingest)
 docker compose logs -f radar-backend
+docker compose logs -f radar-worker
 
 # Accesso diretto al DB PostgreSQL
 docker compose exec radar-db psql -U radar_user -d radar_db
@@ -181,6 +182,16 @@ cd frontend && npm ci --legacy-peer-deps && npm run build
 
 # Avvio dev server Angular con hot-reload
 cd frontend && npm run start
+
+# GeoJSON (gitignored) — verify locale / fetch in Docker builder
+cd frontend && node scripts/verify-geojson.mjs
+# in Dockerfile FE: RUN node scripts/verify-geojson.mjs --fetch  (prima di npm run build)
+
+# Ops runbook
+# vedi radar/docs/runbook.md
+
+# CI GitHub Actions
+# vedi .github/workflows/ci.yml
 ```
 
 ---
@@ -190,7 +201,7 @@ cd frontend && npm run start
 ```
 Miniflux API (ogni 15 min)
         │
-        ▼ [asyncio.sleep(900) loop in main.py]
+        ▼ [asyncio.sleep(WORKER_POLL_INTERVAL_SECONDS) loop in worker.py]
   Validate entry → sanitize HTML → dedup URL
         │ (se non duplicato)
         ▼
@@ -214,7 +225,8 @@ Miniflux API (ogni 15 min)
 
 | File(s)                              | Skill da caricare            |
 |--------------------------------------|------------------------------|
-| `backend/app/main.py`                | `llm-json-extraction`        |
+| `backend/app/worker.py` + `classification/**` | `llm-json-extraction` |
+| `backend/app/main.py`                | Regola: `rules/backend.md` (API-only) |
 | `backend/app/*.py`                   | Regola: `rules/backend.md`   |
 | `frontend/src/**/*.ts`               | Regola: `rules/frontend.md` + `angular-developer` |
 | `frontend/src/**/*.html`             | Regola: `rules/frontend.md` + `angular-developer` |

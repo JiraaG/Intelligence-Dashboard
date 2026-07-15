@@ -21,17 +21,20 @@ Log operativo post–branch restore. Distingue **storico pre-restore** (lavoro p
 
 ## A. Storico pre-restore (ARCHIVIO — non più nel codice)
 
-> Prima del problema al carosello e del restore del branch, l’execution log dichiarava complete: Phase 0–5, remediation Phase 5, Phase 5.5 hardening. **Quel lavoro non è più nel tree sorgente** (restano al più `__pycache__` fantasma). Non spuntare di nuovo queste voci finché non sono ripristinate nel codice attuale.
+> **Solo storico.** Prima del restore del branch, l’execution log dichiarava complete Phase 0–5 (+ 5.5). Quel lavoro era stato perso al restore e **poi rifatto** (vedi § B e scoreboard § C).  
+> **Non** usare questa tabella come stato attuale né come checklist da ripristinare.  
+> Piani eseguibili: `Implementation_Plan.md` + § B/C di questo file.  
+> Anche `Fase2_Implementation_Plan.md` è archivio (claim falsi vs tree attuale).
 
-| Area | Cosa c’era (claim pre-restore) | Stato dopo restore |
+| Area | Cosa c’era (claim pre-restore) | Stato dopo restore (storico) |
 |------|--------------------------------|--------------------|
-| Phase 0 | pytest markers, live gate, diagnostici fuori discovery | **Rifatta** nel codice attuale (sezione B) |
-| Phase 1 | migrazioni SQL, outbox, vault atomico, yaml.safe_dump, path traversal SHA-256, Miniflux stream | **Persa** — di nuovo bootstrap `CREATE TABLE IF NOT EXISTS`, YAML f-string, MD5[:8], ecc. |
-| Phase 2 | `radar-worker`, QuotaLedger, coda bounded, advisory lock | **Persa** — ingestione ancora in `main.py` + `TaskGroup` |
-| Phase 3 | reti `edge`/`data`, `/health/live`+`/ready`, CSP, ops backup, hardening | **Persa** — rete unica, `/health` solo, porte `80`/`8080` aperte |
-| Phase 4 | DestroyRef, XSS `textContent`, `MOCK_MODE`, a11y, spec map | **Persa** — XSS via string HTML, mock fallback silenzioso, no DestroyRef |
-| Phase 5 | SQL senza Cartesian join, `article-list`, marker-read path | **Persa** — join+`array_agg` classico; `article-list` **non** va ripristinato (freeze) |
-| Phase 5.5 | advisory lock, ready checks, reconcile outbox, CoT rimosso, leaflet stub spec | **Persa** (stub leaflet rifatto in Phase 0 attuale) |
+| Phase 0 | pytest markers, live gate, diagnostici fuori discovery | Poi **rifatta** (§ B) |
+| Phase 1 | migrazioni SQL, outbox, vault atomico, … | Era persa; **rifatta** |
+| Phase 2 | `radar-worker`, QuotaLedger, … | Era persa (ingest in `main.py`); **rifatta** |
+| Phase 3 | reti edge/data, live/ready, … | Era persa; **rifatta** |
+| Phase 4 | DestroyRef, MOCK_MODE, … | Era persa; **rifatta** |
+| Phase 5 | SQL LATERAL / map model; `article-list` **non** va ripristinato | Era persa; **rifatta** senza article-list (freeze) |
+| Phase 5.5 | advisory lock, … | Assorbita in 1–3 al ri-run |
 
 ---
 
@@ -240,31 +243,79 @@ Restore: `git checkout 1dfdf60`
 
 ---
 
-### Phase 6 — Governance, docs, ops — NON INIZIATA
+### Phase 6 — Governance, docs, ops — DONE / GATE VERDE (2026-07-15)
 
-- [ ] GeoJSON asset versionato + license + verify script.
-- [ ] README frontend/progetto allineati al comportamento reale.
-- [ ] Docs / ECC / AGENTS / Fase2 archive coerenti col codice post-fasi.
-- [ ] Hook CI reali; secret scanning; runbook ops.
+**Metodo:** audit incongruenze → Blocchi A→D → polish tipografico/Mermaid/indici docs. Sidebar freeze invariato. **Commit solo su richiesta.**
+
+#### Audit incongruenze (chiuso)
+
+Tabella claim→realtà (docs/ECC vs codice @ tip post-`1dfdf60`) chiusa per i claim alti aperti in avvio Phase 6. Residui non-Phase-6 (seed 10k budget, chaos drill, image scan) restano nel Final Release Gate del piano master.
+
+#### Blocco A — Verità documentale + revisione README — DONE
+
+- [x] Audit incongruenze.
+- [x] `README.md` root: 5 servizi edge/data, worker vs API, indice docs, restore SHA, mappa piani→codice, contratto API.
+- [x] Revisione README “allegati” (operatori / piani / ECC / archivio).
+- [x] `docs/01–04_*` riscritti sul contratto Phase 0–5.
+- [x] `radar/frontend/README.md` di progetto (no `ng e2e`).
+- [x] `Fase2_Implementation_Plan.md` banner ARCHIVIO.
+- [x] `.gitignore` / `radar/.gitignore` asset dir.
+
+#### Blocco B — GeoJSON — DONE
+
+- [x] `ASSET_LICENSE.md` (Natural Earth / datasets pin, ODC-PDDL-1.0, SHA-256 `45F41865…CAE4`).
+- [x] `scripts/verify-geojson.mjs` (+ `--fetch`).
+- [x] `package.json` / Dockerfile FE / `.dockerignore`.
+- [x] Policy: geojson **gitignored**; CI/Docker fetch deterministico.
+
+#### Blocco C — ECC / hooks — DONE
+
+- [x] `CLAUDE.md`, `angular-map-expert.md`, `frontend.md`, skills LLM → `worker.py`.
+- [x] Hooks: domain anti-spoof; post fail-closed (ruff / prettier).
+- [x] `.agents/AGENTS.md` status Phase 6 GATE VERDE.
+
+#### Blocco D — CI + runbook — DONE
+
+- [x] `.github/workflows/ci.yml`
+- [x] `radar/docs/runbook.md`
+
+#### Polish docs (post gate) — DONE
+
+- [x] README: Mermaid vault fuori rete; indice 01–04; albero CI/runbook/verify; link ASSET_LICENSE.
+- [x] docs/01: health FE vs API; `LLM_TPM`/`LLM_RPD`; verify-geojson; link runbook.
+- [x] docs/02: Mermaid ciclo articoli corretto; nomi migrazioni 005/006 completi.
+- [x] docs/03: Mermaid sequence con alias participant.
+- [x] docs/04 / FE README / runbook / ops cross-link; typo «riavvia» / `docker compose ps`.
+
+**Gate Phase 6 (locale — 2026-07-15):**
+
+- [x] `git diff -- radar/frontend/src/app/components/radar-sidebar` vuoto
+- [x] `verify-geojson` PASS (258 features)
+- [x] pytest `not live` → 107 passed / 3 deselected
+- [x] `npm run typecheck` → OK
+- [x] `npm run test:ci` → 18 passed (3 files)
+- [x] `npm run build:ci` → verify PASS + production build OK (budget warning ~992 kB, preesistente)
+- [x] Commit Phase 6 creato (no push) — annotare SHA in scoreboard / pin follow-up
 
 ---
 
-## C. Scoreboard attuale (2026-07-15, Phase 5 DONE)
+## C. Scoreboard attuale (2026-07-15)
 
 | Phase | Pre-restore (storico) | Codice attuale | Prossimo lavoro |
 |-------|----------------------|----------------|-----------------|
 | 0 | Completata | **DONE** (`0189359`) | — |
-| 1 | Completata (persa) | **DONE** (`bff8afe` / `bff8abe`) | — |
+| 1 | Completata (persa) | **DONE** (`bff8abe`) | — |
 | 2 | Completata (persa) | **DONE** (`72851d7`) | — |
 | 3 | Completata (persa) | **DONE** (`19c67f0`) | — |
 | 4 | Completata (persa) | **DONE** (`de9bd2f`) | — |
-| 5 | Completata (persa) | **DONE** (`1dfdf60`) | Residuali opzionali → Phase 6 |
-| 5.5 | Completata (persa) | N/A nel piano master | Assorbita in 1–3 al ri-run |
-| 6 | Non iniziata | **NOT STARTED** | Ultima |
+| 5 | Completata (persa) | **DONE** (`1dfdf60`) | Residuali opzionali (seed 10k measure) |
+| 5.5 | Completata (persa) | N/A nel piano master | Assorbita in 1–3 |
+| 6 | Non iniziata | **DONE / GATE VERDE** (questo commit) | ECC remediation follow-up; push solo se chiesto |
 
-**Ordine:** Phase 6.
+**Ordine:** dopo questo commit Phase 6 → commit ECC remediation → pin SHA esplicito in tabella/`Implementation_Plan.md` se serve.
 
-**Restore rapido a Phase 5:** `git checkout 1dfdf60` su `refactor/enterprise-consolidation`.
-**Restore rapido a Phase 4:** `git checkout de9bd2f` su `refactor/enterprise-consolidation`.
-**Restore rapido a Phase 3:** `git checkout 19c67f0` su `refactor/enterprise-consolidation`.
-**Restore a Phase 2:** `git checkout 72851d7`.
+**Restore rapido a Phase 5:** `git checkout 1dfdf60` su `refactor/enterprise-consolidation`.  
+**Restore rapido a Phase 4:** `git checkout de9bd2f`.  
+**Restore rapido a Phase 3:** `git checkout 19c67f0`.  
+**Restore a Phase 2:** `git checkout 72851d7`.  
+**Restore Phase 6 (GATE VERDE, pre–ECC remediation):** `git checkout` dello SHA di questo commit.

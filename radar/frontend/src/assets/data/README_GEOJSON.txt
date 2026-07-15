@@ -1,26 +1,25 @@
-# Placeholder per il file GeoJSON dei confini geografici mondiali.
-# 
-# ISTRUZIONI PER L'INSTALLAZIONE:
-# ─────────────────────────────────────────────────────────────────────────────
-# Questo file NON è incluso nel repository per ragioni di dimensione (~5MB).
-# 
-# Scaricalo da una delle seguenti fonti ufficiali e salvalo in questa cartella
-# con il nome esatto: countries.geo.json
-#
-# Fonti raccomandate:
-# 1. Natural Earth (risoluzione 110m, consigliata per la mappa Radar):
-#    https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson
-#
-# 2. Alternative compatta (50m, più dettagliata):
-#    https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json
-#    (richiede conversione con topojson → geojson prima dell'uso)
-#
-# DOPO il download, rinomina il file in: countries.geo.json
-# e posizionalo in: frontend/src/assets/data/countries.geo.json
-#
-# ─────────────────────────────────────────────────────────────────────────────
-# NOTA: Il file viene caricato offline dalla mappa Leaflet tramite HttpClient:
-#   this.http.get<GeoJSON.FeatureCollection>('assets/data/countries.geo.json')
-#
-# NON usare URL CDN esterni in produzione. Il file deve essere locale.
-# ─────────────────────────────────────────────────────────────────────────────
+# GeoJSON — confini mondiali
+
+Il file `countries.geo.json` (~14 MB) **non** è tracciato in Git.
+
+## Procedura consigliata
+
+Dalla root del monorepo:
+
+```bash
+cd radar/frontend
+npm run verify-geojson:fetch
+```
+
+Scarica l’URL pinnato in `ASSET_LICENSE.md`, verifica SHA-256 e valida il `FeatureCollection`.
+
+## Manuale
+
+1. Scarica l’URL canonico da `ASSET_LICENSE.md` (commit pin `datasets/geo-countries`).
+2. Salva come `countries.geo.json` in questa cartella.
+3. Esegui `npm run verify-geojson` (senza `--fetch`) per controllare SHA + schema.
+
+## Contratto mappa
+
+Proprietà usata da `radar-map`: `ISO3166-1-Alpha-2` (fallback `ISO_A2`).
+**Non** caricare da CDN a runtime — solo asset locale.

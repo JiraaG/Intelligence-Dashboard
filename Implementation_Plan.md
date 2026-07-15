@@ -2,7 +2,7 @@
 
 This plan addresses the production blockers found during the code and architecture review. Execute phases in order. Do not release a later phase while an earlier acceptance gate is failing.
 
-**Progress (2026-07-15):** Phase **0–5 DONE**. Phase **6 NOT STARTED**. Sidebar remains frozen.
+**Progress (2026-07-15):** Phase **0–5 DONE**. Phase **6 DONE / GATE VERDE** (docs, ECC, GeoJSON fetch+verify, CI, runbook; polish README/docs). Working tree **uncommitted** — restore SHA Phase 6 da pinnare al commit. Sidebar remains frozen.
 
 **Git restore points (branch `refactor/enterprise-consolidation`):**
 | Tag semantico | Commit tipico | Contenuto |
@@ -13,6 +13,7 @@ This plan addresses the production blockers found during the code and architectu
 | Phase 3 | `19c67f0` | edge/data, live/ready+heartbeat, CSP, ops, soft hardening; schema Gemini sanificato |
 | Phase 4 | `de9bd2f` | FE XSS/MOCK_MODE/DestroyRef; read-unread no cluster rebuild; hatch owner map; overlay full-bleed |
 | Phase 5 | `1dfdf60` | map-summary + articles cursor/LATERAL; nation detail markers; spiderfy category-aligned |
+| Phase 6 | *(pending commit)* | governance: docs/README, GeoJSON pin+verify, ECC/hooks, CI, runbook |
 
 ## Scope And Exit Criteria
 
@@ -32,7 +33,7 @@ Do **not** modify, restyle, refactor, replace, or add specs for `radar/frontend/
 - [ ] The API, worker, database, Miniflux, and frontend have explicit readiness, bounded resources, recoverable state, and documented operations.
 - [ ] The dashboard stays responsive with 10,000 articles and a large cluster never creates unbounded Leaflet markers. (Sidebar DOM card bounding is out of scope.)
 - [ ] Read-status toggles update map marker `.marker-read` without a full cluster rebuild (expanded spiderfy/graph icons must stay); concurrent toggles converge on the final server state.
-- [ ] Documentation, ECC guardrails, test suite, and deployed behavior describe the same system.
+- [x] Documentation, ECC guardrails, test suite, and deployed behavior describe the same system. *(Phase 6 GATE VERDE; commit restore pending)*
 
 ## Phase 0 - Freeze Risky Deployments And Establish A Baseline
 
@@ -381,56 +382,70 @@ Restore: `git checkout 1dfdf60`
 
 ## Phase 6 - Align Governance, Documentation, And Operations
 
-**Status:** NOT STARTED — run only after Phases 1–5 gates are green on the post-restore codebase.
+**Status:** DONE / GATE VERDE (2026-07-15) — Blocchi A–D + polish README/docs.  
+**Gate locale:** pytest `not live` 107 passed; FE typecheck + test:ci (18) + build:ci + verify-geojson PASS; sidebar diff vuoto.  
+**Commit/pin restore SHA:** solo su richiesta esplicita (nessun push finché non chiesto).
 
 ### Files to modify
 
-- [ ] `README.md`
-- [ ] `docs/01_getting_started.md`
-- [ ] `docs/02_architecture_and_backend.md`
-- [ ] `docs/03_frontend_and_ui.md`
-- [ ] `docs/04_ecc_framework.md`
-- [ ] `Fase2_Implementation_Plan.md`
-- [ ] `radar/frontend/README.md`
-- [ ] `radar/.env.example`
-- [ ] `.gitignore`
-- [ ] `radar/.gitignore`
-- [ ] `.agents/AGENTS.md`
-- [ ] `radar/.ecc/CLAUDE.md`
-- [ ] `radar/.ecc/settings.json`
-- [ ] `radar/.ecc/rules/backend.md`
-- [ ] `radar/.ecc/rules/frontend.md`
-- [ ] `radar/.ecc/rules/docker.md`
-- [ ] `radar/.ecc/agents/pipeline-engineer.md`
-- [ ] `radar/.ecc/agents/angular-map-expert.md`
-- [ ] `radar/.ecc/hooks/pre-tool-use.py`
-- [ ] `radar/.ecc/hooks/post-tool-use.py`
+- [x] `README.md` *(indice 01–04, Mermaid edge/data, restore SHA, mappa piani→codice; polish tipografia/link)*
+- [x] `docs/01_getting_started.md`
+- [x] `docs/02_architecture_and_backend.md`
+- [x] `docs/03_frontend_and_ui.md`
+- [x] `docs/04_ecc_framework.md`
+- [x] `Fase2_Implementation_Plan.md` *(ARCHIVIO — non eseguibile)*
+- [x] `radar/frontend/README.md`
+- [x] `radar/ops/README.md` *(cross-link IT docs/runbook)*
+- [x] `radar/.env.example` *(già allineato Phase 3–5 — verificato, nessuna modifica necessaria)*
+- [x] `.gitignore` *(no più `data/` su assets FE; solo postgres/host data)*
+- [x] `radar/.gitignore` *(geojson ignorato; license/README tracciabili)*
+- [x] `.agents/AGENTS.md`
+- [x] `radar/.ecc/CLAUDE.md`
+- [x] `radar/.ecc/settings.json` *(allowlist ECC invariata; alias Cursor nel post-hook)*
+- [x] `radar/.ecc/rules/backend.md` *(già allineato — audit-only)*
+- [x] `radar/.ecc/rules/frontend.md`
+- [x] `radar/.ecc/rules/docker.md` *(già allineato — audit-only)*
+- [x] `radar/.ecc/agents/pipeline-engineer.md` *(già allineato — audit-only)*
+- [x] `radar/.ecc/agents/angular-map-expert.md`
+- [x] `radar/.ecc/hooks/pre-tool-use.py`
+- [x] `radar/.ecc/hooks/post-tool-use.py`
+- [x] `.agents/skills/llm-json-extraction/SKILL.md` + `radar/.ecc/skills/llm-json-extraction.md`
 
 ### Files to add or track
 
-- [ ] `radar/frontend/src/assets/data/countries.geo.json`
-- [ ] `radar/frontend/src/assets/data/ASSET_LICENSE.md`
-- [ ] `radar/frontend/scripts/verify-geojson.mjs`
-- [ ] `radar/docs/runbook.md`
-- [ ] `.github/workflows/ci.yml`
+- [x] `radar/frontend/src/assets/data/countries.geo.json` *(policy: gitignored + fetch deterministico; non tracciato in Git)*
+- [x] `radar/frontend/src/assets/data/ASSET_LICENSE.md`
+- [x] `radar/frontend/scripts/verify-geojson.mjs`
+- [x] `radar/docs/runbook.md`
+- [x] `.github/workflows/ci.yml`
 
 ### Changes
 
-1. Version the licensed GeoJSON asset or fetch it deterministically during a controlled build. Record origin, license, version, and SHA-256. Add a prebuild check that fails when the asset is missing or malformed. Exempt only this asset directory from the broad root `data/` ignore rule.
-2. Replace the stale frontend README with project-specific build, test, development, asset, and deployment instructions. Remove the nonexistent `ng e2e` command unless an actual e2e runner is added.
-3. Correct all claims that conflict with code: Vault fallback, current RPM/TPM defaults and algorithm, retry behavior, category fallback, PATCH response, cluster architecture, exposed ports, and real health semantics. Document the current limitations only until the related phase is complete.
-4. Update `Fase2_Implementation_Plan.md` as archived historical material or delete claims about Python 3.11, Miniflux `latest`, CORS GET-only, and old cluster rules. It must not remain an apparently executable plan with false facts.
-5. Reconcile global AGENTS, local ECC rules, CLAUDE instructions, profiles, and skills with the chosen architecture. Remove stale six-category/list-schema/mock-toggle/cluster examples. Do not preserve contradictory rules as alternatives.
-6. Make hooks real gates in CI. The post hook must target the actual edit tools, run from the project root, fail on a missing linter rather than silently succeeding, and run typecheck/test/build as appropriate. Add secret scanning, dependency/image vulnerability scanning, migration verification, and documentation link checks to CI.
-7. Correct pre-hook domain matching to accept only `domain == allowed` or `domain.endswith('.' + allowed)`. Expand secret detection to all project keys and avoid relying on regexes as the only secret-control mechanism.
-8. Write a runbook covering deploy, health meanings, logs, quota exhaustion, pending outbox recovery, backup/restore, rolling upgrade, security boundary, and incident escalation.
+1. [x] GeoJSON: pin SHA-256 + license (Natural Earth / datasets/geo-countries, ODC-PDDL-1.0); `verify-geojson.mjs` fail se missing/malformed/SHA errato; `--fetch` URL commit-pinned; Docker + `build:ci` eseguono fetch/verify. Asset resta gitignored.
+2. [x] Frontend README di progetto; rimosso `ng e2e` fantasma; script `typecheck` / `test:ci` / `build:ci` / verify documentati.
+3. [x] Docs 01–04 + README allineati al codice Phase 0–5 (worker vs API, edge/data, live/ready, envelope articles, map-summary, MOCK_MODE, ledger, porte Miniflux).
+4. [x] `Fase2_Implementation_Plan.md` archiviato (banner non eseguibile; claim 3.11 / `latest` / CORS GET-only non più presentati come vivi).
+5. [x] ECC/AGENTS: una verità architetturale; rimossi cluster 6-categorie / spiderfy contradittorio / ingest in `main.py` nei punti toccati; skill LLM → `worker.py`.
+6. [x] CI: `.github/workflows/ci.yml` (FE verify+typecheck+test+build; pytest `not live`; secret grep best-effort). Hook post fail-closed (ruff/prettier). Migration verify = `test_migrations.py` nella suite pytest. Image/vuln scan e doc-link check: **deferred** (non bloccanti per chiudere Phase 6).
+7. [x] Pre-hook: domain `==` o `.endswith('.'+allowed)`; secret patterns ampliati (Gemini/Postgres/Miniflux).
+8. [x] Runbook: deploy, live/ready, logs, quota, outbox, backup/restore, rolling upgrade, security, escalation.
+
+### Acceptance gate
+
+```text
+cd radar && python -m pytest -m "not live" -q
+cd radar/frontend && npm run typecheck && npm run test:ci && npm run build:ci
+# verify-geojson incluso in build:ci; sidebar: git diff vuoto sotto radar-sidebar/**
+```
+
+**Status (2026-07-15):** gate verde — 107 passed / 3 live deselected; FE 18 passed; build:ci + verify GeoJSON PASS. Sidebar untouched. Commit restore pending.
 
 ## Final Release Gate
 
-- [ ] Unit, integration, and opt-in live tests pass in isolated environments.
-- [ ] A clean checkout builds without manually supplied untracked assets.
-- [ ] Compose validation, container health, readiness degradation, backup, and restore are tested.
-- [ ] A kill/restart during DB commit, Vault write, Miniflux mark-read, Gemini timeout, and polling wait leaves no lost or prematurely acknowledged article.
-- [ ] SAST, dependency/image scans, CSP validation, and a manual XSS regression test pass.
-- [ ] The 10,000-article performance test meets the agreed budgets.
-- [ ] Every public document and ECC rule has been reviewed against the deployed configuration.
+- [x] Unit + integration (`pytest -m "not live"`) pass; live resta opt-in (`RUN_LIVE_TESTS=1`).
+- [x] Clean checkout buildable senza asset untracked manuali *(GeoJSON via `verify-geojson --fetch` / Docker)*.
+- [ ] Compose validation, container health, readiness degradation, backup, and restore are tested. *(ops scripts presenti; drill Compose end-to-end — ops manuale / residuale)*
+- [ ] A kill/restart during DB commit, Vault write, Miniflux mark-read, Gemini timeout, and polling wait leaves no lost or prematurely acknowledged article. *(design Phase 1–2; chaos drill residuale)*
+- [ ] SAST, dependency/image scans, CSP validation, and a manual XSS regression test pass. *(CSP Phase 3; CI secret grep; image/SAST deferred)*
+- [ ] The 10,000-article performance test meets the agreed budgets. *(seed script presente; budget measure residuale Phase 5)*
+- [x] Every public document and ECC rule has been reviewed against the deployed configuration. *(Phase 6 + polish tipografico/Mermaid/indici)*

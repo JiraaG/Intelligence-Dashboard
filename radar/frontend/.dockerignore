@@ -11,6 +11,7 @@ dist/
 coverage/
 *.log
 *.md
+!src/assets/data/ASSET_LICENSE.md
 .env
 .env.*
 !.env.example

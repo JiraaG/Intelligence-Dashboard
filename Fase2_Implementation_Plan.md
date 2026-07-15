@@ -1,12 +1,23 @@
 # Fase 2 — Piano di implementazione riveduto (versione 2)
 
-La Fase 1 (README + 4 file docs/) ha costruito una base solida e funzionante. La Fase 2 ha l'obiettivo di **allineare la documentazione allo stato reale del codice** (che è evoluto dopo la stesura iniziale), **espanderla con dettagli tecnici mancanti** e **colmare i gap scoperti dall'analisi approfondita** del codebase.
+> [!WARNING]
+> ## ARCHIVIO STORICO — NON ESEGUIRE
+> Questo file è **materiale storico pre–enterprise consolidation**.  
+> Contiene claim **falsi** rispetto al codice attuale (es. Python 3.11, Miniflux `latest`, CORS GET-only, ingest in `main.py` / `TaskGroup`, bootstrap DB senza migrazioni).  
+> **Piani eseguibili:** [`Implementation_Plan.md`](Implementation_Plan.md) + [`Implementation_Plan_Execution.md`](Implementation_Plan_Execution.md) (Phase 0–5 DONE; Phase 6 governance).  
+> Non usare V2 sotto come checklist di implementazione.
 
 ---
 
-> [!IMPORTANT]
-> ## Piano operativo vincolante — V2
-> Le sezioni V1 più sotto restano come storico dell'analisi iniziale, ma non sono eseguibili: questo blocco le sostituisce integralmente. Tutte le implementazioni devono seguire V2.
+# (Archivio) Contenuto originale
+
+La Fase 1 (README + 4 file docs/) ha costruito una base solida e funzionante. La Fase 2 aveva l'obiettivo di allineare la documentazione allo stato del codice di allora. Quanto segue resta solo come traccia storica.
+
+---
+
+> [!NOTE]
+> ## V2 — storicizzato (non vincolante)
+> Le sezioni V1 più sotto restano come storico dell'analisi iniziale. **Né V1 né V2 sono piani eseguibili** sul tree post Phase 0–5.
 
 ## V2 — Base fattuale, decisioni e perimetro
 

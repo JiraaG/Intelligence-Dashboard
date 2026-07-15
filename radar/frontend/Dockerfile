@@ -7,8 +7,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --legacy-peer-deps
 
-# Copia il resto del codice e compila
+# Copia il resto del codice; fetch+verify GeoJSON (gitignored) poi build
 COPY . .
+RUN node scripts/verify-geojson.mjs --fetch
 RUN npm run build
 
 # ─── 2. Nginx Production Server ────────────────────────────────────────

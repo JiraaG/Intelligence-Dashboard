@@ -1,59 +1,43 @@
-# RadarFrontend
+# Frontend — Radar Informativo Globale
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.2.16.
+SPA Angular 21 del monorepo `radar/`. Documentazione di prodotto: [docs/03_frontend_and_ui.md](../../docs/03_frontend_and_ui.md).
 
-## Development server
+## Prerequisiti
 
-To start a local development server, run:
+- Node 22+ (allineato al Dockerfile)
+- Asset GeoJSON: `src/assets/data/countries.geo.json` (gitignored)
+  - Pin/licenza: [`ASSET_LICENSE.md`](./src/assets/data/ASSET_LICENSE.md)
+  - Istruzioni: [`README_GEOJSON.txt`](./src/assets/data/README_GEOJSON.txt)
 
-```bash
-ng serve
-```
+## Script
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+| Comando | Uso |
+|---------|-----|
+| `npm start` | Dev server `http://localhost:4200` (proxy: `proxy.conf.json` → API) |
+| `npm run verify-geojson` | Verifica SHA/schema asset GeoJSON (fail se manca) |
+| `npm run verify-geojson:fetch` | Download pinnato + verify |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run test:ci` | Unit test senza watch |
+| `npm run build:ci` | Fetch/verify GeoJSON + build production |
+| `npm run lint` | Prettier check |
+| `npm run build` | Build locale (`prebuild` = verify senza fetch) |
 
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
-```bash
-ng generate component component-name
-```
-
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
-
-```bash
-ng generate --help
-```
-
-## Building
-
-To build the project run:
+Installazione dipendenze (come in Docker):
 
 ```bash
-ng build
+npm ci --legacy-peer-deps
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+**Non esiste** uno script `ng e2e` in questo repository.
 
-## Running unit tests
+## Vincoli
 
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
+- **Sidebar freeze:** non editare `src/app/components/radar-sidebar/**`
+- Leaflet solo via `window.L` (`angular.json` scripts); stub test in `src/app/testing/leaflet.stub.ts`
+- Mock solo con token `MOCK_MODE` (`useValue: true`) — mai fallback silenzioso su errore API
+- Cluster: `maxClusterRadius: 40`, `spiderfyOnMaxZoom: false`
 
-```bash
-ng test
-```
+## Docker
 
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+Build multi-stage in `Dockerfile` → fetch/verify GeoJSON → immagine Nginx.  
+Avvio stack: da `radar/` con `docker compose up --build -d` (UI su porta **80**).
