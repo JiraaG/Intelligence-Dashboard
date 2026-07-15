@@ -129,7 +129,9 @@ export interface StubMap {
   hasLayer(layer: unknown): boolean;
   createPane(name: string): HTMLElement;
   getZoom(): number;
+  getCenter(): StubLatLng;
   getContainer(): HTMLElement;
+  setView(latlng: StubLatLng | [number, number], zoom: number, _opts?: unknown): StubMap;
   flyTo(latlng: StubLatLng | [number, number], zoom: number, _opts?: unknown): StubMap;
   fitBounds(_bounds: StubLatLngBounds, _opts?: unknown): StubMap;
   invalidateSize(_opts?: unknown): StubMap;
@@ -159,6 +161,7 @@ export interface StubClusterGroup {
   clearLayers(): StubClusterGroup;
   getLayers(): unknown[];
   getAllChildMarkers(): unknown[];
+  refreshClusters(_layers?: unknown): StubClusterGroup;
   getVisibleParent(marker: StubMarker): {
     spiderfy(): void;
     unspiderfy(): void;
@@ -231,6 +234,13 @@ function createMap(id: string | HTMLElement, options: Record<string, unknown> = 
   const panes: Record<string, HTMLElement> = {};
   const layers: unknown[] = [];
   let zoom = typeof options['zoom'] === 'number' ? (options['zoom'] as number) : 3;
+  const centerOpt = options['center'];
+  let centerLat = 20;
+  let centerLng = 0;
+  if (Array.isArray(centerOpt) && centerOpt.length >= 2) {
+    centerLat = Number(centerOpt[0]);
+    centerLng = Number(centerOpt[1]);
+  }
 
   const mapObj: StubMap = {
     options,
@@ -275,13 +285,22 @@ function createMap(id: string | HTMLElement, options: Record<string, unknown> = 
     getZoom() {
       return zoom;
     },
+    getCenter() {
+      return createLatLng(centerLat, centerLng);
+    },
     getContainer() {
       return container;
     },
-    flyTo(_latlng, nextZoom) {
+    setView(latlng, nextZoom) {
+      const resolved = resolveLatLng(latlng);
+      centerLat = resolved.lat;
+      centerLng = resolved.lng;
       zoom = nextZoom;
       mapObj._zoom = nextZoom;
       return mapObj;
+    },
+    flyTo(latlng, nextZoom) {
+      return mapObj.setView(latlng, nextZoom);
     },
     fitBounds(_bounds, _opts) {
       return mapObj;
@@ -362,6 +381,9 @@ function createClusterGroup(options: Record<string, unknown> = {}): StubClusterG
     },
     getAllChildMarkers() {
       return [...layers];
+    },
+    refreshClusters() {
+      return group;
     },
     getVisibleParent(child) {
       return {

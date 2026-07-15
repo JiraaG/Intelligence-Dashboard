@@ -14,9 +14,9 @@ in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categ
 
 ### Vincoli post–branch restore (2026-07-15)
 
-- **Phase 0–4 DONE**; fasi **5–6 NOT STARTED**. Vedi `Implementation_Plan.md` / `Implementation_Plan_Execution.md`.
-- **Presenti (Phase 1–4):** migrazioni `001`–`006`, outbox, ledger quote, `radar-worker`, reti `radar-edge`/`radar-data`, `/health/live`+`/ready`, CSP Nginx, `ops/` backup, Gemini `build_gemini_response_schema()`, FE `MOCK_MODE` / DestroyRef / XSS-safe markers / read-unread senza rebuild cluster.
-- **Non assumere** `article-list`, pagination cursor, map-summary (Phase 5). Sidebar freeze resta.
+- **Phase 0–5 DONE**; Phase **6 NOT STARTED**. Vedi `Implementation_Plan.md` / `Implementation_Plan_Execution.md`.
+- **Presenti (Phase 1–5):** migrazioni `001`–`007`, outbox, ledger quote, `radar-worker`, reti `radar-edge`/`radar-data`, `/health/live`+`/ready`, CSP Nginx, `ops/` backup, Gemini `build_gemini_response_schema()`, FE `MOCK_MODE` / DestroyRef / XSS-safe markers / read-unread senza rebuild cluster.
+- **Phase 5 API/FE:** `GET /api/map-summary` (`country×category`); `GET /api/articles` → `{items,next_cursor,total}` (keyset `id`, limit≤100, LATERAL); `backend/app/api/articles_query.py`; migrazione `007`. FE: giorno da summary + pallini; nazione = tutti gli articoli + marker solo paese; spiderfy allineato alla **categoria attiva** carosello/pill (no flicker allo scroll stessa categoria). **Vietato** `article-list`. Sidebar freeze resta.
 - Pipeline ingest in `backend/app/worker.py`; `main.py` è API-only. Compose: 5 servizi su edge+data.
 - **Sidebar freeze:** non modificare `frontend/src/app/components/radar-sidebar/**`; tenere `p-carousel` + altezza via `article-card-{id}`; vietato `app-article-list`.
 - Bug **read/unread** (`.marker-read`): risolto in Phase 4 via `state.service.ts` + `radar-map.component.ts`.
@@ -58,11 +58,14 @@ radar/
 │   │   ├── 002_pipeline_outbox_and_quotas.sql
 │   │   ├── 003_quota_ledger.sql
 │   │   ├── 004_worker_heartbeat.sql
-│   │   └── 005–006 (ledger/legacy alignment)
+│   │   ├── 005–006 (ledger/legacy alignment)
+│   │   └── 007_articles_query_indexes.sql
 │   └── app/
 │       ├── __init__.py
 │       ├── main.py                # FastAPI API-only (pool + migrations + REST)
 │       ├── worker.py              # Ingest daemon (coda bounded, advisory lock)
+│       ├── api/                   # Query helpers Phase 5 (articles cursor + map-summary)
+│       │   └── articles_query.py
 │       ├── requirements.txt
 │       ├── core/                  # Configurazione, DB pool asyncpg, logging, heartbeat
 │       │   ├── config.py          # Variabili d'ambiente bounded; knobs worker + Gemini timeout

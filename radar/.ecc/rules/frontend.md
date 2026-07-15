@@ -241,9 +241,17 @@ Il componente `p-sidebar` di PrimeNG può essere usato come wrapper UI.
 
 ---
 
-## Regola 7: Clustering per categoria (allineato al codice attuale)
+## Regola 7: Clustering per categoria + map-summary (Phase 5)
 
-Il clustering utilizza un **`L.markerClusterGroup` per `primary_category`** (fino a 10 categorie).
+**Day open (Phase 5):** la mappa si dipinge da `GET /api/map-summary` (righe `country_code × primary_category` + count/read + lat/lon finite). Niente `Article[]` globale del giorno. Hatching da categorie aggregate per paese (zoom &lt; 5). A zoom ≥ 5: **pallini numerati** da summary (cluster per categoria, count = `article_count`); click pallino/cluster → fetch nazione + sidebar (stesso path nation open).
+
+**Nation open:** `GET /api/articles?date&country` (envelope `{items,next_cursor,total}`, page ≤100; FE concatena tutte le pagine) → carosello = **tutte** le notizie della nazione (sort categoria + pill `findIndex` invariati in sidebar). Sulla mappa si materializzano i marker articolo **solo** per il paese aperto. Spiderfy: categoria del pallino / pill / articolo attivo carosello — **non** tutte le categorie; allo scroll carosello nella stessa categoria solo highlight (`lastSpiderfyKey`), niente `collapseAllGraphs`. Close/cambio paese: clear detail markers; tornano i pallini summary.
+
+**InvalidateSize / spiderfy race:** dopo open nazione, `invalidateSize` **prima** di `focusAndSpiderfyCategory`; `invalidateSize` usa `pan: false` e `setView` solo se la camera è driftata (setView mid-spiderfy svuota il pane MarkerCluster).
+
+**VIETATO:** `article-list` / infinite scroll in sidebar; truncare il carosello nazione a N arbitrario come regola UX; modificare `radar-sidebar/**`.
+
+Il clustering utilizza un **`L.markerClusterGroup` per `primary_category`** (fino a 10 categorie) sui marker del paese aperto.
 Parametri obbligatori (da `radar-map.component.ts`):
 
 ```typescript
@@ -261,6 +269,7 @@ Non reintrodurre raggio 200, `spiderfyOnMaxZoom: true`, o `disableClusteringAtZo
 - `spiderfyOnMaxZoom`: **false** (espansione custom, non spiderfy automatico)
 - **Focus con compensazione sidebar**: `fitBounds` con padding lato sidebar
 - **Sidebar close**: `App.closeSidebar()` → `mapComponent.collapseAllGraphs()` (senza editare file sidebar)
+- **Read/unread**: fingerprint + `syncMarkerReadState` — no `clearLayers` su solo `is_read`
 
 ---
 

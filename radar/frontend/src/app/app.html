@@ -1,7 +1,8 @@
 <!-- Toolbar centrata -->
 <app-radar-toolbar
-  [articles]="state.articles()"
+  [countries]="state.countries()"
   [articleCount]="articleCount()"
+  [readCount]="readCount()"
   [isLoading]="state.isLoading()"
   [apiError]="!!state.error()"
   (filtersChange)="onFiltersChange($event)"
@@ -11,8 +12,9 @@
 <!-- Mappa Leaflet -->
 <div class="map-container" [class.split-active]="isMapSplit()">
   <app-radar-map
-    [articles]="state.articles()"
+    [articles]="state.detailArticles()"
     [countries]="state.countries()"
+    [mapSummary]="state.filteredSummary()"
     [focusCountryCode]="focusCountryCode()"
     (markerClicked)="onMarkerClick($event)"
     (clusterClicked)="onClusterClick($event)"

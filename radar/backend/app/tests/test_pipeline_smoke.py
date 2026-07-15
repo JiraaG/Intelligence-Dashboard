@@ -109,7 +109,7 @@ def test_health_check_endpoint():
 
 @pytest.mark.asyncio
 async def test_get_articles_endpoint_success() -> None:
-    """Verifica che l'endpoint get_articles risponda correttamente ed interroghi il DB applicando i filtri."""
+    """Verifica che get_articles restituisca l'envelope paginato e applichi i filtri."""
     from fastapi.testclient import TestClient
     from app.main import app, state
     
@@ -117,6 +117,7 @@ async def test_get_articles_endpoint_success() -> None:
     mock_conn = MagicMock(spec=asyncpg.Connection)
     mock_pool.acquire.return_value.__aenter__.return_value = mock_conn
     
+    mock_conn.fetchval = AsyncMock(return_value=1)
     mock_conn.fetch = AsyncMock(return_value=[
         {
             "id": 1,
@@ -130,7 +131,7 @@ async def test_get_articles_endpoint_success() -> None:
             "primary_category": "Chip",
             "sentiment": "Positivo",
             "relevance_level": 3,
-            "companies": ["TSMC"],
+            "companies_involved": ["TSMC"],
             "tags": ["Chip", "Sassonia"]
         }
     ])
@@ -142,17 +143,21 @@ async def test_get_articles_endpoint_success() -> None:
     
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 1
-    assert data[0]["title"] == "Notizia Geopolitica"
-    assert data[0]["companies"] == ["TSMC"]
-    assert data[0]["sentiment"] == "Positivo"
-    assert data[0]["relevance_level"] == 3
+    assert set(data.keys()) == {"items", "next_cursor", "total"}
+    assert data["total"] == 1
+    assert data["next_cursor"] is None
+    assert len(data["items"]) == 1
+    assert data["items"][0]["title"] == "Notizia Geopolitica"
+    assert data["items"][0]["companies_involved"] == ["TSMC"]
+    assert data["items"][0]["sentiment"] == "Positivo"
+    assert data["items"][0]["relevance_level"] == 3
     
     mock_conn.fetch.assert_called_once()
     called_query = mock_conn.fetch.call_args[0][0]
     assert "a.published_at = $1" in called_query
     assert "a.sentiment = $2" in called_query
     assert "a.relevance_level = $3" in called_query
+    assert "LEFT JOIN LATERAL" in called_query
 
 
 @pytest.mark.asyncio

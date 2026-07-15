@@ -17,7 +17,7 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 * **Frontend:** Angular 21 (Standalone Components).
 * **Container:** Docker + docker-compose (servizi: `radar-db`, `radar-backend`, `radar-worker`, `radar-frontend`, `radar-miniflux`) su reti `radar-edge` + `radar-data` (Phase 3). Ingestione solo in `radar-worker`.
 * **Web Server:** Nginx (Alpine) per servire Angular e proxying `/api/`.
-* **Piani operativi:** [`Implementation_Plan.md`](../Implementation_Plan.md) + [`Implementation_Plan_Execution.md`](../Implementation_Plan_Execution.md). Post–branch restore (2026-07-15): **Phase 0–4 DONE**; fasi **5–6 NON presenti** nel codice (pagination/map-summary, governance completa).
+* **Piani operativi:** [`Implementation_Plan.md`](../Implementation_Plan.md) + [`Implementation_Plan_Execution.md`](../Implementation_Plan_Execution.md). Post–branch restore (2026-07-15): **Phase 0–5 DONE**; Phase **6 NOT STARTED** (governance/docs completa).
 
 ---
 

@@ -7,7 +7,17 @@ import { HttpClient } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import type * as Leaflet from 'leaflet';
-import { Article, CountrySummary } from '../../models/article.model';
+import { Article, CountrySummary, PrimaryCategory } from '../../models/article.model';
+import { MapSummaryRow } from '../../models/map-summary.model';
+
+/** Payload when opening a nation from polygon or summary marker/cluster. */
+export interface CountryOpenRequest {
+  countryCode: string;
+  /** When set (summary pallino), sidebar focuses this category and spiderfies. */
+  category?: PrimaryCategory;
+  /** Keep current camera (no fitBounds dezoom). */
+  preserveZoom?: boolean;
+}
 
 /** Minimal MarkerCluster group shape from the global UMD plugin (window.L). */
 interface MarkerClusterGroupLike {
@@ -18,6 +28,8 @@ interface MarkerClusterGroupLike {
   getVisibleParent(marker: Leaflet.Marker): Leaflet.Marker | null;
   on(type: string, fn: Leaflet.LeafletEventHandlerFn): this;
   addTo(map: Leaflet.Map): this;
+  /** Forces MarkerCluster to redraw icons after clearLayers/addLayer races. */
+  refreshClusters?: (layers?: Leaflet.Layer | Leaflet.Layer[]) => this;
   _spiderfied?: { unspiderfy?: () => void } | null;
 }
 
@@ -34,6 +46,11 @@ interface ArticleMarkerMeta {
   articleData?: Article;
   realLatLng?: Leaflet.LatLng;
   isDummy?: boolean;
+  /** Aggregate marker from map-summary (day view, before nation open). */
+  isSummary?: boolean;
+  summaryCount?: number;
+  summaryCountry?: string;
+  summaryCategory?: string;
 }
 
 type ArticleMarker = Leaflet.Marker & ArticleMarkerMeta & {
@@ -61,11 +78,14 @@ export class RadarMapComponent implements AfterViewInit {
 
   articles         = input.required<Article[]>();
   countries        = input.required<CountrySummary[]>();
+  /** Day aggregates — used for numbered cluster balls before a nation is opened. */
+  mapSummary       = input<MapSummaryRow[]>([]);
   focusCountryCode = input<string | null>(null);
 
   markerClicked  = output<Article>();
   clusterClicked = output<Article[]>();
-  countryClicked = output<Article[]>();
+  /** Nation open — optional category + preserveZoom for summary pallini. */
+  countryClicked = output<CountryOpenRequest>();
 
   currentZoomLevel = signal<number>(3);
   isZoomedOut      = computed(() => this.currentZoomLevel() < 5);
@@ -140,20 +160,27 @@ export class RadarMapComponent implements AfterViewInit {
   private highlightedMarker: ArticleMarker | null = null;
   private pendingHighlightArticle: Article | null = null;
   private spiderfyGeneration = 0;
+  /** When true, next focusCountryCode effect skips fitBounds (summary pallino path). */
+  private skipNextCountryFit = false;
+  /**
+   * Geometry inputs changed while flyTo/fitBounds held `isNavigating`.
+   * Without a flush, MarkerCluster can keep layers in memory but draw zero icons.
+   */
+  private pendingGeometryRefresh = false;
 
   constructor() {
     effect(() => {
       const arts = this.articles();
       const ctrs = this.countries();
-      if (!this.map || this.isParsingGeoJson() || this.isNavigating || this.destroyed) {
+      const summary = this.mapSummary();
+      if (!this.map || this.isParsingGeoJson() || this.destroyed) {
         return;
       }
-      const fingerprint = this.geometryFingerprint(arts);
-      if (fingerprint === this.lastGeometryFingerprint) {
-        this.syncMarkerReadState(arts);
+      if (this.isNavigating) {
+        this.pendingGeometryRefresh = true;
         return;
       }
-      this.updateMapData(arts, ctrs);
+      this.applyGeometryInputs(arts, ctrs, summary);
     });
 
     effect(() => {
@@ -173,9 +200,28 @@ export class RadarMapComponent implements AfterViewInit {
     }
   }
 
+  /** Arm once: next country focus keeps camera (used after summary pallino click). */
+  public armSkipCountryFit(): void {
+    this.skipNextCountryFit = true;
+  }
+
   /** Call after sidebar open/close or window resize (overlay full-bleed layout). */
   public invalidateSize(): void {
-    this.map?.invalidateSize({ animate: false });
+    if (!this.map) return;
+    // Preserve camera without unconditional setView — setView mid-spiderfy blanks
+    // MarkerCluster icons (layers remain in group, DOM pane goes empty).
+    const center = this.map.getCenter();
+    const zoom = this.map.getZoom();
+    this.map.invalidateSize({ animate: false, pan: false });
+    const after = this.map.getCenter();
+    const afterZoom = this.map.getZoom();
+    if (
+      afterZoom !== zoom ||
+      Math.abs(after.lat - center.lat) > 1e-9 ||
+      Math.abs(after.lng - center.lng) > 1e-9
+    ) {
+      this.map.setView(center, zoom, { animate: false });
+    }
   }
 
   private scheduleTimeout(fn: () => void, ms: number): void {
@@ -191,11 +237,64 @@ export class RadarMapComponent implements AfterViewInit {
     this.pendingTimeouts.clear();
   }
 
-  private geometryFingerprint(articles: Article[]): string {
-    return articles
-      .map((a) => `${a.id}|${a.primary_category}|${a.country_code}|${a.latitude}|${a.longitude}`)
-      .sort()
-      .join(';');
+  private geometryFingerprint(articles: Article[], summary: MapSummaryRow[]): string {
+    if (articles.length > 0) {
+      return (
+        'detail:' +
+        articles
+          .map((a) => `${a.id}|${a.primary_category}|${a.country_code}|${a.latitude}|${a.longitude}`)
+          .sort()
+          .join(';')
+      );
+    }
+    return (
+      'summary:' +
+      summary
+        .map(
+          (r) =>
+            `${r.country_code}|${r.primary_category}|${r.article_count}|${r.latitude}|${r.longitude}`,
+        )
+        .sort()
+        .join(';')
+    );
+  }
+
+  private applyGeometryInputs(
+    articles: Article[],
+    countries: CountrySummary[],
+    summary: MapSummaryRow[],
+  ): void {
+    const fingerprint = this.geometryFingerprint(articles, summary);
+    if (fingerprint === this.lastGeometryFingerprint) {
+      if (articles.length > 0) this.syncMarkerReadState(articles);
+      return;
+    }
+    this.updateMapData(articles, countries, summary);
+  }
+
+  /** End flyTo/fitBounds lock and apply any geometry updates deferred during navigation. */
+  private finishNavigating(): void {
+    this.isNavigating = false;
+    if (!this.pendingGeometryRefresh || this.destroyed || !this.map || this.isParsingGeoJson()) {
+      return;
+    }
+    this.pendingGeometryRefresh = false;
+    this.applyGeometryInputs(this.articles(), this.countries(), this.mapSummary());
+  }
+
+  /** MarkerCluster can keep layers but draw nothing after clearLayers/setView races. */
+  private refreshClusterVisibility(): void {
+    this.categoryClusterGroups.forEach((cg) => {
+      if (typeof cg.refreshClusters === 'function') {
+        cg.refreshClusters();
+      }
+    });
+  }
+
+  private markerWeight(marker: ArticleMarker): number {
+    if (marker.isDummy) return 0;
+    if (marker.isSummary) return marker.summaryCount ?? 1;
+    return 1;
   }
 
   private createSafeMarkerIcon(
@@ -301,7 +400,7 @@ export class RadarMapComponent implements AfterViewInit {
         spiderfyDistanceMultiplier: 2.8,
         iconCreateFunction: (cluster: MarkerClusterLike) => {
           const childMarkers = cluster.getAllChildMarkers() as ArticleMarker[];
-          const realCount = childMarkers.filter((m) => !m.isDummy).length;
+          const realCount = childMarkers.reduce((sum, m) => sum + this.markerWeight(m), 0);
           if (realCount === 0) return L.divIcon({ className: 'hidden', iconSize: [0, 0] });
 
           const zoom = this.map ? this.map.getZoom() : 3;
@@ -347,10 +446,23 @@ export class RadarMapComponent implements AfterViewInit {
           return;
         }
 
-        const arts = childMarkers
-          .filter((m) => !m.isDummy)
+        const articleMarkers = childMarkers.filter((m) => !m.isDummy && !m.isSummary && m.articleData);
+        const arts = articleMarkers
           .map((m) => m.articleData)
           .filter((a): a is Article => !!a);
+
+        // Day-view summary clusters: open nation on this category, keep zoom, then spiderfy.
+        if (arts.length === 0) {
+          const country = this.dominantSummaryCountry(childMarkers);
+          if (country) {
+            this.countryClicked.emit({
+              countryCode: country,
+              category: cat as PrimaryCategory,
+              preserveZoom: true,
+            });
+          }
+          return;
+        }
 
         if (arts.length > 0) this.clusterClicked.emit(arts);
 
@@ -369,9 +481,12 @@ export class RadarMapComponent implements AfterViewInit {
 
         const onZoomEnd = () => {
           this.scheduleTimeout(() => {
-            if (this.destroyed || gen !== this.spiderfyGeneration) return;
+            if (this.destroyed || gen !== this.spiderfyGeneration) {
+              this.finishNavigating();
+              return;
+            }
             this.spiderfyAndCreateRoot(cg, childMarkers, gen);
-            this.isNavigating = false;
+            this.finishNavigating();
           }, 250);
         };
         this.map.once('zoomend', onZoomEnd);
@@ -495,14 +610,10 @@ export class RadarMapComponent implements AfterViewInit {
           if (this.isZoomedOut()) {
             if (e.originalEvent) {
               L.DomEvent.stopPropagation(e.originalEvent);
+              (e.originalEvent as Event & { _radarHandled?: boolean })._radarHandled = true;
             }
-            const countryArts = this.articles().filter((a) => a.country_code === code);
-            if (countryArts.length > 0) {
-              if (e.originalEvent) {
-                (e.originalEvent as Event & { _radarHandled?: boolean })._radarHandled = true;
-              }
-              this.countryClicked.emit(countryArts);
-            }
+            // Emit code only — nation Article[] is fetched by App/StateService (Phase 5).
+            this.countryClicked.emit({ countryCode: code });
           }
         });
 
@@ -659,6 +770,12 @@ export class RadarMapComponent implements AfterViewInit {
     const L = this.L;
     if (!this.map || !L || this.isNavigating || this.destroyed) return;
 
+    // Summary pallino path: keep current zoom/center (do not fitBounds/dezoom).
+    if (this.skipNextCountryFit) {
+      this.skipNextCountryFit = false;
+      return;
+    }
+
     let bounds: Leaflet.LatLngBounds | null = null;
 
     if (code === 'US') {
@@ -691,7 +808,7 @@ export class RadarMapComponent implements AfterViewInit {
       const cleanup = () => {
         if (cleaned || this.destroyed) return;
         cleaned = true;
-        this.isNavigating = false;
+        this.finishNavigating();
         this.map?.off('zoomend', cleanup);
         this.map?.off('moveend', cleanup);
       };
@@ -702,15 +819,176 @@ export class RadarMapComponent implements AfterViewInit {
     }
   }
 
-  private updateMapData(articles: Article[], countries: CountrySummary[]): void {
+  private hasFiniteCoordinates(lat: number, lon: number): boolean {
+    return (
+      Number.isFinite(lat) &&
+      Number.isFinite(lon) &&
+      lat >= -90 &&
+      lat <= 90 &&
+      lon >= -180 &&
+      lon <= 180
+    );
+  }
+
+  private dominantSummaryCountry(markers: ArticleMarker[]): string | null {
+    const totals = new Map<string, number>();
+    for (const m of markers) {
+      if (!m.isSummary || !m.summaryCountry) continue;
+      totals.set(m.summaryCountry, (totals.get(m.summaryCountry) ?? 0) + (m.summaryCount ?? 1));
+    }
+    let best: string | null = null;
+    let bestCount = 0;
+    totals.forEach((count, code) => {
+      if (count > bestCount) {
+        best = code;
+        bestCount = count;
+      }
+    });
+    return best;
+  }
+
+  private createSummaryCountIcon(
+    L: LeafletGlobal,
+    category: string,
+    count: number,
+    ox: number,
+    oy: number,
+  ): Leaflet.DivIcon {
+    const catClass = `cat-${category.toLowerCase()}`;
+    const clusterEl = document.createElement('div');
+    clusterEl.className = 'cluster-icon';
+    clusterEl.textContent = String(count);
+    return L.divIcon({
+      html: clusterEl,
+      className: `radar-cluster ${catClass}`,
+      iconSize: [52, 52],
+      iconAnchor: [26 - ox, 26 - oy],
+    });
+  }
+
+  private updateMapData(
+    articles: Article[],
+    countries: CountrySummary[],
+    summary: MapSummaryRow[],
+  ): void {
     const L = this.L;
     if (!L || !this.map) return;
 
+    // Tear down spiderfy before clearLayers — otherwise MarkerCluster can leave
+    // icons missing from the pane while layers remain in the group.
+    this.spiderfyGeneration++;
+    this.clearRootMarkers();
+    this.categoryClusterGroups.forEach((cg) => {
+      const spiderfiedCluster = cg._spiderfied;
+      if (spiderfiedCluster && typeof spiderfiedCluster.unspiderfy === 'function') {
+        spiderfiedCluster.unspiderfy();
+      }
+    });
+
     this.categoryClusterGroups.forEach((group) => group.clearLayers());
+
+    if (articles.length === 0) {
+      this.renderSummaryMarkers(L, summary);
+      this.lastGeometryFingerprint = this.geometryFingerprint(articles, summary);
+      this.refreshClusterVisibility();
+      this.refreshHatchingStyles();
+      void countries;
+      return;
+    }
+
+    this.renderDetailMarkers(L, articles);
+    this.lastGeometryFingerprint = this.geometryFingerprint(articles, summary);
+    this.refreshClusterVisibility();
+    this.refreshHatchingStyles();
+    void countries;
+  }
+
+  /** Numbered balls from map-summary — same country centroid + UI offsets as detail markers. */
+  private renderSummaryMarkers(L: LeafletGlobal, summary: MapSummaryRow[]): void {
+    // One geographic anchor per country (weighted by article_count), matching detail mode.
+    // Do NOT place each category at its own AVG lat/lon — that scatters balls off-country
+    // and makes them jump when sidebar open swaps summary → detail.
+    const countryCenters = new Map<string, { latSum: number; lngSum: number; weight: number }>();
+    for (const row of summary) {
+      const code = row.country_code || 'XX';
+      if (code === 'XX') continue;
+      if (!this.hasFiniteCoordinates(row.latitude, row.longitude)) continue;
+      const w = Math.max(1, row.article_count);
+      const cur = countryCenters.get(code) ?? { latSum: 0, lngSum: 0, weight: 0 };
+      cur.latSum += row.latitude * w;
+      cur.lngSum += row.longitude * w;
+      cur.weight += w;
+      countryCenters.set(code, cur);
+    }
+
+    const populatedSpots = new Set<string>();
+
+    for (const row of summary) {
+      const code = row.country_code || 'XX';
+      if (code === 'XX') continue;
+      if (row.article_count <= 0) continue;
+      const center = countryCenters.get(code);
+      if (!center || center.weight === 0) continue;
+
+      const baseLat = center.latSum / center.weight;
+      const baseLng = center.lngSum / center.weight;
+      const cat = row.primary_category;
+      const [ox, oy] = this.UI_OFFSETS[cat] || [0, 0];
+      populatedSpots.add(`${code}_${cat}`);
+
+      const icon = this.createSummaryCountIcon(L, cat, row.article_count, ox, oy);
+      const marker = L.marker([baseLat, baseLng], { icon }) as ArticleMarker;
+      marker.isSummary = true;
+      marker.isDummy = false;
+      marker.summaryCount = row.article_count;
+      marker.summaryCountry = code;
+      marker.summaryCategory = cat;
+      marker.realLatLng = L.latLng(baseLat, baseLng);
+
+      marker.on('click', (e: Leaflet.LeafletMouseEvent) => {
+        if (e.originalEvent) {
+          L.DomEvent.stopPropagation(e.originalEvent);
+          (e.originalEvent as Event & { _radarHandled?: boolean })._radarHandled = true;
+        }
+        this.countryClicked.emit({
+          countryCode: code,
+          category: cat,
+          preserveZoom: true,
+        });
+      });
+
+      const targetGroup = this.categoryClusterGroups.get(cat);
+      if (targetGroup) targetGroup.addLayer(marker);
+    }
+
+    // Same dummy anchors as detail mode — stabilizes MarkerCluster parent position.
+    populatedSpots.forEach((spot) => {
+      const [code, cat] = spot.split('_');
+      const center = countryCenters.get(code);
+      if (!center || center.weight === 0) return;
+      const baseLat = center.latSum / center.weight;
+      const baseLng = center.lngSum / center.weight;
+      const invisibleIcon = L.divIcon({
+        html: '',
+        className: '',
+        iconSize: [0, 0],
+        iconAnchor: [0, 0],
+      });
+      const dummyMarker = L.marker([baseLat, baseLng], {
+        icon: invisibleIcon,
+        interactive: false,
+      }) as ArticleMarker;
+      dummyMarker.isDummy = true;
+      const targetGroup = this.categoryClusterGroups.get(cat);
+      if (targetGroup) targetGroup.addLayer(dummyMarker);
+    });
+  }
+
+  private renderDetailMarkers(L: LeafletGlobal, articles: Article[]): void {
     const countryCenters = new Map<string, { latSum: number; lngSum: number; count: number }>();
 
     for (const article of articles) {
-      if (article.latitude && article.longitude) {
+      if (this.hasFiniteCoordinates(article.latitude, article.longitude)) {
         const code = article.country_code || 'XX';
         if (code === 'XX') continue;
         const current = countryCenters.get(code) || { latSum: 0, lngSum: 0, count: 0 };
@@ -778,10 +1056,6 @@ export class RadarMapComponent implements AfterViewInit {
       const targetGroup = this.categoryClusterGroups.get(cat);
       if (targetGroup) targetGroup.addLayer(dummyMarker);
     });
-
-    this.lastGeometryFingerprint = this.geometryFingerprint(articles);
-    this.refreshHatchingStyles();
-    void countries;
   }
 
   collapseAllGraphs(emitClose: boolean = false): void {
@@ -802,7 +1076,11 @@ export class RadarMapComponent implements AfterViewInit {
     }
   }
 
-  public focusAndSpiderfyCategory(countryCode: string, category: string): void {
+  public focusAndSpiderfyCategory(
+    countryCode: string,
+    category: string,
+    attempt = 0,
+  ): void {
     if (!this.map || this.destroyed) return;
     const cg = this.categoryClusterGroups.get(category);
     if (!cg) return;
@@ -812,7 +1090,16 @@ export class RadarMapComponent implements AfterViewInit {
       (m) => m.articleData && m.articleData.country_code === countryCode,
     );
 
-    if (countryMarkers.length === 0) return;
+    if (countryMarkers.length === 0) {
+      // Detail markers may still be applying after nation fetch / invalidateSize.
+      if (attempt < 10) {
+        this.scheduleTimeout(
+          () => this.focusAndSpiderfyCategory(countryCode, category, attempt + 1),
+          50,
+        );
+      }
+      return;
+    }
 
     this.collapseAllGraphs(false);
 
@@ -827,7 +1114,8 @@ export class RadarMapComponent implements AfterViewInit {
       : firstMarker.getLatLng();
     const gen = ++this.spiderfyGeneration;
 
-    if (currentZoom >= targetZoom) {
+    // Detail zoom already (markers visible): spiderfy in place — never fitBounds/dezoom.
+    if (currentZoom >= 5) {
       this.spiderfyAndCreateRoot(cg, countryMarkers, gen);
       return;
     }
@@ -842,11 +1130,11 @@ export class RadarMapComponent implements AfterViewInit {
       cleaned = true;
       this.scheduleTimeout(() => {
         if (this.destroyed || gen !== this.spiderfyGeneration) {
-          this.isNavigating = false;
+          this.finishNavigating();
           return;
         }
         this.spiderfyAndCreateRoot(cg, countryMarkers, gen);
-        this.isNavigating = false;
+        this.finishNavigating();
         this.map?.off('zoomend', cleanup);
         this.map?.off('moveend', cleanup);
       }, 250);
@@ -855,6 +1143,32 @@ export class RadarMapComponent implements AfterViewInit {
     this.map.once('zoomend', cleanup);
     this.map.once('moveend', cleanup);
     this.scheduleTimeout(cleanup, 1200);
+  }
+
+  /**
+   * Nation open / carousel: expand emoji icons for one category in that country.
+   * Prefer focusAndSpiderfyCategory — multi-category expand is not used (active article only).
+   */
+  public focusAndSpiderfyCountry(countryCode: string, attempt = 0): void {
+    if (!this.map || this.destroyed) return;
+
+    // Resolve the first available category for this country and delegate.
+    for (const [cat, cg] of this.categoryClusterGroups) {
+      const markers = (cg.getLayers() as ArticleMarker[]).filter(
+        (m) => m.articleData && m.articleData.country_code === countryCode,
+      );
+      if (markers.length > 0) {
+        this.focusAndSpiderfyCategory(countryCode, cat, attempt);
+        return;
+      }
+    }
+
+    if (attempt < 10) {
+      this.scheduleTimeout(
+        () => this.focusAndSpiderfyCountry(countryCode, attempt + 1),
+        50,
+      );
+    }
   }
 
   public highlightMarkerForArticle(article: Article | null): void {

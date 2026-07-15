@@ -96,8 +96,9 @@ const EMPTY_GEOJSON = {
   template: '',
 })
 class ToolbarStubComponent {
-  articles = input<Article[]>([]);
+  countries = input<CountrySummary[]>([]);
   articleCount = input(0);
+  readCount = input(0);
   isLoading = input(false);
   apiError = input(false);
   filtersChange = output<ArticleFilters>();
@@ -126,14 +127,18 @@ class SidebarStubComponent {
 class MapStubComponent {
   articles = input.required<Article[]>();
   countries = input.required<CountrySummary[]>();
+  mapSummary = input<import('./models/map-summary.model').MapSummaryRow[]>([]);
   focusCountryCode = input<string | null>(null);
   markerClicked = output<Article>();
   clusterClicked = output<Article[]>();
-  countryClicked = output<Article[]>();
+  countryClicked = output<import('./components/radar-map/radar-map.component').CountryOpenRequest>();
   collapseAllGraphs(_emitClose?: boolean): void {
     /* no-op stub */
   }
   focusAndSpiderfyCategory(_countryCode: string, _category: string): void {
+    /* no-op stub */
+  }
+  focusAndSpiderfyCountry(_countryCode: string): void {
     /* no-op stub */
   }
   highlightMarkerForArticle(_article: Article | null): void {
@@ -152,6 +157,7 @@ class MapStubComponent {
     <app-radar-map
       [articles]="articles"
       [countries]="countries"
+      [mapSummary]="mapSummary"
       [focusCountryCode]="focusCountryCode"
     />
   `,
@@ -159,6 +165,7 @@ class MapStubComponent {
 class MapHostComponent {
   articles: Article[] = [];
   countries: CountrySummary[] = [];
+  mapSummary: import('./models/map-summary.model').MapSummaryRow[] = [];
   focusCountryCode: string | null = null;
 }
 
@@ -167,7 +174,7 @@ class MapHostComponent {
  * Avoids Angular 21 rxResource + TestBed PendingTasks race in Vitest/jsdom.
  */
 function createStateStub(initial: Article[] = FIXTURE_ARTICLES, error: unknown = null) {
-  const articleSignal = signal<Article[]>(structuredClone(initial));
+  const detailSignal = signal<Article[]>(structuredClone(initial));
   const errorSignal = signal<unknown>(error);
   return {
     filters: signal<ArticleFilters>({
@@ -175,19 +182,30 @@ function createStateStub(initial: Article[] = FIXTURE_ARTICLES, error: unknown =
       sentiment: [],
       categories: [],
     }),
-    articles: computed(() => articleSignal()),
+    detailArticles: detailSignal,
+    detailLoading: signal(false),
+    articles: computed(() => detailSignal()),
     countries: computed(() => [] as CountrySummary[]),
+    filteredSummary: computed(() => [] as import('./models/map-summary.model').MapSummaryRow[]),
+    articleCount: computed(() => detailSignal().length),
+    readCount: computed(() => detailSignal().filter((a) => a.is_read).length),
     isLoading: computed(() => false),
     error: computed(() => errorSignal()),
-    articlesResource: {
-      value: articleSignal,
-      error: errorSignal,
-      isLoading: computed(() => false),
+    clearDetailArticles(): void {
+      detailSignal.set([]);
+    },
+    async loadCountryArticles(countryCode: string): Promise<Article[]> {
+      const arts = detailSignal().filter((a) => a.country_code === countryCode);
+      detailSignal.set(arts);
+      return arts;
     },
     toggleReadStatus(articleId: number, isRead: boolean): void {
-      articleSignal.update((arts) => {
-        const next = arts.map((a) => (a.id === articleId ? { ...a, is_read: isRead } : a));
-        return next;
+      detailSignal.update((arts) => {
+        return arts.map((a) => {
+          if (a.id !== articleId) return a;
+          a.is_read = isRead;
+          return a;
+        });
       });
     },
   };
@@ -309,9 +327,9 @@ describe('App / map behavior', () => {
       // Drive cluster population directly after GeoJSON is ready (same path as the map effect).
       (
         mapCmp as unknown as {
-          updateMapData: (articles: Article[], countries: CountrySummary[]) => void;
+          updateMapData: (articles: Article[], countries: CountrySummary[], summary?: unknown[]) => void;
         }
-      ).updateMapData(bulk, countries);
+      ).updateMapData(bulk, countries, []);
 
       const mapInstance = (mapCmp as unknown as { map: StubMap }).map;
       const categoryGroups = (
@@ -350,7 +368,9 @@ describe('App / map behavior', () => {
           {
             provide: ArticleService,
             useValue: {
-              getArticles: () => of(structuredClone(FIXTURE_ARTICLES)),
+              getMapSummary: () => of([]),
+              getArticlesPage: () => of({ items: structuredClone(FIXTURE_ARTICLES), next_cursor: null, total: 3 }),
+              getAllArticlesForCountry: () => of(structuredClone(FIXTURE_ARTICLES)),
               getCountries: () => of([]),
               updateReadStatus: () => of({ status: 'success', is_read: true }),
             },

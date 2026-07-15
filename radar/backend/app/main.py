@@ -9,14 +9,21 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime
 from typing import Any, AsyncGenerator, Optional
 
-import asyncpg
 from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from app.api.articles_query import (
+    DEFAULT_ARTICLES_LIMIT,
+    build_articles_count_query,
+    build_articles_page_query,
+    build_countries_summary_query,
+    build_map_summary_query,
+    clamp_articles_limit,
+    parse_published_date,
+)
 from app.core.config import CORS_ALLOW_ORIGINS, DATABASE_URL, WORKER_HEARTBEAT_STALE_SECONDS
 from app.core.database import bootstrap_database, init_pool
 from app.core.heartbeat import evaluate_readiness
@@ -29,7 +36,7 @@ class AppState:
     """Stato globale API: solo pool database."""
 
     def __init__(self) -> None:
-        self.db_pool: Optional[asyncpg.Pool] = None
+        self.db_pool: Optional[Any] = None
 
 
 state = AppState()
@@ -126,53 +133,74 @@ async def health_ready(response: Response) -> dict[str, Any]:
 @app.get("/api/articles")
 async def get_articles(
     date: str,
+    country: Optional[str] = Query(None, min_length=2, max_length=2),
+    category: Optional[str] = Query(None),
+    sentiment: Optional[str] = Query(None),
+    relevance_level: Optional[int] = Query(None, ge=1, le=5),
+    cursor: Optional[int] = Query(None, ge=1),
+    limit: int = Query(DEFAULT_ARTICLES_LIMIT, ge=1),
+):
+    """
+    Day-scoped article page (BREAKING: object envelope, not a bare array).
+
+    Keyset: ``id DESC``, exclusive cursor (``id < cursor``). ``limit`` capped at 100.
+    """
+    empty = {"items": [], "next_cursor": None, "total": 0}
+    if not state.db_pool:
+        return empty
+
+    pub_date = parse_published_date(date)
+    page_limit = clamp_articles_limit(limit)
+    # Fetch one extra row to detect a following page without a second round-trip.
+    fetch_limit = page_limit + 1
+
+    count_sql, count_params = build_articles_count_query(
+        pub_date,
+        sentiment=sentiment,
+        relevance_level=relevance_level,
+        country=country,
+        category=category,
+    )
+    page_sql, page_params = build_articles_page_query(
+        pub_date,
+        sentiment=sentiment,
+        relevance_level=relevance_level,
+        country=country,
+        category=category,
+        cursor=cursor,
+        limit=fetch_limit,
+    )
+
+    async with state.db_pool.acquire() as conn:
+        total = int(await conn.fetchval(count_sql, *count_params) or 0)
+        rows = await conn.fetch(page_sql, *page_params)
+
+    has_more = len(rows) > page_limit
+    page_rows = rows[:page_limit]
+    items = [dict(row) for row in page_rows]
+    next_cursor: Optional[int] = items[-1]["id"] if has_more and items else None
+    return {"items": items, "next_cursor": next_cursor, "total": total}
+
+
+@app.get("/api/map-summary")
+async def get_map_summary(
+    date: str,
     sentiment: Optional[str] = Query(None),
     relevance_level: Optional[int] = Query(None, ge=1, le=5),
 ):
+    """Aggregate rows by country_code × primary_category for day map hatching."""
     if not state.db_pool:
         return []
 
-    try:
-        pub_date = datetime.strptime(date.replace("/", "-"), "%Y-%m-%d").date()
-    except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail="Formato data non valido. Usa il formato ISO YYYY-MM-DD.",
-        )
-
-    query_parts = [
-        """
-        SELECT
-            a.id, a.title, a.summary, a.published_at::text AS published_at, a.source_url,
-            a.country_code, a.latitude, a.longitude, a.primary_category,
-            a.sentiment, a.relevance_level, a.infrastructural_entities, a.feed_title,
-            a.is_read,
-            COALESCE(array_agg(DISTINCT c.name) FILTER (WHERE c.name IS NOT NULL), '{}') AS companies_involved,
-            COALESCE(array_agg(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL), '{}') AS tags
-        FROM articles a
-        LEFT JOIN article_companies ac ON ac.article_id = a.id
-        LEFT JOIN companies c ON c.id = ac.company_id
-        LEFT JOIN article_tags at2 ON at2.article_id = a.id
-        LEFT JOIN tags t ON t.id = at2.tag_id
-        WHERE a.published_at = $1
-        """
-    ]
-
-    params: list = [pub_date]
-
-    if sentiment:
-        params.append(sentiment)
-        query_parts.append(f"AND a.sentiment = ${len(params)}")
-
-    if relevance_level is not None:
-        params.append(relevance_level)
-        query_parts.append(f"AND a.relevance_level = ${len(params)}")
-
-    query_parts.append("GROUP BY a.id ORDER BY a.id DESC")
-    final_query = " ".join(query_parts)
+    pub_date = parse_published_date(date)
+    sql, params = build_map_summary_query(
+        pub_date,
+        sentiment=sentiment,
+        relevance_level=relevance_level,
+    )
 
     async with state.db_pool.acquire() as conn:
-        rows = await conn.fetch(final_query, *params)
+        rows = await conn.fetch(sql, *params)
 
     return [dict(row) for row in rows]
 
@@ -183,43 +211,19 @@ async def get_countries_summary(
     sentiment: Optional[str] = Query(None),
     relevance_level: Optional[int] = Query(None, ge=1, le=5),
 ):
+    """Compat country rollup (no junction joins / Cartesian risk)."""
     if not state.db_pool:
         return []
 
-    try:
-        pub_date = datetime.strptime(date.replace("/", "-"), "%Y-%m-%d").date()
-    except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail="Formato data non valido. Usa il formato ISO YYYY-MM-DD.",
-        )
-
-    query_parts = [
-        """
-        SELECT
-            country_code,
-            array_agg(DISTINCT primary_category) AS categories,
-            COUNT(*) AS article_count
-        FROM articles
-        WHERE published_at = $1
-        """
-    ]
-
-    params: list = [pub_date]
-
-    if sentiment:
-        params.append(sentiment)
-        query_parts.append(f"AND sentiment = ${len(params)}")
-
-    if relevance_level is not None:
-        params.append(relevance_level)
-        query_parts.append(f"AND relevance_level = ${len(params)}")
-
-    query_parts.append("GROUP BY country_code")
-    final_query = " ".join(query_parts)
+    pub_date = parse_published_date(date)
+    sql, params = build_countries_summary_query(
+        pub_date,
+        sentiment=sentiment,
+        relevance_level=relevance_level,
+    )
 
     async with state.db_pool.acquire() as conn:
-        rows = await conn.fetch(final_query, *params)
+        rows = await conn.fetch(sql, *params)
 
     return [dict(row) for row in rows]
 

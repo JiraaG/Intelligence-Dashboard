@@ -1,8 +1,16 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, map, of } from 'rxjs';
-import { Article, CountrySummary, ArticleFilters } from '../models/article.model';
-import { parseArticlesDto } from '../models/article.dto';
+import { EMPTY, Observable, expand, map, of, reduce } from 'rxjs';
+import {
+  Article,
+  ArticleFilters,
+  ArticlesPage,
+  ArticlesPageFilters,
+  CountrySummary,
+  Sentiment,
+} from '../models/article.model';
+import { MapSummaryRow } from '../models/map-summary.model';
+import { parseArticlesPageDto, parseMapSummaryDto } from '../models/article.dto';
 import { ArticleMockService } from './article-mock.service';
 import { MOCK_MODE } from './mock-mode.token';
 
@@ -11,22 +19,72 @@ export interface ReadStatusResponse {
   is_read: boolean;
 }
 
+const DEFAULT_PAGE_LIMIT = 50;
+const MAX_PAGE_LIMIT = 100;
+
 @Injectable({ providedIn: 'root' })
 export class ArticleService {
   private readonly http = inject(HttpClient);
   private readonly mock = inject(ArticleMockService);
   private readonly mockMode = inject(MOCK_MODE);
 
-  getArticles(filters: ArticleFilters): Observable<Article[]> {
+  getMapSummary(filters: {
+    date: string;
+    sentiment?: Sentiment | Sentiment[] | null;
+  }): Observable<MapSummaryRow[]> {
     if (this.mockMode) {
-      return this.mock.getArticles(filters.date);
+      return this.mock.getMapSummary(filters.date, filters.sentiment ?? undefined);
     }
-    const params = new HttpParams().set('date', filters.date);
-    return this.http.get<unknown>('/api/articles', { params }).pipe(
-      map((payload) => parseArticlesDto(payload)),
+    let params = new HttpParams().set('date', filters.date);
+    const singleSentiment = Array.isArray(filters.sentiment)
+      ? (filters.sentiment.length === 1 ? filters.sentiment[0] : undefined)
+      : filters.sentiment ?? undefined;
+    if (singleSentiment) {
+      params = params.set('sentiment', singleSentiment);
+    }
+    return this.http.get<unknown>('/api/map-summary', { params }).pipe(
+      map((payload) => parseMapSummaryDto(payload)),
     );
   }
 
+  getArticlesPage(filters: ArticlesPageFilters): Observable<ArticlesPage> {
+    const limit = Math.min(Math.max(filters.limit ?? DEFAULT_PAGE_LIMIT, 1), MAX_PAGE_LIMIT);
+    if (this.mockMode) {
+      return this.mock.getArticlesPage({ ...filters, limit });
+    }
+    let params = new HttpParams().set('date', filters.date).set('limit', String(limit));
+    if (filters.country) params = params.set('country', filters.country);
+    if (filters.category) params = params.set('category', filters.category);
+    if (filters.sentiment) params = params.set('sentiment', filters.sentiment);
+    if (filters.relevance_level != null) {
+      params = params.set('relevance_level', String(filters.relevance_level));
+    }
+    if (filters.cursor != null) params = params.set('cursor', String(filters.cursor));
+    return this.http.get<unknown>('/api/articles', { params }).pipe(
+      map((payload) => parseArticlesPageDto(payload)),
+    );
+  }
+
+  /**
+   * Concatenate keyset pages until next_cursor is null (nation open — full carousel).
+   */
+  getAllArticlesForCountry(
+    date: string,
+    country: string,
+    extra: Omit<ArticlesPageFilters, 'date' | 'country' | 'cursor' | 'limit'> = {},
+  ): Observable<Article[]> {
+    const limit = MAX_PAGE_LIMIT;
+    return this.getArticlesPage({ date, country, limit, ...extra }).pipe(
+      expand((page) =>
+        page.next_cursor != null
+          ? this.getArticlesPage({ date, country, limit, cursor: page.next_cursor, ...extra })
+          : EMPTY,
+      ),
+      reduce((acc, page) => acc.concat(page.items), [] as Article[]),
+    );
+  }
+
+  /** @deprecated Prefer getMapSummary; kept for compat callers. */
   getCountries(filters: ArticleFilters): Observable<CountrySummary[]> {
     if (this.mockMode) {
       return this.mock.getCountries(filters.date);

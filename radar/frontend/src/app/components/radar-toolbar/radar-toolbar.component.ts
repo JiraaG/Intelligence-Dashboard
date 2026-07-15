@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { CalendarModule } from 'primeng/calendar';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { ProgressBarModule } from 'primeng/progressbar';
-import { Article, ArticleFilters, Sentiment, PrimaryCategory } from '../../models/article.model';
+import { ArticleFilters, CountrySummary, Sentiment, PrimaryCategory } from '../../models/article.model';
 
 @Component({
   selector: 'app-radar-toolbar',
@@ -14,9 +14,10 @@ import { Article, ArticleFilters, Sentiment, PrimaryCategory } from '../../model
   styleUrl: './radar-toolbar.component.scss'
 })
 export class RadarToolbarComponent {
-  articles     = input<Article[]>([]);
+  /** Day summary rollup — country list without full Article[]. */
+  countries    = input<CountrySummary[]>([]);
   articleCount = input<number>(0);
-  readCount    = computed(() => this.articles().filter(a => a.is_read).length);
+  readCount    = input<number>(0);
   isLoading    = input<boolean>(false);
   apiError     = input<boolean>(false);
 
@@ -98,35 +99,29 @@ export class RadarToolbarComponent {
     'XX': 'World Wide'
   };
 
-  // Calcolo dei paesi coinvolti per l'hover tooltip
   readonly countriesList = computed(() => {
-    const arts = this.articles();
-    const countMap = new Map<string, { total: number, read: number }>();
-    for (const a of arts) {
-      const stats = countMap.get(a.country_code) || { total: 0, read: 0 };
-      stats.total += 1;
-      if (a.is_read) stats.read += 1;
-      countMap.set(a.country_code, stats);
-    }
-    
     const list: { code: string; name: string; count: number; readCount: number }[] = [];
-    countMap.forEach((stats, code) => {
-      let name = this.COUNTRY_NAMES[code];
+    for (const c of this.countries()) {
+      let name = this.COUNTRY_NAMES[c.country_code];
       if (!name) {
-        if (code === 'XX') {
+        if (c.country_code === 'XX') {
           name = 'World Wide';
         } else {
           try {
             const displayNames = new Intl.DisplayNames(['it-IT'], { type: 'region' });
-            name = displayNames.of(code) || code;
-          } catch (e) {
-            name = code;
+            name = displayNames.of(c.country_code) || c.country_code;
+          } catch {
+            name = c.country_code;
           }
         }
       }
-      list.push({ code, name, count: stats.total, readCount: stats.read });
-    });
-    
+      list.push({
+        code: c.country_code,
+        name,
+        count: c.article_count,
+        readCount: c.read_count ?? 0,
+      });
+    }
     return list.sort((a, b) => b.count - a.count);
   });
 
@@ -156,4 +151,3 @@ export class RadarToolbarComponent {
     });
   }
 }
-

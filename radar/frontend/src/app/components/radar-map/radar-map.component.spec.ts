@@ -60,6 +60,7 @@ const EMPTY_GEOJSON = {
     <app-radar-map
       [articles]="articles"
       [countries]="countries"
+      [mapSummary]="mapSummary"
       [focusCountryCode]="focusCountryCode"
     />
   `,
@@ -67,6 +68,7 @@ const EMPTY_GEOJSON = {
 class MapHostComponent {
   articles: Article[] = [];
   countries: CountrySummary[] = [];
+  mapSummary: import('../../models/map-summary.model').MapSummaryRow[] = [];
   focusCountryCode: string | null = null;
 }
 
@@ -123,9 +125,9 @@ describe('RadarMapComponent (Phase 4)', () => {
     const mapCmp = getMapCmp(fixture);
     (
       mapCmp as unknown as {
-        updateMapData: (a: Article[], c: CountrySummary[]) => void;
+        updateMapData: (a: Article[], c: CountrySummary[], s?: unknown[]) => void;
       }
-    ).updateMapData(arts, countries);
+    ).updateMapData(arts, countries, []);
 
     const energia = (
       mapCmp as unknown as { categoryClusterGroups: Map<string, StubClusterGroup> }
@@ -180,9 +182,9 @@ describe('RadarMapComponent (Phase 4)', () => {
     const mapCmp = getMapCmp(fixture);
     (
       mapCmp as unknown as {
-        updateMapData: (a: Article[], c: CountrySummary[]) => void;
+        updateMapData: (a: Article[], c: CountrySummary[], s?: unknown[]) => void;
       }
-    ).updateMapData(arts, countries);
+    ).updateMapData(arts, countries, []);
 
     const groups = (
       mapCmp as unknown as { categoryClusterGroups: Map<string, StubClusterGroup> }
@@ -234,9 +236,9 @@ describe('RadarMapComponent (Phase 4)', () => {
     const mapCmp = getMapCmp(fixture);
     (
       mapCmp as unknown as {
-        updateMapData: (a: Article[], c: CountrySummary[]) => void;
+        updateMapData: (a: Article[], c: CountrySummary[], s?: unknown[]) => void;
       }
-    ).updateMapData(arts, countries);
+    ).updateMapData(arts, countries, []);
 
     const sync = (
       mapCmp as unknown as { syncMarkerReadState: (a: Article[]) => void }
@@ -259,5 +261,120 @@ describe('RadarMapComponent (Phase 4)', () => {
 
     expect(marker.articleData.is_read).toBe(true);
     expect(marker._icon.classList.contains('marker-read')).toBe(true);
+  });
+
+  it('invalidateSize does not call setView when camera is unchanged', async () => {
+    const fixture = TestBed.createComponent(MapHostComponent);
+    fixture.detectChanges();
+    flushGeoJson();
+    await fixture.whenStable();
+
+    const mapCmp = getMapCmp(fixture);
+    const mapInstance = (mapCmp as unknown as { map: StubMap }).map;
+    const setViewSpy = vi.spyOn(mapInstance, 'setView');
+
+    mapCmp.invalidateSize();
+
+    expect(setViewSpy).not.toHaveBeenCalled();
+  });
+
+  it('flushes deferred geometry after navigation ends', async () => {
+    const fixture = TestBed.createComponent(MapHostComponent);
+    fixture.detectChanges();
+    flushGeoJson();
+    await fixture.whenStable();
+
+    const mapCmp = getMapCmp(fixture);
+    const applySpy = vi.spyOn(
+      mapCmp as unknown as {
+        applyGeometryInputs: (
+          a: Article[],
+          c: CountrySummary[],
+          s: unknown[],
+        ) => void;
+      },
+      'applyGeometryInputs',
+    );
+
+    (mapCmp as unknown as { isNavigating: boolean }).isNavigating = true;
+    (mapCmp as unknown as { pendingGeometryRefresh: boolean }).pendingGeometryRefresh = true;
+
+    (
+      mapCmp as unknown as { finishNavigating: () => void }
+    ).finishNavigating();
+
+    expect((mapCmp as unknown as { isNavigating: boolean }).isNavigating).toBe(false);
+    expect(
+      (mapCmp as unknown as { pendingGeometryRefresh: boolean }).pendingGeometryRefresh,
+    ).toBe(false);
+    expect(applySpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('updateMapData bumps spiderfyGeneration and refreshes clusters', async () => {
+    const arts = [makeArticle({ id: 1, title: 'A', primary_category: 'Energia' })];
+    const countries: CountrySummary[] = [
+      { country_code: 'DE', categories: ['Energia'], article_count: 1 },
+    ];
+
+    const fixture = TestBed.createComponent(MapHostComponent);
+    fixture.detectChanges();
+    flushGeoJson();
+    await fixture.whenStable();
+
+    const mapCmp = getMapCmp(fixture);
+    const beforeGen = (mapCmp as unknown as { spiderfyGeneration: number }).spiderfyGeneration;
+    const energia = (
+      mapCmp as unknown as { categoryClusterGroups: Map<string, StubClusterGroup> }
+    ).categoryClusterGroups.get('Energia')!;
+    const refreshSpy = vi.spyOn(energia, 'refreshClusters');
+
+    (
+      mapCmp as unknown as {
+        updateMapData: (a: Article[], c: CountrySummary[], s?: unknown[]) => void;
+      }
+    ).updateMapData(arts, countries, []);
+
+    expect((mapCmp as unknown as { spiderfyGeneration: number }).spiderfyGeneration).toBeGreaterThan(
+      beforeGen,
+    );
+    expect(refreshSpy).toHaveBeenCalled();
+    expect(energia.getLayers().length).toBeGreaterThan(0);
+  });
+
+  it('focusAndSpiderfyCountry expands the first category group for the nation', async () => {
+    const arts = [
+      makeArticle({ id: 1, title: 'E', primary_category: 'Energia', country_code: 'DE' }),
+      makeArticle({ id: 2, title: 'T', primary_category: 'Tecnologia', country_code: 'DE' }),
+    ];
+    const countries: CountrySummary[] = [
+      { country_code: 'DE', categories: ['Energia', 'Tecnologia'], article_count: 2 },
+    ];
+
+    const fixture = TestBed.createComponent(MapHostComponent);
+    fixture.detectChanges();
+    flushGeoJson();
+    await fixture.whenStable();
+
+    const mapCmp = getMapCmp(fixture);
+    (
+      mapCmp as unknown as {
+        updateMapData: (a: Article[], c: CountrySummary[], s?: unknown[]) => void;
+      }
+    ).updateMapData(arts, countries, []);
+
+    const mapInstance = (mapCmp as unknown as { map: StubMap }).map;
+    mapInstance.setView([51, 13], 5);
+
+    const spiderfyRoot = vi.spyOn(
+      mapCmp as unknown as {
+        spiderfyAndCreateRoot: (...args: unknown[]) => void;
+      },
+      'spiderfyAndCreateRoot',
+    );
+
+    mapCmp.focusAndSpiderfyCountry('DE');
+
+    // Only one category (first found), not all.
+    expect(spiderfyRoot).toHaveBeenCalledTimes(1);
   });
 });

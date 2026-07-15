@@ -1,6 +1,14 @@
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
-import { Article, CountrySummary, PrimaryCategory } from '../models/article.model';
+import {
+  Article,
+  ArticlesPage,
+  ArticlesPageFilters,
+  CountrySummary,
+  PrimaryCategory,
+  Sentiment,
+} from '../models/article.model';
+import { MapSummaryRow } from '../models/map-summary.model';
 
 const TODAY = new Date().toISOString().split('T')[0];
 
@@ -21,7 +29,8 @@ export const MOCK_ARTICLES: Article[] = [
     sentiment: 'Positivo',
     relevance_level: 4,
     infrastructural_entities: ['TSMC Dresden Fab', 'Silicon Saxony Campus'],
-    feed_title: 'Silicon Saxony News'
+    feed_title: 'Silicon Saxony News',
+    is_read: false,
   },
   {
     id: 2,
@@ -38,7 +47,8 @@ export const MOCK_ARTICLES: Article[] = [
     sentiment: 'Neutrale',
     relevance_level: 3,
     infrastructural_entities: ['Rete di trasmissione 380kV Baviera', 'Interconnessione DE-AT'],
-    feed_title: 'Bavarian Grid Monitor'
+    feed_title: 'Bavarian Grid Monitor',
+    is_read: true,
   },
   // --- CLUSTER TEST: Due articoli vicini in Ucraina ---
   {
@@ -56,7 +66,8 @@ export const MOCK_ARTICLES: Article[] = [
     sentiment: 'Negativo',
     relevance_level: 5,
     infrastructural_entities: ['Centrale Nucleare di Zaporizhzhia', 'Sito di stoccaggio combustibile'],
-    feed_title: 'IAEA Bulletin'
+    feed_title: 'IAEA Bulletin',
+    is_read: false,
   },
   {
     id: 4,
@@ -73,7 +84,8 @@ export const MOCK_ARTICLES: Article[] = [
     sentiment: 'Positivo',
     relevance_level: 3,
     infrastructural_entities: ['Diga di Kakhovka', 'Serbatoio di Kakhovka'],
-    feed_title: 'EU Reconstruction Index'
+    feed_title: 'EU Reconstruction Index',
+    is_read: false,
   },
   // --- SINGOLI MARKER: Test hatching multi-categoria ---
   {
@@ -91,7 +103,8 @@ export const MOCK_ARTICLES: Article[] = [
     sentiment: 'Negativo',
     relevance_level: 5,
     infrastructural_entities: ['Impianto di Natanz', 'Impianto di Fordow'],
-    feed_title: 'United Nations Security News'
+    feed_title: 'United Nations Security News',
+    is_read: false,
   },
   {
     id: 6,
@@ -108,7 +121,8 @@ export const MOCK_ARTICLES: Article[] = [
     sentiment: 'Positivo',
     relevance_level: 4,
     infrastructural_entities: ['Samsung Fab Hwaseong', 'Samsung R&D Campus Suwon'],
-    feed_title: 'Korea Tech Herald'
+    feed_title: 'Korea Tech Herald',
+    is_read: false,
   },
   {
     id: 7,
@@ -125,22 +139,84 @@ export const MOCK_ARTICLES: Article[] = [
     sentiment: 'Positivo',
     relevance_level: 4,
     infrastructural_entities: ['Trans-Adriatic Pipeline (TAP)', 'Terminale di Melendugno', 'Campo di Shah Deniz II'],
-    feed_title: 'Trans-Adriatic Pipeline Press'
-  }
+    feed_title: 'Trans-Adriatic Pipeline Press',
+    is_read: false,
+  },
 ];
 
 @Injectable({ providedIn: 'root' })
 export class ArticleMockService {
+  getMapSummary(date: string, sentiment?: Sentiment | Sentiment[] | null): Observable<MapSummaryRow[]> {
+    void date;
+    let arts = MOCK_ARTICLES;
+    if (Array.isArray(sentiment) && sentiment.length === 1) {
+      arts = arts.filter((a) => a.sentiment === sentiment[0]);
+    } else if (typeof sentiment === 'string') {
+      arts = arts.filter((a) => a.sentiment === sentiment);
+    }
+
+    const grouped = new Map<string, MapSummaryRow>();
+    for (const a of arts) {
+      const key = `${a.country_code}|${a.primary_category}`;
+      const existing = grouped.get(key);
+      if (existing) {
+        existing.article_count += 1;
+        if (a.is_read) existing.read_count += 1;
+        existing.latitude =
+          (existing.latitude * (existing.article_count - 1) + a.latitude) / existing.article_count;
+        existing.longitude =
+          (existing.longitude * (existing.article_count - 1) + a.longitude) / existing.article_count;
+      } else {
+        grouped.set(key, {
+          country_code: a.country_code,
+          primary_category: a.primary_category,
+          article_count: 1,
+          read_count: a.is_read ? 1 : 0,
+          latitude: a.latitude,
+          longitude: a.longitude,
+        });
+      }
+    }
+    return of([...grouped.values()].sort((a, b) => {
+      const c = a.country_code.localeCompare(b.country_code);
+      return c !== 0 ? c : a.primary_category.localeCompare(b.primary_category);
+    }));
+  }
+
+  getArticlesPage(filters: ArticlesPageFilters): Observable<ArticlesPage> {
+    const limit = Math.min(Math.max(filters.limit ?? 50, 1), 100);
+    const allMatching = MOCK_ARTICLES.filter((a) => {
+      if (filters.country && a.country_code !== filters.country.toUpperCase()) return false;
+      if (filters.category && a.primary_category !== filters.category) return false;
+      if (filters.sentiment && a.sentiment !== filters.sentiment) return false;
+      if (filters.relevance_level != null && a.relevance_level !== filters.relevance_level) return false;
+      return true;
+    });
+    const sorted = [...allMatching].sort((a, b) => b.id - a.id);
+    const afterCursor =
+      filters.cursor != null ? sorted.filter((a) => a.id < filters.cursor!) : sorted;
+    const pageItems = afterCursor.slice(0, limit);
+    const hasMore = afterCursor.length > limit;
+    return of({
+      items: pageItems,
+      next_cursor: hasMore && pageItems.length > 0 ? pageItems[pageItems.length - 1].id : null,
+      total: allMatching.length,
+    });
+  }
+
   getArticles(date: string): Observable<Article[]> {
+    void date;
     return of(MOCK_ARTICLES);
   }
 
   getCountries(date: string): Observable<CountrySummary[]> {
-    const grouped = new Map<string, { cats: Set<string>; count: number }>();
+    void date;
+    const grouped = new Map<string, { cats: Set<string>; count: number; read: number }>();
     for (const a of MOCK_ARTICLES) {
-      const entry = grouped.get(a.country_code) ?? { cats: new Set<string>(), count: 0 };
+      const entry = grouped.get(a.country_code) ?? { cats: new Set<string>(), count: 0, read: 0 };
       entry.cats.add(a.primary_category);
       entry.count++;
+      if (a.is_read) entry.read++;
       grouped.set(a.country_code, entry);
     }
     const result: CountrySummary[] = [];
@@ -148,7 +224,8 @@ export class ArticleMockService {
       result.push({
         country_code: k,
         categories: [...v.cats] as PrimaryCategory[],
-        article_count: v.count
+        article_count: v.count,
+        read_count: v.read,
       });
     });
     return of(result);

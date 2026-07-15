@@ -32,11 +32,19 @@ export interface Article {
   is_read?:                 boolean;          // Stato letto/da leggere
 }
 
+/** Paginated envelope from GET /api/articles (Phase 5 breaking). */
+export interface ArticlesPage {
+  items: Article[];
+  next_cursor: number | null;
+  total: number;
+}
+
 // ─── RIEPILOGO PAESE — per hatching SVG e click-nazione ──────────────────────
 export interface CountrySummary {
   country_code:  string;
   categories:    PrimaryCategory[];
   article_count: number;
+  read_count?:   number;
 }
 
 // ─── FILTRI ATTIVI ─────────────────────────────────────────────────────────────
@@ -46,3 +54,13 @@ export interface ArticleFilters {
   categories?:      PrimaryCategory[] | null; // Filtro multiscelta per categoria
 }
 
+/** Query params for a single articles page (API contract). */
+export interface ArticlesPageFilters {
+  date: string;
+  country?: string;
+  category?: string;
+  sentiment?: Sentiment;
+  relevance_level?: number;
+  cursor?: number;
+  limit?: number;
+}

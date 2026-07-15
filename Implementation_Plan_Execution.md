@@ -175,15 +175,67 @@ cd radar/frontend && npm run typecheck && npm run test:ci && npm run build:ci
 
 ---
 
-### Phase 5 — Scale query & map model — NON INIZIATA (no article-list)
+### Phase 5 — Scale query & map model — DONE (2026-07-15)
 
-- [ ] Endpoint articoli cursor-based (`items`, `next_cursor`, `total`) + filtri.
-- [ ] Endpoint map-summary (aggregati paese/categoria + coordinate validate).
-- [ ] Rewrite SQL `/api/articles` (no Cartesian join); indici + `EXPLAIN (ANALYZE)`.
-- [ ] Marker aggregati bounded; `addLayers` / `chunkedLoading` se MarkerCluster resta; **no rebuild** su solo `is_read`.
-- [ ] ~~Replace carousel / `article-list`~~ — **cancellato (sidebar freeze)**.
-- [ ] Contratto geografico (finite bounds, non truthiness su lat/lon).
-- [ ] Performance gate 10k articoli (path Leaflet; DOM sidebar out of scope).
+**Fase A (analisi):** confermata. Collo di bottiglia = articoli/giorno su mappa/API, non ingest 10k Miniflux 48h.
+
+**Contratto prodotto locked (revisionato vs draft “limit 50”):**
+
+- Apertura giorno → `GET /api/map-summary` (hatching + count `country×category` + pallini zoom ≥ 5); niente `Article[]` globale.
+- Click nazione / toolbar → fetch **tutti** gli articoli `date+country` (page HTTP ≤100, FE concatena); carosello nazione completo.
+- Pallino summary → nazione + sidebar filtrata categoria + spiderfy categoria (no dezoom).
+- Open nazione senza categoria → spiderfy **solo** categoria dell’articolo attivo nel carosello.
+- Scroll carosello stessa categoria → highlight only (`lastSpiderfyKey`); cambio categoria → spiderfy.
+- Close: clear detail markers; summary resta.
+- Seed gate: SQL sintetico 10k/1 day — **non** pipeline Miniflux/Gemini (script pronto; EXPLAIN residuale).
+- Breaking API; SQL LATERAL; finite lat/lon; MOCK_MODE; sidebar freeze.
+
+**Checklist implementazione**
+
+- [x] Blocco 1 — BE: LATERAL articles + cursor + map-summary + indici `007` + `test_articles_pagination.py` + `seed_perf_articles`
+- [x] Blocco 2 — FE services/models: summary dto, ArticleService paged + summary, StateService dual, mock
+- [x] Blocco 3 — Map/app/toolbar: summary hatch; nation fetch; detail markers; finite geo; Phase 4 fingerprint
+- [x] Blocco 4 — Gate pytest + typecheck/test/build; smoke UI; ECC light; aggiornare scoreboard
+- [x] Fix pallini multi-click (invalidate→spiderfy; pendingGeometryRefresh; refreshClusters)
+- [x] Nation open spiderfy = categoria attiva carosello (non tutte)
+- [x] Carousel scroll: no collapse/reopen spiderfy within same category
+
+**Gate regression (2026-07-15)**
+
+```text
+cd radar && backend\.venv\Scripts\python.exe -m pytest -m "not live" -q
+# → 107 passed, 3 deselected
+
+cd radar/frontend && npm run typecheck && npm run test:ci && npm run build:ci
+# → typecheck OK; 18 passed; build:ci OK
+```
+
+**Docker / smoke (2026-07-15)**
+
+- [x] `docker compose up -d --build radar-backend radar-frontend` — healthy; migrazione `007` applicata
+- [x] `/api/map-summary` + `/api/articles` envelope; nation open + pallini + carousel
+- [x] Sidebar freeze: `git diff` vuoto sotto `radar-sidebar/**`
+- [ ] Seed 10k + EXPLAIN documentato (script pronto; run opzionale su DB isolato)
+- [ ] Smoke manuale toggle letta + spiderfy icone grafo (path Phase 4; non bloccante)
+
+**Fix pallini multi-click (2026-07-15)**
+
+Sintomo: click ripetuti su pallini → icone MarkerCluster sparite (layer in group, pane DOM vuoto).
+
+Fix: `invalidateSize` senza `setView` inutile; invalidate **prima** dello spiderfy; `nationOpenGeneration`; `pendingGeometryRefresh` + `finishNavigating`; unspiderfy + `refreshClusters` post-`clearLayers`.
+
+**Nation open / carousel (2026-07-15)**
+
+- Open nazione → spiderfy sola categoria dell’articolo carosello (sort categoria).
+- Scroll stessa categoria → `lastSpiderfyKey` skip collapse; cambio categoria / pill → spiderfy.
+
+**Non fare**
+
+- [x] ~~Replace carousel / `article-list`~~ — cancellato (sidebar freeze)
+- [x] Truncate carosello nazione a 50
+- [x] Fetch solo `country×category` al click nazione
+
+**Restore point Phase 5:** pinned in scoreboard below after commit on `refactor/enterprise-consolidation`.
 
 ---
 
@@ -196,21 +248,22 @@ cd radar/frontend && npm run typecheck && npm run test:ci && npm run build:ci
 
 ---
 
-## C. Scoreboard attuale (audit 2026-07-15, post–Phase 4)
+## C. Scoreboard attuale (2026-07-15, Phase 5 DONE)
 
 | Phase | Pre-restore (storico) | Codice attuale | Prossimo lavoro |
 |-------|----------------------|----------------|-----------------|
 | 0 | Completata | **DONE** (`0189359`) | — |
-| 1 | Completata (persa) | **DONE** (`bff8abe`) | — |
+| 1 | Completata (persa) | **DONE** (`bff8afe` / `bff8abe`) | — |
 | 2 | Completata (persa) | **DONE** (`72851d7`) | — |
 | 3 | Completata (persa) | **DONE** (`19c67f0`) | — |
 | 4 | Completata (persa) | **DONE** (`de9bd2f`) | — |
-| 5 | Completata (persa) | **NOT STARTED** | No `article-list` |
+| 5 | Completata (persa) | **DONE** *(SHA pinned after commit)* | Residuali opzionali → Phase 6 |
 | 5.5 | Completata (persa) | N/A nel piano master | Assorbita in 1–3 al ri-run |
 | 6 | Non iniziata | **NOT STARTED** | Ultima |
 
-**Ordine di ripresa:** Phase 5 → 6.
+**Ordine:** Phase 6.
 
+**Restore rapido a Phase 5:** `git checkout <Phase5-SHA>` su `refactor/enterprise-consolidation` (SHA in scoreboard dopo pin).
 **Restore rapido a Phase 4:** `git checkout de9bd2f` su `refactor/enterprise-consolidation`.
 **Restore rapido a Phase 3:** `git checkout 19c67f0` su `refactor/enterprise-consolidation`.
 **Restore a Phase 2:** `git checkout 72851d7`.

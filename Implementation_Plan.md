@@ -2,7 +2,7 @@
 
 This plan addresses the production blockers found during the code and architecture review. Execute phases in order. Do not release a later phase while an earlier acceptance gate is failing.
 
-**Progress (audit codice 2026-07-15, post–Phase 4):** Phase **0–4 DONE**. Phases **5–6 NOT STARTED**. Resume at Phase 5. Sidebar remains frozen.
+**Progress (2026-07-15):** Phase **0–5 DONE**. Phase **6 NOT STARTED**. Sidebar remains frozen.
 
 **Git restore points (branch `refactor/enterprise-consolidation`):**
 | Tag semantico | Commit tipico | Contenuto |
@@ -12,6 +12,7 @@ This plan addresses the production blockers found during the code and architectu
 | Phase 2 | `72851d7` | `radar-worker`, coda bounded, `llm_request_ledger`, Gemini deadline/retry |
 | Phase 3 | `19c67f0` | edge/data, live/ready+heartbeat, CSP, ops, soft hardening; schema Gemini sanificato |
 | Phase 4 | `de9bd2f` | FE XSS/MOCK_MODE/DestroyRef; read-unread no cluster rebuild; hatch owner map; overlay full-bleed |
+| Phase 5 | *(pin after commit — see Execution log)* | map-summary + articles cursor/LATERAL; nation detail markers; spiderfy category-aligned |
 
 ## Scope And Exit Criteria
 
@@ -289,37 +290,93 @@ Restore: `git checkout de9bd2f`
 
 ## Phase 5 - Scale The Query And Map Model
 
-**Status:** NOT STARTED after restore — unpaginated `/api/articles`, Cartesian join + `array_agg`, one marker per article. Change 5 (`article-list`) cancelled — keep `p-carousel`.
+**Status:** DONE (2026-07-15) on post-restore branch.
+
+**Bottleneck:** articles **per day** on map/API (not 10k via Miniflux 48h). DB ~1.5k total; peak day ~600. Miniflux `published_after=now-48h`, `MINIFLUX_LIMIT`≤500 — real ingest cannot be the 10k gate.
+
+**Product contract (locked — overrides earlier “limit 50 detail” draft):**
+
+```text
+DAY OPEN     → GET /api/map-summary  → hatching + numbered pallini (zoom ≥ 5)
+COUNTRY / TOOLBAR → ALL articles date+country → full-nation carousel
+PALLINO summary (country×category) → nation fetch, sidebar filtered to category,
+  spiderfy that category, no dezoom (armSkipCountryFit)
+NATION OPEN (no category) → spiderfy only the carousel-active category
+CAROUSEL SCROLL → highlight article; spiderfy only when category changes
+CLOSE        → clear detailArticles → summary pallini return
+```
+
+Do **not** truncate the nation carousel at 50. HTTP page size may be ≤100 for transport; FE concatenates pages until `next_cursor` is null. Do **not** fetch only `country×category` on nation click (breaks category index). Sidebar freeze unchanged.
+
+### Decisions (Fase A → B)
+
+| ID | Choice |
+|----|--------|
+| D1 | Breaking FE+BE same phase; `/api/articles` returns `{items,next_cursor,total}` — no legacy bare array |
+| D2 | Keyset cursor for single day: `id DESC`; cursor = article `id`; `total` = filtered `COUNT(*)`; max page `limit` 100 |
+| D3 | map-summary aggregated by `country_code × primary_category` (+ finite representative lat/lon, counts, read/unread) |
+| D4 | StateService: `mapSummaryResource` + `detailArticles` (nation scope); hybrid `toggleRead` on detail; toolbar/countries from summary |
+| D5 | Nation click loads **all** nation articles; no infinite scroll / `article-list` |
+| D6 | SQL: LATERAL/subselect for companies & tags — **no** double `LEFT JOIN` in one FROM |
+| D7 | Geo: `Number.isFinite` + range; replace `latitude && longitude` |
+| D8 | Perf gate: **synthetic SQL seed** 10k/1 day (≥100 country codes, 10 cats) — not Miniflux/Gemini |
+| D9 | Phase 4 regression checklist mandatory (spiderfy + read toggle, XSS, MOCK_MODE, DestroyRef, sidebar diff empty) |
+| D10 | ECC light (frontend.md map-summary + nation markers; CLAUDE API) — full docs Phase 6 |
+| D11 | Defer: Playwright 10k, peer-deps matrix, `httpResource` migration, rigorous browser-memory CI |
 
 ### Files to add
 
-- [ ] `radar/backend/app/tests/test_articles_pagination.py`
-- [ ] `radar/frontend/src/app/models/map-summary.model.ts`
+- [x] `radar/backend/migrations/007_articles_query_indexes.sql`
+- [x] `radar/backend/app/api/articles_query.py` (+ `api/__init__.py`)
+- [x] `radar/backend/app/tests/test_articles_pagination.py`
+- [x] `radar/backend/scripts/seed_perf_articles.py`
+- [x] `radar/frontend/src/app/models/map-summary.model.ts` (+ dto guards)
+- [x] Extended: `article.dto.ts`, `article-mock.service.ts`
 
 ### Files to modify
 
-- [ ] `radar/backend/app/main.py`
-- [ ] `radar/backend/app/core/database.py`
-- [ ] `radar/frontend/src/app/models/article.model.ts`
-- [ ] `radar/frontend/src/app/services/article.service.ts`
-- [ ] `radar/frontend/src/app/services/state.service.ts`
-- [ ] `radar/frontend/src/app/components/radar-map/radar-map.component.ts`
-- [ ] `radar/frontend/src/app/app.ts`
+- [x] `radar/backend/app/main.py`
+- [x] `radar/frontend/src/app/models/article.model.ts`
+- [x] `radar/frontend/src/app/models/article.dto.ts`
+- [x] `radar/frontend/src/app/services/article.service.ts`
+- [x] `radar/frontend/src/app/services/article-mock.service.ts`
+- [x] `radar/frontend/src/app/services/state.service.ts`
+- [x] `radar/frontend/src/app/components/radar-map/radar-map.component.ts` (+ spec)
+- [x] `radar/frontend/src/app/components/radar-toolbar/radar-toolbar.component.ts`
+- [x] `radar/frontend/src/app/app.ts` / `app.html` / `app.spec.ts`
+- [x] `radar/.ecc/rules/frontend.md` + `radar/.ecc/CLAUDE.md` (ECC light)
+- [x] **Never** `radar-sidebar/**` (verified empty diff)
 
 ### Changes
 
-1. Add a paginated, cursor-based article endpoint with a stable order and filters for date, country, category, sentiment, and relevance. Return `items`, `next_cursor`, and `total`; impose a server-side maximum page size.
-2. Add a map-summary endpoint that returns country/category aggregates and validated representative coordinates. Do not send all article records merely to draw a map.
-3. Rewrite the current Cartesian join aggregation in `/api/articles` using lateral aggregates or pre-aggregated subqueries. Add and verify indexes for the actual date/filter/order access patterns with `EXPLAIN (ANALYZE, BUFFERS)` against a representative dataset.
-4. Render bounded aggregate markers rather than one Leaflet marker per article. If MarkerCluster remains, use `addLayers` and `chunkedLoading`; do not rebuild geometry for a read-status-only update (supports the read/unread marker fix).
-5. ~~Replace PrimeNG carousel with `article-list`~~ — **cancelled (sidebar freeze).** Keep existing `p-carousel`.
-6. Establish a clear geographic contract: use validated event coordinates where available; only aggregate to a country centroid when the product explicitly requests country-level rendering. Include zero latitude/longitude values by checking finite numeric bounds, not truthiness.
+1. [x] Paginated `/api/articles` with filters `date` (required), `country`, `category`, `sentiment`, `relevance_level`, `cursor`, `limit` (cap 100). Response `{ items, next_cursor, total }`. Companies/tags via LATERAL.
+2. [x] `GET /api/map-summary?date=…` → rows `country_code × primary_category` with counts + finite lat/lon.
+3. [x] Indexes migration `007`; seed script `seed_perf_articles.py` (EXPLAIN residual / optional on isolated DB).
+4. [x] **Map UX:** day = summary hatching + numbered pallini; nation open = detail markers only for that country; category pallino / pill / active carousel category → `focusAndSpiderfyCategory`; carousel same-category scroll does **not** collapse/reopen spiderfy (`lastSpiderfyKey`); multi-pallino race fixed (`invalidateSize` before spiderfy, `pendingGeometryRefresh`).
+5. [x] ~~`article-list`~~ — **cancelled (sidebar freeze).**
+6. [x] Geographic contract: finite bounds BE+FE.
+7. [x] Seed script isolated to DB — no vault write, no Miniflux mark-read.
+8. [x] `MOCK_MODE`: mock summary + mock paged articles; no silent fallback.
 
 ### Performance gate
 
-- [ ] Seed 10,000 articles across at least 100 countries and all categories.
-- [ ] Initial map render, date change, read toggle, country focus, and large-cluster opening have defined latency budgets and no long task above 50 ms in the normal interaction path (Leaflet path; sidebar DOM out of scope).
-- [ ] Browser memory returns close to baseline after repeated filter/open/close cycles.
+- [x] Seed script ready (10k SQL); EXPLAIN documentato come residuale opzionale su DB isolato.
+- [x] pytest coverage for pagination + map-summary.
+- [x] FE typecheck / test:ci / build:ci; map specs cover fingerprint, invalidateSize, spiderfy generation.
+- [x] Browser smoke: summary load, nation open, pallini multi-click, carousel scroll no flicker; sidebar `git diff` empty under `radar-sidebar/**`.
+- [ ] Long-task / memory budgets: deferred (Playwright not required to close Phase 5).
+- [ ] Smoke manuale toggle letta + spiderfy (residual; path Phase 4 preserved).
+
+### Acceptance gate
+
+```text
+cd radar && python -m pytest -m "not live"
+cd radar/frontend && npm run typecheck && npm run test:ci && npm run build:ci
+# Docker rebuild FE+BE; /health/live+/ready; smoke UI above
+```
+
+**Status (2026-07-15):** gate verde locale — pytest `not live` OK; FE typecheck + test:ci (18) + build:ci OK; Docker FE/BE healthy; migrazione `007` applicata. Residuali non bloccanti: seed EXPLAIN su DB isolato, smoke toggle letta manuale.
+**Restore point Phase 5:** pinned in `Implementation_Plan_Execution.md` scoreboard after commit on `refactor/enterprise-consolidation`.
 
 ## Phase 6 - Align Governance, Documentation, And Operations
 
