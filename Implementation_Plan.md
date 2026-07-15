@@ -2,7 +2,7 @@
 
 This plan addresses the production blockers found during the code and architecture review. Execute phases in order. Do not release a later phase while an earlier acceptance gate is failing.
 
-**Progress (2026-07-15):** Phase **0–5 DONE**. Phase **6 DONE / GATE VERDE** (docs, ECC, GeoJSON fetch+verify, CI, runbook; polish README/docs). Working tree **uncommitted** — restore SHA Phase 6 da pinnare al commit. Sidebar remains frozen.
+**Progress (2026-07-15):** Phase **0–5 DONE**. Phase **6 DONE / GATE VERDE** (`56c2eff` — docs, GeoJSON fetch+verify, CI, runbook, hooks). ECC remediation tip = commit successivo su questo branch. Sidebar remains frozen.
 
 **Git restore points (branch `refactor/enterprise-consolidation`):**
 | Tag semantico | Commit tipico | Contenuto |
@@ -13,7 +13,7 @@ This plan addresses the production blockers found during the code and architectu
 | Phase 3 | `19c67f0` | edge/data, live/ready+heartbeat, CSP, ops, soft hardening; schema Gemini sanificato |
 | Phase 4 | `de9bd2f` | FE XSS/MOCK_MODE/DestroyRef; read-unread no cluster rebuild; hatch owner map; overlay full-bleed |
 | Phase 5 | `1dfdf60` | map-summary + articles cursor/LATERAL; nation detail markers; spiderfy category-aligned |
-| Phase 6 | *(pending commit)* | governance: docs/README, GeoJSON pin+verify, ECC/hooks, CI, runbook |
+| Phase 6 | `56c2eff` | governance: docs/README, GeoJSON pin+verify, ECC/hooks, CI, runbook |
 
 ## Scope And Exit Criteria
 
@@ -33,7 +33,7 @@ Do **not** modify, restyle, refactor, replace, or add specs for `radar/frontend/
 - [ ] The API, worker, database, Miniflux, and frontend have explicit readiness, bounded resources, recoverable state, and documented operations.
 - [ ] The dashboard stays responsive with 10,000 articles and a large cluster never creates unbounded Leaflet markers. (Sidebar DOM card bounding is out of scope.)
 - [ ] Read-status toggles update map marker `.marker-read` without a full cluster rebuild (expanded spiderfy/graph icons must stay); concurrent toggles converge on the final server state.
-- [x] Documentation, ECC guardrails, test suite, and deployed behavior describe the same system. *(Phase 6 GATE VERDE; commit restore pending)*
+- [x] Documentation, ECC guardrails, test suite, and deployed behavior describe the same system. *(Phase 6 `56c2eff` + ECC remediation tip)*
 
 ## Phase 0 - Freeze Risky Deployments And Establish A Baseline
 
@@ -438,7 +438,7 @@ cd radar/frontend && npm run typecheck && npm run test:ci && npm run build:ci
 # verify-geojson incluso in build:ci; sidebar: git diff vuoto sotto radar-sidebar/**
 ```
 
-**Status (2026-07-15):** gate verde — 107 passed / 3 live deselected; FE 18 passed; build:ci + verify GeoJSON PASS. Sidebar untouched. Commit restore pending.
+**Status (2026-07-15):** gate verde — 107 passed / 3 live deselected; FE 18 passed; build:ci + verify GeoJSON PASS. Sidebar untouched. Restore: `git checkout 56c2eff` (pre–ECC remediation).
 
 ## Final Release Gate
 

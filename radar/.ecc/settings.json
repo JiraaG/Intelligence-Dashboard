@@ -14,26 +14,41 @@
       "run_command",
       "read_url_content",
       "replace_file_content",
-      "multi_replace_file_content"
+      "multi_replace_file_content",
+      "Read",
+      "Write",
+      "StrReplace",
+      "Delete",
+      "Glob",
+      "Grep",
+      "Shell",
+      "EditNotebook",
+      "WebFetch",
+      "WebSearch",
+      "search_replace",
+      "apply_patch"
     ],
     "denylist": [
       "arbitrary_shell_exec",
       "eval",
       "exec"
     ],
-    "notes": "Solo i tool nella allowlist possono essere invocati dall'agente. run_command è abilitato ma vincolato al dominio della whitelist di rete sotto."
+    "notes": "Allowlist dual ECC↔Cursor. Mapping: view_file↔Read, write_to_file↔Write, replace_file_content/multi_replace_file_content↔StrReplace, list_dir/grep_search↔Glob/Grep, run_command↔Shell, read_url_content↔WebFetch. Post-hook write tools: write_to_file, replace_*, Write, StrReplace, EditNotebook, search_replace, apply_patch. Pre-hook network check su run_command/Shell/read_url_content/WebFetch."
   },
 
   "network": {
     "allowedDomains": [
       "github.com",
+      "raw.githubusercontent.com",
       "api.miniflux.app",
       "generativelanguage.googleapis.com",
       "fonts.googleapis.com",
       "fonts.gstatic.com",
       "registry.hub.docker.com",
       "pypi.org",
-      "npmjs.com"
+      "npmjs.com",
+      "registry.npmjs.org",
+      "opendatacommons.org"
     ],
     "deniedPatterns": [
       "*.onion",
@@ -42,7 +57,7 @@
       "10.*",
       "192.168.*"
     ],
-    "notes": "L'agente non può effettuare richieste HTTP a domini non in lista. Le chiamate interne Docker (radar-db, radar-backend) sono permesse solo via codice applicativo, non via tool di rete dell'agente."
+    "notes": "Deve restare in sync con ALLOWED_DOMAINS in hooks/pre-tool-use.py (match == o endswith('.'+allowed)). Domini interni Docker (radar-db, radar-backend) solo via codice applicativo. Opzionale prodotto: *.basemaps.cartocdn.com (tile Carto) se tool agente fetchano URL tile."
   },
 
   "secretRedaction": {
@@ -52,12 +67,19 @@
       "sk-[A-Za-z0-9]{32,}",
       "ghp_[A-Za-z0-9]{36}",
       "postgres://[^\\s]+:[^\\s]+@",
-      "MINIFLUX_API_KEY=[^\\s]+"
+      "MINIFLUX_API_KEY\\s*=\\s*\\S+",
+      "GEMINI_API_KEY\\s*=\\s*\\S+",
+      "GOOGLE_API_KEY\\s*=\\s*\\S+",
+      "POSTGRES_PASSWORD\\s*=\\s*\\S+"
     ],
     "action": "redact",
     "redactedValue": "[SECRET_REDACTED]",
     "scanTargets": ["log_output", "tool_arguments", "model_responses"],
-    "notes": "Qualsiasi stringa corrispondente ai pattern sopra viene automaticamente oscurata prima di essere scritta in log o passata al modello. Impedisce il leak accidentale di chiavi Gemini, token Miniflux e credenziali PostgreSQL."
+    "notes": "Allineato a SECRET_PATTERNS in hooks/pre-tool-use.py. Oscura chiavi Gemini/Google, token Miniflux e credenziali PostgreSQL."
+  },
+
+  "hooks": {
+    "notes": "Nessuna auto-registrazione harness in questo file. Default operativo = esecuzione MANUALE di hooks/pre-tool-use.py e hooks/post-tool-use.py (vedi AGENTS.md §6 e docs/04_ecc_framework.md). Auto-hook dipende dall'harness esterno se/quando configurato."
   },
 
   "contextScope": {
@@ -121,7 +143,7 @@
       "file": ".ecc/agents/geo-data-architect.md",
       "scope": ["backend/app/core/database.py", "backend/app/commit/**", "backend/migrations/**"],
       "model": "sonnet",
-      "notes": "Phase 1 DONE: schema source of truth = backend/migrations/*.sql + core/migrations.py (schema_migrations). Scope include migrations/** e commit/** (outbox)."
+      "notes": "Phase 1 DONE: schema source of truth = backend/migrations/*.sql + core/migrations.py (schema_migrations). Scope include migrations/** e commit/** (outbox). Migrazioni 001–007."
     },
     "angular-map-expert": {
       "file": ".ecc/agents/angular-map-expert.md",

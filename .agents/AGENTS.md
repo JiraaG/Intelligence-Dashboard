@@ -17,7 +17,7 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 * **Frontend:** Angular 21 (Standalone Components).
 * **Container:** Docker + docker-compose (servizi: `radar-db`, `radar-backend`, `radar-worker`, `radar-frontend`, `radar-miniflux`) su reti `radar-edge` + `radar-data` (Phase 3). Ingestione solo in `radar-worker`.
 * **Web Server:** Nginx (Alpine) per servire Angular e proxying `/api/`.
-* **Piani operativi:** [`Implementation_Plan.md`](../Implementation_Plan.md) + [`Implementation_Plan_Execution.md`](../Implementation_Plan_Execution.md). Post–branch restore (2026-07-15): **Phase 0–5 DONE**; Phase **6 NOT STARTED** (governance/docs completa).
+* **Piani operativi:** [`Implementation_Plan.md`](../Implementation_Plan.md) + [`Implementation_Plan_Execution.md`](../Implementation_Plan_Execution.md). Post–branch restore (2026-07-15): **Phase 0–5 DONE**; Phase **6 DONE / GATE VERDE** (commit su richiesta).
 
 ---
 
@@ -84,13 +84,14 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 7. **Risoluzione DNS Dinamica in Nginx (Prevenzione 502 Bad Gateway):**
    * Per evitare errori `502 Bad Gateway` a seguito di riavvii dei container o riassegnazioni di IP nella rete bridge, `nginx.conf` deve utilizzare un resolver interno (`resolver 127.0.0.11 valid=10s;`) ed una variabile locale per il `proxy_pass` (es. `set $backend_upstream http://radar-backend:8000; proxy_pass $backend_upstream$request_uri;`). Questo costringe Nginx a risolvere l'IP a runtime anziché solo all'avvio.
 8. **Riproducibilità Frontend (`npm ci`):**
-   * Nel `Dockerfile` del frontend Angular, l'installazione delle dipendenze nello stage builder deve avvenire tramite `npm ci --legacy-peer-deps` finché la matrix Angular/CDK/PrimeNG non è allineata (Phase 6). È vietato l'uso di `npm install`.
+   * Nel `Dockerfile` del frontend Angular, l'installazione delle dipendenze nello stage builder deve avvenire tramite `npm ci --legacy-peer-deps`. È vietato l'uso di `npm install`. Drop di `--legacy-peer-deps` = **deferred post–Phase 6** (quando matrix Angular/CDK/PrimeNG allineata).
 9. **Sicurezza Immagini (No `latest`):**
-   * È severamente vietato l'utilizzo del tag `latest` per le immagini di base nei `docker-compose.yml` e nei `Dockerfile` (es. `miniflux/miniflux:latest`). Le versioni devono sempre essere bloccate (pinnate) a una major/minor specifica (es. `2.3.2`) per prevenire rotture distruttive da aggiornamenti silenti. Digest SHA: opzionale / Phase 6 — non richiesto per il path ready-to-run.
+   * È severamente vietato l'utilizzo del tag `latest` per le immagini di base nei `docker-compose.yml` e nei `Dockerfile` (es. `miniflux/miniflux:latest`). Le versioni devono sempre essere bloccate (pinnate) a una major/minor specifica (es. `2.3.2`) per prevenire rotture distruttive da aggiornamenti silenti. Digest SHA: **deferred post–Phase 6** — non richiesto per il path ready-to-run.
 10. **Coerenza Healthcheck (Alpine Linux):**
     * Gli script di healthcheck definiti nei Dockerfile e nel docker-compose devono utilizzare eseguibili realmente disponibili nell'immagine di base. Ad esempio, per immagini basate su Alpine (come Nginx), è obbligatorio usare `wget` invece di `curl` per evitare che il container venga marchiato costantemente come `unhealthy`.
 11. **CORS:** default allowlist vuota (same-origin via Nginx). Mai `allow_origins=["*"]`. Dev diretto: `CORS_ALLOW_ORIGINS=http://localhost:4200`.
 12. **Ops:** backup/restore in `radar/ops/`; vedi `ops/README.md`.
+13. **Phase 6 ops/CI:** `radar/frontend/scripts/verify-geojson.mjs` (+ `--fetch` in Docker FE); runbook `radar/docs/runbook.md`; CI `.github/workflows/ci.yml`.
 
 ---
 
@@ -119,6 +120,8 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 > 8. **Gestione Dinamica Altezza Carosello**: Il ridimensionamento dinamico dell'altezza delle schede nel carosello laterale DEVE essere calcolato estraendo l'ID univoco dell'articolo corrente (`document.getElementById('article-card-' + id)`) anziché affidarsi alla classe `.p-carousel-item-active` di PrimeNG, la quale introduce race-condition nel DOM al primo avvio.
 > 9. **Allineamento Flexbox e Troncamento Fonti**: Le sezioni di metadati contenenti stringhe potenzialmente lunghe (es. la fonte dell'articolo) e bottoni affiancati (es. `Leggi fonte →`) devono impiegare rigorosamente layout *Flexbox* (`flex: 1`, `min-width: 0` per il contenitore di testo e `flex-shrink: 0`, `white-space: nowrap` per il link).
 > 10. **Pulizia Prefisso Feed**: I titoli dei feed provenienti da Miniflux devono essere processati in Angular tramite Regex (es. `.replace(/^Feed:\s*/i, '')`) per rimuovere la dicitura automatica "Feed: " prima del rendering.
+> 11. **API Phase 5:** day view via `GET /api/map-summary`; nation open via `GET /api/articles` con envelope `{ items, next_cursor, total }` (page ≤ 100; FE concatena). Mock solo con `MOCK_MODE`.
+> 12. **Overlay full-bleed:** mappa sempre `100vw`; sidebar sopra — non split 70%/30% che restringe la mappa; `invalidateSize()` dopo open/close.
 
 ---
 
@@ -134,5 +137,5 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 > ### Esecuzione Manuale degli Hook
 > Prima di dare per completato un file di codice o una modifica strutturale, l'agente deve verificare la conformità eseguendo manualmente gli script presenti in `radar/.ecc/hooks/`:
 > 1. **Pre-Tool-Use Scan:** Usare [pre-tool-use.py](file:///c:/Users/lucag/Documents/Dashboard%20finance/radar/.ecc/hooks/pre-tool-use.py) per scansionare l'input del tool alla ricerca di leak di chiavi segrete, pattern di codice vietati o comandi distruttivi.
-> 2. **Post-Tool-Use Linting:** Eseguire [post-tool-use.py](file:///c:/Users/lucag/Documents/Dashboard%20finance/radar/.ecc/hooks/post-tool-use.py) per attivare i controlli sintattici e di qualità del codice (ruff per Python, eslint per TS/JS) e garantire che nessun commento `TODO` o placeholder sia presente nel file finale.
+> 2. **Post-Tool-Use Linting:** Eseguire [post-tool-use.py](radar/.ecc/hooks/post-tool-use.py) per controlli qualità (ruff per Python, **prettier** per FE — allineato a `package.json` `lint`) e placeholder vietati. Fail-closed se il linter manca.
 

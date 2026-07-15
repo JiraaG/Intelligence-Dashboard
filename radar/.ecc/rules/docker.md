@@ -24,7 +24,8 @@ Internet/LAN → [Porta 80] → radar-frontend (Nginx) ──radar-edge──→
 ```
 
 Phase 3 DONE: edge/data, `/health/live`+`/ready`, CSP, ops backup, soft hardening.
-Phase 4 DONE: frontend lifecycle/security (non tocca Compose). Digest pin immagini e drop `--legacy-peer-deps` restano Phase 6 / allineamento Angular.
+Phase 4 DONE: frontend lifecycle/security (non tocca Compose).
+Phase 6 DONE / GATE VERDE: docs/CI/GeoJSON/runbook. **Deferred post–Phase 6 (prodotto):** image digest pin SHA e drop `--legacy-peer-deps` (quando matrix Angular/CDK/PrimeNG allineata).
 ---
 
 ## Regola 1: Cinque Servizi, Nomi Immutabili
@@ -47,26 +48,27 @@ Non rinominarli senza aggiornare anche le variabili d'ambiente e il codice Pytho
 Il volume PostgreSQL deve essere persistente sul filesystem dell'host.
 Se il container viene ricreato, i dati NON devono andare persi.
 
-**OBBLIGATORIO:**
+**OBBLIGATORIO (compose reale):**
 ```yaml
+radar-db:
+  volumes:
+    - ./data/postgres:/var/lib/postgresql/data
+```
+
+**VIETATO:**
+```yaml
+# NO: Volume anonimo senza path host (dati non accessibili / persi al down -v)
+volumes:
+  - /var/lib/postgresql/data
+
+# NO: Named volume + driver_opts (non è lo schema Compose attuale)
 volumes:
   radar-postgres-data:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: ./data/postgres  # Cartella locale sul host
-```
-
-**VIETATO:**
-```yaml
-# NO: Volume senza nome (dati persi al docker-compose down -v)
-volumes:
-  - /var/lib/postgresql/data
-
-# NO: Volume named ma senza binding locale (dati non accessibili dall'host)
-volumes:
-  postgres_data:
+      device: ./data/postgres
 ```
 
 ---
@@ -145,30 +147,36 @@ environment:
 
 ---
 
-## Regola 6: Dockerfile Backend — Python 3.12 Slim
+## Regola 6: Dockerfile Backend — Multi-Stage Python 3.12 Slim
+
+Allineato a `radar/backend/Dockerfile`. `WORKDIR=/app`, `PYTHONPATH=/app`.
+API default: `uvicorn app.main:app`. Worker Compose override: `python -m app.worker`.
 
 ```dockerfile
-# Usa sempre slim, non alpine (compatibilità librerie C)
-FROM python:3.12-slim
+# Stage 1: Builder (gcc + libpq-dev per asyncpg)
+FROM python:3.12-slim AS builder
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /build
+COPY app/requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-# Nessun utente root in produzione
-RUN useradd -m -u 1000 radar
+# Stage 2: Production
+FROM python:3.12-slim AS production
+RUN apt-get update && apt-get install -y --no-install-recommends libpq5 curl \
+    && rm -rf /var/lib/apt/lists/*
+RUN useradd -m -u 1000 -s /bin/sh radar
+COPY --from=builder /install /usr/local
 WORKDIR /app
-
-# Installa dipendenze prima del codice (layer caching Docker)
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copia il codice
-COPY --chown=radar:radar . .
-
-# Esegui come utente non-root
+COPY --chown=radar:radar app/ app/
+COPY --chown=radar:radar scripts/ scripts/
+COPY --chown=radar:radar migrations/ migrations/
+ENV PYTHONPATH=/app
 USER radar
-
-# Healthcheck endpoint
 EXPOSE 8000
-
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8000/health/live || exit 1
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
 ```
 
 ---
@@ -180,22 +188,28 @@ CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000
 > Il workflow per aggiornare il frontend è unicamente: `docker compose up --build -d radar-frontend`
 
 ```dockerfile
-# Stage 1: Build dell'applicazione Angular
+# Stage 1: Build Angular (allineato a radar/frontend/Dockerfile)
 FROM node:22-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --legacy-peer-deps
 COPY . .
+# GeoJSON è gitignored: fetch+verify OBBLIGATORIO prima del build
+RUN node scripts/verify-geojson.mjs --fetch
 RUN npm run build
 
 # Stage 2: Nginx Production Server
-FROM nginx:alpine-slim AS production
+FROM nginx:1.27-alpine AS production
 RUN rm /etc/nginx/conf.d/default.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist/radar-frontend/browser /usr/share/nginx/html
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget -qO- http://localhost:80/ || exit 1
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 ```
+
+> **Deferred post–Phase 6:** drop `--legacy-peer-deps` solo quando la matrix Angular/CDK/PrimeNG è allineata; digest pin immagini = opzionale prodotto.
 
 ---
 

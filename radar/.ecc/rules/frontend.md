@@ -101,7 +101,7 @@ Usare esclusivamente `signal()`, `computed()` e `effect()` di Angular 21.
 **Policy Phase 4 (Signals vs RxJS):**
 - **Signals** possiedono lo stato UI (`StateService`, input/output componenti, filtri).
 - **RxJS** è ammesso solo come adapter di trasporto HttpClient (`Observable`, `rxResource`, operatori HTTP).
-- Non introdurre `BehaviorSubject` per stato locale. Un eventuale passaggio a `httpResource` è deferito (Phase 5/6).
+- Non introdurre `BehaviorSubject` per stato locale. Un eventuale passaggio a `httpResource` resta **deferred post–Phase 5 (D11)**; il trasporto attuale è `rxResource` + HttpClient.
 
 **OBBLIGATORIO:**
 ```typescript
@@ -179,13 +179,17 @@ Usare sempre le CSS Custom Properties definite in `styles.scss`.
   --color-text-secondary:   #8b949e;   // Testo secondario/metadata
   --color-text-accent:      #58a6ff;   // Link e accenti
 
-  // Categorie (per hatching SVG e marker)
-  --color-nucleare:         #FF6B35;
-  --color-elettronica:      #00D4FF;
-  --color-chip:             #7B2FBE;
-  --color-acqua:            #0080FF;
-  --color-energia:          #FFD700;
-  --color-infrastrutture:   #4CAF50;
+  // Categorie (per hatching SVG e marker) — 10 categorie = styles.scss
+  --color-nucleare:         #00E5FF;
+  --color-energia:          #FFEA00;
+  --color-infrastrutture:   #9E9E9E;
+  --color-geopolitica:      #E040FB;
+  --color-economia:         #00E676;
+  --color-tecnologia:       #2979FF;
+  --color-spazio:           #7C4DFF;
+  --color-ambiente:         #8BC34A;
+  --color-salute:           #FF1744;
+  --color-sicurezza:        #FF9100;
 }
 ```
 
@@ -372,9 +376,9 @@ I tipi TypeScript vengono usati solo a compile-time, il runtime usa sempre `wind
 ## Regola 11: Limitazioni Zoom, Bounding Box Focus e Legenda Monoriga
 
 1. **Limitazioni Zoom all'indietro:** Per impedire lo zoom all'indietro infinito e lo scorrimento verso aree nere o duplicazioni di mappa, la configurazione di `L.map` deve comprendere `minZoom: 2.2`, `maxBounds` impostati sui confini del globo terrestre e `maxBoundsViscosity: 1.0`.
-2. **Focus Bounding Box (US & RU):** Per evitare crash o anomalie nel calcolo dinamico dei bounds derivati dall'antimeridiano, utilizzare bounding box statici hardcoded per lo zoom di focus su:
-   * Stati Uniti (`US`): `[24.39, -125.0]` a `[49.38, -66.93]`
-   * Russia (`RU`): `[41.18, 19.63]` a `[81.85, 169.0]`
+2. **Focus Bounding Box (US & RU):** Per evitare crash o anomalie nel calcolo dinamico dei bounds derivati dall'antimeridiano, utilizzare bounding box statici hardcoded (literal da `radar-map.component.ts`):
+   * Stati Uniti (`US`): `L.latLngBounds(L.latLng(24.396308, -125.0), L.latLng(49.384358, -66.93457))`
+   * Russia (`RU`): `L.latLngBounds(L.latLng(41.1856, 19.6389), L.latLng(81.8587, 169.0))`
 3. **Legenda Monoriga:** La legenda in basso alla mappa deve disporsi su una singola riga orizzontale (`flex-wrap: nowrap` con `overflow-x: auto` e `max-width: 90vw` in CSS) per un look glassmorphic premium e per evitare il wrap verticale.
 4. **Allineamento Tooltip Nazioni:** La riga del tooltip delle nazioni (`.tooltip-row`) deve allineare perfettamente flag, nome e badge a livello di baseline/center impostando un `line-height` comune ed allineando i flex item.
 5. **Livello di Zoom Massimo Focus:** Lo zoom durante l'azione di focus su nazione deve essere moderato (`maxZoom: 4` o inferiore nel `fitBounds`) per prevenire uno zoom-in troppo profondo che farebbe perdere il contesto.

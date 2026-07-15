@@ -119,15 +119,17 @@ await save_to_db(result)
 **Livello 3 (Articolo)** — un articolo fallisce, gli altri vengono processati
 
 ```python
-# OBBLIGATORIO: struttura a tre livelli
+# OBBLIGATORIO: struttura a tre livelli (allineata a Regola 1 / worker.py)
 async def run_pipeline_loop():          # Livello 1
     while True:
         try:
             await run_pipeline_cycle()  # Livello 2
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             logger.error(...)
-        finally:
-            await asyncio.sleep(900)
+        # Sleep di polling FUORI dal finally di shutdown
+        await asyncio.sleep(WORKER_POLL_INTERVAL_SECONDS)
 
 async def run_pipeline_cycle():
     articles = await fetch_miniflux_articles()
@@ -217,6 +219,11 @@ Lo schema `GeopoliticalArticleSchema` è il contratto tra backend e frontend.
 Phase 2: stessa immagine, due processi.
 - API: `WORKDIR=/app`, `PYTHONPATH=/app`, `uvicorn app.main:app`
 - Worker: `python -m app.worker`
+
+**API Phase 5 (query layer):**
+- Day: `GET /api/map-summary` → righe aggregate `country_code × primary_category`
+- Nation: `GET /api/articles` → envelope `{ items, next_cursor, total }` (keyset, page ≤ 100)
+- Implementazione SQL: `backend/app/api/articles_query.py` (o modulo query dedicato) + migrazione `007_articles_query_indexes.sql`
 
 **OBBLIGATORIO (Dockerfile / Compose):**
 ```bash

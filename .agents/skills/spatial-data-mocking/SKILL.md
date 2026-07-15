@@ -3,7 +3,7 @@ name: spatial-data-mocking
 description: >
   Playbook per il testing offline del frontend Angular 21 in totale isolamento dal backend Python.
   Definisce il set di dati mockati, le istruzioni per attivare/disattivare il mock service,
-  e i checklist visivi per validare cluster, split-screen, hatching SVG e carousel PrimeNG
+  e i checklist visivi per validare cluster, overlay full-bleed, hatching SVG e carousel PrimeNG
   senza necessità del backend attivo o di dati reali da Miniflux/Gemini.
   **Sidebar freeze:** validare il carosello in sola osservazione — non modificare
   `radar-sidebar/**` né sostituire `p-carousel` con `article-list`.
@@ -12,7 +12,7 @@ when_to_use:
   - Test di regressione visiva delle funzionalità della mappa
   - Dimostrazione/preview del Radar senza dati reali
   - Debug di layout, CSS e comportamento dei componenti PrimeNG
-version: 1.0.0
+version: 1.1.0
 ---
 
 ## Quando Usare Questa Skill
@@ -20,7 +20,7 @@ version: 1.0.0
 Carica questa skill ogni volta che:
 - Sviluppi o modifichi componenti del frontend senza backend attivo
 - Devi verificare che il pattern hatching SVG si applichi correttamente in zoom-out
-- Vuoi testare la transizione split-screen (70%/30%) al click sui marker
+- Vuoi testare l'overlay full-bleed (mappa 100vw; sidebar sopra) al click sui marker
 - Devi validare il corretto funzionamento del carosello PrimeNG su cluster di notizie
 - Stai preparando una demo o screenshot dell'interfaccia
 
@@ -29,13 +29,17 @@ Carica questa skill ogni volta che:
 ## Come Funziona
 
 Il mock service sostituisce le chiamate HTTP reali iniettando dati statici pre-compilati.
-L'interfaccia Angular non sa la differenza: riceve lo stesso tipo di dato `Article[]` sia
-in modalità mock che in modalità produzione.
+L'interfaccia Angular non sa la differenza: riceve gli stessi tipi (`MapSummaryRow[]`,
+`ArticlesPage`) sia in modalità mock che in modalità produzione.
 
-**Phase 4:** il toggle è l'injection token esplicito `MOCK_MODE` (`services/mock-mode.token.ts`).
+**Phase 4–5:** il toggle è l'injection token esplicito `MOCK_MODE` (`services/mock-mode.token.ts`).
 Default `false` in `app.config.ts`. Per offline/demo, fornire `{ provide: MOCK_MODE, useValue: true }`.
 **Vietato** l'auto-fallback silenzioso su mock in caso di errore API: l'errore resta visibile
 (`StateService.error` → banner toolbar).
+
+Contratto API Phase 5 (allineato a `article.service.ts` / `article-mock.service.ts`):
+- Day view: `getMapSummary` → `GET /api/map-summary`
+- Nation open: `getArticlesPage` → `GET /api/articles` con envelope `{ items, next_cursor, total }` (page ≤ 100; FE concatena)
 
 ```typescript
 // frontend/src/app/services/mock-mode.token.ts
@@ -47,15 +51,20 @@ export const MOCK_MODE = new InjectionToken<boolean>('MOCK_MODE', {
 
 > **Nota:** In produzione il token è `false`. Un fallimento di rete/API non attiva i mock.
 
+**Categorie primary ammesse (10 — SoT `PRIMARY_CATEGORIES`):**
+Nucleare, Energia, Infrastrutture, Geopolitica, Economia, Tecnologia, Spazio, Ambiente, Salute, Sicurezza.
+
+**Vietato** come `primary_category`: `Chip`, `Acqua`, `Elettronica` (possono restare solo come tag testuali).
+
 ---
 
 ## Dataset Mock Completo
 
-Il dataset copre 7 nazioni e 5 categorie diverse per testare tutti gli scenari visivi:
+Il dataset copre 5 nazioni e 4 categorie valide per testare gli scenari visivi.
+**SoT codice:** `radar/frontend/src/app/services/article-mock.service.ts` (non inventare categorie).
 
 ```typescript
-// frontend/src/app/mock/mock-articles.data.ts
-// Schema allineato a GeopoliticalArticleSchema Pydantic (contratto immutabile)
+// frontend/src/app/services/article-mock.service.ts (estratto dataset)
 import { Article } from '../models/article.model';
 
 const TODAY = new Date().toISOString().split('T')[0];
@@ -65,7 +74,7 @@ export const MOCK_ARTICLES: Article[] = [
   {
     id: 1,
     title: 'TSMC inaugura la prima fab europea a Dresda',
-    summary: 'TSMC ha inaugurato in Sassonia il primo impianto produttivo europeo per chip a 28nm. La Germania consolida il suo ruolo di hub semiconductore del continente.',
+    summary: 'TSMC ha inaugurato in Sassonia il primo impianto produttivo europeo per chip a 28nm.',
     published_at: TODAY,
     source_url: 'https://example.com/tsmc-dresden',
     country_code: 'DE',
@@ -73,15 +82,17 @@ export const MOCK_ARTICLES: Article[] = [
     longitude: 13.7373,
     companies_involved: ['TSMC', 'Infineon', 'Bosch'],
     tags: ['Chip', 'Semiconduttori', 'Germania', 'Fab'],
-    primary_category: 'Chip',
+    primary_category: 'Tecnologia',
     sentiment: 'Positivo',
     relevance_level: 4,
-    infrastructural_entities: ['TSMC Dresden Fab', 'Silicon Saxony Campus']  // ← OBBLIGATORIO
+    infrastructural_entities: ['TSMC Dresden Fab', 'Silicon Saxony Campus'],
+    feed_title: 'Silicon Saxony News',
+    is_read: false,
   },
   {
     id: 2,
     title: 'Siemens Energy amplia la rete di trasmissione ad alta tensione in Baviera',
-    summary: "Siemens Energy ha completato il potenziamento di 800km di linee di trasmissione nel sud della Germania.",
+    summary: 'Siemens Energy ha completato il potenziamento di 800km di linee di trasmissione nel sud della Germania.',
     published_at: TODAY,
     source_url: 'https://example.com/siemens-baviera',
     country_code: 'DE',
@@ -92,14 +103,16 @@ export const MOCK_ARTICLES: Article[] = [
     primary_category: 'Energia',
     sentiment: 'Neutrale',
     relevance_level: 3,
-    infrastructural_entities: ['Rete di trasmissione 380kV Baviera', 'Interconnessione DE-AT']  // ← OBBLIGATORIO
+    infrastructural_entities: ['Rete di trasmissione 380kV Baviera', 'Interconnessione DE-AT'],
+    feed_title: 'Bavarian Grid Monitor',
+    is_read: true,
   },
 
   // --- CLUSTER TEST: Due articoli vicini in Ucraina ---
   {
     id: 3,
     title: 'Centrale di Zaporizhzhia: rapporto IAEA sui sistemi di raffreddamento',
-    summary: "L'IAEA certifica il funzionamento dei sistemi di backup della centrale. La missione permanente rimane sul posto.",
+    summary: "L'IAEA certifica il funzionamento dei sistemi di backup della centrale.",
     published_at: TODAY,
     source_url: 'https://example.com/zaporizhzhia-iaea',
     country_code: 'UA',
@@ -110,12 +123,14 @@ export const MOCK_ARTICLES: Article[] = [
     primary_category: 'Nucleare',
     sentiment: 'Negativo',
     relevance_level: 5,
-    infrastructural_entities: ['Centrale Nucleare di Zaporizhzhia', 'Sito di stoccaggio combustibile']  // ← OBBLIGATORIO
+    infrastructural_entities: ['Centrale Nucleare di Zaporizhzhia', 'Sito di stoccaggio combustibile'],
+    feed_title: 'IAEA Bulletin',
+    is_read: false,
   },
   {
     id: 4,
     title: "Diga di Kakhovka: progetto di ricostruzione approvato dall'UE",
-    summary: "L'Unione Europea ha approvato 2.3 miliardi di euro per la ricostruzione dell'infrastruttura idrica nel sud dell'Ucraina.",
+    summary: "L'Unione Europea ha approvato 2.3 miliardi di euro per la ricostruzione dell'infrastruttura idrica.",
     published_at: TODAY,
     source_url: 'https://example.com/kakhovka-ue',
     country_code: 'UA',
@@ -123,13 +138,15 @@ export const MOCK_ARTICLES: Article[] = [
     longitude: 33.4750,
     companies_involved: ['European Commission', 'EBRD'],
     tags: ['Acqua', 'Diga', 'Ucraina', 'Ricostruzione'],
-    primary_category: 'Acqua',
+    primary_category: 'Ambiente',
     sentiment: 'Positivo',
     relevance_level: 3,
-    infrastructural_entities: ['Diga di Kakhovka', 'Serbatoio di Kakhovka']  // ← OBBLIGATORIO
+    infrastructural_entities: ['Diga di Kakhovka', 'Serbatoio di Kakhovka'],
+    feed_title: 'EU Reconstruction Index',
+    is_read: false,
   },
 
-  // --- SINGOLI MARKER: Test hatching multi-categoria ---
+  // --- SINGOLI MARKER ---
   {
     id: 5,
     title: 'Iran accelera arricchimento uranio, IAEA convoca riunione di emergenza',
@@ -144,7 +161,9 @@ export const MOCK_ARTICLES: Article[] = [
     primary_category: 'Nucleare',
     sentiment: 'Negativo',
     relevance_level: 5,
-    infrastructural_entities: ['Impianto di Natanz', 'Impianto di Fordow']  // ← OBBLIGATORIO
+    infrastructural_entities: ['Impianto di Natanz', 'Impianto di Fordow'],
+    feed_title: 'United Nations Security News',
+    is_read: false,
   },
   {
     id: 6,
@@ -157,10 +176,12 @@ export const MOCK_ARTICLES: Article[] = [
     longitude: 126.9780,
     companies_involved: ['Samsung Electronics', 'TSMC', 'Apple'],
     tags: ['Chip', 'Samsung', 'Corea del Sud', '2nm', 'Semiconduttori'],
-    primary_category: 'Chip',
+    primary_category: 'Tecnologia',
     sentiment: 'Positivo',
     relevance_level: 4,
-    infrastructural_entities: ['Samsung Fab Hwaseong', 'Samsung R&D Campus Suwon']  // ← OBBLIGATORIO
+    infrastructural_entities: ['Samsung Fab Hwaseong', 'Samsung R&D Campus Suwon'],
+    feed_title: 'Korea Tech Herald',
+    is_read: false,
   },
   {
     id: 7,
@@ -176,7 +197,9 @@ export const MOCK_ARTICLES: Article[] = [
     primary_category: 'Energia',
     sentiment: 'Positivo',
     relevance_level: 4,
-    infrastructural_entities: ['Trans-Adriatic Pipeline (TAP)', 'Terminale di Melendugno', 'Campo di Shah Deniz II']  // ← OBBLIGATORIO
+    infrastructural_entities: ['Trans-Adriatic Pipeline (TAP)', 'Terminale di Melendugno', 'Campo di Shah Deniz II'],
+    feed_title: 'Trans-Adriatic Pipeline Press',
+    is_read: false,
   }
 ];
 ```
@@ -185,38 +208,41 @@ export const MOCK_ARTICLES: Article[] = [
 
 ## Come Attivare il Mock Service
 
-### Step 1: Creare il Mock Service
+### Step 1: Mock Service (Phase 5)
 
 ```typescript
 // frontend/src/app/services/article-mock.service.ts
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
-import { Article, CountrySummary, PrimaryCategory } from '../models/article.model';
-import { MOCK_ARTICLES } from '../mock/mock-articles.data';
+import {
+  Article,
+  ArticlesPage,
+  ArticlesPageFilters,
+  CountrySummary,
+  PrimaryCategory,
+  Sentiment,
+} from '../models/article.model';
+import { MapSummaryRow } from '../models/map-summary.model';
 
 @Injectable({ providedIn: 'root' })
 export class ArticleMockService {
+  getMapSummary(date: string, sentiment?: Sentiment | Sentiment[] | null): Observable<MapSummaryRow[]> {
+    // Aggrega MOCK_ARTICLES per (country_code, primary_category) → MapSummaryRow[]
+    // ...
+  }
+
+  getArticlesPage(filters: ArticlesPageFilters): Observable<ArticlesPage> {
+    // Filtra + keyset cursor + envelope { items, next_cursor, total }; limit clamp 1–100
+    // ...
+  }
+
+  /** @deprecated Prefer getMapSummary / getArticlesPage */
   getArticles(date: string): Observable<Article[]> {
     return of(MOCK_ARTICLES);
   }
 
   getCountries(date: string): Observable<CountrySummary[]> {
-    const grouped = new Map<string, { cats: Set<string>; count: number }>();
-    for (const a of MOCK_ARTICLES) {
-      const entry = grouped.get(a.country_code) ?? { cats: new Set<string>(), count: 0 };
-      entry.cats.add(a.primary_category);
-      entry.count++;
-      grouped.set(a.country_code, entry);
-    }
-    const result: CountrySummary[] = [];
-    grouped.forEach((v, k) => {
-      result.push({
-        country_code: k,
-        categories: [...v.cats] as PrimaryCategory[],
-        article_count: v.count
-      });
-    });
-    return of(result);
+    // ...
   }
 }
 ```
@@ -227,9 +253,10 @@ export class ArticleMockService {
 // frontend/src/app/services/article.service.ts
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, map, of } from 'rxjs';
-import { Article, CountrySummary, ArticleFilters } from '../models/article.model';
-import { parseArticlesDto } from '../models/article.dto';
+import { Observable, map } from 'rxjs';
+import { ArticlesPage, ArticlesPageFilters, Sentiment } from '../models/article.model';
+import { MapSummaryRow } from '../models/map-summary.model';
+import { parseArticlesPageDto, parseMapSummaryDto } from '../models/article.dto';
 import { ArticleMockService } from './article-mock.service';
 import { MOCK_MODE } from './mock-mode.token';
 
@@ -239,22 +266,26 @@ export class ArticleService {
   private readonly mock = inject(ArticleMockService);
   private readonly mockMode = inject(MOCK_MODE);
 
-  getArticles(filters: ArticleFilters): Observable<Article[]> {
+  getMapSummary(filters: {
+    date: string;
+    sentiment?: Sentiment | Sentiment[] | null;
+  }): Observable<MapSummaryRow[]> {
     if (this.mockMode) {
-      return this.mock.getArticles(filters.date);
+      return this.mock.getMapSummary(filters.date, filters.sentiment ?? undefined);
     }
-    const params = new HttpParams().set('date', filters.date);
-    return this.http.get<unknown>('/api/articles', { params }).pipe(
-      map((payload) => parseArticlesDto(payload)),
+    let params = new HttpParams().set('date', filters.date);
+    // ... sentiment opzionale
+    return this.http.get<unknown>('/api/map-summary', { params }).pipe(
+      map((payload) => parseMapSummaryDto(payload)),
     );
   }
 
-  getCountries(filters: ArticleFilters): Observable<CountrySummary[]> {
+  getArticlesPage(filters: ArticlesPageFilters): Observable<ArticlesPage> {
     if (this.mockMode) {
-      return this.mock.getCountries(filters.date);
+      return this.mock.getArticlesPage(filters);
     }
-    const params = new HttpParams().set('date', filters.date);
-    return this.http.get<CountrySummary[]>('/api/countries', { params });
+    // GET /api/articles → parseArticlesPageDto → { items, next_cursor, total }
+    // ...
   }
 }
 ```
@@ -271,45 +302,44 @@ con i dati mockati prima di connettere il backend reale.
 
 ### ✅ Test 1: Hatching SVG in Zoom-Out (livello < 5)
 
-- [ ] La Germania mostra due colori di hatching (Chip + Energia)
-- [ ] L'Ucraina mostra due colori di hatching (Nucleare + Acqua)
+- [ ] La Germania mostra due colori di hatching (Tecnologia + Energia)
+- [ ] L'Ucraina mostra due colori di hatching (Nucleare + Ambiente)
 - [ ] L'Iran mostra hatching singolo (Nucleare)
-- [ ] La Corea del Sud mostra hatching singolo (Chip)
+- [ ] La Corea del Sud mostra hatching singolo (Tecnologia)
 - [ ] L'Azerbaijan mostra hatching singolo (Energia)
 - [ ] I marker puntuali sono invisibili in zoom-out
-- [ ] **Cliccando su Germania in hatching**: sidebar apre con riepilogo 2 notizie (Chip + Energia) [PRD Fase 5]
-- [ ] **Cliccando su Ucraina in hatching**: sidebar apre con riepilogo 2 notizie (Nucleare + Acqua) [PRD Fase 5]
+- [ ] **Cliccando su Germania in hatching**: sidebar apre (nation load via `getArticlesPage` / envelope)
+- [ ] **Cliccando su Ucraina in hatching**: sidebar apre con articoli Nucleare + Ambiente
 
 ### ✅ Test 2: Dissolvenza e Marker in Zoom-In (livello >= 5)
 
 - [ ] L'hatching SVG sfuma gradualmente con CSS transition opacity a 0
-- [ ] I marker puntuali compaiono con la loro icona tematica (☢️ 💾 ⚡ 💧)
-- [ ] I due marker tedeschi (Dresda Chip e Monaco Energia) sono separati e cliccabili
-- [ ] I due marker ucraini (Zaporizhzhia Nucleare e Kakhovka Acqua) **NON** formano un cluster unico — ciascuno appartiene al proprio cluster group di categoria
+- [ ] I marker puntuali compaiono con icona tematica (categorie 10: es. ☢️ Nucleare, ⚡ Energia, 💻 Tecnologia, 🌿 Ambiente)
+- [ ] I due marker tedeschi (Dresda Tecnologia e Monaco Energia) sono separati e cliccabili
+- [ ] I due marker ucraini (Zaporizhzhia Nucleare e Kakhovka Ambiente) **NON** formano un cluster unico — ciascuno appartiene al proprio cluster group di categoria
 - [ ] A zoom intermedio (5-9), i marker della stessa categoria in aree vicine si raggruppano in cluster colorati per categoria
 
 ### ✅ Test 3: Cluster per Categoria e Carosello PrimeNG
 
-- [ ] I cluster mostrano colori diversi per categoria (Nucleare=arancione, Chip=viola, Acqua=blu, Energia=giallo, Elettronica=ciano, Infrastrutture=verde)
+- [ ] I cluster usano le 10 categorie valide (Nucleare, Energia, Infrastrutture, Geopolitica, Economia, Tecnologia, Spazio, Ambiente, Salute, Sicurezza) — **no** Chip/Acqua/Elettronica come primary
 - [ ] Cliccando su un cluster categoria si apre la sidebar sinistra con **solo** gli articoli di quella categoria
-- [ ] Il componente `p-carousel` scorre correttamente tra le notizie della categoria selezionata
+- [ ] Il componente `p-carousel` scorre correttamente tra le notizie della categoria selezionata (**osservare only** — non editare `radar-sidebar/**`)
 - [ ] Ogni slide del carousel mostra: titolo, summary, badge tags, link sorgente
-- [ ] A zoom >= 17, i marker sono ancora clusterizzati (spiderfy su click per vederli singolarmente)
+- [ ] `spiderfyOnMaxZoom: false`; `maxClusterRadius: 40` — espansione custom, non spiderfy Leaflet automatico
 
-### ✅ Test 4: Split-Screen 70/30
+### ✅ Test 4: Overlay Full-Bleed (Phase 4)
 
-- [ ] Mappa occupa 100% in stato idle
-- [ ] Al click su un marker singolo: mappa si restringe al 70% (destra), sidebar al 30% (sinistra)
-- [ ] La transizione è fluida (CSS cubic-bezier 350ms)
-- [ ] Il punto cliccato rimane centrato nella porzione di mappa al 70%
-- [ ] Cliccando fuori dalla sidebar o sul bottone ✕, mappa torna al 100%
+- [ ] Mappa occupa 100vw / 100vh in stato idle
+- [ ] Al click su marker/nazione: **mappa resta 100vw**; sidebar disegna **sopra** (overlay) — **non** restringere a 70%/30%
+- [ ] Dopo open/close sidebar: `map.invalidateSize()` viene chiamato
+- [ ] Cliccando fuori dalla sidebar o sul bottone ✕, sidebar chiude; mappa resta full-bleed
 
 ### ✅ Test 5: Filtraggio Temporale p-calendar
 
 - [ ] Il selettore data in alto mostra la data odierna come default
-- [ ] Cambiando data a ieri: 0 notizie (dati mock sono del 2026-06-23)
-- [ ] Cambiando data al 2026-06-23: tutte le 7 notizie compaiono
-- [ ] La transizione dei marker è animata (fade-out vecchi, fade-in nuovi)
+- [ ] In mock mode i dati usano `TODAY` — cambiando data in passato tipicamente 0 notizie (day view via `getMapSummary`)
+- [ ] Con data odierna: le 7 notizie mock compaiono (summary + nation pages)
+- [ ] Day view usa `getMapSummary`; nation open concatena pagine `{ items, next_cursor, total }`
 
 ---
 
@@ -322,13 +352,18 @@ con i dati mockati prima di connettere il backend reale.
   id: 8,
   title: 'Siccità record nel bacino del Po: livello minimo storico',
   summary: 'Il fiume Po registra il livello più basso degli ultimi 70 anni. Le regioni padane attivano protocolli di emergenza idrica.',
-  published_at: '2026-06-23',
+  published_at: TODAY,
   source_url: 'https://example.com/po-siccita',
   country_code: 'IT',
   latitude: 44.9007,
   longitude: 10.2186,
   companies_involved: [],       // Test: sidebar senza sezione aziende
   tags: ['Acqua', 'Italia', 'Siccità', 'Emergenza'],
-  primary_category: 'Acqua'
+  primary_category: 'Ambiente',  // NON 'Acqua'
+  sentiment: 'Negativo',
+  relevance_level: 3,
+  infrastructural_entities: ['Bacino del Po'],
+  feed_title: 'Italian Climate Watch',
+  is_read: false,
 }
 ```

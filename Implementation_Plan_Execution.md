@@ -243,6 +243,23 @@ Restore: `git checkout 1dfdf60`
 
 ---
 
+### ECC remediation (post Phase 6 GATE VERDE) — DONE (2026-07-15)
+
+Allineamento `.agents/` + `radar/.ecc/` al codice reale (worker, Compose, API Phase 5, FE Phase 4–5). Sorgente: `ECC_Architecture_Audit_Handoff.md` §§5–8.
+
+- [x] **P0:** `spatial-data-mocking` (entrambe le copie) — 10 categorie, overlay full-bleed, `getMapSummary`/`getArticlesPage`; `angular-map-expert` Chip→Tecnologia + prettier; `backend.md` Regola 3 sleep fuori da `finally`
+- [x] **P1:** `docker.md` = Dockerfile/compose reali; wording deferred post–Phase 6; `settings.json` ↔ hooks; `llm-json-extraction` SoT `.agents` → mirror `.ecc`; path references `angular-developer`
+- [x] **P2:** geo-data `007`; AGENTS/backend map-summary bullets; bounds US/RU esatti; note hooks manuali; comandi verify/runbook/CI
+- [x] Checklist accettazione handoff §9
+- [x] Commit remediation (no push) — tip = questo commit; Phase 6 tip = `56c2eff`
+
+Sidebar freeze: zero touch `radar-sidebar/**`.
+
+**Restore Phase 6 only (senza remediation ECC):** `git checkout 56c2eff`  
+**Restore tip post-remediation:** SHA di questo commit (vedi `git log -1`).
+
+---
+
 ### Phase 6 — Governance, docs, ops — DONE / GATE VERDE (2026-07-15)
 
 **Metodo:** audit incongruenze → Blocchi A→D → polish tipografico/Mermaid/indici docs. Sidebar freeze invariato. **Commit solo su richiesta.**
@@ -310,12 +327,13 @@ Tabella claim→realtà (docs/ECC vs codice @ tip post-`1dfdf60`) chiusa per i c
 | 4 | Completata (persa) | **DONE** (`de9bd2f`) | — |
 | 5 | Completata (persa) | **DONE** (`1dfdf60`) | Residuali opzionali (seed 10k measure) |
 | 5.5 | Completata (persa) | N/A nel piano master | Assorbita in 1–3 |
-| 6 | Non iniziata | **DONE / GATE VERDE** (questo commit) | ECC remediation follow-up; push solo se chiesto |
+| 6 | Non iniziata | **DONE / GATE VERDE** (`56c2eff`) | ECC remediation tip (commit successivo); push solo se chiesto |
 
-**Ordine:** dopo questo commit Phase 6 → commit ECC remediation → pin SHA esplicito in tabella/`Implementation_Plan.md` se serve.
+**Ordine:** Phase 6 `56c2eff` → ECC remediation (tip) → pin SHA esplicito in `Implementation_Plan.md` se serve.
 
 **Restore rapido a Phase 5:** `git checkout 1dfdf60` su `refactor/enterprise-consolidation`.  
 **Restore rapido a Phase 4:** `git checkout de9bd2f`.  
 **Restore rapido a Phase 3:** `git checkout 19c67f0`.  
 **Restore a Phase 2:** `git checkout 72851d7`.  
-**Restore Phase 6 (GATE VERDE, pre–ECC remediation):** `git checkout` dello SHA di questo commit.
+**Restore Phase 6 (GATE VERDE, pre–ECC remediation):** `git checkout 56c2eff`.  
+**Restore tip post–ECC remediation:** `git checkout` dello SHA del commit remediation.

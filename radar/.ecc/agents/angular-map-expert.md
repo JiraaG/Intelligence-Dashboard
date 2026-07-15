@@ -148,11 +148,15 @@ nazioni attive riempiti con un pattern SVG a righe colorate:
 ```typescript
 const CATEGORY_CSS_VARS: Record<string, string> = {
   'Nucleare':       '--color-nucleare',
-  'Elettronica':    '--color-elettronica',
-  'Chip':           '--color-chip',
-  'Acqua':          '--color-acqua',
   'Energia':        '--color-energia',
-  'Infrastrutture': '--color-infrastrutture'
+  'Infrastrutture': '--color-infrastrutture',
+  'Geopolitica':    '--color-geopolitica',
+  'Economia':       '--color-economia',
+  'Tecnologia':     '--color-tecnologia',
+  'Spazio':         '--color-spazio',
+  'Ambiente':       '--color-ambiente',
+  'Salute':         '--color-salute',
+  'Sicurezza':      '--color-sicurezza',
 };
 
 // Recupero dinamico a runtime (nessun colore HEX nel codice del componente)
@@ -216,95 +220,61 @@ function createHatchPattern(categoryColor: string, patternId: string): string {
 // Dopo open/close sidebar e resize: App chiama map.invalidateSize() (senza editare sidebar)
 ```
 
-### Icone Tematiche per Categoria
+### Icone Tematiche per Categoria (XSS-safe — Phase 4)
+
+Non usare `html: \`<div>…\`\` stringhe. Pattern reale in `radar-map.component.ts` (`createSafeMarkerIcon`):
 
 ```typescript
-const CATEGORY_ICONS: Record<string, L.DivIcon> = {
-  'Nucleare': L.divIcon({
-    className: 'marker-nuclear',
-    html: `<div class="marker-icon">☢️</div>`,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16]
-  }),
-  'Chip': L.divIcon({
-    className: 'marker-chip',
-    html: `<div class="marker-icon">💾</div>`,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16]
-  }),
-  'Acqua': L.divIcon({
-    className: 'marker-water',
-    html: `<div class="marker-icon">💧</div>`,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16]
-  }),
-  'Energia': L.divIcon({
-    className: 'marker-energy',
-    html: `<div class="marker-icon">⚡</div>`,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16]
-  }),
-  'Elettronica': L.divIcon({
-    className: 'marker-electronics',
-    html: `<div class="marker-icon">📡</div>`,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16]
-  }),
-  'Infrastrutture': L.divIcon({
-    className: 'marker-infra',
-    html: `<div class="marker-icon">🏗️</div>`,
-    iconSize: [32, 32],
-    iconAnchor: [16, 16]
-  })
+const CATEGORY_ICONS: Record<string, string> = {
+  'Nucleare': '☢️', 'Energia': '⚡', 'Infrastrutture': '🏗️',
+  'Geopolitica': '🌍', 'Economia': '📈', 'Tecnologia': '💻',
+  'Spazio': '🚀', 'Ambiente': '🌿', 'Salute': '⚕️', 'Sicurezza': '🛡️',
 };
 
-// ─── OUTPUT EVENTS: tre scenari di interazione (PRD plan.md Fase 5) ─────────
-//
-// markerClicked  → emesso al click su marker singolo (zoom ≥ 5)
-//                   payload: Article singolo
-// clusterClicked → emesso al click su marker cluster (zoom ≥ 5, più articoli vicini)
-//                   payload: Article[] (tutti gli articoli nel cluster)
-// countryClicked → emesso al click su poligono nazione in hatching-mode (zoom < 5)
-//                   payload: Article[] (tutti gli articoli di quella nazione)
-//
-// Esempio di dichiarazione nel componente:
-// markerClicked  = output<Article>();
-// clusterClicked = output<Article[]>();
-// countryClicked = output<Article[]>();   // ← OBBLIGATORIO — PRD Fase 5
-//
-// Nel Root Component (app.ts), il gestore onCountryClick() popola
-// clusterArticles() e apre la sidebar in modalità riepilogo-nazione.
+function createSafeMarkerIcon(article: Article): L.DivIcon {
+  const emoji = CATEGORY_ICONS[article.primary_category] ?? '📍';
+  const el = document.createElement('div');
+  el.className = 'marker-icon';
+  el.textContent = emoji; // no innerHTML
+  if (article.is_read) el.classList.add('marker-read');
+  return L.divIcon({
+    html: el,
+    className: `marker-${article.primary_category.toLowerCase()}`,
+    iconSize: [44, 44],
+  });
+}
+
+// ─── OUTPUT EVENTS ───────────────────────────────────────────────────────────
+// markerClicked / clusterClicked / countryClicked — nation open carica articles paged
+// (map-summary per day view). Sidebar freeze: non sostituire p-carousel.
 ```
 
-### Clustering a 6 Gruppi con Offset Geografici Progressivi
+### Clustering per categoria (fino a 10 gruppi) — allineato a `radar-map.component.ts`
 
 > **⚠️ GOTCHA ESBuild:** NON usare `import * as L from 'leaflet'` né `import 'leaflet.markercluster'` nei componenti.
 > Caricali come script globali in `angular.json` e accedi via `(window as any).L`.
 
-**6 Cluster Group indipendenti** — offset geografici progressivi, nessun offset CSS/ancoraggio:
+**Un `markerClusterGroup` per categoria** (`Object.keys(CATEGORY_CSS_VARS)` = 10). Offset UI in pixel, non lat/lon legacy. Spiderfy automatico **off**.
 
 ```typescript
 const L = (window as any).L as typeof import('leaflet');
-
-// Direzioni offset geografico (magnitudine ~1.2 uniforme)
-const GEO_DIRECTIONS: [number, number][] = [
-  [-1, -0.6], [1, -0.6], [-1, 0.6], [1, 0.6], [0, -1.2], [0, 1.2]
-];
 
 const categoryClusterGroups = new Map<string, any>();
 const categories = Object.keys(CATEGORY_CSS_VARS);
 for (const cat of categories) {
   const cg = L.markerClusterGroup({
-    maxClusterRadius: 40,             // allineato a radar-map.component.ts
-    spiderfyOnMaxZoom: false,         // espansione custom
+    maxClusterRadius: 40,
     showCoverageOnHover: false,
-    disableClusteringAtZoom: 18,      // zero icone nude
-    spiderfyOnMaxZoom: true,
-    spiderfyDistanceMultiplier: 2.0,
+    spiderfyOnMaxZoom: false,         // espansione custom — NON true
+    zoomToBoundsOnClick: false,
+    spiderfyDistanceMultiplier: 2.8,
     iconCreateFunction: (cluster: any) => {
       const count = cluster.getChildCount();
+      const el = document.createElement('div');
+      el.className = 'cluster-icon';
+      el.textContent = String(count);  // XSS-safe (Phase 4)
       return L.divIcon({
-        html: `<div class="cluster-icon">${count}</div>`,
+        html: el,
         className: `radar-cluster cat-${cat.toLowerCase()}`,
         iconSize: [52, 52],
         iconAnchor: [26, 26]           // fisso, centrato
@@ -343,11 +313,11 @@ if (targetGroup) {
 ```
 
 **Vantaggi dell'architettura:**
-- Spiderfy **nativamente per-categoria** + filtro esplicito doppia sicurezza
-- Spiderfy origin **corretto**: cluster center = media coordinate offset = centro icona
-- `maxClusterRadius: 40` → match codice attuale
-- `spiderfyOnMaxZoom: false` → non spiderfy automatico legacy
-- `disableClusteringAtZoom: 18` → zero icone nude, solo spiderfy mostra icone
+- Un cluster group **per categoria** (fino a 10) — allineato a `PRIMARY_CATEGORIES`
+- Spiderfy custom / graph; `spiderfyOnMaxZoom: false` (mai `true`)
+- `maxClusterRadius: 40` → match `radar-map.component.ts`
+- Icone marker XSS-safe: DOM + `textContent` (Phase 4), non HTML string
+- Non reintrodurre `disableClusteringAtZoom: 18` come requisito ECC
 
 **In `angular.json` → `projects.radar-frontend.architect.build.options`:**
 ```json
@@ -374,15 +344,16 @@ if (targetGroup) {
 
 ## Mock Service per Sviluppo Offline
 
-> **IMPORTANTE:** Il toggle mock/produzione avviene tramite la costante `USE_MOCK` nel file
-> `article.service.ts`. Angular 21 con esbuild **non usa più** `environment.ts` in modo nativo.
-> Non creare la cartella `environments/` per questo scopo.
+> **IMPORTANTE (Phase 4):** toggle solo via injection token `MOCK_MODE`
+> (`services/mock-mode.token.ts`). Default `false` in `app.config.ts`.
+> Offline: `{ provide: MOCK_MODE, useValue: true }`. **Vietato** fallback silenzioso su errore API.
+> Contratto mock Phase 5: `getMapSummary` + pagine `{items,next_cursor,total}` — vedi `article-mock.service.ts`.
 
 ```typescript
-// ─── SWITCH MOCK/PROD (article.service.ts) ──────────────────────────────────
-// true  = sviluppo offline (ng serve, nessun backend)
-// false = produzione (docker compose up o proxy.conf.json + ng serve)
-const USE_MOCK = true;
+import { MOCK_MODE } from './mock-mode.token';
+
+// app.config.ts
+{ provide: MOCK_MODE, useValue: false }
 ```
 
 ```typescript
@@ -406,7 +377,7 @@ export const MOCK_ARTICLES: Article[] = [
     longitude: 13.7373,
     companies_involved: ['TSMC', 'Infineon', 'Bosch'],
     tags: ['Chip', 'Semiconduttori', 'Germania', 'Fab'],
-    primary_category: 'Chip',
+    primary_category: 'Tecnologia',
     sentiment: 'Positivo',
     relevance_level: 4,
     infrastructural_entities: ['TSMC Dresden Fab', 'Silicon Saxony Campus']  // ← OBBLIGATORIO
@@ -447,8 +418,9 @@ export const MOCK_ARTICLES: Article[] = [
 
 @Injectable({ providedIn: 'root' })
 export class ArticleMockService {
+  // Phase 5 SoT: getMapSummary + getArticlesPage({ items, next_cursor, total })
+  // Vedi article-mock.service.ts — non usare solo getArticles/getCountries.
   getArticles(date: string): Observable<Article[]> {
-    // In mock mode: restituisce tutti gli articoli indipendentemente dalla data
     return of(MOCK_ARTICLES);
   }
 
@@ -482,11 +454,11 @@ cd frontend && npm run start
 # Build produzione
 cd frontend && npm run build
 
-# Lint TypeScript
-cd frontend && npx eslint src/ --ext .ts
+# Lint FE (prettier — non eslint)
+cd frontend && npm run lint
 
 # Verifica errori di tipo
-cd frontend && npx tsc --noEmit
+cd frontend && npm run typecheck
 ```
 
 ---

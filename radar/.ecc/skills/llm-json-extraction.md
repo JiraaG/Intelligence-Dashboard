@@ -4,8 +4,8 @@ description: >
   Playbook per l'integrazione con Google Gemini API tramite l'SDK ufficiale google-genai.
   Definisce il System Prompt immutabile (no Chain-of-Thought), lo schema Pydantic strict
   per gli Structured Outputs, i delimitatori <untrusted_article>, e il flusso commit+outbox.
-  Usare ogni volta che si modifica la logica di chiamata a Gemini in backend/app/main.py
-  o in classification/.
+  Usare ogni volta che si modifica la logica di chiamata a Gemini in
+  backend/app/worker.py, classification/, o commit/ (non main.py API-only).
 when_to_use:
   - Modifiche al prompt di sistema per Gemini
   - Aggiornamento dello schema Pydantic GeopoliticalArticleSchema
@@ -17,7 +17,7 @@ version: 1.2.0
 ## Quando Usare Questa Skill
 
 Carica questa skill ogni volta che:
-- Modifichi `backend/app/main.py` o `classification/` (client, prompts, validator)
+- Modifichi `backend/app/worker.py` o `classification/` (client, prompts, validator, quota)
 - Ricevi errori del tipo `ValidationError` da Pydantic
 - Gemini restituisce un JSON incompleto o con campi non presenti nello schema
 - Devi ottimizzare il System Prompt per ridurre le allucinazioni geografiche
@@ -26,20 +26,15 @@ Carica questa skill ogni volta che:
 
 ## Come Funziona
 
-### Flusso di Esecuzione (Phase 1)
+### Flusso di Esecuzione (Phase 2)
 
 ```
-1. Fetch articolo da Miniflux API (entry_validation + byte limits)
-2. Sanitizzazione HTML → testo pulito
-3. CHECK DUPLICATO: SELECT EXISTS su articles WHERE source_url = ?
-4. (se non duplicato) build_user_prompt(...) con <untrusted_article>
-5. Chiamata google-genai con `response_schema=build_gemini_response_schema()` (dict sanificato; **mai** la classe Pydantic grezza — Gemini rifiuta `additional_properties`)
-6. Parsing e validazione Pydantic strict (reject category/sentiment/date invalidi)
-7. Overwrite autoritativo source_url + published_at da Miniflux
-8. Commit atomico DB + article_outbox
-9. Reconcile vault (atomic write) → status completed
-10. Mark-read Miniflux solo dopo vault durable
-11. (se FAIL classificazione) fallback geografico + log errore
+1. Worker (radar-worker): advisory lock → reconcile outbox → fetch Miniflux (coda bounded)
+2. Per entry: dedup → sanitize → QuotaLedger.reserve → Gemini (async, deadline)
+3. Parsing/validazione Pydantic strict; complete(reservation_id) con usage reale
+4. Overwrite source_url + published_at da Miniflux
+5. Commit atomico DB + article_outbox
+6. Reconcile vault → mark-read Miniflux solo se durable completed
 ```
 
 ---
@@ -241,7 +236,7 @@ FALLBACK_COORDINATES = {
 }
 ```
 
-Dopo l'estrazione (in pipeline `main.py` / commit):
+Dopo l'estrazione (in pipeline `worker.py` / commit):
 1. Overwrite `source_url` / `published_at` da Miniflux
 2. Commit atomico + outbox
 3. Vault reconcile → mark-read solo se durable completed

@@ -4,8 +4,8 @@ description: >
   Playbook per l'integrazione con Google Gemini API tramite l'SDK ufficiale google-genai.
   Definisce il System Prompt immutabile (no Chain-of-Thought), lo schema Pydantic strict
   per gli Structured Outputs, i delimitatori <untrusted_article>, e il flusso commit+outbox.
-  Usare ogni volta che si modifica la logica di chiamata a Gemini in backend/app/main.py
-  o in classification/.
+  Usare ogni volta che si modifica la logica di chiamata a Gemini in
+  backend/app/worker.py, classification/, o commit/ (non main.py API-only).
 when_to_use:
   - Modifiche al prompt di sistema per Gemini
   - Aggiornamento dello schema Pydantic GeopoliticalArticleSchema
@@ -17,7 +17,7 @@ version: 1.2.0
 ## Quando Usare Questa Skill
 
 Carica questa skill ogni volta che:
-- Modifichi `backend/app/main.py` o `classification/` (client, prompts, validator)
+- Modifichi `backend/app/worker.py` o `classification/` (client, prompts, validator, quota)
 - Ricevi errori del tipo `ValidationError` da Pydantic
 - Gemini restituisce un JSON incompleto o con campi non presenti nello schema
 - Devi ottimizzare il System Prompt per ridurre le allucinazioni geografiche
@@ -236,7 +236,7 @@ FALLBACK_COORDINATES = {
 }
 ```
 
-Dopo l'estrazione (in pipeline `main.py` / commit):
+Dopo l'estrazione (in pipeline `worker.py` / commit):
 1. Overwrite `source_url` / `published_at` da Miniflux
 2. Commit atomico + outbox
 3. Vault reconcile → mark-read solo se durable completed
