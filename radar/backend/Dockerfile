@@ -9,8 +9,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /build
 
-# Copia e installa dipendenze (layer separato per cache Docker efficiente)
+# Copia e installa dipendenze runtime only (layer separato per cache Docker)
 # NOTA: il build context è ./backend, quindi requirements.txt è in app/
+# pytest* vive in app/requirements-dev.txt e NON entra nell'immagine production.
 COPY app/requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
@@ -46,9 +47,9 @@ USER radar
 # Porta API FastAPI (il servizio radar-worker override il CMD e non espone HTTP)
 EXPOSE 8000
 
-# Healthcheck API: il servizio Compose radar-worker disabilita questo check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+# Liveness only — Compose healthcheck mirrors this; readiness is ops-only (/health/ready).
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8000/health/live || exit 1
 
 # Default: API uvicorn. Worker Compose: command ["python", "-m", "app.worker"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

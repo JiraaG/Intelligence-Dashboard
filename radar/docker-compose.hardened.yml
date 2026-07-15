@@ -1,0 +1,22 @@
+# Override: bind published services to loopback only.
+# Use when the host should not expose Radar on the LAN interface.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.hardened.yml up -d
+#
+# Also publishes Miniflux admin on 127.0.0.1:8080 (loopback only) so local
+# feed management works without docker-compose.lan.yml.
+# For LAN-wide Miniflux, use docker-compose.lan.yml instead.
+#
+# Remote / multi-host deployments should sit behind a TLS reverse proxy with
+# authentication and network ACLs — do not publish :80 directly to the internet.
+#
+# NOTE: ports use !override so they replace (not append) the base compose ports.
+
+services:
+  radar-frontend:
+    ports: !override
+      - "127.0.0.1:80:80"
+
+  radar-miniflux:
+    ports: !override
+      - "127.0.0.1:8080:8080"

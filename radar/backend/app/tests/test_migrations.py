@@ -29,6 +29,9 @@ def test_discover_migrations_finds_001_and_002_in_order() -> None:
     assert versions[0].startswith("001_")
     assert versions[1].startswith("002_")
     assert any(v.startswith("003_") for v in versions)
+    assert any(v.startswith("004_") for v in versions)
+    assert any(v.startswith("005_") for v in versions)
+    assert any(v.startswith("006_") for v in versions)
     assert versions == sorted(versions)
 
     for version, path, checksum in migrations:

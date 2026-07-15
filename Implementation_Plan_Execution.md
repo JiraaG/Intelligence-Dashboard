@@ -86,7 +86,7 @@ cd radar && backend\.venv\Scripts\python.exe -m pytest -m "not live" -q
 
 - [x] `docker compose up -d --build radar-backend` — healthy; migrazioni 001+002 applicate.
 - [x] HTTP `/`, `/health`, `/api/articles` 200.
-- [x] Sidebar non toccata. Phase 1 verificata; Phase 2 completata — **in attesa test manuale UI/ops prima di Phase 3.**
+- [x] Sidebar non toccata. Phase 1 verificata; Phase 2/3 completate.
 
 ---
 
@@ -114,19 +114,39 @@ cd radar && backend\.venv\Scripts\python.exe -m pytest -m "not live" -q
 - [x] `docker compose up -d --build` — backend/frontend/db healthy; `radar-worker` up; leadership acquisita.
 - [x] Migrazione `003_quota_ledger` applicata; schema_migrations 001+002+003.
 - [x] HTTP `/`, `/health`, `/api/articles` 200.
-- [x] Sidebar non toccata. **In attesa conferma UI/ops prima di Phase 3.**
+- [x] Sidebar non toccata. Phase 2 verificata; Phase 3 completata.
 
 ---
 
-### Phase 3 — Secure container stack — NON INIZIATA
+### Phase 3 — Secure container stack — COMPLETATA (2026-07-15)
 
-- [ ] Bind loopback (o doc reverse-proxy); Miniflux non pubblico di default / loopback.
-- [ ] CORS non `*`; reti `edge` + data; frontend solo su edge.
-- [ ] Healthcheck Miniflux; `/health/live` + `/health/ready` (pool, migrazioni, heartbeat, outbox).
-- [ ] Pin immagini digest; constraints Python; allineamento Angular peer deps.
-- [ ] Runtime image senza test deps; `.dockerignore` rafforzati.
-- [ ] Nginx unprivileged + CSP; `no-new-privileges` / caps / read-only / limiti risorse.
-- [ ] Script `ops/backup-postgres.sh` + `restore-postgres.sh` + README; drill restore.
+- [x] Default FE `80:80` (0.0.0.0) plug-and-play; Miniflux unpublished; `docker-compose.hardened.yml` (loopback) + `docker-compose.lan.yml` (Miniflux :8080).
+- [x] CORS allowlist env (default vuota, mai `*`); reti `radar-edge` + `radar-data`; frontend solo edge.
+- [x] Healthcheck Miniflux; worker `depends_on` db+miniflux healthy; `/health/live` + `/health/ready` + migrazione `004_worker_heartbeat`.
+- [x] Runtime image senza pytest (`requirements-dev.txt`); `.dockerignore` rafforzati. Digest pin / Angular matrix / drop legacy-peer-deps **deferred**.
+- [x] Soft hardening (no-new-privileges, caps, limits, log rotation, FE read_only+tmpfs); CSP Nginx; no X-XSS-Protection.
+- [x] Script `ops/backup-postgres.sh` + `restore-postgres.sh` + README (Windows/Git Bash, live vs ready, Miniflux admin).
+- [x] **Fix Gemini:** `build_gemini_response_schema()` rimuove `additionalProperties`/`additional_properties` (400 INVALID_ARGUMENT → fallback “Errore di elaborazione…”). Verificato con reset vault/DB/Miniflux unread del giorno e re-ingest (categorie/paesi reali; 429 Retry-After OK).
+
+**Gate regression**
+
+```text
+cd radar && backend\.venv\Scripts\python.exe -m pytest -m "not live" -q
+# → 100+ passed, 3 deselected (include test_gemini_response_schema_strips_additional_properties)
+cd radar && docker compose config -q   # (+ hardened, lan)
+```
+
+**Docker / smoke (2026-07-15):**
+
+- [x] `docker compose config -q` (base + hardened + lan)
+- [x] `docker compose build --pull` + `up -d` — backend/frontend/db/miniflux healthy; worker up; FE `0.0.0.0:80`; Miniflux unpublished
+- [x] `/health/live` 200; `/health/ready` 200 (heartbeat fresco); `/` + `/api/articles` 200
+- [x] Migrazioni `004`–`006` applicate (heartbeat + allineamento ledger legacy pre-restore)
+- [x] Worker leader + ingest OK (commit+outbox). Sidebar non toccata.
+- [x] Riavvio verificato (`compose down` + `up -d`): tutti healthy; `/health/live`+`/ready` 200; Traceback=0; Miniflux unpublished.
+- [x] Re-ingest post-fix schema: niente fallback spurio su lotto di prova; Miniflux fetch 48h + classificazione IT OK.
+
+**Restore point Phase 3:** commit `feat(phase3): ...` su `refactor/enterprise-consolidation` — SHA nella tabella restore di `Implementation_Plan.md` / scoreboard (docs pin successivo se necessario).
 
 ---
 
@@ -166,19 +186,17 @@ cd radar && backend\.venv\Scripts\python.exe -m pytest -m "not live" -q
 
 ---
 
-## C. Scoreboard attuale (audit 2026-07-14, post–Phase 2)
+## C. Scoreboard attuale (audit 2026-07-15, post–Phase 3)
 
 | Phase | Pre-restore (storico) | Codice attuale | Prossimo lavoro |
 |-------|----------------------|----------------|-----------------|
 | 0 | Completata | **DONE** (`0189359`) | — |
 | 1 | Completata (persa) | **DONE** (`bff8abe`) | — |
-| 2 | Completata (persa) | **DONE** (`72851d7`) | Conferma UI/ops, poi Phase 3 |
-| 3 | Completata (persa) | **NOT STARTED** | Dopo conferma UI Phase 2 |
+| 2 | Completata (persa) | **DONE** (`72851d7`) | — |
+| 3 | Completata (persa) | **DONE** (feat phase3 + schema Gemini; SHA in tabella restore) | Phase 4 |
 | 4 | Completata (persa) | **NOT STARTED** | Include bug read/unread; no sidebar |
 | 5 | Completata (persa) | **NOT STARTED** | No `article-list` |
 | 5.5 | Completata (persa) | N/A nel piano master | Assorbita in 1–3 al ri-run |
 | 6 | Non iniziata | **NOT STARTED** | Ultima |
 
-**Ordine di ripresa:** Phase 3 → 4 → 5 → 6 (dopo conferma UI/ops Phase 2).
-
-**Restore rapido a Phase 2:** `git checkout 72851d7` su `refactor/enterprise-consolidation` (messaggio: `feat(phase2): radar-worker...`).
+**Ordine di ripresa:** Phase 4 → 5 → 6 (dopo conferma smoke Compose Phase 3).

@@ -15,9 +15,9 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 * **Database:** PostgreSQL 15 (`radar-db`). Accesso tramite driver asincrono `asyncpg` puro.
 * **Feed Source:** Miniflux REST API.
 * **Frontend:** Angular 21 (Standalone Components).
-* **Container:** Docker + docker-compose (servizi: `radar-db`, `radar-backend`, `radar-worker`, `radar-frontend`, `radar-miniflux`) su `radar-network`. Ingestione solo in `radar-worker` (Phase 2 DONE).
+* **Container:** Docker + docker-compose (servizi: `radar-db`, `radar-backend`, `radar-worker`, `radar-frontend`, `radar-miniflux`) su reti `radar-edge` + `radar-data` (Phase 3). Ingestione solo in `radar-worker`.
 * **Web Server:** Nginx (Alpine) per servire Angular e proxying `/api/`.
-* **Piani operativi:** [`Implementation_Plan.md`](../Implementation_Plan.md) + [`Implementation_Plan_Execution.md`](../Implementation_Plan_Execution.md). Post–branch restore (2026-07-14): **Phase 0–2 DONE**; fasi **3–6 NON presenti** nel codice (edge-network/hardening FE ancora da fare).
+* **Piani operativi:** [`Implementation_Plan.md`](../Implementation_Plan.md) + [`Implementation_Plan_Execution.md`](../Implementation_Plan_Execution.md). Post–branch restore (2026-07-15): **Phase 0–3 DONE** (incluso fix schema Gemini `additional_properties`); fasi **4–6 NON presenti** nel codice (read/unread FE, pagination, governance completa).
 
 ---
 
@@ -72,8 +72,8 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 
 1. **Nomi dei Servizi Immutabili:** `radar-db`, `radar-backend`, `radar-worker`, `radar-frontend`, `radar-miniflux`.
 2. **Persistenza Dati:** PostgreSQL deve utilizzare un volume named bind-mounted locale (`./data/postgres`).
-3. **Isolamento di Rete:** Tutti i servizi risiedono sulla rete bridge interna `radar-network` (Phase 3 introdurrà `edge`/`data`). Solo il frontend espone la porta 80 all'host.
-4. **Healthcheck & dipende_on:** Backend, worker e frontend dipendono da `radar-db` con condizione `service_healthy`. L'ingestione gira solo in `radar-worker` (non nel processo API).
+3. **Isolamento di Rete (Phase 3):** reti `radar-edge` (frontend ↔ backend) e `radar-data` (backend, worker, db, miniflux). Il frontend **non** sta su `radar-data`. Default plug-and-play: FE `80:80` (tutte le interfacce); Miniflux **senza** porte host. Loopback: `docker-compose.hardened.yml`. Admin Miniflux LAN: `docker-compose.lan.yml`.
+4. **Healthcheck & depends_on:** Compose healthcheck API = `GET /health/live` (non `/health/ready`). Frontend `depends_on` backend healthy (= live). Worker attende db + Miniflux healthy. Readiness (`/health/ready`: pool, migrazioni, heartbeat) è ops-only e non deve restartare l'API.
 5. **Password e Sicurezza:** 
    * Le credenziali reali vivono esclusivamente nel file `.env` (ignorato da Git).
    * È vietato l'uso del carattere `$` all'interno del valore delle password in quanto Docker Compose lo interpreta come interpolazione di variabili.
@@ -83,11 +83,13 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 7. **Risoluzione DNS Dinamica in Nginx (Prevenzione 502 Bad Gateway):**
    * Per evitare errori `502 Bad Gateway` a seguito di riavvii dei container o riassegnazioni di IP nella rete bridge, `nginx.conf` deve utilizzare un resolver interno (`resolver 127.0.0.11 valid=10s;`) ed una variabile locale per il `proxy_pass` (es. `set $backend_upstream http://radar-backend:8000; proxy_pass $backend_upstream$request_uri;`). Questo costringe Nginx a risolvere l'IP a runtime anziché solo all'avvio.
 8. **Riproducibilità Frontend (`npm ci`):**
-   * Nel `Dockerfile` del frontend Angular, l'installazione delle dipendenze nello stage builder deve sempre avvenire tramite `npm ci --legacy-peer-deps` per garantire build riproducibili. È vietato l'uso di `npm install`.
+   * Nel `Dockerfile` del frontend Angular, l'installazione delle dipendenze nello stage builder deve avvenire tramite `npm ci --legacy-peer-deps` finché la matrix Angular/CDK/PrimeNG non è allineata (Phase 4/6). È vietato l'uso di `npm install`.
 9. **Sicurezza Immagini (No `latest`):**
-   * È severamente vietato l'utilizzo del tag `latest` per le immagini di base nei `docker-compose.yml` e nei `Dockerfile` (es. `miniflux/miniflux:latest`). Le versioni devono sempre essere bloccate (pinnate) a una major/minor specifica (es. `2.3.2`) per prevenire rotture distruttive da aggiornamenti silenti.
+   * È severamente vietato l'utilizzo del tag `latest` per le immagini di base nei `docker-compose.yml` e nei `Dockerfile` (es. `miniflux/miniflux:latest`). Le versioni devono sempre essere bloccate (pinnate) a una major/minor specifica (es. `2.3.2`) per prevenire rotture distruttive da aggiornamenti silenti. Digest SHA: opzionale / Phase 6 — non richiesto per il path ready-to-run.
 10. **Coerenza Healthcheck (Alpine Linux):**
     * Gli script di healthcheck definiti nei Dockerfile e nel docker-compose devono utilizzare eseguibili realmente disponibili nell'immagine di base. Ad esempio, per immagini basate su Alpine (come Nginx), è obbligatorio usare `wget` invece di `curl` per evitare che il container venga marchiato costantemente come `unhealthy`.
+11. **CORS:** default allowlist vuota (same-origin via Nginx). Mai `allow_origins=["*"]`. Dev diretto: `CORS_ALLOW_ORIGINS=http://localhost:4200`.
+12. **Ops:** backup/restore in `radar/ops/`; vedi `ops/README.md`.
 
 ---
 

@@ -33,6 +33,44 @@ logger = logging.getLogger("radar.classification.client")
 _MAX_ATTEMPTS = 4
 _RETRY_AFTER_MAX_SECONDS = 300.0
 
+# Keys rejected by Gemini REST when nested under generation_config.response_schema
+# (SDK may also snake_case additionalProperties → additional_properties).
+_GEMINI_UNSUPPORTED_SCHEMA_KEYS = frozenset(
+    {
+        "additionalProperties",
+        "additional_properties",
+    }
+)
+
+
+def sanitize_gemini_response_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """
+    Return a deep-copied JSON Schema safe for Gemini structured outputs.
+
+    Pydantic ``extra='forbid'`` emits ``additionalProperties: false``; the Gemini API
+    rejects that field (and the SDK snake_case form ``additional_properties``).
+    """
+    def _walk(node: Any) -> Any:
+        if isinstance(node, dict):
+            return {
+                key: _walk(value)
+                for key, value in node.items()
+                if key not in _GEMINI_UNSUPPORTED_SCHEMA_KEYS
+            }
+        if isinstance(node, list):
+            return [_walk(item) for item in node]
+        return node
+
+    cleaned = _walk(schema)
+    if not isinstance(cleaned, dict):
+        raise TypeError("sanitize_gemini_response_schema expects a dict schema root")
+    return cleaned
+
+
+def build_gemini_response_schema() -> dict[str, Any]:
+    """JSON Schema for GenerateContentConfig.response_schema (Gemini-safe)."""
+    return sanitize_gemini_response_schema(GeopoliticalArticleSchema.model_json_schema())
+
 
 class ErrorClass(str, Enum):
     """Classification of provider / local failures for retry policy."""
@@ -249,7 +287,9 @@ class ClassificationClient:
                 config=types.GenerateContentConfig(
                     system_instruction=SYSTEM_PROMPT,
                     response_mime_type="application/json",
-                    response_schema=GeopoliticalArticleSchema,
+                    # Dict schema without additionalProperties — Pydantic class
+                    # emits keys Gemini rejects as additional_properties (400).
+                    response_schema=build_gemini_response_schema(),
                     temperature=0.3,
                     max_output_tokens=2048,
                 ),

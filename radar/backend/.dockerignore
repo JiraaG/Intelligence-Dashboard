@@ -1,12 +1,26 @@
 # Build context exclusions per il backend Python
 .venv/
+venv/
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+htmlcov/
+.tox/
 tests/
+**/tests/
 *.log
+.git/
 .gitignore
 *.md
+.env
+.env.*
+!.env.example
+# Dev-only / lock artifacts (runtime installs app/requirements.txt only)
+**/requirements-dev.txt
+requirements.lock
+*.egg-info/

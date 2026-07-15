@@ -24,6 +24,7 @@ from app.commit.outbox import process_outbox_row, reconcile_outbox
 from app.commit.router import get_article_file_path, initialize_vault_directories
 from app.core.config import (
     DATABASE_URL,
+    LLM_API_KEY,
     LLM_RPD,
     MAX_MINIFLUX_RESPONSE_BYTES,
     MINIFLUX_API_KEY,
@@ -38,12 +39,14 @@ from app.core.config import (
     WORKER_DB_CONCURRENCY,
     WORKER_ENTRY_CONCURRENCY,
     WORKER_GEMINI_CONCURRENCY,
+    WORKER_HEARTBEAT_INTERVAL_SECONDS,
     WORKER_PARSE_CONCURRENCY,
     WORKER_POLL_INTERVAL_SECONDS,
     WORKER_QUEUE_DEPTH,
     WORKER_SHUTDOWN_TIMEOUT,
 )
 from app.core.database import bootstrap_database, init_pool
+from app.core.heartbeat import upsert_worker_heartbeat
 from app.core.logging import setup_logging
 from app.extraction.client import MinifluxClient
 from app.extraction.entry_validation import ValidatedMinifluxEntry
@@ -67,6 +70,7 @@ class WorkerState:
         self.consumer_tasks: list[asyncio.Task] = []
         self.lock_conn: Optional[asyncpg.Connection] = None
         self.lock_held: bool = False
+        self.heartbeat_task: Optional[asyncio.Task] = None
 
 
 def build_worker_semaphores(
@@ -130,9 +134,19 @@ async def shutdown_worker_resources(
     lock_key: int = WORKER_ADVISORY_LOCK_KEY,
 ) -> None:
     """
-    Ordered shutdown: cancel consumers → await (bounded) → close httpx →
+    Ordered shutdown: cancel heartbeat + consumers → await (bounded) → close httpx →
     release advisory → close pool. No sleep.
     """
+    if state.heartbeat_task is not None:
+        state.heartbeat_task.cancel()
+        try:
+            await state.heartbeat_task
+        except asyncio.CancelledError:
+            pass
+        except Exception as hb_err:
+            logger.debug("Heartbeat task shutdown: %s", hb_err)
+        state.heartbeat_task = None
+
     consumers = list(state.consumer_tasks)
     for task in consumers:
         task.cancel()
@@ -391,6 +405,33 @@ async def run_pipeline_cycle(state: WorkerState) -> None:
     )
 
 
+async def run_heartbeat_loop(
+    state: WorkerState,
+    *,
+    interval_seconds: float = float(WORKER_HEARTBEAT_INTERVAL_SECONDS),
+    status: str = "running",
+    detail: str | None = None,
+) -> None:
+    """
+    Periodically UPSERT worker_heartbeat while this process holds leadership.
+    CancelledError is re-raised; other errors are logged and the loop continues.
+    """
+    assert state.db_pool is not None
+    logger.info(
+        "Heartbeat leader avviato (interval=%ss, status=%s).",
+        interval_seconds,
+        status,
+    )
+    while True:
+        try:
+            await upsert_worker_heartbeat(state.db_pool, status=status, detail=detail)
+        except asyncio.CancelledError:
+            raise
+        except Exception as hb_err:
+            logger.warning("Upsert worker_heartbeat fallito: %s", hb_err)
+        await asyncio.sleep(interval_seconds)
+
+
 async def run_pipeline_loop(state: WorkerState) -> None:
     """Daemon loop. Poll interval is awaited outside any finally (shutdown-safe)."""
     logger.info(
@@ -435,6 +476,7 @@ async def run_worker() -> None:
     )
 
     state = WorkerState()
+    ingest_enabled = bool(LLM_API_KEY)
 
     try:
         state.db_pool = await init_pool(DATABASE_URL)
@@ -456,7 +498,14 @@ async def run_worker() -> None:
             MINIFLUX_API_KEY,
             http_client=state.http_client,
         )
-        state.classification_client = ClassificationClient(pool=state.db_pool)
+
+        if ingest_enabled:
+            state.classification_client = ClassificationClient(pool=state.db_pool)
+        else:
+            logger.error(
+                "GEMINI_API_KEY/GOOGLE_API_KEY mancante: ingest LLM sospeso. "
+                "API e frontend restano disponibili; il worker mantiene leadership + heartbeat."
+            )
 
         parse_sem, db_sem, gemini_sem = build_worker_semaphores()
         state.parse_sem = parse_sem
@@ -475,7 +524,24 @@ async def run_worker() -> None:
             state.lock_conn = None
             raise
 
-        await run_pipeline_loop(state)
+        hb_status = "running" if ingest_enabled else "degraded"
+        hb_detail = None if ingest_enabled else "missing_llm_api_key"
+        await upsert_worker_heartbeat(state.db_pool, status=hb_status, detail=hb_detail)
+        state.heartbeat_task = asyncio.create_task(
+            run_heartbeat_loop(
+                state,
+                status=hb_status,
+                detail=hb_detail,
+            ),
+            name="radar-worker-heartbeat",
+        )
+
+        if ingest_enabled:
+            await run_pipeline_loop(state)
+        else:
+            # Stay alive for heartbeat / leadership without calling Gemini.
+            while True:
+                await asyncio.sleep(float(WORKER_POLL_INTERVAL_SECONDS))
 
     except asyncio.CancelledError:
         logger.info("Worker cancellato; avvio shutdown ordinato.")

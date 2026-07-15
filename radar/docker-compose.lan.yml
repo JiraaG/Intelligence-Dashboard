@@ -1,0 +1,17 @@
+# Optional override: publish Miniflux admin UI on the host.
+#
+# Default compose leaves Miniflux unpublished (data network only). Use this when
+# you need the web UI to manage feeds/API keys:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.lan.yml up -d
+#
+# Then open http://localhost:8080
+#
+# Without this file, prefer hardened (loopback :8080) or compose exec.
+#
+# NOTE: ports use !override for a clean publish list (Miniflux has none in base).
+
+services:
+  radar-miniflux:
+    ports: !override
+      - "8080:8080"

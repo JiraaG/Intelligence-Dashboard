@@ -35,8 +35,10 @@ PostgreSQL via **asyncpg puro** (niente ORM/SQLAlchemy).
 **Source of truth (Phase 1 DONE):** `backend/migrations/*.sql` applicati da `backend/app/core/migrations.py`
 (`run_migrations` con tabella `schema_migrations` + checksum). `bootstrap_database()` in
 `core/database.py` chiama `run_migrations` — **non** reinventare DDL via `CREATE TABLE` ad-hoc nel bootstrap.
-Migrazioni attuali: `001_initial.sql`, `002_pipeline_outbox_and_quotas.sql` (`article_outbox`).
-Phase 2 DONE (worker, `llm_request_ledger`). Phase 3+ (reti edge/data, hardening) **non** è ancora presente.
+Migrazioni attuali: `001_initial.sql`, `002_pipeline_outbox_and_quotas.sql` (`article_outbox`),
+`003_quota_ledger.sql`, `004_worker_heartbeat.sql`, `005_quota_ledger_align.sql`,
+`006_quota_ledger_legacy_nulls.sql`.
+Phase 2 DONE (worker, `llm_request_ledger`). Phase 3 DONE (heartbeat, edge/data, `/health/live`+`/ready`).
 
 ---
 
@@ -260,4 +262,4 @@ docker compose exec radar-db psql -U radar_user -d radar_db -c \
 - **BLOCCA** se: relazioni molti-a-molti implementate senza junction table
 - **BLOCCA** se: `DROP TABLE` o `TRUNCATE` senza `IF EXISTS` e senza commento di migrazione
 - **AVVISA** se: query senza `LIMIT` che potrebbero restituire milioni di righe
-- **AVVISA** se: si assume reti `edge`/`data` o `/health/ready` Phase 3 come già presenti
+- **AVVISA** se: si assume ancora rete unica `radar-network` o solo `/health` aggregato (Phase 3 ha `radar-edge`/`radar-data` e `/health/live`+`/ready`)

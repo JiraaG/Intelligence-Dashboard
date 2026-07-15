@@ -11,7 +11,7 @@ when_to_use:
   - Aggiornamento dello schema Pydantic GeopoliticalArticleSchema
   - Debug di errori di parsing JSON dalla risposta Gemini
   - Aggiunta di nuovi campi al contratto di estrazione
-version: 1.1.0
+version: 1.2.0
 ---
 
 ## Quando Usare Questa Skill
@@ -209,7 +209,11 @@ async def extract_geopolitical_data(
             config=types.GenerateContentConfig(
                 system_instruction=SYSTEM_PROMPT,
                 response_mime_type="application/json",
-                response_schema=GeopoliticalArticleSchema,
+                # NEVER pass GeopoliticalArticleSchema class directly: Pydantic
+                # extra='forbid' emits additionalProperties; Gemini/SDK reject
+                # additional_properties (400 INVALID_ARGUMENT → fallback summary).
+                # Use build_gemini_response_schema() from classification/client.py.
+                response_schema=build_gemini_response_schema(),
                 temperature=0.1,
                 max_output_tokens=2048
             )

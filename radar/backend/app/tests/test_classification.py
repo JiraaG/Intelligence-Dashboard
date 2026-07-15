@@ -8,8 +8,10 @@ from pydantic import ValidationError
 from app.classification.client import (
     ClassificationClient,
     ErrorClass,
+    build_gemini_response_schema,
     classify_provider_error,
     extract_retry_after_seconds,
+    sanitize_gemini_response_schema,
 )
 from app.classification.quota import compute_day_window
 from app.classification.validator import GeopoliticalArticleSchema
@@ -27,6 +29,23 @@ def _client_with_mock_quota() -> tuple[ClassificationClient, AsyncMock]:
 
 
 # ─── Tests per lo Schema Pydantic ─────────────────────────────────────────────
+
+def test_gemini_response_schema_strips_additional_properties() -> None:
+    """Gemini rejects additionalProperties / additional_properties in response_schema."""
+    raw = GeopoliticalArticleSchema.model_json_schema()
+    assert "additionalProperties" in raw
+    cleaned = build_gemini_response_schema()
+    blob = json.dumps(cleaned)
+    assert "additionalProperties" not in blob
+    assert "additional_properties" not in blob
+    assert "properties" in cleaned
+    # Nested unsupported keys must also be removed.
+    nested = sanitize_gemini_response_schema(
+        {"type": "object", "additional_properties": False, "properties": {"a": {"additionalProperties": False}}}
+    )
+    assert "additional_properties" not in nested
+    assert "additionalProperties" not in nested["properties"]["a"]
+
 
 def test_schema_valid_article() -> None:
     """Verifica che GeopoliticalArticleSchema accetti e convalidi dati corretti."""

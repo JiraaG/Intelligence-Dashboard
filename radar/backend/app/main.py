@@ -10,15 +10,16 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import AsyncGenerator, Optional
+from typing import Any, AsyncGenerator, Optional
 
 import asyncpg
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from app.core.config import DATABASE_URL
+from app.core.config import CORS_ALLOW_ORIGINS, DATABASE_URL, WORKER_HEARTBEAT_STALE_SECONDS
 from app.core.database import bootstrap_database, init_pool
+from app.core.heartbeat import evaluate_readiness
 from app.core.logging import setup_logging
 
 logger = logging.getLogger("radar.main")
@@ -69,18 +70,57 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["GET", "PATCH", "OPTIONS"],
-    allow_headers=["*"],
-)
+if CORS_ALLOW_ORIGINS:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=CORS_ALLOW_ORIGINS,
+        allow_credentials=False,
+        allow_methods=["GET", "PATCH", "OPTIONS"],
+        allow_headers=["*"],
+    )
+    logger.info("CORS allowlist attiva: %s", CORS_ALLOW_ORIGINS)
+else:
+    logger.info("CORS disabilitato (allowlist vuota — same-origin via Nginx).")
+
+
+@app.get("/health/live")
+async def health_live() -> dict[str, str]:
+    """Liveness: processo API su. Usato da Compose HEALTHCHECK (non dipende dal worker)."""
+    return {"status": "ok", "service": "radar-backend"}
 
 
 @app.get("/health")
-async def health_check():
-    return {"status": "ok", "service": "radar-backend"}
+async def health_check() -> dict[str, str]:
+    """Alias di /health/live per compatibilità."""
+    return await health_live()
+
+
+@app.get("/health/ready")
+async def health_ready(response: Response) -> dict[str, Any]:
+    """
+    Readiness: pool, migrazione heartbeat, freshness leader.
+    503 non deve far restartare l'API (Compose usa /health/live).
+    """
+    if state.db_pool is None:
+        response.status_code = 503
+        return {
+            "status": "not_ready",
+            "service": "radar-backend",
+            "reasons": ["pool_unavailable"],
+        }
+
+    ready, details = await evaluate_readiness(
+        state.db_pool,
+        stale_seconds=WORKER_HEARTBEAT_STALE_SECONDS,
+    )
+    payload: dict[str, Any] = {
+        "status": "ready" if ready else "not_ready",
+        "service": "radar-backend",
+        **details,
+    }
+    if not ready:
+        response.status_code = 503
+    return payload
 
 
 @app.get("/api/articles")

@@ -64,9 +64,9 @@ IS_PRODUCTION = RADAR_ENV in {"production", "prod"}
 # ── LLM ──────────────────────────────────────────────────────────────────────
 GOOGLE_API_KEY = _env_str("GOOGLE_API_KEY")
 GEMINI_API_KEY = _env_str("GEMINI_API_KEY")
+# Optional at import so API/FE can boot without a key (ready-to-run).
+# Production fail-fast and ClassificationClient still require a key.
 LLM_API_KEY = GOOGLE_API_KEY or GEMINI_API_KEY
-if not LLM_API_KEY:
-    raise ConfigError("Configurazione errata: manca GOOGLE_API_KEY o GEMINI_API_KEY")
 
 _raw_model = _env_str("GEMINI_MODEL", "gemma-4-31b") or "gemma-4-31b"
 GEMINI_MODEL = "gemma-4-31b-it" if _raw_model in ("gemma-4-31b", "gemma-4-31b-it") else _raw_model
@@ -158,6 +158,27 @@ WORKER_ADVISORY_LOCK_BACKOFF_SECONDS = _env_int(
     min_value=1,
     max_value=300,
 )
+# Leader UPSERT interval for worker_heartbeat (readiness TTL uses STALE below).
+WORKER_HEARTBEAT_INTERVAL_SECONDS = _env_int(
+    "WORKER_HEARTBEAT_INTERVAL_SECONDS",
+    30,
+    min_value=5,
+    max_value=300,
+)
+WORKER_HEARTBEAT_STALE_SECONDS = _env_int(
+    "WORKER_HEARTBEAT_STALE_SECONDS",
+    90,
+    min_value=15,
+    max_value=600,
+)
+
+# CSV allowlist for direct browser→API origins. Empty = no CORS middleware (Nginx same-origin).
+# Never use "*".
+_raw_cors = _env_str("CORS_ALLOW_ORIGINS", "") or ""
+_cors_parts = [origin.strip() for origin in _raw_cors.split(",") if origin.strip()]
+if any(part == "*" for part in _cors_parts):
+    raise ConfigError("CORS_ALLOW_ORIGINS non può contenere '*' — usare una allowlist esplicita.")
+CORS_ALLOW_ORIGINS: list[str] = _cors_parts
 
 
 def _validate_production_secrets() -> None:
@@ -166,6 +187,8 @@ def _validate_production_secrets() -> None:
         return
 
     missing: list[str] = []
+    if not LLM_API_KEY:
+        missing.append("GEMINI_API_KEY o GOOGLE_API_KEY")
     if not MINIFLUX_API_KEY:
         missing.append("MINIFLUX_API_KEY")
     if not _env_str("DATABASE_URL") and not _env_str("POSTGRES_PASSWORD"):

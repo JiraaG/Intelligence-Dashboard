@@ -1,148 +1,244 @@
-services:
-
-  # ─── 1. DATABASE POSTGRESQL ─────────────────────────────────────────────────
-  radar-db:
-    image: postgres:15-alpine
-    container_name: radar-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER:     ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB:       ${POSTGRES_DB}
-    volumes:
-      # Volume persistente locale: i dati sopravvivono al container restart
-      - ./data/postgres:/var/lib/postgresql/data
-    networks:
-      - radar-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-    # PostgreSQL NON esposto verso l'host: accessibile solo sulla rete interna
-    # Se necessario per debug: decommentare la riga sotto
-    # ports:
-    #   - "5432:5432"
-
-
-  # ─── 2. BACKEND PYTHON (API only — no ingest) ───────────────────────────────
-  radar-backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-      target: production
-    container_name: radar-backend
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      # DATABASE_URL viene costruita qui perché combina variabili tra loro.
-      # Le altre variabili (GEMINI_API_KEY, MINIFLUX_*) sono già in env_file.
-      # NOTA: i $ nella password vengono escaped con $$ nel YAML di Compose.
-      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@radar-db:5432/${POSTGRES_DB}"
-      OBSIDIAN_VAULT_PATH: "/app/vault"
-    volumes:
-      - ./vault:/app/vault
-    depends_on:
-      radar-db:
-        condition: service_healthy   # Attende che PostgreSQL sia pronto prima di avviarsi
-    networks:
-      - radar-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    # Backend NON esposto verso l'host: accessibile via Nginx proxy su /api/
-    # Se necessario per debug: decommentare la riga sotto
-    # ports:
-    #   - "8000:8000"
-
-
-  # ─── 2b. WORKER INGEST (uno solo — stessa immagine del backend) ─────────────
-  radar-worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-      target: production
-    container_name: radar-worker
-    restart: unless-stopped
-    command: ["python", "-m", "app.worker"]
-    env_file:
-      - .env
-    environment:
-      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@radar-db:5432/${POSTGRES_DB}"
-      OBSIDIAN_VAULT_PATH: "/app/vault"
-    volumes:
-      - ./vault:/app/vault
-    depends_on:
-      radar-db:
-        condition: service_healthy
-      radar-miniflux:
-        condition: service_started
-    networks:
-      - radar-network
-    # Nessun HTTP: disabilita HEALTHCHECK dell'immagine (curl :8000)
-    healthcheck:
-      disable: true
-
-
-  # ─── 3. FRONTEND ANGULAR + NGINX ────────────────────────────────────────────
-  radar-frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: production
-    container_name: radar-frontend
-    restart: unless-stopped
-    ports:
-      - "80:80"    # Unica porta esposta verso l'host — punto di ingresso del sistema
-    depends_on:
-      radar-backend:
-        condition: service_healthy   # Attende che il backend sia sano prima di avviarsi
-    networks:
-      - radar-network
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
-
-
-  # ─── 4. MINIFLUX (Aggregatore RSS) ──────────────────────────────────────────
-  radar-miniflux:
-    image: miniflux/miniflux:2.3.2
-    container_name: radar-miniflux
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    environment:
-      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@radar-db:5432/${POSTGRES_DB}?sslmode=disable
-      - RUN_MIGRATIONS=1
-      - CREATE_ADMIN=1
-      - ADMIN_USERNAME=${MINIFLUX_ADMIN_USERNAME}
-      - ADMIN_PASSWORD=${MINIFLUX_ADMIN_PASSWORD}
-    depends_on:
-      radar-db:
-        condition: service_healthy
-    networks:
-      - radar-network
-
-
-# ─── RETE VIRTUALE INTERNA ──────────────────────────────────────────────────
-networks:
-  radar-network:
-    driver: bridge
-    name: radar-network
-    # internal: false è il default — il backend può raggiungere Internet per Gemini/Miniflux
-
-
-# ─── VOLUME ESTERNO (opzionale, per backup gestito) ─────────────────────────
-# Se vuoi usare un volume Docker named invece del bind mount locale,
-# decommenta il blocco qui sotto e aggiorna la sezione volumes del radar-db.
-# volumes:
-#   radar-postgres-data:
-#     driver: local
+# Radar Informativo Globale — Compose (Phase 3)
+#
+# Quickstart (plug-and-play):
+#   cp .env.example .env   # fill secrets
+#   docker compose up -d --build
+#   → UI: http://localhost:80
+#
+# Miniflux has NO host ports by default (admin via lan override or compose exec).
+# Hardened loopback FE:  docker compose -f docker-compose.yml -f docker-compose.hardened.yml up -d
+# Miniflux admin UI:     docker compose -f docker-compose.yml -f docker-compose.lan.yml up -d
+#
+# Networks:
+#   radar-edge  — frontend ↔ backend (API proxy)
+#   radar-data  — backend + worker + db + miniflux (frontend NEVER here)
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+
+  # ─── 1. DATABASE POSTGRESQL ─────────────────────────────────────────────────
+  radar-db:
+    image: postgres:15-alpine
+    container_name: radar-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB:       ${POSTGRES_DB}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    networks:
+      - radar-data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+          pids: 256
+        reservations:
+          memory: 128M
+    # PostgreSQL NOT published to the host (data network only).
+
+
+  # ─── 2. BACKEND PYTHON (API only — no ingest) ───────────────────────────────
+  radar-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: radar-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # DATABASE_URL combines vars; $ in passwords must be escaped as $$ in Compose.
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@radar-db:5432/${POSTGRES_DB}"
+      OBSIDIAN_VAULT_PATH: "/app/vault"
+    volumes:
+      - ./vault:/app/vault
+    depends_on:
+      radar-db:
+        condition: service_healthy
+    networks:
+      - radar-edge
+      - radar-data
+    healthcheck:
+      # Liveness only — readiness (/health/ready) must NOT restart the API.
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+          pids: 256
+        reservations:
+          memory: 128M
+    # Backend NOT published — reachable via Nginx /api/ on radar-edge.
+
+
+  # ─── 2b. WORKER INGEST (uno solo — stessa immagine del backend) ─────────────
+  radar-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: radar-worker
+    restart: unless-stopped
+    command: ["python", "-m", "app.worker"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@radar-db:5432/${POSTGRES_DB}"
+      OBSIDIAN_VAULT_PATH: "/app/vault"
+    volumes:
+      - ./vault:/app/vault
+    depends_on:
+      radar-db:
+        condition: service_healthy
+      radar-miniflux:
+        condition: service_healthy
+    networks:
+      - radar-data
+    # No HTTP listener — disable image HEALTHCHECK (curl :8000).
+    healthcheck:
+      disable: true
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768M
+          pids: 256
+        reservations:
+          memory: 256M
+
+
+  # ─── 3. FRONTEND ANGULAR + NGINX ────────────────────────────────────────────
+  radar-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    container_name: radar-frontend
+    restart: unless-stopped
+    ports:
+      # Plug-and-play: all interfaces. Loopback-only → docker-compose.hardened.yml
+      - "80:80"
+    depends_on:
+      radar-backend:
+        condition: service_healthy   # = /health/live, NOT ready
+    networks:
+      - radar-edge
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:mode=1777
+      - /var/run:mode=1777
+      - /tmp:mode=1777
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+          pids: 128
+        reservations:
+          memory: 64M
+
+
+  # ─── 4. MINIFLUX (Aggregatore RSS) ──────────────────────────────────────────
+  radar-miniflux:
+    image: miniflux/miniflux:2.3.2
+    container_name: radar-miniflux
+    restart: unless-stopped
+    # No host ports by default — use docker-compose.lan.yml for admin UI on :8080
+    environment:
+      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@radar-db:5432/${POSTGRES_DB}?sslmode=disable
+      - RUN_MIGRATIONS=1
+      - CREATE_ADMIN=1
+      - ADMIN_USERNAME=${MINIFLUX_ADMIN_USERNAME}
+      - ADMIN_PASSWORD=${MINIFLUX_ADMIN_PASSWORD}
+    depends_on:
+      radar-db:
+        condition: service_healthy
+    networks:
+      - radar-data
+    healthcheck:
+      test: ["CMD", "/usr/bin/miniflux", "-healthcheck", "auto"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+          pids: 128
+        reservations:
+          memory: 64M
+
+
+# ─── NETWORKS ────────────────────────────────────────────────────────────────
+networks:
+  radar-edge:
+    driver: bridge
+    name: radar-edge
+  radar-data:
+    driver: bridge
+    name: radar-data
+    # internal: false (default) — backend/worker need egress for Gemini / Miniflux fetch

@@ -12,12 +12,12 @@
 li arricchisce semanticamente via Google Gemini API e li visualizza su una mappa 2D interattiva
 in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categoria geopolitica).
 
-### Vincoli post–branch restore (2026-07-14)
+### Vincoli post–branch restore (2026-07-15)
 
-- **Phase 0–2 DONE**; fasi **3–6 NOT STARTED**. Vedi `Implementation_Plan.md` / `Implementation_Plan_Execution.md`.
-- **Presenti (Phase 1–2):** `backend/migrations/` (`001`, `002`, `003_quota_ledger.sql`), `core/migrations.py`, `article_outbox`, `llm_request_ledger`, `worker.py` + Compose `radar-worker`, coda bounded + advisory lock, `classification/quota.py`.
-- **Non assumere** reti `edge`/`data`, `/health/live|/ready`, o `article-list` (Phase 3+ / freeze).
-- Pipeline ingest in `backend/app/worker.py`; `main.py` è API-only. Compose: 5 servizi su `radar-network` (incluso `radar-worker`).
+- **Phase 0–3 DONE**; fasi **4–6 NOT STARTED**. Vedi `Implementation_Plan.md` / `Implementation_Plan_Execution.md`.
+- **Presenti (Phase 1–3):** migrazioni `001`–`006`, outbox, ledger quote, `radar-worker`, reti `radar-edge`/`radar-data`, `/health/live`+`/ready`, CSP Nginx, `ops/` backup, Gemini `build_gemini_response_schema()` (no `additional_properties`).
+- **Non assumere** `article-list`, DestroyRef map cleanup, pagination cursor (Phase 4–5). Sidebar freeze resta.
+- Pipeline ingest in `backend/app/worker.py`; `main.py` è API-only. Compose: 5 servizi su edge+data.
 - **Sidebar freeze:** non modificare `frontend/src/app/components/radar-sidebar/**`; tenere `p-carousel` + altezza via `article-card-{id}`; vietato `app-article-list`.
 - Bug **read/unread** (`.marker-read`): solo `state.service.ts` + `radar-map.component.ts`.
 - Pydantic: `companies_involved` / `tags` / `infrastructural_entities` sono **`str` CSV** (non `List[str]`). Nessun campo `reasoning`; `ConfigDict(strict=True, extra="forbid")`. Il modello FE può ancora usare `string[]` dopo `array_agg` API — non confondere i due.
@@ -35,8 +35,8 @@ in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categ
 | Frontend    | Angular 21 (Standalone Components)      | Signals, lazy loading                       |
 | UI Library  | PrimeNG 17+                             | p-sidebar, p-carousel, p-calendar           |
 | Mappa       | Leaflet + CartoDB Dark Positron          | GeoJSON locale in assets/data/             |
-| Container   | Docker + docker-compose                  | Cinque servizi su `radar-network` (incluso `radar-worker`) |
-| Web Server  | Nginx (Alpine)                          | Serve build Angular, porta 80 esposta       |
+| Container   | Docker + docker-compose                  | Cinque servizi su `radar-edge` + `radar-data` |
+| Web Server  | Nginx (Alpine)                          | Serve build Angular, porta 80; CSP Phase 3  |
 
 ---
 

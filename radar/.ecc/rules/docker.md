@@ -7,22 +7,24 @@
 
 ## Principio Architetturale Fondamentale
 
-Il sistema Radar è composto da **cinque servizi Docker** su una rete bridge interna
-`radar-network`: `radar-db`, `radar-backend` (API), `radar-worker` (ingest),
-`radar-frontend`, `radar-miniflux`.
-Il frontend espone la porta 80; Miniflux può esporre 8080 (da restringere in Phase 3).
+Il sistema Radar è composto da **cinque servizi Docker** su due reti bridge:
+`radar-edge` (frontend ↔ backend) e `radar-data` (backend, worker, db, miniflux).
+Il frontend espone la porta **80** su tutte le interfacce (plug-and-play).
+Miniflux **non** pubblica porte host di default (override `docker-compose.lan.yml` o
+`docker-compose.hardened.yml` per admin UI).
 
 ```
-Internet → [Porta 80] → radar-frontend (Nginx)
-                                │
-              rete interna radar-network
-          ┌──────────┬──────────┼──────────┐
-          │          │          │          │
-   radar-backend  radar-worker radar-db  radar-miniflux
-      (API)         (ingest)
+Internet/LAN → [Porta 80] → radar-frontend (Nginx) ──radar-edge──→ radar-backend
+                                                                  │
+                                                            radar-data
+                                          ┌──────────┬────────────┼──────────┐
+                                          │          │            │          │
+                                   radar-worker   radar-db   radar-miniflux
+                                      (ingest)
 ```
 
-Phase 3 del Consolidation Plan introdurrà reti `edge`/`data` e hardening — **non** sono lo stato attuale.
+Phase 3 DONE: edge/data, `/health/live`+`/ready`, CSP, ops backup, soft hardening.
+Digest pin immagini e drop `--legacy-peer-deps` restano Phase 6 / allineamento Angular.
 ---
 
 ## Regola 1: Cinque Servizi, Nomi Immutabili
@@ -69,50 +71,44 @@ volumes:
 
 ---
 
-## Regola 3: Rete Virtuale Interna Dedicata
+## Regola 3: Reti edge + data (Phase 3)
 
-Tutti i servizi devono essere connessi a una rete interna.
-Il frontend non deve avere accesso diretto al database.
+Frontend mai sulla stessa rete di PostgreSQL.
 
 **OBBLIGATORIO:**
 ```yaml
 networks:
-  radar-network:
+  radar-edge:
     driver: bridge
-    internal: false  # false = permette al backend di uscire su Internet per Gemini/Miniflux
+  radar-data:
+    driver: bridge
+    # internal: false — worker/backend need egress (Gemini / Miniflux fetch)
 
-# In ogni servizio:
-networks:
-  - radar-network
+# frontend: solo radar-edge
+# backend: radar-edge + radar-data
+# worker, db, miniflux: solo radar-data
 ```
 
 ---
 
 ## Regola 4: Healthcheck Obbligatori
 
-Ogni servizio deve avere un healthcheck. Il backend e il frontend dipendono dal DB.
-Usare `depends_on` con `condition: service_healthy` per la sequenza di avvio.
+Compose healthcheck del backend = **`/health/live`** (non ready).
+Frontend `depends_on` backend healthy (= live). Worker attende db + Miniflux healthy.
+Miniflux: `["CMD", "/usr/bin/miniflux", "-healthcheck", "auto"]`.
 
 ```yaml
-# PostgreSQL healthcheck
+# Backend liveness (Compose + Dockerfile)
 healthcheck:
-  test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-  interval: 10s
-  timeout: 5s
-  retries: 5
-  start_period: 20s
-
-# Backend healthcheck (endpoint /health su FastAPI)
-healthcheck:
-  test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+  test: ["CMD", "curl", "-f", "http://localhost:8000/health/live"]
   interval: 30s
   timeout: 10s
   retries: 3
-  start_period: 30s
+  start_period: 60s
 
-# Frontend healthcheck (Nginx risponde su porta 80/health)
+# Frontend healthcheck (Nginx Alpine → wget)
 healthcheck:
-  test: ["CMD", "curl", "-sf", "http://127.0.0.1:80/health"]
+  test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/health"]
   interval: 30s
   timeout: 5s
   retries: 3
@@ -237,10 +233,11 @@ server {
         proxy_connect_timeout 10s;
     }
 
-    # Headers di sicurezza
+    # Headers di sicurezza (no X-XSS-Protection — obsoleto)
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    # CSP: Angular + Carto tiles + Google Fonts (vedi nginx.conf reale)
 
     # Cache assets statici
     location ~* \.(js|css|png|jpg|ico|svg|woff2)$ {

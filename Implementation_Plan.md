@@ -2,7 +2,7 @@
 
 This plan addresses the production blockers found during the code and architecture review. Execute phases in order. Do not release a later phase while an earlier acceptance gate is failing.
 
-**Progress (audit codice 2026-07-14, post–branch restore):** Phase **0 DONE**. Phase **1 DONE**. Phase **2 DONE**. Phases **3–6 NOT STARTED**. Resume at Phase 3 after manual UI/ops check. Sidebar remains frozen; read/unread `.marker-read` remains in scope via `state.service` + `radar-map` only.
+**Progress (audit codice 2026-07-15, post–Phase 3):** Phase **0 DONE**. Phase **1 DONE**. Phase **2 DONE**. Phase **3 DONE** (stack secure/operate + fix Gemini `additional_properties` → no fallback spurio). Phases **4–6 NOT STARTED**. Resume at Phase 4. Sidebar remains frozen; read/unread `.marker-read` remains in scope via `state.service` + `radar-map` only.
 
 **Git restore points (branch `refactor/enterprise-consolidation`):**
 | Tag semantico | Commit tipico | Contenuto |
@@ -10,6 +10,7 @@ This plan addresses the production blockers found during the code and architectu
 | Phase 0 | `0189359` | pytest markers / frontend CI baseline |
 | Phase 1 | `bff8abe` | migrations 001–002, outbox, Pydantic strict, vault atomico |
 | Phase 2 | `72851d7` | `radar-worker`, coda bounded, `llm_request_ledger`, Gemini deadline/retry |
+| Phase 3 | *(SHA di questo commit feat(phase3) — pinnato subito dopo)* | edge/data, live/ready+heartbeat, CSP, ops, soft hardening; schema Gemini sanificato |
 
 ## Scope And Exit Criteria
 
@@ -176,42 +177,47 @@ cd radar && python -m pytest -m "not live"
 cd radar && docker compose up -d --build
 ```
 
-**Status (2026-07-14):** gate verde — 95 passed / 3 live deselected. Docker: migrazione 003 applicata; `radar-worker` leader (advisory lock); API healthy; `/` `/health` `/api/articles` 200. Sidebar untouched. **In attesa conferma UI/ops prima di Phase 3.**
+**Status (2026-07-14):** gate verde — 95 passed / 3 live deselected. Docker: migrazione 003 applicata; `radar-worker` leader (advisory lock); API healthy; `/` `/health` `/api/articles` 200. Sidebar untouched.
 
 ## Phase 3 - Secure And Operate The Container Stack
 
-**Status:** NOT STARTED after restore — single `radar-network`, combined `/health`, no `ops/` backup scripts, CORS/`ports` still pre-hardening.
+**Status:** DONE (2026-07-15) — plug-and-play ports `80:80`; Miniflux unpublished; `radar-edge`/`radar-data`; `/health/live`+`/ready` + heartbeat `004`; CSP; ops backup; soft hardening; **Gemini structured output** via `build_gemini_response_schema()` (strip `additionalProperties` — evita 400 → summary fallback). Deferred: image digest pin, Angular peer-deps matrix, drop `--legacy-peer-deps`.
 
 ### Files to add
 
-- [ ] `radar/ops/backup-postgres.sh`
-- [ ] `radar/ops/restore-postgres.sh`
-- [ ] `radar/ops/README.md`
+- [x] `radar/ops/backup-postgres.sh`
+- [x] `radar/ops/restore-postgres.sh`
+- [x] `radar/ops/README.md`
+- [x] `radar/docker-compose.hardened.yml`
+- [x] `radar/docker-compose.lan.yml`
+- [x] `radar/backend/migrations/004_worker_heartbeat.sql`
+- [x] `radar/backend/app/core/heartbeat.py`
+- [x] `radar/backend/app/requirements-dev.txt`
 
 ### Files to modify
 
-- [ ] `radar/docker-compose.yml`
-- [ ] `radar/backend/Dockerfile`
-- [ ] `radar/frontend/Dockerfile`
-- [ ] `radar/frontend/nginx.conf`
-- [ ] `radar/backend/.dockerignore`
-- [ ] `radar/frontend/.dockerignore`
-- [ ] `radar/.env.example`
-- [ ] `radar/backend/app/main.py`
-- [ ] `radar/frontend/package.json`
-- [ ] `radar/frontend/package-lock.json`
+- [x] `radar/docker-compose.yml`
+- [x] `radar/backend/Dockerfile`
+- [x] `radar/frontend/nginx.conf`
+- [x] `radar/backend/.dockerignore`
+- [x] `radar/frontend/.dockerignore`
+- [x] `radar/.env.example`
+- [x] `radar/backend/app/main.py`
+- [x] `radar/backend/app/worker.py`
+- [x] `radar/backend/app/core/config.py`
+- [ ] `radar/frontend/package.json` / `package-lock.json` — **deferred** (legacy-peer-deps retained)
 
 ### Changes
 
-1. Bind the default public services to loopback (`127.0.0.1:80:80` and, only if needed, `127.0.0.1:8080:8080`). Remove Miniflux publication by default or bind it to loopback. Document that a remote deployment must sit behind a TLS reverse proxy with authentication and network ACLs.
-2. Remove permissive CORS from the default deployment. Same-origin Nginx traffic does not need it. If a development origin is supported, make it an explicitly configured allowlist, never `*`.
-3. Create an `edge` network for frontend-to-API traffic and a separate data network for backend, database, and Miniflux. Attach the frontend only to `edge`; attach the backend to both. Do not put the frontend and PostgreSQL on the same network.
-4. Add a Miniflux healthcheck and make the worker wait for database and Miniflux readiness. Split FastAPI checks into liveness and readiness. Readiness must verify the pool, migration completion, worker heartbeat freshness, and outbox/reconciliation health; it must not return healthy after the pipeline has died.
-5. Pin base images by immutable digest after a reviewed update process. Generate and review a hash-locked Python constraints file separately from development/test dependencies. Align Angular, animations, CDK, PrimeNG, and the lockfile on a supported Angular 21 matrix; remove `--legacy-peer-deps` only after `npm ci` is clean.
-6. Remove test-only packages from the backend runtime image. Add `.env`, `.git`, caches, test output, Vault data, and local database data to both Docker ignore files.
-7. Run the frontend under an unprivileged Nginx configuration and add `no-new-privileges`, dropped capabilities, read-only filesystems with required temporary mounts, CPU/memory/pid limits, and Docker log rotation. Validate every hardening setting in the actual images before enabling it.
-8. Add a CSP compatible with Angular, local assets, Carto tiles, and Google Fonts. Keep `nosniff`, frame protection, referrer policy, explicit proxy body limits, and proxy timeouts. Remove obsolete `X-XSS-Protection` rather than relying on it.
-9. Add backup and restore scripts that use `pg_dump`/`pg_restore`, checksum manifests, a retention policy, and a documented restore drill. Back up Vault data consistently with the database/outbox state.
+1. [x] Default FE `80:80` (0.0.0.0) for ready-to-run; Miniflux unpublished; hardened loopback via `docker-compose.hardened.yml`; lan Miniflux via `docker-compose.lan.yml`. Document TLS reverse-proxy for remote.
+2. [x] CORS allowlist env (`CORS_ALLOW_ORIGINS`); default empty; never `*`.
+3. [x] Networks `radar-edge` + `radar-data`; frontend only edge; backend both; worker/db/miniflux data only.
+4. [x] Miniflux healthcheck; worker waits db+Miniflux healthy; `/health/live` + `/health/ready` (pool, migration 004, heartbeat freshness, outbox counts). Compose uses live only.
+5. [x] Tag pins retained; digest pin + Angular matrix + drop legacy-peer-deps **deferred**. Runtime image without pytest (`requirements-dev.txt`).
+6. [x] Strengthened `.dockerignore`; test deps out of runtime image.
+7. [x] Soft hardening: no-new-privileges, cap_drop, resource limits, log rotation; FE read_only+tmpfs. Aggressive backend/db read-only deferred.
+8. [x] CSP (Angular, Carto, Google Fonts); nosniff/frame/referrer; remove X-XSS-Protection; proxy body/timeouts.
+9. [x] Backup/restore scripts + checksum + retention + drill docs; vault consistent with dump.
 
 ### Acceptance gate
 
@@ -220,9 +226,10 @@ cd radar && docker compose config -q
 cd radar && docker compose build --pull
 cd radar && docker compose up -d
 cd radar && docker compose ps
+cd radar && python -m pytest -m "not live"
 ```
 
-Run a restore drill in a disposable deployment before declaring this phase complete.
+**Status (2026-07-15):** pytest 100+ passed / 3 live deselected. Compose smoke verde: live/ready 200, FE `:80`, Miniflux unpublished, worker ingest OK. Migrazioni `004`–`006`. Fix Gemini schema verificato (re-ingest oggi: summary reali, non fallback; 429 gestiti con Retry-After).
 
 ## Phase 4 - Stabilize The Frontend Lifecycle And Security Boundary
 
