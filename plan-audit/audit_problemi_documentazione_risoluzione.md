@@ -6,7 +6,7 @@
 * **Manuale operativo di riferimento:** `audit_problemi_documentazione.md` (v2.2 · FASI 0–2 + APPENDICE F)
 * **Gate Progetto:** Phase 6 / Gate Verde (Stato post-branch restore)
 * **Stato Fase 0:** **FASE 0 DONE DEFINITIVA**
-* **Remediation codice:** T-P0-01 **DONE**, T-P1-03 **DONE**, T-P1-01 **DONE**, T-P1-02 **DONE** (2026-07-15); resto OPEN; prossimo **T-P0-02**
+* **Remediation codice:** T-P0-01 **DONE**, T-P1-03 **DONE**, T-P1-01 **DONE**, T-P1-02 **DONE**, T-P0-02 **DONE** (2026-07-16); resto OPEN; prossimo **T-P1-04**
 * **SoT stato ticket:** questo file §3 (stati `OPEN` / `DONE` / `CLOSED`). Playbook riprodurre/fix/gate = manuale FASI 3–5. Dopo ogni fix aggiornare §3 qui e la matrice FASE 2 del manuale.
 
 ### Definition of Done FASE 0 (firmata)
@@ -43,9 +43,9 @@ SoT: audit_problemi_documentazione.md v2.2 + APPENDICE F.
 Stato ticket operativo: audit_problemi_documentazione_risoluzione.md §3.
 radar/.ecc/CLAUDE.md è allineato Gate Verde (T-DOC-01 CLOSED); preferisci comunque .agents/AGENTS.md + radar/.ecc/rules/*.md come guardrail.
 Vincoli: sidebar freeze; main.py API-only; asyncpg; window.L; no commit senza richiesta.
-Ticket OPEN in ordine FASE 4 (T-P0-01, T-P1-03, T-P1-01, T-P1-02 DONE; prossimo T-P0-02).
+Ticket OPEN in ordine FASE 4 (T-P0-01..T-P0-02 DONE; prossimo T-P1-04 → T-P1-05 → P2).
 Ticket per turno: riproduci → fix → gate FASE 5 → marca DONE in risoluzione §3 e aggiorna manuale FASE 2.
-Priorità elevate T-P0-02 / T-P1-05 sono intenzionali (App. F §F.2).
+Priorità elevate storiche: T-P0-02 chiuso; T-P1-05 resta P1 (App. F §F.2).
 ```
 
 ### 0.3 Artefatti correlati (letture FASE 0)
@@ -142,7 +142,7 @@ Se già nel DB (Duplicato)
 
 | Classe | Count |
 |--------|------:|
-| P0 OPEN codice | 1 (T-P0-02; T-P0-01 DONE) |
+| P0 OPEN codice | 0 |
 | P1 OPEN codice | 2 (T-P1-03, T-P1-01, T-P1-02 DONE; restano T-P1-04/05) |
 | P2 OPEN codice | 8 |
 | Docs OPEN residui | 0 |
@@ -156,7 +156,7 @@ Se già nel DB (Duplicato)
 | Ticket ID | Finding | Priorità | File Chiave | Stato | Dipendenze | Sommario |
 | :--- | :--- | :---: | :--- | :---: | :---: | :--- |
 | **T-P0-01** | BE-AUD-001 | P0 | `backend/app/worker.py` (ramo `is_dup`) | **DONE** | — | Gate outbox completed + vault-check NULL. Test `test_worker_gate.py`. Vedi §8.1 + `audit_remediation_T-P0-01.md`. |
-| **T-P0-02** | BE-AUD-005/006 | P0 | `backend/scripts/**` | OPEN | — | `ClassificationClient()` vuoto + `_wait_for_rate_limit` rimosso. |
+| **T-P0-02** | BE-AUD-005/006 | P0 | `backend/scripts/**` | **DONE** | — | `ClassificationClient()` vuoto + `_wait_for_rate_limit` rimosso. Vedi §14 + `audit_remediation_T-P0-02.md`. |
 | **T-P1-01** | BE-AUD-002, INF-AUD-01 | P1 | `core/config.py` (`quote_plus`) + Compose `POSTGRES_HOST` | **DONE** | — | Credenziali encoded via `quote_plus`; niente `DATABASE_URL` grezzo su backend/worker. Vedi §12 + `audit_remediation_T-P1-01.md`. |
 | **T-P1-02** | BE-AUD-003 | P1 | `worker.py` | **DONE** | — | Race TOCTOU multi-consumer; pg_advisory_lock per-URL. Vedi §13 + `audit_remediation_T-P1-02.md`. |
 | **T-P1-03** | BE-AUD-004 | P1 | `commit/outbox.py` (`reconcile_outbox` + `_update_miniflux_marked_at`) | **DONE** | **T-P0-01** | Mark-read post-`completed` ritentabile via `miniflux_marked_at` (migrazione 008). Vedi §8.2 + `audit_remediation_T-P1-03.md`. |
@@ -196,7 +196,7 @@ Ordine FASE 4 (T-DOC-01 escluso: già CLOSED):
 2. **`T-P1-03`** — Retry mark-read — **DONE**
 3. **`T-P1-01`** — `DATABASE_URL` `quote_plus` (+ Compose/`.env`) — **DONE**
 4. **`T-P1-02`** — Advisory lock per-URL — **DONE**
-5. **`T-P0-02`** — Script diagnostici. (prossimo)
+5. **`T-P0-02`** — Script diagnostici. — **DONE**
 6. **`T-P1-04`** — Banner nation-open / `detailError`.
 7. **`T-P1-05`** — Nginx non-root **oppure** eccezione SoT.
 8. **P2 in blocco** (`T-P2-01` → `T-P2-08`).
@@ -230,7 +230,7 @@ Deferred infra (digest pin, `--legacy-peer-deps`) ≠ FAIL — non aprire ticket
 
 ### 7.1 Letture e evidenze
 * Manuale v2.1→v2.2, scratch×6, AGENTS.md, `.ecc/rules/*`, `runbook.md`, `CLAUDE.md`.
-* Spot-check codice (FASE 0 + verifica aggiuntiva): `worker.py` gate T-P0-01 DONE; `config.py` `quote_plus` + Compose `POSTGRES_HOST` (T-P1-01 DONE); `outbox.py` retry `miniflux_marked_at` (T-P1-03 DONE); `state.service.ts` / `app.ts` (T-P1-04 OPEN); script `ClassificationClient` (T-P0-02 OPEN); Dockerfile/nginx (T-P1-05 OPEN); `CLAUDE.md` Gate Verde (T-DOC-01 CLOSED).
+* Spot-check codice (FASE 0 + verifica aggiuntiva): `worker.py` gate T-P0-01 DONE; `config.py` `quote_plus` + Compose `POSTGRES_HOST` (T-P1-01 DONE); `outbox.py` retry `miniflux_marked_at` (T-P1-03 DONE); script diagnostici T-P0-02 DONE; `state.service.ts` / `app.ts` (T-P1-04 OPEN); Dockerfile/nginx (T-P1-05 OPEN); `CLAUDE.md` Gate Verde (T-DOC-01 CLOSED).
 * P2 spot-check: T-P2-01/02/05 CONFIRMED; T-P2-06 WEAK (difesa in profondità); T-P2-08 path residuo da verificare prima del delete.
 
 ### 7.2 Multi-agente (FASE 0 iniziale + verifica chiusura)
@@ -369,4 +369,16 @@ Select-String -Path "radar\.ecc\CLAUDE.md" -Pattern "radar-network|Phase 0–2|P
 - Gap: Docker Desktop spento → rebuild/`grep` container **non** riverificabili finché il daemon non riparte.
 - Nota design accettata: connessione (+ `db_sem`) tenuta per tutta la classify Gemini (session lock); pool `max_size=10`, entry/db concurrency default 4.
 - **Handoff:** **T-P0-02** — script diagnostici / `ClassificationClient()`.
+
+---
+
+## 14. Esito Remediation Ticket T-P0-02
+
+**T-P0-02 DONE — PASS** (codice/gate orchestratore; SoT drift chiuso in riverifica Cursor 2026-07-16).
+
+- Walkthrough: eliminati gli script diagnostici orfani `test_500.py` e `test_rate_limiter.py` per non interferire con Script I; riparato `test_production_pipeline.py` istanziando `ClassificationClient(quota=quota)` con un `AsyncMock` della quota e rimuovendo lo stress test basato sul vecchio metodo `_wait_for_rate_limit`; configurato skip esplicito per `test_live_rate_limiter_throttling` in `test_integration_live.py`.
+- Gate FASE 5 (riverifica Cursor): ruff OK; pytest offline **115/115 passed**; pytest live test_live_rate_limiter_throttling **SKIPPED**; Script I **ZERO match**.
+- Docs: pie FASE 2 / App. D / prompt F.8 / spot-check allineati post drift.
+- **Handoff:** **T-P1-04** (Banner nation-open / `detailError`).
+
 

@@ -142,8 +142,8 @@ flowchart LR
 ## 2.1 Sintesi conteggi OPEN
 
 ```mermaid
-pie title Problematiche OPEN da remediation (post T-P0-01..T-P1-02)
-    "P0 OPEN codice" : 1
+pie title Problematiche OPEN da remediation (post T-P0-02)
+    "P0 OPEN codice" : 0
     "P1 OPEN codice" : 2
     "P2 OPEN codice" : 8
     "Docs FIXED / non riaprire" : 12
@@ -151,14 +151,14 @@ pie title Problematiche OPEN da remediation (post T-P0-01..T-P1-02)
 ```
 
 > **v2.1→v2.2 (FASE 0):** `T-DOC-01` CLOSED — `radar/.ecc/CLAUDE.md` allineato Gate Verde (grep legacy = 0).  
-> **Post-remediation 2026-07-15:** T-P0-01 + T-P1-03 + T-P1-01 + T-P1-02 **DONE** → restano **11 ticket codice OPEN** (P0=1, P1=2, P2=8). Snapshot FASE 0 era 15. Dettaglio → **APPENDICE F** + `audit_problemi_documentazione_risoluzione.md` §3.
+> **Post-remediation 2026-07-16:** T-P0-01 + T-P1-03 + T-P1-01 + T-P1-02 + T-P0-02 **DONE** → restano **10 ticket codice OPEN** (P0=0, P1=2, P2=8). Snapshot FASE 0 era 15. Dettaglio → **APPENDICE F** + `audit_problemi_documentazione_risoluzione.md` §3.
 
 ## 2.2 P0 — OPEN (fix obbligatorio)
 
 | ID | Titolo | File chiave | Finding audit |
 |----|--------|-------------|----------------|
 | **T-P0-01** | ~~Mark-read su duplicato senza gate~~ → **DONE** (gate outbox + vault-check NULL) | `backend/app/worker.py` ramo `is_dup` | BE-AUD-001 |
-| **T-P0-02** | Script diagnostici: `ClassificationClient()` + `_wait_for_rate_limit` | `backend/scripts/**` | BE-AUD-005/006 *(scratch=P1; elevato a P0 — vedi App. F §F.2)* |
+| **T-P0-02** | ~~Script diagnostici: `ClassificationClient()` + `_wait_for_rate_limit`~~ → **DONE** (delete orfani + mock quota smoke + skip live stress) | `backend/scripts/**` | BE-AUD-005/006 *(scratch=P1; elevato a P0 — vedi App. F §F.2)* |
 
 ## 2.3 P1 — OPEN
 
@@ -304,6 +304,8 @@ Audit dettagliato: `audit_remediation_T-P0-01.md`.
 
 ## 3.2 T-P0-02 — Script ClassificationClient rotti
 
+> **Stato:** **DONE** (2026-07-16). Riproduzione sotto = **AS-IS pre-fix**. POST-FIX: script obsoleti eliminati, `test_production_pipeline.py` riparato con mock di quota, `test_live_rate_limiter_throttling` skippato. Vedi §4.5, `audit_remediation_T-P0-02.md`.
+
 ### Riproduzione immediata (senza Gemini)
 
 ```powershell
@@ -320,8 +322,9 @@ Select-String -Path backend/scripts/**/*.py -Pattern "ClassificationClient\(\)|_
 
 **Atteso oggi:** match in `test_production_pipeline.py`, `diagnostics/test_rate_limiter.py`, `diagnostics/test_500.py`.
 
-### Dipendenza a cascata
-`app/tests/test_integration_live.py` (marker `live`) importa `stress_test_rate_limiter` dallo script → live rate-limiter inutilizzabile.
+### Dipendenza a cascata (storico pre-fix)
+`app/tests/test_integration_live.py` importava `stress_test_rate_limiter` dallo script → `AttributeError` su `_wait_for_rate_limit`.  
+**POST-FIX:** stress rimosso; `test_live_rate_limiter_throttling` → `pytest.skip` (throttling = `test_quota_concurrency`).
 
 ---
 
@@ -578,6 +581,9 @@ Salvare `last_error = 'vault_ok mark_read_pending: ...'` e estendere la SELECT d
 
 ## 4.5 T-P0-02 — Riparare / deprecare script
 
+> **Stato:** **DONE** (2026-07-16).
+> Risoluzione: implementata l'opzione ibrida con rimozione degli script obsoleti `test_500.py` e `test_rate_limiter.py` per non interferire con Script I, riparazione di `test_production_pipeline.py` con l'iniezione del mock di quota, e skip per `test_live_rate_limiter_throttling` nei live test.
+
 ### Opzione A (riparare)
 Iniettare pool:
 
@@ -593,9 +599,9 @@ await classification.quota.release(rid)
 Se gli script non servono più: spostarli sotto `scripts/diagnostics/_obsolete/` e far fallire i live test con skip chiaro, oppure allinearli ai helper di `test_integration_live.py`.
 
 ### Criteri
-- [ ] Nessun `ClassificationClient()` senza argomenti
-- [ ] Nessun `_wait_for_rate_limit`
-- [ ] `Select-String` (FASE 5 Script 9) pulito
+- [x] Nessun `ClassificationClient()` senza argomenti
+- [x] Nessun `_wait_for_rate_limit`
+- [x] `Select-String` (FASE 5 Script 9) pulito
 
 ---
 
@@ -941,6 +947,7 @@ Usa questa checklist a ogni sessione di remediation.
 | 2026-07-15 | T-P1-03 | Antigravity + Cursor verify | No (su richiesta utente) | Migrazione 008 + backfill; `outbox.py` retry completed unmarked; `test_outbox_mark_read_retry.py` 2/2; pytest not live 113/113; DB/worker sync OK. Docs drift (conteggi/handoff) allineati post PASS_WITH_GAPS. Next: T-P1-01. |
 | 2026-07-15 | T-P1-01 | Antigravity + Cursor verify | No (su richiesta utente) | `quote_plus` in `config.py`; Compose backend/worker → `POSTGRES_HOST` (no `DATABASE_URL` grezzo); `.env.example` + Miniflux note; `test_database_url.py` 1/1; pytest not live 114/114; Script F OK; container printenv/health OK. Next: T-P1-02. |
 | 2026-07-15 | T-P1-02 | Antigravity + Cursor verify | No (su richiesta utente) | `pg_advisory_lock(ns, hash)` per-URL in `process_single_entry`; `test_worker_concurrency.py` 1/1; pytest not live 115/115; ruff OK. Docker rebuild **GAP** (daemon spento). Next: T-P0-02. |
+| 2026-07-16 | T-P0-02 | Multi-agente + Cursor verify | No (su richiesta utente) | Ibrido+(b1): delete `test_500.py`/`test_rate_limiter.py`; smoke `ClassificationClient(quota=mock)`; stress rimosso; live throttling SKIPPED; Script I 0 match; pytest not live 115/115. Next: T-P1-04. |
 | | … | | | |
 
 ---
@@ -1062,11 +1069,11 @@ SoT: audit_problemi_documentazione.md v2.2 + APPENDICE F.
 Stato ticket operativo: audit_problemi_documentazione_risoluzione.md §3.
 Preferisci .agents/AGENTS.md + radar/.ecc/rules/*.md (T-DOC-01 CLOSED).
 Vincoli: sidebar freeze; main.py API-only; asyncpg; window.L; no commit senza richiesta.
-Ticket OPEN in ordine FASE 4 (T-P0-01, T-P1-03, T-P1-01, T-P1-02 DONE; prossimo T-P0-02 → T-P1-04 → …).
+Ticket OPEN in ordine FASE 4 (T-P0-01..T-P0-02 DONE; prossimo T-P1-04 → T-P1-05 → P2).
 Un ticket per turno: riproduci → fix → gate FASE 5 → marca DONE in risoluzione §3.
-Priorità elevate T-P0-02 / T-P1-05 sono intenzionali (App. F §F.2).
+Priorità elevate storiche: T-P0-02 chiuso; T-P1-05 resta P1 (App. F §F.2).
 ```
 
 ---
 
-**Esito check definitivo:** il manuale è **coerente** con `scratch/*_audit.md` e `scratch/*_rules.md`. I dubbi di v2.0 sono **chiusi**. Docs: **T-DOC-01 CLOSED** (FASE 0). Snapshot FASE 0: 15 OPEN; **post T-P0-01+T-P1-03+T-P1-01+T-P1-02: 11 ticket codice OPEN** (SoT = risoluzione §3).
+**Esito check definitivo:** il manuale è **coerente** con `scratch/*_audit.md` e `scratch/*_rules.md`. I dubbi di v2.0 sono **chiusi**. Docs: **T-DOC-01 CLOSED** (FASE 0). Snapshot FASE 0: 15 OPEN; **post T-P0-02: 10 ticket codice OPEN** (P0=0, P1=2, P2=8; SoT = risoluzione §3).
