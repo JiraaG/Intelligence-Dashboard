@@ -2,6 +2,7 @@
 
 > **Scopo:** consolidamento di requisiti **enforceable** da governance (AGENTS, `.ecc/rules/docker.md`, geo-data-architect, skill docker-ops / geojson-assets).  
 > **Non è un audit del codice** — solo inventario regole.  
+> **STORICO:** riferimenti «migrazioni 001–007» = snapshot checklist; tree attuale include `008_outbox_miniflux_marked_at.sql`.  
 > **Delta skill ECC vs `.agents`:** `radar/.ecc/skills/radar-docker-ops.md` e `radar/.ecc/skills/radar-geojson-assets.md` sono **identici** alle skill `.agents` (nessun delta).
 
 ---
@@ -231,7 +232,7 @@
 
 1. `.agents/AGENTS.md` (sezioni stack, §4 Docker, vault, CORS, logging non-root)
 2. `radar/.ecc/rules/docker.md` (SoT containerizzazione)
-3. `radar/.ecc/agents/geo-data-architect.md` (schema, indici, migrazioni 001–007)
+3. `radar/.ecc/agents/geo-data-architect.md` (schema, indici, migrazioni 001–008)
 4. `.agents/skills/radar-docker-ops/SKILL.md`
 5. `.agents/skills/radar-geojson-assets/SKILL.md`
 6. Skim: `radar/.ecc/skills/radar-docker-ops.md` + `radar/.ecc/skills/radar-geojson-assets.md` → **nessun delta**

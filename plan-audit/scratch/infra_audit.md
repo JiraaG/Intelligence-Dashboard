@@ -1,8 +1,9 @@
 # Audit Infra/DB — Radar Informativo Globale
 
 **Data:** 2026-07-15  
+**STORICO:** scope migrazioni «001–007» = snapshot FASE 0; su disco esiste anche `008_outbox_miniflux_marked_at.sql` (post T-P1-03). Non usare come SoT migrazioni senza `ls backend/migrations`.  
 **Checklist:** `scratch/infra_rules.md` (83 item)  
-**Scope:** Compose (+ override), Dockerfile backend/frontend, `nginx.conf`, migrazioni `001`–`007`, `.dockerignore`, GeoJSON verify, `config.py`, logging, CI/runbook/ops correlati.  
+**Scope:** Compose (+ override), Dockerfile backend/frontend, `nginx.conf`, migrazioni `001`–`007` *(+008 post-audit)*, `.dockerignore`, GeoJSON verify, `config.py`, logging, CI/runbook/ops correlati.  
 **Metodo:** walk checklist → pass/fail con evidenza; solo FAIL in sezione Findings.
 
 ---

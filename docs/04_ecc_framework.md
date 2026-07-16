@@ -77,7 +77,7 @@ Prerequisito host per post-hook Python: `ruff` sul `PATH`.
 - Sidebar freeze: `radar-sidebar/**` + `p-carousel`
 - Ingest solo `worker.py`; API in `main.py`
 - Reti `radar-edge` / `radar-data`; health live vs ready
-- Cluster: radius **40**, `spiderfyOnMaxZoom: false`; nation hub disco + fan ≤24 adattivo
+- Cluster: radius **40**, `spiderfyOnMaxZoom: false`; nation hub disco + fan tutte le icone (no hard cap 24; size/distanza adattivi)
 - Pydantic CSV `str`; FE `string[]` solo post-API
 - `MOCK_MODE` esplicito; no fallback silenzioso
 - Docker: no tag `latest`; FE `npm ci --legacy-peer-deps`

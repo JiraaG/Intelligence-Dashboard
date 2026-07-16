@@ -15,8 +15,8 @@ in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categ
 ### Vincoli post–branch restore (2026-07-15)
 
 - **Phase 0–5 DONE**; Phase **6 DONE / GATE VERDE**. Vedi `Implementation_Plan.md` / `Implementation_Plan_Execution.md`.
-- **Presenti (Phase 1–5):** migrazioni `001`–`007`, outbox, ledger quote, `radar-worker`, reti `radar-edge`/`radar-data`, `/health/live`+`/ready`, CSP Nginx, `ops/` backup, Gemini `build_gemini_response_schema()`, FE `MOCK_MODE` / DestroyRef / XSS-safe markers / read-unread senza rebuild cluster.
-- **Phase 5 API/FE:** `GET /api/map-summary` (`country×category`); `GET /api/articles` → `{items,next_cursor,total}` (keyset `id`, limit≤100, LATERAL); `backend/app/api/articles_query.py`; migrazione `007`. FE: giorno da summary + **pin nazione**; nazione = tutti gli articoli + hub disco compatto + spiderfy categoria attiva (tutte le icone, size/distanza adattivi; hub stabile al cambio categoria; restore hub se spiderfy fallisce). **Vietato** `article-list`. Sidebar freeze resta.
+- **Presenti (Phase 1–5 + follow-up):** migrazioni `001`–`008` (incluso `008_outbox_miniflux_marked_at`), outbox, ledger quote, `radar-worker`, reti `radar-edge`/`radar-data`, `/health/live`+`/ready`, CSP Nginx, `ops/` backup, Gemini `build_gemini_response_schema()`, FE `MOCK_MODE` / DestroyRef / XSS-safe markers / read-unread senza rebuild cluster.
+- **Phase 5 API/FE:** `GET /api/map-summary` (`country×category`); `GET /api/articles` → `{items,next_cursor,total}` (keyset `id`, limit≤100, LATERAL); `backend/app/api/articles_query.py`; migrazioni `007`+. FE: giorno da summary + **pin nazione**; nazione = tutti gli articoli + hub disco compatto + spiderfy categoria attiva (tutte le icone, size/distanza adattivi; hub stabile al cambio categoria; restore hub se spiderfy fallisce). **Vietato** `article-list`. Sidebar freeze resta.
 - Pipeline ingest in `backend/app/worker.py`; `main.py` è API-only. Compose: 5 servizi su edge+data.
 - **Sidebar freeze:** non modificare `frontend/src/app/components/radar-sidebar/**`; tenere `p-carousel` + altezza via `article-card-{id}`; vietato `app-article-list`.
 - Bug **read/unread** (`.marker-read`): risolto in Phase 4 via `state.service.ts` + `radar-map.component.ts`.
@@ -29,7 +29,7 @@ in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categ
 | Layer       | Tecnologia                              | Note                                       |
 |-------------|------------------------------------------|---------------------------------------------|
 | Backend     | Python 3.12-slim (Docker) / 3.14 (locale) | Demone asincrono, polling ogni 15 minuti   |
-| LLM         | google-genai SDK + Gemma 4 31B (gemma-4-31b-it) | Structured Output via schema Pydantic       |
+| LLM         | google-genai SDK; default `GEMINI_MODEL=gemma-4-31b-it` | Structured Output via schema Pydantic. Ops: se Gemma 31b risponde HTTP 500 → fallback `.env` es. `gemini-3.1-flash-lite` (non hardcodare segreti). |
 | Database    | PostgreSQL 15                            | Tabelle articles, companies, tags + sentiment, relevance + indici |
 | Feed Source | Miniflux REST API                       | Articoli non letti, deduplica per URL       |
 | Frontend    | Angular 21 (Standalone Components)      | Signals, lazy loading                       |
@@ -59,7 +59,8 @@ radar/
 │   │   ├── 003_quota_ledger.sql
 │   │   ├── 004_worker_heartbeat.sql
 │   │   ├── 005–006 (ledger/legacy alignment)
-│   │   └── 007_articles_query_indexes.sql
+│   │   ├── 007_articles_query_indexes.sql
+│   │   └── 008_outbox_miniflux_marked_at.sql
 │   └── app/
 │       ├── __init__.py
 │       ├── main.py                # FastAPI API-only (pool + migrations + REST)

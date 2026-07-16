@@ -1,5 +1,7 @@
 # Checklist regole Frontend — Radar Informativo Globale
 
+> **STORICO (checklist 2026-07-15):** FE-CL-04 «cap 24» / `SPIDERFY_MAX_ICONS` è **stale** rispetto al runtime 2026-07-16 (tutte le icone; no hard cap). Aggiornare solo dopo riverifica SoT: `radar/.ecc/rules/frontend.md`. Non riscrivere l’intero audit grezzo.
+
 > **Scopo:** consolidamento di ogni requisito FE enforceabile dalle governance docs/skills.  
 > **Non è un audit del codice** — solo regole da verificare.  
 > **Linguaggio:** italiano (termini tecnici in English dove standard).  
@@ -163,7 +165,7 @@
 | FE-CL-01 | `.agents/AGENTS.md` §5.2; `frontend.md` Regola 7 | `maxClusterRadius: 40` — non legacy 200/100. | `radar-map.component.ts` | Valore esatto 40. |
 | FE-CL-02 | stessi | `spiderfyOnMaxZoom: false` — espansione custom, non spiderfy automatico. | stesso | `false`; non `true`. |
 | FE-CL-03 | `frontend.md` Regola 7; `angular-map-expert.md` | Non reintrodurre `disableClusteringAtZoom: 18` come requisito ECC. | stesso | Assente come “requisito” / non allineare a legacy. |
-| FE-CL-04 | `AGENTS.md` §5.3; `frontend.md` Regola 7 | Nation open: hub disco `radar-spider-root` + fan emoji categoria attiva; max **24** icone (`SPIDERFY_MAX_ICONS = 24`); size/distanza adattivi. | `radar-map.component.ts` | Cap 24; helpers distanza/size per count. |
+| FE-CL-04 | `AGENTS.md` §5.3; `frontend.md` Regola 7 | Nation open: hub disco `radar-spider-root` + fan emoji categoria attiva; **storico:** max 24 / `SPIDERFY_MAX_ICONS` — **runtime attuale:** tutte le icone (no hard cap); size/distanza adattivi; restore hub on failure. | `radar-map.component.ts` | Nessun `SPIDERFY_MAX_ICONS`; helpers distanza/size per count. |
 | FE-CL-05 | `frontend.md` Regola 7 | Spiderfy: **solo** categoria del pallino / pill / articolo attivo carosello — non tutte; scroll stessa categoria → solo highlight (`lastSpiderfyKey`). | stesso | Un fan per categoria attiva; no multi-cat spiderfy. |
 | FE-CL-06 | `frontend.md` Regola 7; `AGENTS.md` §5.3 | Hub root lifecycle: su cambio categoria `collapseAllGraphs(false, false)` setta `restoreDetailHubOnUnspiderfy = false`; handler `unspiderfied` **non** deve `clearRootMarkers`/ripristinare hub in quel caso. | stesso | Root non sparisce al cambio categoria; solo chiusura reale (`restoreHub: true`) ripristina. |
 | FE-CL-07 | `frontend.md` Regola 7 | Close/cambio paese: clear detail markers; tornano i pin summary. | stesso | Detail layer cleared; day pins restored. |

@@ -21,6 +21,7 @@ Carica questa skill ogni volta che:
 - Ricevi errori del tipo `ValidationError` da Pydantic
 - Gemini restituisce un JSON incompleto o con campi non presenti nello schema
 - Devi ottimizzare il System Prompt per ridurre le allucinazioni geografiche
+- Cambi `GEMINI_MODEL` / fallback ops (Gemma 500 → altro modello)
 
 ---
 
@@ -202,6 +203,9 @@ async def extract_geopolitical_data(
     )
 
     try:
+        # Produzione: usare GEMINI_MODEL da config (default gemma-4-31b-it).
+        # Ops: se Gemma 31b risponde HTTP 500 → .env GEMINI_MODEL=gemini-3.1-flash-lite
+        # (restart radar-worker; non hardcodare API key).
         response = await asyncio.to_thread(
             client.models.generate_content,
             model="gemma-4-31b-it",

@@ -316,7 +316,7 @@ if (targetGroup) {
 - Un cluster group **per categoria** (fino a 10) — allineato a `PRIMARY_CATEGORIES`
 - Spiderfy custom / graph; `spiderfyOnMaxZoom: false` (mai `true`)
 - `maxClusterRadius: 40` → match `radar-map.component.ts`
-- Day-view: pin nazione da map-summary; nation open: hub disco `radar-spider-root` + fan emoji (≤24, size/distanza adattivi)
+- Day-view: pin nazione da map-summary; nation open: hub disco `radar-spider-root` + fan emoji (tutte le icone della categoria; size/distanza adattivi; restore hub se spiderfy fallisce)
 - Hub root: non cancellare su `unspiderfied` se `restoreDetailHubOnUnspiderfy === false` (cambio categoria)
 - Icone marker XSS-safe: DOM + `textContent` (Phase 4), non HTML string
 - Non reintrodurre `disableClusteringAtZoom: 18` come requisito ECC

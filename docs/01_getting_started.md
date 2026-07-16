@@ -33,9 +33,9 @@ Categorie principali (dettaglio in `.env.example`):
 |------|--------|
 | Runtime | `RADAR_ENV`, `RADAR_TIME_ZONE` |
 | CORS | `CORS_ALLOW_ORIGINS` (vuoto in prod dietro Nginx; es. `http://localhost:4200` per `ng serve`) |
-| LLM | `GEMINI_MODEL`, `LLM_RPM` / `LLM_TPM` / `LLM_RPD`, `GEMINI_REQUEST_TIMEOUT` |
+| LLM | `GEMINI_MODEL` (default `gemma-4-31b-it`; ops: `gemini-3.1-flash-lite` se Gemma risponde 500), `LLM_RPM` / `LLM_TPM` / `LLM_RPD`, `GEMINI_REQUEST_TIMEOUT` |
 | Worker | coda/concorrenza, `WORKER_POLL_INTERVAL_SECONDS`, heartbeat |
-| Miniflux | URL interno, API key, limit, timeout/byte caps |
+| Miniflux | URL interno, API key, `MINIFLUX_LIMIT` (tipico **50**; `100` può superare `MAX_MINIFLUX_RESPONSE_BYTES=5MB`), timeout/byte caps |
 | Postgres | user/password/db, `DATABASE_URL` (Compose la costruisce in container) |
 
 ---
@@ -116,8 +116,10 @@ docker compose exec radar-db psql -U radar_user -d radar_db -c "\dt"
 
 1. Pubblica Miniflux (lan/hardened) e apri l’UI admin.
 2. **Settings → API Keys → Create** → copia in `.env` come `MINIFLUX_API_KEY`.
-3. `docker compose up -d` (rispetta `depends_on` healthy) per rileggere l’env. Evitare `docker compose restart` su tutti i servizi insieme: Postgres può essere ancora in recovery mentre backend/worker aprono il pool (`CannotConnectNowError`).
+3. `docker compose up -d` (rispetta `depends_on` healthy) per rileggere l’env. Evitare `docker compose restart` su tutti i servizi insieme: Postgres può essere ancora in recovery mentre backend/worker aprono il pool (`CannotConnectNowError`). Preferire `up -d` o restart ordinato (`radar-db` → wait healthy → resto); `init_pool` ritenta errori transienti di startup.
 4. Aggiungi feed (catalogo: [RSS.txt](../RSS.txt)).
+
+Con unread Miniflux alti, tenere `MINIFLUX_LIMIT` ≤ ~50 sotto il cap `MAX_MINIFLUX_RESPONSE_BYTES` (5MB). Se Gemma 31b restituisce HTTP 500 in classificazione, impostare in `.env` `GEMINI_MODEL=gemini-3.1-flash-lite` (o altro modello supportato) e riavviare solo `radar-worker` — **non** commitare `.env`.
 
 **Ciclo reale (worker, non API):**
 
@@ -141,5 +143,7 @@ Riavviare solo `radar-backend` **non** riavvia l’ingest: serve `radar-worker`.
 | 429 Gemini | Ledger + Retry-After; verifica quote in AI Studio |
 | Mappa senza confini | Manca o SHA errato su `countries.geo.json` → `npm run verify-geojson:fetch` |
 | Nessun articolo nuovo | `MINIFLUX_API_KEY`, log `radar-worker`, `LLM_RPD` |
+| Payload Miniflux troppo grande / log 5MB | Abbassare `MINIFLUX_LIMIT` (tipico 50); non alzare cieco il cap |
+| Classificazione → fallback summary / HTTP 500 modello | Verificare `GEMINI_MODEL` in `.env`; ops tipico: `gemini-3.1-flash-lite` se `gemma-4-31b-it` fallisce |
 
 Backup/restore: [radar/ops/README.md](../radar/ops/README.md) (`radar/ops/backup-postgres.sh`, `restore-postgres.sh`). Persistenza: `radar/data/postgres/`, `radar/vault/`.

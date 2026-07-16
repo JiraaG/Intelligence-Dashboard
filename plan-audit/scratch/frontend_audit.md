@@ -1,5 +1,7 @@
 # Frontend Code Audit — Radar Informativo Globale
 
+> **STORICO (2026-07-15):** snapshot pre–fix map. Claim «cap 24» / `SPIDERFY_MAX_ICONS` **non è più runtime** (2026-07-16): spiderfy mostra tutte le icone categoria; size/distanza adattivi; restore hub on failure. SoT attuale: `radar/.ecc/rules/frontend.md`, `Implementation_Plan.md` Map UX. Non usare questo file come checklist operativa senza riverifica.
+
 > **Scope:** `radar/frontend/src/app/` (+ `angular.json` / `package.json` / `Dockerfile` solo dove richiesto dalla checklist)  
 > **Checklist:** `scratch/frontend_rules.md` (88 items, 16 domini)  
 > **Data:** 2026-07-15  
@@ -10,7 +12,7 @@
 
 ## Executive summary
 
-Il frontend è **largamente conforme** alle governance rules: sidebar freeze rispettata nello stato attuale (`p-carousel`, no `article-list`), Leaflet via `window.L`, icone XSS-safe con `textContent`, day-view su `getMapSummary`, nation open con concatenazione cursor fino a `next_cursor == null`, overlay `100vw` + `invalidateSize`, bounds US/RU letterali, cluster `maxClusterRadius: 40` / `spiderfyOnMaxZoom: false`, spiderfy single-category con cap 24.
+Il frontend è **largamente conforme** alle governance rules: sidebar freeze rispettata nello stato attuale (`p-carousel`, no `article-list`), Leaflet via `window.L`, icone XSS-safe con `textContent`, day-view su `getMapSummary`, nation open con concatenazione cursor fino a `next_cursor == null`, overlay `100vw` + `invalidateSize`, bounds US/RU letterali, cluster `maxClusterRadius: 40` / `spiderfyOnMaxZoom: false`, spiderfy single-category ~~con cap 24~~ *(storico; runtime attuale = no hard cap)*.
 
 L’unico scostamento **P1** è la superficie errore nation-fetch: fallimenti di `loadCountryArticles` non popolano `StateService.error` / banner toolbar. Il resto dei gap è igiene o difesa in profondità (**P2**).
 

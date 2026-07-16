@@ -49,7 +49,7 @@ Hatching SVG: owner in `radar-map.component.ts` (`getOrCreateComboPattern`) — 
 1. `GET /api/articles?date&country` con envelope `{items,next_cursor,total}`; FE concatena pagine (`limit` ≤ 100) finché `next_cursor` è null
 2. Carosello = tutte le notizie della nazione (sort categoria; pill `findIndex` invariato in sidebar)
 3. Marker: **hub compatto** (`radar-spider-root`, stesso stile del root spiderfy — non il pin alto day-view) + spiderfy a **icone emoji** della sola categoria attiva
-4. Fan spiderfy: max **24** icone (oltre → park; carosello le raggiunge); dimensione icone e `spiderfyDistanceMultiplier` **adattivi** al conteggio; root mostra `visibili/totale` se capped
+4. Fan spiderfy: **tutte** le icone della categoria (niente hard cap 24 / park extras); dimensione icone e `spiderfyDistanceMultiplier` **adattivi** al conteggio; se spiderfy fallisce → restore hub nazione
 5. Spiderfy allineato alla **categoria attiva** (pill / slide carosello). Stessa categoria allo scroll → solo highlight (`lastSpiderfyKey`). Cambio categoria: non cancellare il root su `unspiderfied` asincrono (`restoreDetailHubOnUnspiderfy === false` → no-op)
 6. Focus camera: pin summary → `preserveZoom` + `armSkipCountryFit`; poligono/toolbar → `fitBounds` (`maxZoom: 4`); ri-click stessa nazione → `refocusCountry`
 

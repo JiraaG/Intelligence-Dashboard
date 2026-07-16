@@ -249,7 +249,7 @@ Il componente `p-sidebar` di PrimeNG può essere usato come wrapper UI.
 
 **Day open (Phase 5):** la mappa si dipinge da `GET /api/map-summary` (righe `country_code × primary_category` + count/read + lat/lon finite). Niente `Article[]` globale del giorno. Hatching da categorie aggregate per paese (zoom &lt; 5). A zoom ≥ 5: **un pin nazione** (conteggio + anello conic categorie) — non pallini numerati per-categoria. Click pin → fetch nazione + sidebar (`preserveZoom: true`, niente dezoom). Click poligono/toolbar → nation open + `fitBounds` (`maxZoom: 4`).
 
-**Nation open:** `GET /api/articles?date&country` (envelope `{items,next_cursor,total}`, page ≤100; FE concatena tutte le pagine) → carosello = **tutte** le notizie della nazione (sort categoria + pill `findIndex` invariati in sidebar). Sulla mappa: marker articolo **solo** per il paese aperto + **hub disco compatto** (`radar-spider-root`, stesso stile del root spiderfy). Spiderfy: sola categoria del pallino / pill / articolo attivo carosello — **non** tutte; allo scroll stessa categoria solo highlight (`lastSpiderfyKey`). Fan: max **24** icone (park extras); size emoji + `spiderfyDistanceMultiplier` adattivi al conteggio. Close/cambio paese: clear detail markers; tornano i pin summary.
+**Nation open:** `GET /api/articles?date&country` (envelope `{items,next_cursor,total}`, page ≤100; FE concatena tutte le pagine) → carosello = **tutte** le notizie della nazione (sort categoria + pill `findIndex` invariati in sidebar). Sulla mappa: marker articolo **solo** per il paese aperto + **hub disco compatto** (`radar-spider-root`, stesso stile del root spiderfy). Spiderfy: sola categoria del pallino / pill / articolo attivo carosello — **non** tutte; allo scroll stessa categoria solo highlight (`lastSpiderfyKey`). Fan: **tutte** le icone della categoria (niente hard cap 24 / park extras); size emoji + `spiderfyDistanceMultiplier` adattivi al conteggio; restore hub se spiderfy fallisce. Close/cambio paese: clear detail markers; tornano i pin summary.
 
 **InvalidateSize / spiderfy race:** dopo open nazione, `invalidateSize` **prima** di `focusAndSpiderfyCategory`; `invalidateSize` usa `pan: false` e `setView` solo se la camera è driftata (setView mid-spiderfy svuota il pane MarkerCluster).
 
@@ -275,7 +275,7 @@ Non reintrodurre raggio 200, `spiderfyOnMaxZoom: true`, o `disableClusteringAtZo
 **Regole di calibrazione:**
 - `maxClusterRadius`: **40px** (allineato a `radar-map.component.ts` post-restore)
 - `spiderfyOnMaxZoom`: **false** (espansione custom, non spiderfy automatico)
-- Spiderfy fan: `SPIDERFY_MAX_ICONS = 24`; distanza/size adattivi (`spiderfyDistanceForCount` / `spiderfyIconSizeForCount`)
+- Spiderfy fan: **tutte** le icone della categoria attiva (niente hard cap 24 / niente `SPIDERFY_MAX_ICONS`); distanza/size adattivi (`spiderfyDistanceForCount` / `spiderfyIconSizeForCount`); restore hub nazione se spiderfy fallisce
 - **Focus:** pin summary = preserveZoom; poligono/toolbar = `fitBounds` maxZoom 4; US/RU bounds hardcoded
 - **Sidebar close**: `App.closeSidebar()` → `mapComponent.collapseAllGraphs()` (senza editare file sidebar)
 - **Read/unread**: fingerprint + `syncMarkerReadState` — no `clearLayers` su solo `is_read`
