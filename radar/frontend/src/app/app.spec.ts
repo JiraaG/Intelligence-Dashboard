@@ -182,6 +182,7 @@ class MapHostComponent {
 function createStateStub(initial: Article[] = FIXTURE_ARTICLES, error: unknown = null) {
   const detailSignal = signal<Article[]>(structuredClone(initial));
   const errorSignal = signal<unknown>(error);
+  const detailErrorSignal = signal<unknown>(null);
   return {
     filters: signal<ArticleFilters>({
       date: FIXTURE_DATE,
@@ -190,20 +191,30 @@ function createStateStub(initial: Article[] = FIXTURE_ARTICLES, error: unknown =
     }),
     detailArticles: detailSignal,
     detailLoading: signal(false),
+    detailError: detailErrorSignal,
     articles: computed(() => detailSignal()),
     countries: computed(() => [] as CountrySummary[]),
     filteredSummary: computed(() => [] as import('./models/map-summary.model').MapSummaryRow[]),
     articleCount: computed(() => detailSignal().length),
     readCount: computed(() => detailSignal().filter((a) => a.is_read).length),
     isLoading: computed(() => false),
-    error: computed(() => errorSignal()),
-    clearDetailArticles(): void {
+    error: computed(() => errorSignal() ?? detailErrorSignal()),
+    clearDetailArticles(options?: { clearError?: boolean }): void {
       detailSignal.set([]);
+      if (options?.clearError !== false) {
+        detailErrorSignal.set(null);
+      }
     },
     async loadCountryArticles(countryCode: string): Promise<Article[]> {
-      const arts = detailSignal().filter((a) => a.country_code === countryCode);
-      detailSignal.set(arts);
-      return arts;
+      detailErrorSignal.set(null);
+      try {
+        const arts = detailSignal().filter((a) => a.country_code === countryCode);
+        detailSignal.set(arts);
+        return arts;
+      } catch (err) {
+        detailErrorSignal.set(err);
+        throw err;
+      }
     },
     toggleReadStatus(articleId: number, isRead: boolean): void {
       detailSignal.update((arts) => {
@@ -477,6 +488,37 @@ describe('App / map behavior', () => {
 
       expect(fixture.componentInstance.state.error()).toBeTruthy();
       expect(fixture.componentInstance.state.articles()).toEqual([]);
+    });
+
+    it('sets state.error when loadCountryArticles fails, keeping sidebar closed and retaining error', async () => {
+      const fixture = TestBed.createComponent(App);
+      const app = fixture.componentInstance;
+      fixture.detectChanges();
+
+      const errorInstance = new Error('Network failure');
+      vi.spyOn(app.state, 'loadCountryArticles').mockImplementation(async () => {
+        (app.state as any).detailError.set(errorInstance);
+        throw errorInstance;
+      });
+
+      await app.onCountryClick('UA');
+
+      expect(app.isSidebarOpen()).toBe(false);
+      expect(app.state.error()).toBe(errorInstance);
+    });
+
+    it('clears detailError when closeSidebar is called intentionally', async () => {
+      const fixture = TestBed.createComponent(App);
+      const app = fixture.componentInstance;
+      fixture.detectChanges();
+
+      const errorInstance = new Error('Network failure');
+      (app.state as any).detailError.set(errorInstance);
+      expect(app.state.error()).toBe(errorInstance);
+
+      app.closeSidebar();
+
+      expect(app.state.error()).toBe(null);
     });
   });
 });

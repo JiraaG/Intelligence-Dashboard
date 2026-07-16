@@ -2,12 +2,7 @@ import { Injectable, inject, signal, computed } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { firstValueFrom } from 'rxjs';
 import { ArticleService } from './article.service';
-import {
-  Article,
-  ArticleFilters,
-  CountrySummary,
-  PrimaryCategory,
-} from '../models/article.model';
+import { Article, ArticleFilters, CountrySummary, PrimaryCategory } from '../models/article.model';
 import { MapSummaryRow } from '../models/map-summary.model';
 
 @Injectable({ providedIn: 'root' })
@@ -30,8 +25,7 @@ export class StateService {
   readonly mapSummaryResource = rxResource({
     params: () => {
       const f = this.filters();
-      const sentiment =
-        f.sentiment && f.sentiment.length === 1 ? f.sentiment[0] : undefined;
+      const sentiment = f.sentiment && f.sentiment.length === 1 ? f.sentiment[0] : undefined;
       return { date: f.date, sentiment };
     },
     stream: (p) =>
@@ -50,10 +44,7 @@ export class StateService {
   });
 
   readonly countries = computed((): CountrySummary[] => {
-    const grouped = new Map<
-      string,
-      { cats: Set<PrimaryCategory>; count: number; read: number }
-    >();
+    const grouped = new Map<string, { cats: Set<PrimaryCategory>; count: number; read: number }>();
 
     for (const row of this.filteredSummary()) {
       const entry = grouped.get(row.country_code) ?? {
@@ -93,12 +84,16 @@ export class StateService {
    */
   readonly articles = computed(() => this.detailArticles());
 
-  readonly isLoading = computed(
-    () => this.mapSummaryResource.isLoading() || this.detailLoading(),
-  );
-  readonly error = computed(() => this.mapSummaryResource.error());
+  readonly isLoading = computed(() => this.mapSummaryResource.isLoading() || this.detailLoading());
+  readonly detailError = signal<unknown>(null);
 
-  clearDetailArticles(): void {
+  readonly error = computed(() => this.mapSummaryResource.error() ?? this.detailError());
+
+  clearDetailArticles(options?: { clearError?: boolean }): void {
+    const clearError = options?.clearError ?? true;
+    if (clearError) {
+      this.detailError.set(null);
+    }
     this.detailArticles.set([]);
     this.detailLoading.set(false);
   }
@@ -110,6 +105,7 @@ export class StateService {
   async loadCountryArticles(countryCode: string): Promise<Article[]> {
     const f = this.filters();
     this.detailLoading.set(true);
+    this.detailError.set(null);
     try {
       const all = await firstValueFrom(
         this.articleService.getAllArticlesForCountry(f.date, countryCode.toUpperCase()),
@@ -120,6 +116,7 @@ export class StateService {
     } catch (err) {
       console.error('[StateService] Impossibile caricare articoli nazione:', err);
       this.detailArticles.set([]);
+      this.detailError.set(err);
       throw err;
     } finally {
       this.detailLoading.set(false);

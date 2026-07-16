@@ -121,7 +121,7 @@ export class App {
       this.scheduleCategorySpiderfy(open.countryCode, displayArticle.primary_category);
     } catch {
       if (gen !== this.nationOpenGeneration) return;
-      this.closeSidebar();
+      this.closeSidebar(false);
     }
   }
 
@@ -144,14 +144,14 @@ export class App {
     await this.onCountryClick({ countryCode });
   }
 
-  closeSidebar(): void {
+  closeSidebar(clearError = true): void {
     this.nationOpenGeneration++;
     this.lastSpiderfyKey = null;
     this.isSidebarOpen.set(false);
     this.selectedArticle.set(null);
     this.clusterArticles.set([]);
     this.focusCountryCode.set(null);
-    this.state.clearDetailArticles();
+    this.state.clearDetailArticles({ clearError });
     this.mapComponent()?.collapseAllGraphs();
     this.scheduleInvalidateSize();
   }
