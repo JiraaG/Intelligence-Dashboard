@@ -11,7 +11,7 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 
 ### Stack Tecnologico Ufficiale
 * **Backend:** Python 3.12-slim (Docker) / 3.14 (locale). Demone asincrono con polling `WORKER_POLL_INTERVAL_SECONDS` (default 900).
-* **LLM:** `google-genai` SDK + DeepSeek via httpx (no package `openai`); default Gemini `GEMINI_MODEL=gemma-4-31b-it`. Lane: `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (limiti per-lane; soft-trim = `LLM_SIMPLE.rpd` se >0). Output strutturato via schema Pydantic. Ops locale: se Gemma 31b dà HTTP 500, impostare in `.env` un fallback (es. `gemini-3.1-flash-lite`) — non hardcodare chiavi.
+* **LLM:** `google-genai` SDK + OpenAI-compat via httpx (`deepseek`/`openai`/`glm`/`grok`; no package `openai`); default Gemini `GEMINI_MODEL=gemma-4-31b-it`. Lane: `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (limiti per-lane; soft-trim = `LLM_SIMPLE.rpd` se >0). Dialect: deepseek=`thinking`; openai/glm/grok=stock. `claude` = stub. Output strutturato via schema Pydantic. Ops locale: se Gemma 31b dà HTTP 500, impostare in `.env` un fallback (es. `gemini-3.1-flash-lite`) — non hardcodare chiavi.
 * **Database:** PostgreSQL 15 (`radar-db`). Accesso tramite driver asincrono `asyncpg` puro.
 * **Feed Source:** Miniflux REST API.
 * **Frontend:** Angular 21 (Standalone Components).

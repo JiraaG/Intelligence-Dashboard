@@ -1,6 +1,6 @@
 # Source of Truth — LLM Multi-Model Fallback
 
-> **Stato:** SoT design A+B + **Fase C implementata** + **lane env v2.2** + **heuristic complexity v2.2** (2026-07-16).  
+> **Stato:** SoT design A+B + **Fase C implementata** + **lane env v2.2** + **heuristic complexity v2.2** + **OpenAI-compat dialect / provider aliases** (`openai`|`glm`|`grok`, 2026-07-16).  
 > **Skills:** `llm-json-extraction`, `radar-quota-ledger`.  
 > **Sostituisce come riferimento operativo:** stub in `archive/llm-stubs/`.  
 > **Canvas:** `article-complexity-routing.canvas.tsx` + `complexity-routing-audit.canvas.tsx`.  
@@ -17,7 +17,7 @@
 | Cascata Gemini free ha senso? | **Sì** — ops tipico: Lite bulk; Flash pieni solo se RPD Studio ≥~500 |
 | Paid DeepSeek ha senso? | **Sì** — `deepseek-v4-flash` + `reasoning_effort=high` (~$0.001/art.), non Max |
 | Routing per complessità? | **Sì, a tre fasce** (SIMPLE / BORDERLINE / COMPLEX). Complessità = **rischio estrazione schema** (G/E/X), non lunghezza sola |
-| Provider/model per lane? | **Env** — `LLM_SIMPLE_*` (solo SIMPLE) + `LLM_COMPLEX_*` (**BORDERLINE + COMPLEX** + escalate) |
+| Provider/model per lane? | **Env** — `LLM_SIMPLE_*` (solo SIMPLE) + `LLM_COMPLEX_*` (**BORDERLINE + COMPLEX** + escalate). Adapter: `gemini` \| `deepseek` \| `openai` \| `glm` \| `grok` \| `claude` (stub) |
 | Free o paid come “path primario”? | **Vietato** — SLO mix + quorum famiglie + shadow ≥3g |
 | Cooldown 24h? | **SQL durable** `(provider, model, until_ts, reason)` |
 | Fase C? | **DONE** — vedi remediation; default codice `LLM_ROUTING_MODE=off` |
@@ -41,6 +41,9 @@ GEMINI_MODEL_FALLBACKS=
 # Swap COMPLEX → Google senza codice:
 #   LLM_COMPLEX_PROVIDER=gemini
 #   LLM_COMPLEX_MODEL=gemini-3.5-flash
+# OpenAI / GLM / Grok: PROVIDER=openai|glm|grok + MODEL + API_KEY + BASE_URL
+#   (dialect openai = stock chat/completions, niente thinking DeepSeek)
+# Ricette Profili C/D/E in radar/.env.example
 ```
 
 ---
@@ -235,7 +238,9 @@ else:
 | **BORDERLINE** | **`LLM_COMPLEX_*`** (tipico `effort=high`) — v2.2 | Dopo **1 correction fallita** resta su COMPLEX (già high); escalate legacy se identity diversa |
 | **COMPLEX** | `LLM_COMPLEX_*` → residuale SIMPLE | Se COMPLEX down / no key → SIMPLE; poi fallback article |
 
-Provider ammessi: `gemini` \| `deepseek` \| `openai` \| `claude` (claude stub). DeepSeek riceve `model=` + effort dalla lane (`LLM_*_REASONING_EFFORT`; `none` = thinking disabled).
+Provider ammessi: `gemini` \| `deepseek` \| `openai` \| `glm` \| `grok` \| `claude` (claude stub).
+OpenAI-compat (`deepseek`/`openai`/`glm`/`grok`) via httpx: dialect `deepseek` = thinking payload;
+dialect `openai` = stock chat/completions (niente campi DeepSeek-only). Effort da lane (`LLM_*_REASONING_EFFORT`).
 
 ### 4.5 SLO mix (anti “path primario”)
 
@@ -301,7 +306,20 @@ flowchart TD
 ## 5. Config env (SoT ops)
 
 Limiti e provider sono **per lane** (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`).  
-Legacy `LLM_RPM` / `DEEPSEEK_*` = fill-gap se il campo lane è assente — **non** un tetto globale.
+Legacy `LLM_RPM` / `DEEPSEEK_*` / `OPENAI_API_KEY` / `GLM_*` / `GROK_*` / `XAI_*` = fill-gap se il campo lane è assente — **non** un tetto globale.
+
+### Provider e dialect (OpenAI-compat)
+
+| `PROVIDER` | Adapter | Default `BASE_URL` | Payload dialect |
+|------------|---------|-------------------|-----------------|
+| `gemini` | `google-genai` SDK | — | n/a |
+| `deepseek` | httpx `/chat/completions` | `https://api.deepseek.com` | **deepseek** (`thinking` + `reasoning_effort`) |
+| `openai` | httpx `/chat/completions` | `https://api.openai.com/v1` | **openai** (stock; **niente** `thinking`) |
+| `glm` | httpx `/chat/completions` | `https://open.bigmodel.cn/api/paas/v4` | **openai** |
+| `grok` | httpx `/chat/completions` | `https://api.x.ai/v1` | **openai** |
+| `claude` | stub | `https://api.anthropic.com` | n/a — Messages API non implementata; proxy OpenAI-compat via `PROVIDER=openai` + `BASE_URL` |
+
+Package `openai` / `anthropic` **vietati**. Implementazione: `classification/deepseek.py` (`api_dialect` + `build_chat_completions_payload`).
 
 ### Profilo B — DeepSeek-only (ops tipico / `.env.example` attivo)
 
@@ -348,11 +366,40 @@ LLM_COMPLEX_RPD=0
 LLM_COMPLEX_BUDGET_USD_DAY=5         # soft-cap USD/giorno (esempio)
 ```
 
-Legacy opzionale (solo fill-gap): `GEMINI_*`, `LLM_RPM`/`LLM_TPM`/`LLM_RPD`, `DEEPSEEK_*`.  
+### Profili C / D / E — OpenAI / GLM / Grok (commentati in `.env.example`)
+
+Swap **solo env** (stesso pattern lane). Dialect sempre `openai` (no campi DeepSeek-only).
+
+```text
+# C — OpenAI
+LLM_SIMPLE_PROVIDER=openai
+LLM_SIMPLE_MODEL=gpt-4.1-mini
+LLM_SIMPLE_BASE_URL=https://api.openai.com/v1
+LLM_SIMPLE_REASONING_EFFORT=none
+LLM_COMPLEX_PROVIDER=openai
+LLM_COMPLEX_MODEL=gpt-4.1
+LLM_COMPLEX_REASONING_EFFORT=high
+# key: LLM_*_API_KEY o legacy OPENAI_API_KEY; budget via *_BUDGET_USD_DAY
+
+# D — GLM (Zhipu)
+LLM_SIMPLE_PROVIDER=glm
+LLM_SIMPLE_MODEL=glm-4-flash
+LLM_SIMPLE_BASE_URL=https://open.bigmodel.cn/api/paas/v4
+# key: LLM_*_API_KEY o GLM_API_KEY / ZHIPU_API_KEY
+
+# E — Grok (xAI)
+LLM_SIMPLE_PROVIDER=grok
+LLM_SIMPLE_MODEL=grok-3-mini
+LLM_SIMPLE_BASE_URL=https://api.x.ai/v1
+# key: LLM_*_API_KEY o GROK_API_KEY / XAI_API_KEY
+```
+
+Legacy opzionale (solo fill-gap): `GEMINI_*`, `LLM_RPM`/`LLM_TPM`/`LLM_RPD`, `DEEPSEEK_*`, `OPENAI_API_KEY`, `GLM_API_KEY`/`ZHIPU_API_KEY`, `GROK_API_KEY`/`XAI_API_KEY`.  
 `off` / `shadow` = solo catena SIMPLE.  
 Default codice senza env: `LLM_ROUTING_MODE=off`, `LLM_ROUTING_SHADOW=true` (boot sicuro).  
 Periodicità ciclo: `WORKER_POLL_INTERVAL_SECONDS` (default **900**).  
-Env `T_LOW`/`T_HIGH` **non** richiesti (lane = heuristic famiglie v2.2).
+Env `T_LOW`/`T_HIGH` **non** richiesti (lane = heuristic famiglie v2.2).  
+Ops: edit `.env` → `docker compose up -d --build radar-worker` (o restart) → log `route lane=` / `openai-compat/<dialect> ok`.
 
 ---
 
@@ -387,15 +434,17 @@ Env `T_LOW`/`T_HIGH` **non** richiesti (lane = heuristic famiglie v2.2).
 ### 8.1 File toccabili
 
 - `radar/backend/app/core/config.py`
+- `radar/backend/app/core/llm_lanes.py` — provider set + dialect + defaults BASE_URL
 - `radar/backend/app/classification/complexity.py` (**nuovo**)
 - `radar/backend/app/classification/client.py` — router + dual provider
+- `radar/backend/app/classification/deepseek.py` — OpenAI-compat httpx + `api_dialect`
 - `radar/backend/app/classification/quota.py` — solo se budget/per-model
 - `radar/backend/migrations/00N_llm_model_cooldown.sql`
-- `radar/backend/app/tests/test_*.py`
+- `radar/backend/app/tests/test_*.py` (incluso `test_openai_compat_dialect.py`)
 - `radar/.env.example`, `radar/docs/runbook.md`
 - Report post-ship: `plan-audit/remediation/audit_remediation_llm_multi_model_fallback.md`
 
-**Vietato:** sidebar; rimuovere QuotaLedger; hardcodare key; cambiare prompt/schema senza necessità; DeepSeek Max default; commit `.env`.
+**Vietato:** sidebar; rimuovere QuotaLedger; hardcodare key; cambiare prompt/schema senza necessità; DeepSeek Max default; commit `.env`; package `openai`/`anthropic`.
 
 ### 8.2 Test minimi
 
@@ -410,7 +459,9 @@ Env `T_LOW`/`T_HIGH` **non** richiesti (lane = heuristic famiglie v2.2).
 - `complexity` + no key → off+WARN o fail se strict  
 - 402 → cooldown; 429 short → no cooldown  
 - Shadow: lane loggata, catena sempre SIMPLE  
-- `LLM_COMPLEX_MODEL` passato a DeepSeek `classify_json(model=)` (+ effort lane)  
+- `LLM_COMPLEX_MODEL` passato a OpenAI-compat `classify_json(model=)` (+ effort lane; dialect da provider)  
+- dialect `openai` → payload **senza** `thinking`; dialect `deepseek` → thinking on/off da effort  
+- `load_lane` per `openai` / `glm` / `grok` → BASE_URL default + `api_dialect=openai`
 
 ### 8.3 Gate
 
@@ -487,17 +538,17 @@ flowchart LR
 |-------|------|-------------------------|
 | Client | `classification/client.py` | Cascade + lane + escalate + dual provider + residual |
 | Quota | `classification/quota.py` | `reserve(model=, lane=, provider=)`; limiti **per-lane** (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`; `0` = unmanaged); legacy fill-gap |
-| Config | `core/config.py` + `llm_lanes.py` | Gemini + DeepSeek + routing + lane env |
+| Config | `core/config.py` + `llm_lanes.py` | Lane env + provider aliases (`gemini`/`deepseek`/`openai`/`glm`/`grok`/`claude`) |
 | Worker | `worker.py` | Soft-trim = `LLM_SIMPLE.rpd` se `> 0`; heuristic nel client |
 | Schema/prompt | `validator.py`, `prompts.py` | **Immutabili** |
 | Cooldown | `cooldown.py` + `009_…sql` | Durable 24h |
-| DeepSeek | `deepseek.py` | httpx; `model=` + effort da lane |
+| OpenAI-compat | `deepseek.py` | httpx; `api_dialect` deepseek\|openai; `model=` + effort da lane |
 | FE/API | DTO articles/map | Nessun `model_id` — out of scope |
 
-### 12.2 Decisione ECC: DeepSeek via httpx
+### 12.2 Decisione ECC: OpenAI-compat via httpx
 
-`radar/.ecc/rules/backend.md` vieta `openai` / `anthropic` / `langchain`.  
-**Locked:** `httpx` async → `https://api.deepseek.com` (API OpenAI-compatible). Package `openai` resta VIETATO. Skills aggiornate di conseguenza.
+`radar/.ecc/rules/backend.md` vieta package `openai` / `anthropic` / `langchain`.  
+**Locked:** `httpx` async → `/chat/completions` (DeepSeek default URL; OpenAI/GLM/Grok via `BASE_URL` + dialect). Package `openai` resta VIETATO. Skills aggiornate di conseguenza.
 
 ### 12.3 Extension points
 
@@ -524,18 +575,23 @@ else: chain = chain_for(lane)
   # SIMPLE → LLM_SIMPLE_*; BORDERLINE|COMPLEX → LLM_COMPLEX_* (+ residual SIMPLE)
 for ref in filter_cooldown(chain):
   for attempt in validation_loop:
-    reserve(model=ref.model, lane=ref.quota_lane)
-    call provider (gemini|deepseek)  # deepseek: classify_json(model=) + thinking per effort
+    reserve(model=ref.model, lane=ref.quota_lane, provider=ref.provider)
+    call provider:
+      gemini → google-genai
+      deepseek|openai|glm|grok → httpx chat/completions (dialect da provider)
+      claude → stub / ConfigError
     …
 ```
 
 ### 12.5 Attenzioni ops
 
 - RPD ledger globale 1400 vs Lite tipico ~1000 (VERIFY_IN_STUDIO).  
-- Budget USD DeepSeek: env presente, **enforcement post-v1**; 402 → cooldown SQL.  
+- Budget USD paid: env presente; 402 → cooldown SQL.  
 - Mai alzare `content[:4000]`.  
 - Default codice: `LLM_ROUTING_SHADOW=true` / `MODE=off` finché mix calibrato; ops live può forzare `SHADOW=false`.  
-- Swap COMPLEX→Google: solo `LLM_COMPLEX_PROVIDER=gemini` + `LLM_COMPLEX_MODEL=…`.
+- Swap COMPLEX→Google: solo `LLM_COMPLEX_PROVIDER=gemini` + `LLM_COMPLEX_MODEL=…`.  
+- Swap OpenAI/GLM/Grok: `PROVIDER` + `MODEL` + `API_KEY` + `BASE_URL` + budget; ricette Profili C/D/E in `.env.example`.  
+- `claude` nativo = fuori scope; usare gateway OpenAI-compat se serve.
 
 ---
 

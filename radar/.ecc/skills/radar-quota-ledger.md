@@ -7,7 +7,7 @@ description: >
   Complexity v2.2: BORDERLINE → purpose classify:complex.
 when_to_use:
   - classification/quota.py, cooldown.py, llm_request_ledger, client cascade/retry
-version: 2.2.0
+version: 2.3.0
 ---
 
 ## Limiti (obbligatorio)
@@ -44,7 +44,8 @@ reservation_id = await self.quota.reserve(
 
 1. Env preferito: `LLM_SIMPLE_*` / `LLM_COMPLEX_*`.
 2. Legacy riempie i gap se i campi lane sono assenti.
-3. `PROVIDER` ∈ {gemini, deepseek, openai, claude}.
+3. `PROVIDER` ∈ {gemini, deepseek, openai, glm, grok, claude}.
+   OpenAI-compat dialect: deepseek → `thinking`; openai|glm|grok → stock (no DeepSeek-only fields).
 4. Budget exceeded → skip, no cooldown 24h.
 
 ## SoT

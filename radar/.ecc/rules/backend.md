@@ -42,11 +42,11 @@ Quando aggiungi una nuova dipendenza al `requirements.txt`:
 
 | Componente          | Tecnologia Obbligatoria              | VIETATO                               |
 |---------------------|--------------------------------------|---------------------------------------|
-| LLM SDK             | `google-genai` (Gemini) + **httpx** OpenAI-compatible per DeepSeek only | Package `openai`, `anthropic`, `langchain` |
+| LLM SDK             | `google-genai` (Gemini) + **httpx** OpenAI-compatible (`deepseek`/`openai`/`glm`/`grok`) | Package `openai`, `anthropic`, `langchain` |
 | Async               | `asyncio` + `asyncio.sleep()`        | `time.sleep()`, `threading.sleep()`   |
 | Validazione         | `pydantic` v2 + BaseModel            | Dict non tipizzati, `json.loads()` raw|
 | DB Driver           | `asyncpg` (async PostgreSQL)         | `psycopg2`, `SQLAlchemy` ORM          |
-| HTTP Client         | `httpx` (async) — Miniflux + DeepSeek | `requests` (sincrono)                 |
+| HTTP Client         | `httpx` (async) — Miniflux + OpenAI-compat LLM | `requests` (sincrono)                 |
 | HTML Sanitize       | `re` stdlib o `html.parser` stdlib   | `beautifulsoup4` come dipendenza extra |
 
 ---
@@ -261,7 +261,7 @@ reservation_id = await self.quota.reserve(
     estimated_tokens=..., model=ref.model, lane=ref.quota_lane, provider=ref.provider
 )
 try:
-    # gemini: google-genai | deepseek: classification/deepseek.py (httpx)
+    # gemini: google-genai | openai-compat: classification/deepseek.py (httpx)
     response = await provider_call(...)
     await self.quota.complete(reservation_id, actual_tokens)
 except asyncio.CancelledError:
@@ -299,9 +299,11 @@ Routing opzionale (`LLM_ROUTING_MODE=off|complexity`). Lane = heuristic in
 **Lane v2.2:** L sola → SIMPLE; 1 di {G,E,X} → BORDERLINE; ≥2 famiglie (L solo in combo) → COMPLEX.
 `geo_marker` da solo richiede `body_len ≥ 1500`; ≥2 country names → G sempre.
 Residual SIMPLE↔COMPLEX se identity diversa (fattura `ref.quota_lane`).
+`PROVIDER` ∈ {gemini, deepseek, openai, glm, grok, claude}; OpenAI-compat dialect:
+deepseek → thinking; openai|glm|grok → stock. `claude` = stub.
 
 **Invarianti:** stesso `content[:4000]` su tutte le lane; schema/prompt immutabili;
-DeepSeek riceve `model=` + thinking da effort lane (`none` = thinking disabled);
+OpenAI-compat riceve `model=` + dialect da provider (`deepseek` = thinking; `openai`/`glm`/`grok` = stock);
 mai hardcodare API key; mai commit `.env`; no package `openai`.
 
 SoT: `plan-audit/active/sot_llm_multi_model_fallback.md` + skill `radar-quota-ledger`.

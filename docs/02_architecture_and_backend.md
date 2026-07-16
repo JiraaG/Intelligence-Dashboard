@@ -9,7 +9,7 @@ Stack post Phase 0–5 (governance Phase 6). Piano master: [`Implementation_Plan
 | Processo | Entry | Ruolo |
 |----------|-------|--------|
 | API | `python -m uvicorn` / `main.py` | FastAPI: pool, migrazioni, REST, health |
-| Ingest | `python -m app.worker` (`radar-worker`) | Polling Miniflux, coda bounded, Gemini, commit/outbox, heartbeat |
+| Ingest | `python -m app.worker` (`radar-worker`) | Polling Miniflux, coda bounded, LLM (Gemini / OpenAI-compat), commit/outbox, heartbeat |
 
 Non avviare due worker leader: advisory lock session-level. L’API non esegue ingest nel lifespan.
 
@@ -22,7 +22,7 @@ flowchart TD
   Dedup -->|sì| Loop
   Dedup -->|no| Parse[Sanitize HTML]
   Parse --> Quota[QuotaLedger reserve]
-  Quota --> LLM[Gemini structured output]
+  Quota --> LLM[LLM structured output]
   LLM -->|invalid / retryable| Retry{Tentativi rimasti?}
   Retry -->|sì| LLM
   Retry -->|no| Fallback[Fallback entity XX]
@@ -37,7 +37,7 @@ Moduli sotto `radar/backend/app/`:
 
 1. **`core/`** — config bounded, pool asyncpg, `migrations.py`, logging, heartbeat
 2. **`extraction/`** — client Miniflux (httpx, byte limits, retry), parser HTML, dedup
-3. **`classification/`** — client Gemini (`google-genai`) + DeepSeek (httpx), complexity v2.2, `quota.py` per-lane, prompts (no CoT), validator Pydantic strict
+3. **`classification/`** — client Gemini (`google-genai`) + OpenAI-compat httpx (`deepseek`/`openai`/`glm`/`grok`; dialect), complexity v2.2, `quota.py` per-lane, prompts (no CoT), validator Pydantic strict
 4. **`commit/`** — commit atomico, outbox, vault `yaml.safe_dump` + write atomica
 5. **`api/`** — query helpers Phase 5 (`articles_query.py`)
 
@@ -52,7 +52,7 @@ Moduli sotto `radar/backend/app/`:
 - 10 categorie: Nucleare, Energia, Infrastrutture, Geopolitica, Economia, Tecnologia, Spazio, Ambiente, Salute, Sicurezza
 - Fallback geografico su fallimento irreversibile: paese `XX`, categoria `Infrastrutture` (vedi `validator.py`)
 - Quote: `llm_request_ledger` via `QuotaLedger` — limiti **per lane** `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (`0` = unmanaged); soft-trim worker = `LLM_SIMPLE.rpd` se >0; legacy `LLM_RPM`/`DEEPSEEK_*` = fill-gap — **non** `COUNT(*)` su `articles` per RPD
-- Routing: `LLM_ROUTING_MODE=complexity`; residual SIMPLE↔COMPLEX; DeepSeek via httpx (no package `openai`)
+- Routing: `LLM_ROUTING_MODE=complexity`; residual SIMPLE↔COMPLEX; OpenAI-compat via httpx (no package `openai`); provider swap env-only (SoT §5 Profili A–E)
 - Periodicità ingest: `WORKER_POLL_INTERVAL_SECONDS` (default 900)
 
 ---

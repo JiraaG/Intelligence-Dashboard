@@ -25,7 +25,7 @@ cd radar
 cp .env.example .env
 ```
 
-Compila almeno: `GEMINI_API_KEY` (o `GOOGLE_API_KEY`, che ha precedenza), `POSTGRES_PASSWORD`, credenziali Miniflux. **Non** usare `$` nelle password (interpolazione Compose).
+Compila almeno: key lane (`LLM_SIMPLE_API_KEY` / `LLM_COMPLEX_API_KEY` o legacy `GEMINI_API_KEY` / `DEEPSEEK_API_KEY` / `OPENAI_API_KEY` a seconda del provider), `POSTGRES_PASSWORD`, credenziali Miniflux. **Non** usare `$` nelle password (interpolazione Compose).
 
 Categorie principali (dettaglio in `.env.example`):
 
@@ -33,7 +33,7 @@ Categorie principali (dettaglio in `.env.example`):
 |------|--------|
 | Runtime | `RADAR_ENV`, `RADAR_TIME_ZONE` |
 | CORS | `CORS_ALLOW_ORIGINS` (vuoto in prod dietro Nginx; es. `http://localhost:4200` per `ng serve`) |
-| LLM | Lane `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (provider/model/RPM/TPM/RPD/budget; `0`=unmanaged); soft-trim = `LLM_SIMPLE.rpd` se >0; legacy `GEMINI_*` / `LLM_RPM` / `DEEPSEEK_*` = fill-gap; `GEMINI_REQUEST_TIMEOUT` |
+| LLM | Lane `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (provider=`gemini`\|`deepseek`\|`openai`\|`glm`\|`grok`\|`claude`; model/RPM/TPM/RPD/budget; `0`=unmanaged); dialect OpenAI-compat: deepseek=`thinking`, openai/glm/grok=stock; soft-trim = `LLM_SIMPLE.rpd` se >0; legacy `GEMINI_*` / `LLM_RPM` / `DEEPSEEK_*` / `OPENAI_API_KEY` = fill-gap; Profili A–E in `.env.example` |
 | Worker | coda/concorrenza, `WORKER_POLL_INTERVAL_SECONDS` (default 900), heartbeat |
 | Miniflux | URL interno, API key, `MINIFLUX_LIMIT` (tipico **50**; `100` può superare `MAX_MINIFLUX_RESPONSE_BYTES=5MB`), timeout/byte caps |
 | Postgres | user/password/db, `DATABASE_URL` (Compose la costruisce in container) |

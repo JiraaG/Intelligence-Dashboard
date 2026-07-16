@@ -1,19 +1,20 @@
 ---
 name: llm-json-extraction
 description: >
-  Playbook per l'integrazione con Google Gemini API tramite l'SDK ufficiale google-genai,
-  e (opzionale) DeepSeek V4 Flash via httpx OpenAI-compatible (no package openai).
-  Definisce il System Prompt immutabile (no Chain-of-Thought), lo schema Pydantic strict
-  per gli Structured Outputs, i delimitatori <untrusted_article>, e il flusso commit+outbox.
-  Usare ogni volta che si modifica la logica di chiamata LLM in
-  backend/app/worker.py, classification/, o commit/ (non main.py API-only).
+  Playbook per l'integrazione con Google Gemini (google-genai) e provider OpenAI-compat
+  via httpx (deepseek / openai / glm / grok; no package openai). Dialect: deepseek=thinking,
+  openai/glm/grok=stock. System Prompt immutabile (no CoT), schema Pydantic strict,
+  delimitatori <untrusted_article>, flusso commit+outbox. Usare ogni volta che si modifica
+  la logica di chiamata LLM in backend/app/worker.py, classification/, o commit/
+  (non main.py API-only).
 when_to_use:
-  - Modifiche al prompt di sistema per Gemini / DeepSeek
+  - Modifiche al prompt di sistema per Gemini / OpenAI-compat
   - Aggiornamento dello schema Pydantic GeopoliticalArticleSchema
   - Debug di errori di parsing JSON dalla risposta LLM
-  - Cascata modelli, routing complexity, cooldown 24h
+  - Cascata modelli, routing complexity, dialect, cooldown 24h
+  - Swap provider via LLM_SIMPLE_* / LLM_COMPLEX_* (Profili A–E)
   - Aggiunta di nuovi campi al contratto di estrazione
-version: 1.5.0
+version: 1.6.0
 ---
 
 ## Quando Usare Questa Skill
@@ -35,7 +36,7 @@ Carica questa skill ogni volta che:
 ```
 1. Worker (radar-worker): advisory lock → reconcile outbox → fetch Miniflux (coda bounded)
 2. Per entry: dedup → sanitize → complexity lane v2.2 → QuotaLedger.reserve(model=, lane=)
-   → Gemini (google-genai) e/o DeepSeek (httpx OpenAI-compatible; no package openai)
+   → Gemini (google-genai) e/o OpenAI-compat httpx (deepseek/openai/glm/grok; no package openai)
 3. Parsing/validazione Pydantic strict; complete(reservation_id) con usage reale
 4. Hard-fail → llm_model_cooldown 24h + next model; 429 breve → Retry-After same model
 5. Overwrite source_url + published_at da Miniflux
@@ -44,7 +45,7 @@ Carica questa skill ogni volta che:
 ```
 
 **Invarianti:** schema/prompt immutabili; `content[:4000]` su tutte le lane; package `openai` vietato;
-lane via `LLM_SIMPLE_*` / `LLM_COMPLEX_*`; DeepSeek `classify_json(model=ref.model)`.
+lane via `LLM_SIMPLE_*` / `LLM_COMPLEX_*`; OpenAI-compat `classify_json(model=ref.model)`.
 
 ### Complexity → modello (v2.2)
 
@@ -72,8 +73,10 @@ LLM_COMPLEX_REASONING_EFFORT=high
 LLM_COMPLEX_RPM=0
 LLM_COMPLEX_RPD=0
 # Soft-trim worker = LLM_SIMPLE.rpd se > 0; free=RPM/RPD>0; paid=0+BUDGET
+# PROVIDER ∈ {gemini, deepseek, openai, glm, grok, claude}
+# OpenAI-compat dialect: deepseek → thinking; openai|glm|grok → stock (no thinking)
 # Swap COMPLEX → Google: LLM_COMPLEX_PROVIDER=gemini + LLM_COMPLEX_MODEL=…
-# Profilo A (hybrid) documentato in .env.example (blocco commentato)
+# Profili A/C/D/E (hybrid / OpenAI / GLM / Grok) in .env.example
 ```
 
 SoT: `plan-audit/active/sot_llm_multi_model_fallback.md` §5–§6.

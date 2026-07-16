@@ -7,7 +7,12 @@ Preferred env (source of truth for limits):
 Also: PROVIDER, MODEL, API_KEY, BASE_URL, BUDGET_USD_DAY, USD_PER_1M_TOKENS,
 TIMEOUT, REASONING_EFFORT, FALLBACKS for each lane.
 
-``PROVIDER`` selects the adapter: gemini | deepseek | openai | claude.
+``PROVIDER`` selects the adapter:
+  gemini | deepseek | openai | glm | grok | claude (claude = stub).
+OpenAI-compat HTTP adapters: deepseek | openai | glm | grok.
+Dialect: deepseek → DeepSeek ``thinking`` payload; openai/glm/grok → stock
+chat/completions (no DeepSeek-only fields).
+
 Legacy vendor keys (GEMINI_*, DEEPSEEK_*, LLM_RPM/TPM/RPD) fill gaps only when
 the corresponding LLM_SIMPLE_* / LLM_COMPLEX_* key is unset — they are NOT a
 shared global quota across both lanes.
@@ -19,8 +24,10 @@ import os
 from dataclasses import dataclass
 from typing import Mapping
 
-LLM_PROVIDERS = frozenset({"gemini", "deepseek", "openai", "claude"})
-OPENAI_COMPAT_PROVIDERS = frozenset({"deepseek", "openai"})
+LLM_PROVIDERS = frozenset({"gemini", "deepseek", "openai", "glm", "grok", "claude"})
+OPENAI_COMPAT_PROVIDERS = frozenset({"deepseek", "openai", "glm", "grok"})
+API_DIALECT_DEEPSEEK = "deepseek"
+API_DIALECT_OPENAI = "openai"
 LANE_SIMPLE = "simple"
 LANE_COMPLEX = "complex"
 
@@ -28,8 +35,17 @@ _PROVIDER_DEFAULT_BASE_URL: Mapping[str, str] = {
     "gemini": "",
     "deepseek": "https://api.deepseek.com",
     "openai": "https://api.openai.com/v1",
+    "glm": "https://open.bigmodel.cn/api/paas/v4",
+    "grok": "https://api.x.ai/v1",
     "claude": "https://api.anthropic.com",
 }
+
+
+def api_dialect_for_provider(provider: str) -> str:
+    """HTTP payload dialect for OpenAI-compatible adapters."""
+    if provider == "deepseek":
+        return API_DIALECT_DEEPSEEK
+    return API_DIALECT_OPENAI
 
 
 class LlmConfigError(ValueError):
@@ -67,6 +83,10 @@ class LlmLaneConfig:
     @property
     def is_openai_compat(self) -> bool:
         return self.provider in OPENAI_COMPAT_PROVIDERS
+
+    @property
+    def api_dialect(self) -> str:
+        return api_dialect_for_provider(self.provider)
 
     @property
     def models(self) -> tuple[str, ...]:
@@ -167,6 +187,16 @@ def _legacy_api_key(provider: str) -> str:
         return (_env_raw("DEEPSEEK_API_KEY") or "").strip()
     if provider == "openai":
         return (_env_raw("OPENAI_API_KEY") or "").strip()
+    if provider == "glm":
+        return (
+            (_env_raw("GLM_API_KEY") or "").strip()
+            or (_env_raw("ZHIPU_API_KEY") or "").strip()
+        )
+    if provider == "grok":
+        return (
+            (_env_raw("GROK_API_KEY") or "").strip()
+            or (_env_raw("XAI_API_KEY") or "").strip()
+        )
     if provider == "claude":
         return (
             (_env_raw("ANTHROPIC_API_KEY") or "").strip()
@@ -186,6 +216,10 @@ def _legacy_model(provider: str, *, lane: str) -> str:
         )
     if provider == "openai":
         return "gpt-4.1-mini"
+    if provider == "glm":
+        return "glm-4-flash"
+    if provider == "grok":
+        return "grok-3-mini"
     if provider == "claude":
         return "claude-sonnet-4-5"
     return "unknown"

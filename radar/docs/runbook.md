@@ -59,7 +59,7 @@ Ingest / Gemini / outbox → **`radar-worker`**. API HTTP → `radar-backend`.
 
 Sintomi: log worker con wait/`429`/`Retry-After`; pochi articoli nuovi; ready può restare 200 se heartbeat fresco.
 
-- Ledger durable per **lane** (`classify:simple` / `classify:complex`): limiti da `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (RPM/TPM/RPD/budget; `0` = unmanaged); `PROVIDER` = gemini|deepseek|openai|claude; legacy `GEMINI_*`/`DEEPSEEK_*`/`LLM_RPM` = fill-gap (non tetto globale)
+- Ledger durable per **lane** (`classify:simple` / `classify:complex`): limiti da `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (RPM/TPM/RPD/budget; `0` = unmanaged); `PROVIDER` = gemini|deepseek|openai|glm|grok|claude; legacy `GEMINI_*`/`DEEPSEEK_*`/`LLM_RPM` = fill-gap (non tetto globale)
 - Soft-trim worker: solo `LLM_SIMPLE.rpd` se `> 0`. Free tier → RPM/RPD `> 0`; paid → RPM/RPD `= 0` + `*_BUDGET_USD_DAY` / 402
 - Cascata Gemini (lane SIMPLE se provider=gemini): `LLM_SIMPLE_MODEL` + `GEMINI_MODEL_FALLBACKS` (CSV)
 - Cooldown 24h hard-fail: tabella `llm_model_cooldown` (`LLM_MODEL_COOLDOWN_HOURS`) — **non** per 429 brevi con Retry-After
@@ -68,12 +68,15 @@ Sintomi: log worker con wait/`429`/`Retry-After`; pochi articoli nuovi; ready pu
   - `LLM_COMPLEX_PROVIDER` / `LLM_COMPLEX_MODEL` (BORDERLINE + COMPLEX + escalate — effort tipico `high`)
   - Residual SIMPLE↔COMPLEX se identity diversa
   - Complessità = rischio estrazione schema (G/E/X); **L sola → SIMPLE** (non eleva)
+  - Swap provider: cambiare `PROVIDER`+`MODEL`+`API_KEY`+`BASE_URL`+limiti/budget; restart `radar-worker`
   - Esempio COMPLEX → Google: `LLM_COMPLEX_PROVIDER=gemini` + `LLM_COMPLEX_MODEL=gemini-3.5-flash`
+  - OpenAI/GLM/Grok: dialect `openai` (niente `thinking` DeepSeek); ricette in `.env.example` Profili C/D/E
+  - `claude` = stub (Messages API non implementata)
   - `LLM_ROUTING_SHADOW=true` = solo log lane (usa sempre SIMPLE)
-- DeepSeek via httpx (`DEEPSEEK_*` legacy + lane `LLM_*`); effort: `*_REASONING_EFFORT`
+- OpenAI-compat via httpx (`deepseek`/`openai`/`glm`/`grok`); effort: `*_REASONING_EFFORT` (DeepSeek dialect usa `thinking`)
 - Periodicità ciclo: `WORKER_POLL_INTERVAL_SECONDS` (default 900)
 - Senza `GEMINI_API_KEY`: API/FE avviano; worker degradato se tutte le lane richiedono Gemini
-- Senza `DEEPSEEK_API_KEY` con COMPLEX=deepseek: warning (o fail se `LLM_ROUTING_STRICT=1`); COMPLEX usa SIMPLE
+- Senza key OpenAI-compat con COMPLEX=deepseek/openai/glm/grok: warning (o fail se `LLM_ROUTING_STRICT=1`); COMPLEX usa SIMPLE
 
 Azioni: verificare key/model in `.env` e restart `radar-worker`; controllare quote provider / AI Studio;  
 `SELECT * FROM llm_model_cooldown;`; abbassare `MINIFLUX_LIMIT` se serve; **non** scalare worker multipli (single-leader).

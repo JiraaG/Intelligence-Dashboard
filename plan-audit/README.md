@@ -40,3 +40,4 @@ plan-audit/
 * **Stub LLM Storici:** Gli stub superati sono in [archive/llm-stubs/](archive/llm-stubs/) e non devono essere usati come riferimento.
 * **Complexity v2.2:** SIMPLE = solo `LLM_SIMPLE`; BORDERLINE+COMPLEX = `LLM_COMPLEX` (effort tipico high); L sola → SIMPLE.
 * **Limiti:** per-lane `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (`0` = unmanaged); soft-trim = `LLM_SIMPLE.rpd`; free = RPM/RPD, paid = `BUDGET_USD_DAY`.
+* **Provider env-swap (2026-07-16):** `gemini` \| `deepseek` \| `openai` \| `glm` \| `grok` \| `claude` (stub). OpenAI-compat dialect: `deepseek` = thinking payload; `openai`/`glm`/`grok` = stock. SoT §5 Profili A–E.

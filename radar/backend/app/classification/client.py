@@ -452,6 +452,7 @@ class ClassificationClient:
             model=cfg.model,
             effort=cfg.reasoning_effort,
             timeout=cfg.timeout,
+            api_dialect=cfg.api_dialect,
         )
         self._compat_clients[quota_lane] = client
         return client

@@ -29,7 +29,7 @@ in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categ
 | Layer       | Tecnologia                              | Note                                       |
 |-------------|------------------------------------------|---------------------------------------------|
 | Backend     | Python 3.12-slim (Docker) / 3.14 (locale) | Demone asincrono; poll `WORKER_POLL_INTERVAL_SECONDS` (default 900) |
-| LLM         | google-genai (Gemini) + httpx DeepSeek (no package `openai`) | Lane env: `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (limiti per-lane; `0`=unmanaged). Soft-trim = `LLM_SIMPLE.rpd` se >0. Free=RPM/RPD; paid=budget. Complexity **v2.2**. Ops tipico: DeepSeek Flash none/high. Non hardcodare segreti. |
+| LLM         | google-genai (Gemini) + httpx OpenAI-compat (`deepseek`/`openai`/`glm`/`grok`; no package `openai`) | Lane env: `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (limiti per-lane; `0`=unmanaged). Soft-trim = `LLM_SIMPLE.rpd` se >0. Free=RPM/RPD; paid=budget. Dialect: deepseek=`thinking`; openai/glm/grok=stock. Complexity **v2.2**. Ops tipico: DeepSeek Flash none/high. Non hardcodare segreti. |
 | Database    | PostgreSQL 15                            | Tabelle articles, companies, tags + sentiment, relevance + indici |
 | Feed Source | Miniflux REST API                       | Articoli non letti, deduplica per URL       |
 | Frontend    | Angular 21 (Standalone Components)      | Signals, lazy loading                       |
@@ -79,8 +79,9 @@ radar/
 │       │   ├── entry_validation.py # Validazione entry Miniflux pre-pipeline
 │       │   ├── parser.py          # strip_html_tags() — purge totale media tags
 │       │   └── state.py           # is_article_duplicate() — SELECT EXISTS asyncpg
-│       ├── classification/        # Layer C: Gemini LLM + schema Pydantic + quota ledger
-│       │   ├── client.py          # ClassificationClient — async SDK, deadline, retry classificato
+│       ├── classification/        # Layer C: Gemini + OpenAI-compat LLM + schema Pydantic + quota ledger
+│       │   ├── client.py          # ClassificationClient — lanes, cascade, dialect
+│       │   ├── deepseek.py        # httpx OpenAI-compat (deepseek/openai/glm/grok)
 │       │   ├── quota.py           # QuotaLedger per-lane RPM/TPM/RPD (+ budget)
 │       │   ├── prompts.py         # System prompt (no CoT) + build_user_prompt(<untrusted_article>)
 │       │   └── validator.py       # GeopoliticalArticleSchema strict, extra=forbid, no reasoning
@@ -206,7 +207,7 @@ Miniflux API (`WORKER_POLL_INTERVAL_SECONDS`, default 900)
   Validate entry → sanitize HTML → dedup URL
         │ (se non duplicato)
         ▼
-  Gemma 4 31B (google-genai SDK)
+  LLM lane (Gemini SDK e/o OpenAI-compat httpx)
   → GeopoliticalArticleSchema (strict, no reasoning)
         │
         ▼ overwrite source_url / published_at da Miniflux (authoritative)

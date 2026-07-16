@@ -1,4 +1,9 @@
-"""DeepSeek V4 Flash client via httpx (OpenAI-compatible). No openai package."""
+"""OpenAI-compatible chat client via httpx (DeepSeek / OpenAI / GLM / Grok).
+
+No ``openai`` package. Payload dialect:
+  - ``deepseek``: DeepSeek ``thinking`` + ``reasoning_effort``
+  - ``openai``: stock chat/completions (no DeepSeek-only fields)
+"""
 
 from __future__ import annotations
 
@@ -15,6 +20,7 @@ from app.core.config import (
     DEEPSEEK_REASONING_EFFORT,
     GEMINI_REQUEST_TIMEOUT,
 )
+from app.core.llm_lanes import API_DIALECT_DEEPSEEK, API_DIALECT_OPENAI
 
 logger = logging.getLogger("radar.classification.deepseek")
 
@@ -46,6 +52,52 @@ def _parse_retry_after(headers: httpx.Headers) -> float | None:
         return None
 
 
+def normalize_api_dialect(raw: str | None) -> str:
+    value = (raw or API_DIALECT_DEEPSEEK).strip().lower()
+    if value in {API_DIALECT_DEEPSEEK, API_DIALECT_OPENAI}:
+        return value
+    return API_DIALECT_DEEPSEEK
+
+
+def build_chat_completions_payload(
+    *,
+    model: str,
+    system: str,
+    user: str,
+    effort: str,
+    api_dialect: str,
+) -> dict[str, Any]:
+    """Build POST /chat/completions JSON for the given dialect."""
+    dialect = normalize_api_dialect(api_dialect)
+    payload: dict[str, Any] = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        "response_format": {"type": "json_object"},
+        "max_tokens": 2048 if effort == "none" else 8192,
+    }
+    if dialect == API_DIALECT_DEEPSEEK:
+        # Thinking off = cheaper / less capable path (bulk SIMPLE).
+        # Thinking on: temperature/top_p non ammessi; effort high|max only (low→high).
+        if effort == "none":
+            payload["thinking"] = {"type": "disabled"}
+        else:
+            ds_effort = effort if effort in {"high", "max"} else "high"
+            payload["thinking"] = {"type": "enabled"}
+            payload["reasoning_effort"] = ds_effort
+    elif effort != "none":
+        # Stock OpenAI-compat: no DeepSeek ``thinking``. Effort only sizes max_tokens
+        # above; vendors that reject unknown fields stay safe.
+        logger.debug(
+            "openai dialect ignores thinking/reasoning_effort (effort=%s model=%s)",
+            effort,
+            model,
+        )
+    return payload
+
+
 class DeepSeekClient:
     """Async chat completions → JSON string (Pydantic validated by caller)."""
 
@@ -57,6 +109,7 @@ class DeepSeekClient:
         model: str | None = None,
         effort: str | None = None,
         timeout: float | None = None,
+        api_dialect: str | None = None,
     ) -> None:
         self.api_key = api_key if api_key is not None else DEEPSEEK_API_KEY
         self.base_url = (base_url or DEEPSEEK_BASE_URL).rstrip("/")
@@ -70,10 +123,27 @@ class DeepSeekClient:
         else:
             self.effort = "high"
         self.timeout = float(timeout if timeout is not None else GEMINI_REQUEST_TIMEOUT)
+        self.api_dialect = normalize_api_dialect(api_dialect)
 
     @property
     def available(self) -> bool:
         return bool(self.api_key)
+
+    def build_payload(
+        self,
+        *,
+        model: str,
+        system: str,
+        user: str,
+    ) -> dict[str, Any]:
+        """Public builder for unit tests and callers that need the request body."""
+        return build_chat_completions_payload(
+            model=model,
+            system=system,
+            user=user,
+            effort=self.effort,
+            api_dialect=self.api_dialect,
+        )
 
     async def classify_json(
         self,
@@ -92,7 +162,7 @@ class DeepSeekClient:
         Raises DeepSeekError on HTTP/provider failures.
         """
         if not self.api_key:
-            raise DeepSeekError("DEEPSEEK_API_KEY mancante", status_code=401)
+            raise DeepSeekError("OpenAI-compat API key mancante", status_code=401)
 
         use_model = model or self.model
         user_message = build_user_prompt(
@@ -101,7 +171,7 @@ class DeepSeekClient:
             date=date,
             content=content[:4000],
         )
-        # DeepSeek json_object richiede "json"; campi flat (SYSTEM_PROMPT parla di
+        # json_object richiede "json"; campi flat (SYSTEM_PROMPT parla di
         # "coordinate" e il modello tende a nestare coordinates{}).
         user_message = (
             f"{user_message}\n\n"
@@ -123,41 +193,30 @@ class DeepSeekClient:
                 "(senza campo reasoning)."
             )
 
-        # Thinking off = cheaper / less capable path (bulk SIMPLE ≈ Gemma-class JSON).
-        # Thinking on: temperature/top_p non ammessi; effort high|max only (low→high).
-        payload: dict[str, Any] = {
-            "model": use_model,
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_message},
-            ],
-            "response_format": {"type": "json_object"},
-            "max_tokens": 2048 if self.effort == "none" else 8192,
-        }
-        if self.effort == "none":
-            payload["thinking"] = {"type": "disabled"}
-        else:
-            effort = self.effort if self.effort in {"high", "max"} else "high"
-            payload["thinking"] = {"type": "enabled"}
-            payload["reasoning_effort"] = effort
+        payload = self.build_payload(
+            model=use_model,
+            system=SYSTEM_PROMPT,
+            user=user_message,
+        )
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
         url_path = f"{self.base_url}/chat/completions"
+        label = f"openai-compat/{self.api_dialect}"
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             try:
                 resp = await client.post(url_path, headers=headers, json=payload)
             except httpx.TimeoutException as exc:
-                raise DeepSeekError(f"DeepSeek timeout: {exc}", status_code=408) from exc
+                raise DeepSeekError(f"{label} timeout: {exc}", status_code=408) from exc
             except httpx.TransportError as exc:
-                raise DeepSeekError(f"DeepSeek transport: {exc}") from exc
+                raise DeepSeekError(f"{label} transport: {exc}") from exc
 
         if resp.status_code == 429:
             raise DeepSeekError(
-                "DeepSeek 429 rate limit",
+                f"{label} 429 rate limit",
                 status_code=429,
                 retry_after=_parse_retry_after(resp.headers),
                 body=resp.text[:500],
@@ -167,31 +226,31 @@ class DeepSeekClient:
             and "credit" in resp.text.lower()
         ):
             raise DeepSeekError(
-                "DeepSeek insufficient credits",
+                f"{label} insufficient credits",
                 status_code=402,
                 body=resp.text[:500],
             )
         if resp.status_code in (401, 403):
             raise DeepSeekError(
-                f"DeepSeek auth {resp.status_code}",
+                f"{label} auth {resp.status_code}",
                 status_code=resp.status_code,
                 body=resp.text[:500],
             )
         if resp.status_code == 404:
             raise DeepSeekError(
-                "DeepSeek model not found",
+                f"{label} model not found",
                 status_code=404,
                 body=resp.text[:500],
             )
         if resp.status_code >= 500:
             raise DeepSeekError(
-                f"DeepSeek server {resp.status_code}",
+                f"{label} server {resp.status_code}",
                 status_code=resp.status_code,
                 body=resp.text[:500],
             )
         if resp.status_code >= 400:
             raise DeepSeekError(
-                f"DeepSeek HTTP {resp.status_code}: {resp.text[:400]}",
+                f"{label} HTTP {resp.status_code}: {resp.text[:400]}",
                 status_code=resp.status_code,
                 body=resp.text[:500],
             )
@@ -208,10 +267,10 @@ class DeepSeekClient:
                 )
             text = str(text).strip()
         except (KeyError, IndexError, TypeError) as exc:
-            raise DeepSeekError(f"DeepSeek response shape: {exc}", body=str(data)[:500]) from exc
+            raise DeepSeekError(f"{label} response shape: {exc}", body=str(data)[:500]) from exc
 
         if not text:
-            raise DeepSeekError("DeepSeek empty content", status_code=502, body=str(data)[:500])
+            raise DeepSeekError(f"{label} empty content", status_code=502, body=str(data)[:500])
 
         usage = data.get("usage") or {}
         total = usage.get("total_tokens")
@@ -221,7 +280,8 @@ class DeepSeekClient:
             tokens = None
 
         logger.info(
-            "DeepSeek ok model=%s effort=%s tokens=%s",
+            "%s ok model=%s effort=%s tokens=%s",
+            label,
             use_model,
             self.effort,
             tokens,
