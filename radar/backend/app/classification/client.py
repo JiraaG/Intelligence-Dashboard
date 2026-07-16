@@ -128,10 +128,11 @@ def classify_provider_error(exc: BaseException) -> ErrorClass:
         if code == 404:
             return ErrorClass.HARD_COOLDOWN
         if code == 429:
-            # Daily / resource exhausted → cooldown; short Retry-After stays retryable.
+            # Solo segnali espliciti di RPD/giorno → cooldown 24h.
+            # "RESOURCE_EXHAUSTED" / "quota" generici sono spesso RPM → RETRYABLE.
             if any(
                 token in message
-                for token in ("daily", "resource exhausted", "quota exceeded", "per day", "rpd")
+                for token in ("daily", "per day", "rpd", "requests per day")
             ):
                 return ErrorClass.HARD_COOLDOWN
             return ErrorClass.RETRYABLE

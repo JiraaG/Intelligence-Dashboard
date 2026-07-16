@@ -102,6 +102,8 @@ class DeepSeekClient:
                 "Restituisci SOLO un JSON valido secondo lo schema (senza campo reasoning)."
             )
 
+        # Thinking mode: temperature/top_p non ammessi (API V4 → 400). Effort high|max only.
+        effort = self.effort if self.effort in {"high", "max"} else "high"
         payload: dict[str, Any] = {
             "model": use_model,
             "messages": [
@@ -109,15 +111,10 @@ class DeepSeekClient:
                 {"role": "user", "content": user_message},
             ],
             "response_format": {"type": "json_object"},
-            "temperature": 0.3,
-            "max_tokens": 2048,
-            "reasoning_effort": self.effort,
-            "extra_body": {"thinking": {"type": "enabled"}},
+            "max_tokens": 8192,
+            "thinking": {"type": "enabled"},
+            "reasoning_effort": effort,
         }
-        # DeepSeek docs: thinking may be top-level; keep effort; strip unknown if 400.
-        # Prefer flat thinking field used by API:
-        payload["thinking"] = {"type": "enabled"}
-        payload.pop("extra_body", None)
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -169,7 +166,7 @@ class DeepSeekClient:
             )
         if resp.status_code >= 400:
             raise DeepSeekError(
-                f"DeepSeek HTTP {resp.status_code}",
+                f"DeepSeek HTTP {resp.status_code}: {resp.text[:400]}",
                 status_code=resp.status_code,
                 body=resp.text[:500],
             )

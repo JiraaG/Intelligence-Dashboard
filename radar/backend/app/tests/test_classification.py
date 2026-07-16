@@ -178,6 +178,16 @@ def test_classify_provider_error_policy() -> None:
 
     err_429 = genai_errors.APIError(429, {"error": {"message": "rate"}})
     assert classify_provider_error(err_429) == ErrorClass.RETRYABLE
+    err_rpm = genai_errors.APIError(
+        429,
+        {"error": {"message": "429 RESOURCE_EXHAUSTED. You exceeded your current quota"}},
+    )
+    assert classify_provider_error(err_rpm) == ErrorClass.RETRYABLE
+    err_rpd = genai_errors.APIError(
+        429,
+        {"error": {"message": "daily quota exceeded / requests per day"}},
+    )
+    assert classify_provider_error(err_rpd) == ErrorClass.HARD_COOLDOWN
 
     err_401 = genai_errors.APIError(401, {"error": {"message": "auth"}})
     assert classify_provider_error(err_401) == ErrorClass.FATAL
