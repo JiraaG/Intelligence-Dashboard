@@ -244,6 +244,19 @@ Fix:
 - `armSkipCountryFit` solo con `preserveZoom`; `refocusCountry` per stesso codice; poligono click sempre emette.
 - Docs ECC: `docs/03_frontend_and_ui.md`, `radar/.ecc/rules/frontend.md` Regola 7, `.agents/AGENTS.md`, README FE.
 
+**Spider dezoom / hatching close (2026-07-16)**
+
+Sintomo: con spider aperto, un tick di dezoom (wheel) chiudeva il fan; a zoom &lt; 5 (barre/hatching) la sidebar restava aperta.
+
+Causa: MarkerCluster auto-unspiderfy su `zoomstart`/`zoomanim`/`zoomend`; il nostro `zoomend` non chiudeva se `nationOpen`.
+
+Fix (`radar-map.component.ts` only; sidebar freeze rispettato):
+- `disableMarkerClusterMapClickUnspiderfy` rimuove anche `_unspiderfyZoomStart` / `_unspiderfyZoomAnim` / `_noanimationUnspiderfy`.
+- `lastSpiderfyCountry` / `lastSpiderfyCategory` settati su spiderfy riuscito; azzerati su `collapseAllGraphs(emitClose)`.
+- `zoomend`: se nation open + zoom ≥ 5 + lastSpiderfy → re-spiderfy deferito 50ms; se nation open + zoom &lt; 5 + lastSpiderfy → `collapseAllGraphs(true)` (sidebar + spider); guard lastSpiderfy evita race `fitBounds(maxZoom:4)`.
+- Bundle budget initial `maximumError`: `1050kB` (fix ~310B oltre 1MB).
+- Docs: `frontend.md` Regola 5+7, `angular-map-expert.md`, `.agents/AGENTS.md`, `CLAUDE.md`, checklist scratch, `audit_remediation_spider_dezoom.md`.
+
 **Non fare**
 
 - [x] ~~Replace carousel / `article-list`~~ — cancellato (sidebar freeze)

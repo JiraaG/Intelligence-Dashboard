@@ -174,6 +174,9 @@ export class RadarMapComponent implements AfterViewInit {
   private highlightedMarker: ArticleMarker | null = null;
   private pendingHighlightArticle: Article | null = null;
   private spiderfyGeneration = 0;
+  /** Last successful spiderfy target — re-open after MarkerCluster zoom-unspiderfy. */
+  private lastSpiderfyCountry: string | null = null;
+  private lastSpiderfyCategory: string | null = null;
   /** When true, next focusCountryCode effect skips fitBounds (summary pallino path). */
   private skipNextCountryFit = false;
   /**
@@ -536,10 +539,33 @@ export class RadarMapComponent implements AfterViewInit {
       this.refreshHatchingStyles();
       this.syncSummaryMarkerVisibility();
 
-      // fitBounds(nation) uses maxZoom: 4, so zoomend lands below 5 after open.
-      // Do NOT collapse/close while nation detail is open (would shut the sidebar).
+      // Nation detail open: keep spider until hatching (zoom < 5); then close sidebar too.
+      // MC zoom-unspiderfy is disabled; re-spiderfy after zoom to refresh leg positions.
       const nationOpen = this.articles().length > 0 || !!this.focusCountryCode();
-      if (zoom < 5 && !this.isNavigating && !nationOpen) {
+      // Require lastSpiderfy so fitBounds(maxZoom:4) open race cannot close the sidebar.
+      if (
+        !this.isNavigating &&
+        nationOpen &&
+        zoom < 5 &&
+        !!this.lastSpiderfyCategory
+      ) {
+        this.collapseAllGraphs(true);
+      } else if (
+        !this.isNavigating &&
+        nationOpen &&
+        zoom >= 5 &&
+        this.lastSpiderfyCountry &&
+        this.lastSpiderfyCategory
+      ) {
+        const country = this.lastSpiderfyCountry;
+        const category = this.lastSpiderfyCategory;
+        // Defer so MarkerCluster finishes its own zoom bookkeeping first.
+        this.scheduleTimeout(() => {
+          if (this.destroyed || !this.map) return;
+          if (this.map.getZoom() < 5) return;
+          this.focusAndSpiderfyCategory(country, category);
+        }, 50);
+      } else if (zoom < 5 && !this.isNavigating && !nationOpen) {
         this.collapseAllGraphs(true);
       }
     });
@@ -676,6 +702,12 @@ export class RadarMapComponent implements AfterViewInit {
     // spiderfy may leave/rebind map-click unspiderfy; keep nation hinterland clicks stable.
     this.disableMarkerClusterMapClickUnspiderfy(cg);
 
+    const firstArt = categoryArts[0];
+    if (firstArt?.country_code && firstArt.primary_category) {
+      this.lastSpiderfyCountry = firstArt.country_code;
+      this.lastSpiderfyCategory = firstArt.primary_category;
+    }
+
     for (const m of realMarkers) {
       if (typeof m.setZIndexOffset === 'function') {
         m.setZIndexOffset(1400);
@@ -685,17 +717,32 @@ export class RadarMapComponent implements AfterViewInit {
   }
 
   /**
-   * leaflet.markercluster registers map `click` → `_unspiderfyWrapper` on add.
-   * That closes the spider fan when clicking the open nation (outside emoji icons).
-   * Remove only that listener; zoom-based unspiderfy stays.
+   * leaflet.markercluster registers map `click` → `_unspiderfyWrapper` and
+   * zoomstart/zoomanim/zoomend → auto-unspiderfy. Click unspiderfy closes the
+   * fan on nation hinterland clicks; zoom unspiderfy collapses the fan on any
+   * wheel tick. Remove both — we unspiderfy explicitly via collapseAllGraphs /
+   * hub root / zoom&lt;5 hatch close instead.
    */
   private disableMarkerClusterMapClickUnspiderfy(cg: MarkerClusterGroupLike): void {
     if (!this.map) return;
     const group = cg as MarkerClusterGroupLike & {
       _unspiderfyWrapper?: (e?: Leaflet.LeafletMouseEvent) => void;
+      _unspiderfyZoomStart?: () => void;
+      _unspiderfyZoomAnim?: (e?: Leaflet.LeafletEvent) => void;
+      _noanimationUnspiderfy?: () => void;
     };
-    if (typeof group._unspiderfyWrapper !== 'function') return;
-    this.map.off('click', group._unspiderfyWrapper, group);
+    if (typeof group._unspiderfyWrapper === 'function') {
+      this.map.off('click', group._unspiderfyWrapper, group);
+    }
+    if (typeof group._unspiderfyZoomStart === 'function') {
+      this.map.off('zoomstart', group._unspiderfyZoomStart, group);
+    }
+    if (typeof group._unspiderfyZoomAnim === 'function') {
+      this.map.off('zoomanim', group._unspiderfyZoomAnim, group);
+    }
+    if (typeof group._noanimationUnspiderfy === 'function') {
+      this.map.off('zoomend', group._noanimationUnspiderfy, group);
+    }
   }
 
   private loadGeoJson(): void {
@@ -1342,6 +1389,10 @@ export class RadarMapComponent implements AfterViewInit {
     this.spiderfyGeneration++;
     this.clearRootMarkers();
     this.restoreDetailHubOnUnspiderfy = restoreHub;
+    if (emitClose) {
+      this.lastSpiderfyCountry = null;
+      this.lastSpiderfyCategory = null;
+    }
 
     this.categoryClusterGroups.forEach((cg) => {
       const spiderfiedCluster = cg._spiderfied;

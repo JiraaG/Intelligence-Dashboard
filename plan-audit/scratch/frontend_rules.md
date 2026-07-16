@@ -169,12 +169,13 @@
 | FE-CL-05 | `frontend.md` Regola 7 | Spiderfy: **solo** categoria del pallino / pill / articolo attivo carosello — non tutte; scroll stessa categoria → solo highlight (`lastSpiderfyKey`). | stesso | Un fan per categoria attiva; no multi-cat spiderfy. |
 | FE-CL-06 | `frontend.md` Regola 7; `AGENTS.md` §5.3 | Hub root lifecycle: su cambio categoria `collapseAllGraphs(false, false)` setta `restoreDetailHubOnUnspiderfy = false`; handler `unspiderfied` **non** deve `clearRootMarkers`/ripristinare hub in quel caso. | stesso | Root non sparisce al cambio categoria; solo chiusura reale (`restoreHub: true`) ripristina. |
 | FE-CL-07 | `frontend.md` Regola 7 | Close/cambio paese: clear detail markers; tornano i pin summary. | stesso | Detail layer cleared; day pins restored. |
-| FE-CL-08 | `angular-map-expert.md` | Offset marker per categoria in pixel/geo progressivo (`GEO_DIRECTIONS`), non solo CSS `iconAnchor` legacy come unica strategia. | stesso | Offset geografico progressivo presente. |
-| FE-CL-09 | `angular-map-expert.md` | `clusterclick`: filtrare articoli esplicitamente per `primary_category` del gruppo. | stesso | Handler filtra `a.primary_category === cat`. |
-| FE-CL-10 | `.agents/AGENTS.md` (nota clustering) | Day-view può usare marker invisibili `isDummy: true` per raggruppamento spaziale nazione senza punti ridondanti (dove ancora applicabile al design day pins). | `radar-map.component.ts` | Se presenti dummy, `isDummy: true` e non mostrati come pin reali. |
-| FE-CL-11 | `frontend.md` accettazione | `showCoverageOnHover: false`, `zoomToBoundsOnClick: false` (pattern expert agent). | stesso | Allineato al pattern documentato in angular-map-expert. |
+| FE-CL-08 | `frontend.md` Regola 5/7 (2026-07-16) | Disabilitare auto-unspiderfy MarkerCluster su click **e** zoom; `lastSpiderfy*`; su `zoomend` ≥ 5 re-spiderfy deferito. | `disableMarkerClusterMapClickUnspiderfy` + `zoomend` | Wheel dezoom di 1 non chiude il fan a zoom ≥ 5. |
+| FE-CL-09 | `angular-map-expert.md` | Offset marker per categoria in pixel/geo progressivo (`GEO_DIRECTIONS`), non solo CSS `iconAnchor` legacy come unica strategia. | stesso | Offset geografico progressivo presente. |
+| FE-CL-10 | `angular-map-expert.md` | `clusterclick`: filtrare articoli esplicitamente per `primary_category` del gruppo. | stesso | Handler filtra `a.primary_category === cat`. |
+| FE-CL-11 | `.agents/AGENTS.md` (nota clustering) | Day-view può usare marker invisibili `isDummy: true` per raggruppamento spaziale nazione senza punti ridondanti (dove ancora applicabile al design day pins). | `radar-map.component.ts` | Se presenti dummy, `isDummy: true` e non mostrati come pin reali. |
+| FE-CL-12 | `frontend.md` accettazione | `showCoverageOnHover: false`, `zoomToBoundsOnClick: false` (pattern expert agent). | stesso | Allineato al pattern documentato in angular-map-expert. |
 
-**Conteggio dominio 11:** 11
+**Conteggio dominio 11:** 12
 
 ---
 
@@ -183,6 +184,7 @@
 | ID | Source | Requirement | Where to verify | Pass criteria |
 |----|--------|-------------|-----------------|---------------|
 | FE-ZM-01 | `frontend.md` Regola 5; `angular-map-expert.md` | Zoom &lt; 5: hatching SVG nazioni, marker nascosti; zoom ≥ 5: hatching opacity 0, marker/pin visibili. | `radar-map.component.ts` + SCSS | Soglia 5 rispettata; transizione CSS `fill-opacity` / opacity. |
+| FE-ZM-08 | `frontend.md` Regola 5 (2026-07-16) | Nation open + spider: a zoom &lt; 5 chiudere fan **e** sidebar (`collapseAllGraphs(true)`); guard `lastSpiderfyCategory` (no close durante `fitBounds` open). | `radar-map` `zoomend` | Hatching on → sidebar chiusa; spider icone assenti. |
 | FE-ZM-02 | `frontend.md` Regola 5 | Transizione CSS obbligatoria (~0.3–0.4s ease-in-out), non toggle istantaneo. | SCSS mappa / global | Regole transition presenti. |
 | FE-ZM-03 | `angular-map-expert.md` Phase 4 | Hatch owner = `getOrCreateComboPattern` — niente direttiva `appLeafletHatch`. | `radar-map` / helpers hatch | Nessun `appLeafletHatch`; combo pattern owner corretto. |
 | FE-ZM-04 | `.agents/AGENTS.md` §5.6; `frontend.md` Regola 11 | `minZoom: 2.2`, `maxBounds` `[-85,-180]`→`[85,180]`, `maxBoundsViscosity: 1.0`. | `radar-map.component.ts` init `L.map` | Opzioni mappa matchano. |
@@ -190,7 +192,7 @@
 | FE-ZM-06 | `frontend.md` Regola 11 | Tooltip nazioni (`.tooltip-row`): allineamento flag/nome/badge (line-height comune, flex). | SCSS tooltip | Allineamento baseline/center coerente. |
 | FE-ZM-07 | `angular-map-expert.md` | Tile CartoDB Dark Positron (estetica Palantir); zoomControl tipicamente off in init documentato. | init map | Tile dark_nolabels (o equivalente Carto dark documentato). |
 
-**Conteggio dominio 12:** 7
+**Conteggio dominio 12:** 8
 
 ---
 
@@ -266,13 +268,13 @@
 | 8 | MOCK_MODE | 4 |
 | 9 | Categorie (10) | 4 |
 | 10 | Bounding box US/RU | 3 |
-| 11 | Spiderfy / cluster | 11 |
-| 12 | Zoom / hatching / legenda | 7 |
+| 11 | Spiderfy / cluster | 12 |
+| 12 | Zoom / hatching / legenda | 8 |
 | 13 | Stack Signals / Standalone | 9 |
 | 14 | GeoJSON / assets | 2 |
 | 15 | Palette / template | 3 |
 | 16 | Misc (feed, flex, npm, browser/, …) | 8 |
-| | **TOTALE** | **88** |
+| | **TOTALE** | **90** |
 
 ---
 

@@ -66,6 +66,7 @@ Il frontend è **largamente conforme** alle governance rules: sidebar freeze ris
 - **Cap:** `SPIDERFY_MAX_ICONS = 24` con park/restore dei layer in eccesso.
 - **Opzioni cluster:** `maxClusterRadius: 40`, `spiderfyOnMaxZoom: false`, `zoomToBoundsOnClick: false`, `showCoverageOnHover: false`; **nessun** `disableClusteringAtZoom: 18`.
 - **Lifecycle hub:** `collapseAllGraphs(false, false)` setta `restoreDetailHubOnUnspiderfy = false`; handler `unspiderfied` non ripristina hub in quel caso.
+- **Dezoom (2026-07-16):** MC zoom-unspiderfy disabilitato; spider+sidebar restano a zoom ≥ 5; a zoom &lt; 5 → `collapseAllGraphs(true)` (guard `lastSpiderfy*`); re-spiderfy deferito su `zoomend` ≥ 5.
 - **Dummy:** `isDummy: true` per raggruppamento spaziale nation (non interattivi).
 - **Offset:** `UI_OFFSETS` dichiarato ma **non applicato** (marker dettaglio condividono il centroide; lo spread è dello spiderfy) → finding P2-01.
 
@@ -290,7 +291,7 @@ style: () => ({
 | FE-MK-01/03/04 | PASS | token default `false`; mock stesse firme Phase 5 |
 | FE-BB-01..03 | PASS | US/RU literal bounds esatti |
 | FE-CL-01..07,10,11 | PASS | 40 / false / cap 24 / hub lifecycle / dummy / coverage flags |
-| FE-ZM-01..07 | PASS | zoom&lt;5 hatch; transition 0.3–0.4s; Carto dark; legenda monoriga |
+| FE-ZM-01..08 | PASS | zoom&lt;5 hatch; spider stay ≥5 / close &lt;5; transition 0.3–0.4s; Carto dark; legenda monoriga |
 | FE-ST-* | PASS | Standalone, signals, PrimeNG+SCSS, Leaflet 1.9.x, DestroyRef |
 | FE-GEO-* | PASS | asset locale + verify in Docker/`prebuild` |
 | FE-MISC-01/02/03/04/07/08 | PASS | Feed: strip in sidebar; flex meta; `npm ci --legacy-peer-deps`; `dist/.../browser`; prettier lint; `infrastructural_entities` in mock |

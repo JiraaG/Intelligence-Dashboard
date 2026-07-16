@@ -204,8 +204,8 @@ Usare sempre le CSS Custom Properties definite in `styles.scss`.
 
 ### Soglia di Zoom
 
-- **Zoom < 5**: Modalità macro — mostra hatching SVG sulle nazioni, nascondi marker
-- **Zoom >= 5**: Modalità dettaglio — nascondi hatching (opacity 0), mostra marker con icone
+- **Zoom < 5**: Modalità macro — mostra hatching SVG sulle nazioni, nascondi marker / pin summary
+- **Zoom >= 5**: Modalità dettaglio — nascondi hatching (opacity 0), mostra marker/pin
 
 ```typescript
 // Nel componente mappa — listener sull'evento zoom di Leaflet
@@ -220,6 +220,14 @@ this.map.on('zoomend', () => {
   }
 });
 ```
+
+### Nation open + spiderfy vs dezoom (obbligatorio)
+
+Con nazione aperta e fan spiderfy attivo:
+
+- **Zoom ≥ 5** (nessun hatching): lo spider **resta aperto**. MarkerCluster **non** deve auto-unspiderfy su wheel/zoom (`disableMarkerClusterMapClickUnspiderfy` rimuove anche `zoomstart` / `zoomanim` / `_noanimationUnspiderfy`). Su `zoomend`, re-spiderfy deferito (`lastSpiderfyCountry` + `lastSpiderfyCategory`) per riallineare le gambe.
+- **Zoom < 5** (hatching / barre colorate): chiudere fan **e** sidebar via `collapseAllGraphs(true)` → `clusterClicked([])`. Guard: solo se `lastSpiderfyCategory` è settato (evita race `fitBounds(maxZoom:4)` all’open nazione).
+- `emitClose` su `collapseAllGraphs` azzera `lastSpiderfyCountry` / `lastSpiderfyCategory`.
 
 ### Transizione CSS Obbligatoria
 
@@ -259,6 +267,8 @@ Il componente `p-sidebar` di PrimeNG può essere usato come wrapper UI.
 **InvalidateSize / spiderfy race:** dopo open nazione, `invalidateSize` **prima** di `focusAndSpiderfyCategory`; `invalidateSize` usa `pan: false` e `setView` solo se la camera è driftata (setView mid-spiderfy svuota il pane MarkerCluster).
 
 **Hub root lifecycle:** su cambio categoria, `collapseAllGraphs(false, false)` setta `restoreDetailHubOnUnspiderfy = false`. Il handler `unspiderfied` **non** deve `clearRootMarkers` / ripristinare hub in quel caso (altrimenti l’`unspiderfy` asincrono del fan precedente cancella il nuovo root). Solo chiusura reale (`restoreHub: true`) ripristina l’hub.
+
+**Zoom / wheel con spider aperto:** disabilitare auto-unspiderfy MarkerCluster su click **e** su zoom (`_unspiderfyWrapper`, `_unspiderfyZoomStart`, `_unspiderfyZoomAnim`, `_noanimationUnspiderfy`). Tenere il fan finché zoom ≥ 5; a zoom &lt; 5 (hatching) → `collapseAllGraphs(true)` (sidebar + spider). Tracciare `lastSpiderfyCountry` / `lastSpiderfyCategory`; su `zoomend` ≥ 5 re-spiderfy deferito (~50ms) per refresh posizioni.
 
 **Focus camera:** `armSkipCountryFit` **solo** con `preserveZoom` (pin summary). Poligono/toolbar: `fitBounds`. Stesso `focusCountryCode` di nuovo → `refocusCountry(code)` (il signal non ri-triggera).
 
