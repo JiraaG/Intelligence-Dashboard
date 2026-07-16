@@ -180,6 +180,7 @@ docker compose exec radar-db psql -U radar_user -d radar_db -c \
 
 # Test manuale pipeline (via script diagnostico)
 docker compose exec radar-backend python scripts/test_production_pipeline.py
+# Nota: lo smoke test test_production_pipeline.py non include più lo stress test RPM (coperto da test_quota_concurrency).
 ```
 
 ---

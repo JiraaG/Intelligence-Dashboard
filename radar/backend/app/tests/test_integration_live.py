@@ -14,7 +14,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 from scripts.test_production_pipeline import (
     test_external_connections as run_test_external_connections,
     test_e2e_transactional_commit as run_test_e2e_transactional_commit,
-    stress_test_rate_limiter as run_stress_test_rate_limiter,
 )
 
 
@@ -69,8 +68,6 @@ async def test_live_e2e_transactional_commit() -> None:
 @pytest.mark.asyncio
 async def test_live_rate_limiter_throttling() -> None:
     """Verifica il corretto distanziamento temporale delle chiamate asincrone concorrenti."""
-    classification = _live_classification_client()
-    try:
-        await run_stress_test_rate_limiter(classification)
-    except Exception as e:
-        pytest.fail(f"Errore nel test del rate limiter throttling: {e}")
+    pytest.skip(
+        "T-P0-02 path b: throttling coperto da test_quota_concurrency; stress pipeline rimosso/neutralizzato"
+    )

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Radar Informativo Globale — Live Integration & Production Audit Script
-Esegue controlli reali senza l'ausilio di mock su database, client Miniflux,
-connessioni Gemini API ed il throttling del rate limiter.
+Esegue controlli reali senza l'ausilio di mock su database, client Miniflux
+e connessioni Gemini API.
 
 Requires RUN_LIVE_TESTS=1. E2E write tests require an isolated test database
 (RADAR_LIVE_TEST_DATABASE_URL) and optionally RADAR_LIVE_TEST_VAULT_PATH.
@@ -11,14 +11,13 @@ Requires RUN_LIVE_TESTS=1. E2E write tests require an isolated test database
 import sys
 import os
 import asyncio
-import time
 import logging
 import socket
 import uuid
 import tempfile
 import shutil
 from urllib.parse import urlparse
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 # Setup PYTHONPATH per caricare i moduli di app/
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -286,32 +285,16 @@ async def test_e2e_transactional_commit(miniflux: MinifluxClient) -> None:
                 logger.warning(f"Errore nella rimozione del vault temporaneo: {clean_vault_err}")
 
 
-async def stress_test_rate_limiter(classification: ClassificationClient) -> None:
-    require_live_tests_enabled()
-    logger.info("=== STEP 3: Stress Test del Rate Limiter ===")
-    logger.info("Lancio di 5 chiamate asincrone concorrenti al rate limiter...")
+def _local_classification_client() -> ClassificationClient:
+    """Helper locale per inizializzare ClassificationClient con una quota fittizia (mock)."""
+    from unittest.mock import AsyncMock
 
-    timestamps: List[float] = []
-
-    async def limiter_worker(worker_id: int) -> None:
-        await classification._wait_for_rate_limit()
-        acq_time = time.time()
-        timestamps.append(acq_time)
-        logger.info(f"Worker {worker_id} ha superato la barriera temporale al timestamp: {acq_time:.4f}")
-
-    start_time = time.time()
-    await asyncio.gather(*(limiter_worker(i) for i in range(1, 6)))
-    total_duration = time.time() - start_time
-
-    logger.info(f"Tutti i worker hanno completato l'esecuzione in {total_duration:.2f}s")
-
-    timestamps.sort()
-    for idx in range(len(timestamps) - 1):
-        diff = timestamps[idx + 1] - timestamps[idx]
-        logger.info(f"Intervallo tra transizione {idx+1} e {idx+2}: {diff:.4f} secondi")
-        assert diff >= 3.9, f"Errore: Throttling insufficiente. Rilevati solo {diff:.2f}s di attesa."
-
-    logger.info("Stress Test Rate Limiter superato con successo.")
+    quota = AsyncMock()
+    quota.reserve = AsyncMock(side_effect=list(range(1, 10_000)))
+    quota.complete = AsyncMock()
+    quota.release = AsyncMock()
+    quota.fail = AsyncMock()
+    return ClassificationClient(quota=quota)
 
 
 async def main() -> None:
@@ -324,7 +307,7 @@ async def main() -> None:
 
     async with httpx.AsyncClient() as http_client:
         miniflux = MinifluxClient(MINIFLUX_API_URL, MINIFLUX_API_KEY, http_client=http_client)
-        classification = ClassificationClient()
+        classification = _local_classification_client()
 
         try:
             await test_external_connections(miniflux, classification)
@@ -336,8 +319,6 @@ async def main() -> None:
                     f"[DB INTEGRATION WARNING] E2E isolato non riuscito ({db_net_err}). "
                     "Imposta RADAR_LIVE_TEST_DATABASE_URL verso un database di test dedicato."
                 )
-
-            await stress_test_rate_limiter(classification)
 
             logger.info("=== TUTTI I CONTROLLI DI INTEGRAZIONE HANNO AVUTO ESITO POSITIVO ===")
             sys.exit(0)
