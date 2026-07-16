@@ -39,12 +39,12 @@ File unico: `radar/frontend/src/app/components/radar-map/radar-map.component.ts`
 
 ## Restore
 
-Dopo il commit su `refactor/testing`, usare lo SHA del commit di questo fix come restore point:
+Restore point su `refactor/testing`:
 
 ```text
-git checkout <SHA_DI_QUESTO_COMMIT>
+git checkout ed3d88f
 # oppure
-git revert <SHA_DI_QUESTO_COMMIT>
+git revert ed3d88f
 ```
 
 Rollback mirato al solo comportamento zoom: ripristinare il `zoomend` precedente (close solo se `!nationOpen`) e rimuovere lo strip degli handler zoom da `disableMarkerClusterMapClickUnspiderfy` — **non** reintrodurre auto-unspiderfy su click hinterland.
