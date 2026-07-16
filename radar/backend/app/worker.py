@@ -27,7 +27,7 @@ from app.commit.router import get_article_file_path, initialize_vault_directorie
 from app.core.config import (
     DATABASE_URL,
     LLM_API_KEY,
-    LLM_RPD,
+    LLM_SIMPLE,
     MAX_MINIFLUX_RESPONSE_BYTES,
     MINIFLUX_API_KEY,
     MINIFLUX_API_URL,
@@ -328,13 +328,14 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                     async with state.parse_sem:
                         clean_content = strip_html_tags(entry.content)
 
-                    async with state.gemini_sem:
-                        extracted_article = await state.classification_client.classify_article(
-                            title=title,
-                            content=clean_content,
-                            url=source_url,
-                            date=published_date,
-                        )
+                    # Gemini concurrency is enforced inside ClassificationClient._generate_content
+                    # so DeepSeek COMPLEX work is not blocked behind Gemini 429 sleeps.
+                    extracted_article = await state.classification_client.classify_article(
+                        title=title,
+                        content=clean_content,
+                        url=source_url,
+                        date=published_date,
+                    )
 
                     extracted_article = extracted_article.model_copy(
                         update={
@@ -431,8 +432,12 @@ async def _entry_consumer(
             queue.task_done()
 
 
-async def _ledger_rpd_used(pool: asyncpg.Pool) -> int:
-    """Count active llm_request_ledger rows in the RADAR_TIME_ZONE half-open day."""
+async def _ledger_simple_rpd_used(pool: asyncpg.Pool) -> int:
+    """Count active SIMPLE-lane ledger rows in the RADAR_TIME_ZONE half-open day.
+
+    Prefer purpose ``classify:simple``; legacy rows without that purpose fall back to
+    non-DeepSeek model heuristic (pre-generalization ledger).
+    """
     day_start, day_end = compute_day_window(datetime.now(timezone.utc), RADAR_TIME_ZONE)
     async with pool.acquire() as conn:
         used = await conn.fetchval(
@@ -442,6 +447,13 @@ async def _ledger_rpd_used(pool: asyncpg.Pool) -> int:
             WHERE created_at >= $1
               AND created_at < $2
               AND status = ANY($3::text[])
+              AND (
+                    purpose = 'classify:simple'
+                 OR (
+                        (purpose IS NULL OR purpose = 'classify_article')
+                    AND (model IS NULL OR model NOT ILIKE '%deepseek%')
+                 )
+              )
             """,
             day_start,
             day_end,
@@ -452,9 +464,9 @@ async def _ledger_rpd_used(pool: asyncpg.Pool) -> int:
 
 async def run_pipeline_cycle(state: WorkerState) -> None:
     """
-    One ingest cycle: reconcile → RPD soft-trim via ledger → fetch →
+    One ingest cycle: reconcile → SIMPLE RPD soft-trim via ledger → fetch →
     bounded queue + N consumers (never TaskGroup-all-entries).
-    Hard RPM/TPM/RPD enforcement remains in QuotaLedger.reserve per attempt.
+    Hard RPM/TPM/RPD enforcement remains in QuotaLedger.reserve per lane.
     """
     assert state.db_pool is not None
     assert state.miniflux_client is not None
@@ -463,13 +475,16 @@ async def run_pipeline_cycle(state: WorkerState) -> None:
 
     await reconcile_outbox(state.db_pool, state.miniflux_client)
 
-    processed_today = await _ledger_rpd_used(state.db_pool)
-    if processed_today >= LLM_RPD:
+    # Soft-trim solo sulla lane SIMPLE (LLM_SIMPLE_RPD). 0 = nessun soft-trim.
+    # Hard RPM/TPM/RPD restano in QuotaLedger.reserve(lane=...) per entrambe le lane.
+    simple_rpd = LLM_SIMPLE.rpd
+    processed_today = await _ledger_simple_rpd_used(state.db_pool)
+    if simple_rpd > 0 and processed_today >= simple_rpd:
         logger.warning(
-            "LIMITE RPD RAGGIUNTO (ledger): %s/%s tentativi LLM oggi (tz window). "
-            "Ciclo in ibernazione.",
+            "LIMITE RPD LANE SIMPLE RAGGIUNTO (ledger): %s/%s tentativi oggi (tz window). "
+            "Ciclo in ibernazione (lane COMPLEX non conta su questo tetto).",
             processed_today,
-            LLM_RPD,
+            simple_rpd,
         )
         return
 
@@ -478,14 +493,15 @@ async def run_pipeline_cycle(state: WorkerState) -> None:
         logger.info("Nessun articolo non letto presente in Miniflux.")
         return
 
-    remaining_rpd = LLM_RPD - processed_today
-    if len(entries) > remaining_rpd:
-        logger.info(
-            "Riduzione lotto da %d a %d per soft-trim RPD ledger.",
-            len(entries),
-            remaining_rpd,
-        )
-        entries = entries[:remaining_rpd]
+    if simple_rpd > 0:
+        remaining_rpd = simple_rpd - processed_today
+        if len(entries) > remaining_rpd:
+            logger.info(
+                "Riduzione lotto da %d a %d per soft-trim RPD lane SIMPLE.",
+                len(entries),
+                remaining_rpd,
+            )
+            entries = entries[:remaining_rpd]
 
     queue: asyncio.Queue = asyncio.Queue(maxsize=WORKER_QUEUE_DEPTH)
     results: dict[str, int] = {"success": 0, "failure": 0}
@@ -613,18 +629,21 @@ async def run_worker() -> None:
             http_client=state.http_client,
         )
 
+        parse_sem, db_sem, gemini_sem = build_worker_semaphores()
+        state.parse_sem = parse_sem
+        state.db_sem = db_sem
+        state.gemini_sem = gemini_sem
+
         if ingest_enabled:
-            state.classification_client = ClassificationClient(pool=state.db_pool)
+            state.classification_client = ClassificationClient(
+                pool=state.db_pool,
+                gemini_sem=gemini_sem,
+            )
         else:
             logger.error(
                 "GEMINI_API_KEY/GOOGLE_API_KEY mancante: ingest LLM sospeso. "
                 "API e frontend restano disponibili; il worker mantiene leadership + heartbeat."
             )
-
-        parse_sem, db_sem, gemini_sem = build_worker_semaphores()
-        state.parse_sem = parse_sem
-        state.db_sem = db_sem
-        state.gemini_sem = gemini_sem
 
         state.lock_conn = await asyncpg.connect(DATABASE_URL)
         try:

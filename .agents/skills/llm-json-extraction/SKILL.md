@@ -13,7 +13,7 @@ when_to_use:
   - Debug di errori di parsing JSON dalla risposta LLM
   - Cascata modelli, routing complexity, cooldown 24h
   - Aggiunta di nuovi campi al contratto di estrazione
-version: 1.4.0
+version: 1.5.0
 ---
 
 ## Quando Usare Questa Skill
@@ -24,7 +24,7 @@ Carica questa skill ogni volta che:
 - Gemini/DeepSeek restituisce un JSON incompleto o con campi non presenti nello schema
 - Devi ottimizzare il System Prompt per ridurre le allucinazioni geografiche
 - Cambi `GEMINI_MODEL` / fallbacks / `DEEPSEEK_*` / `LLM_ROUTING_*` /
-  `LLM_SIMPLE_PROVIDER|MODEL` / `LLM_COMPLEX_PROVIDER|MODEL`
+  `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (incluso `REASONING_EFFORT`)
 
 ---
 
@@ -34,7 +34,7 @@ Carica questa skill ogni volta che:
 
 ```
 1. Worker (radar-worker): advisory lock → reconcile outbox → fetch Miniflux (coda bounded)
-2. Per entry: dedup → sanitize → complexity lane (optional) → QuotaLedger.reserve(model=)
+2. Per entry: dedup → sanitize → complexity lane v2.2 → QuotaLedger.reserve(model=, lane=)
    → Gemini (google-genai) e/o DeepSeek (httpx OpenAI-compatible; no package openai)
 3. Parsing/validazione Pydantic strict; complete(reservation_id) con usage reale
 4. Hard-fail → llm_model_cooldown 24h + next model; 429 breve → Retry-After same model
@@ -44,17 +44,29 @@ Carica questa skill ogni volta che:
 ```
 
 **Invarianti:** schema/prompt immutabili; `content[:4000]` su tutte le lane; package `openai` vietato;
-lane via `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (`gemini`\|`deepseek`); DeepSeek `classify_json(model=ref.model)`.
+lane via `LLM_SIMPLE_*` / `LLM_COMPLEX_*`; DeepSeek `classify_json(model=ref.model)`.
 
-### Env lane (ops)
+### Complexity → modello (v2.2)
+
+| Condizione | Lane | Catena |
+|------------|------|--------|
+| 0 famiglie forti, o solo L | SIMPLE | `LLM_SIMPLE` (tipico effort=`none`) |
+| 1 di {G, E, X} | BORDERLINE | `LLM_COMPLEX` (tipico effort=`high`) |
+| ≥2 famiglie (L solo in combo) | COMPLEX | `LLM_COMPLEX` (tipico effort=`high`) |
+
+`geo_marker` da solo: solo se `body_len ≥ 1500`. ≥2 country → G sempre.
+
+### Env lane (ops tipico)
 
 ```text
-LLM_ROUTING_MODE=complexity          # off | complexity
-LLM_ROUTING_SHADOW=false             # true = solo log lane + catena SIMPLE
-LLM_SIMPLE_PROVIDER=gemini
-LLM_SIMPLE_MODEL=gemini-3.1-flash-lite
+LLM_ROUTING_MODE=complexity
+LLM_ROUTING_SHADOW=false
+LLM_SIMPLE_PROVIDER=deepseek
+LLM_SIMPLE_MODEL=deepseek-v4-flash
+LLM_SIMPLE_REASONING_EFFORT=none
 LLM_COMPLEX_PROVIDER=deepseek
 LLM_COMPLEX_MODEL=deepseek-v4-flash
+LLM_COMPLEX_REASONING_EFFORT=high
 # Swap COMPLEX → Google: LLM_COMPLEX_PROVIDER=gemini + LLM_COMPLEX_MODEL=…
 ```
 

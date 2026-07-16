@@ -1,4 +1,4 @@
-"""Gemini (+ optional DeepSeek) classification with durable quota, cascade, and lanes."""
+"""Multi-provider classification with durable quota, cascade, and lanes."""
 
 from __future__ import annotations
 
@@ -19,26 +19,27 @@ from app.classification.complexity import Lane, score_complexity
 from app.classification.cooldown import ModelCooldownStore
 from app.classification.deepseek import DeepSeekClient, DeepSeekError
 from app.classification.prompts import SYSTEM_PROMPT, build_user_prompt
-from app.classification.quota import QuotaLedger
-from app.classification.validator import GeopoliticalArticleSchema, get_fallback_article
+from app.classification.quota import QuotaBudgetExceeded, QuotaLedger
+from app.classification.validator import GeopoliticalArticleSchema, get_fallback_article, parse_llm_article_json
 from app.core.config import (
     ConfigError,
     ESTIMATED_TOKENS_PER_REQUEST,
     GEMINI_MODEL,
-    GEMINI_MODEL_FALLBACKS,
     GEMINI_REQUEST_TIMEOUT,
     LLM_API_KEY,
-    LLM_COMPLEX_MODEL,
-    LLM_COMPLEX_PROVIDER,
+    LLM_COMPLEX,
     LLM_COMPLEXITY_ESCALATE_ON_VALIDATION,
     LLM_MODEL_COOLDOWN_HOURS,
     LLM_ROUTING_MODE,
     LLM_ROUTING_SHADOW,
     LLM_ROUTING_STRICT,
-    LLM_RPM,
-    LLM_SIMPLE_MODEL,
-    LLM_SIMPLE_PROVIDER,
-    LLM_TPM,
+    LLM_SIMPLE,
+)
+from app.core.llm_lanes import (
+    LANE_COMPLEX,
+    LANE_SIMPLE,
+    LlmLaneConfig,
+    OPENAI_COMPAT_PROVIDERS,
 )
 
 logger = logging.getLogger("radar.classification.client")
@@ -47,6 +48,55 @@ _MAX_ATTEMPTS = 4
 _RETRY_AFTER_MAX_SECONDS = 300.0
 _PROVIDER_GEMINI = "gemini"
 _PROVIDER_DEEPSEEK = "deepseek"
+# Gemma often truncates / drifts more than Flash; prefer lower temp + more room.
+# Cap below Flash-Lite extremes: 8192 + concurrency=4 was hitting the 60s deadline.
+_GEMMA_MAX_OUTPUT_TOKENS = 4096
+_GEMMA_TEMPERATURE = 0.1
+_DEFAULT_MAX_OUTPUT_TOKENS = 2048
+_DEFAULT_TEMPERATURE = 0.3
+
+
+def _is_gemma_model(model: str) -> bool:
+    return "gemma" in (model or "").lower()
+
+
+def _extract_gemini_text(response: Any) -> str | None:
+    """Best-effort text from a generate_content response (never trust .text alone)."""
+    direct = getattr(response, "text", None)
+    if isinstance(direct, str) and direct.strip():
+        return direct
+    try:
+        candidates = getattr(response, "candidates", None) or []
+        for cand in candidates:
+            content = getattr(cand, "content", None)
+            parts = getattr(content, "parts", None) or []
+            chunks: list[str] = []
+            for part in parts:
+                t = getattr(part, "text", None)
+                if isinstance(t, str) and t:
+                    chunks.append(t)
+            if chunks:
+                joined = "".join(chunks).strip()
+                if joined:
+                    return joined
+    except Exception:
+        pass
+    return None
+
+
+def _exc_msg(exc: BaseException, limit: int = 200) -> str:
+    """Human-readable exception text; never empty (some SDK errors have blank str())."""
+    text = str(exc).strip() or repr(exc)
+    cause = getattr(exc, "__cause__", None)
+    if cause is not None:
+        cause_text = str(cause).strip() or repr(cause)
+        if cause_text and cause_text not in text:
+            text = f"{text} | cause={cause_text}"
+    return text[:limit]
+
+
+_PROVIDER_OPENAI = "openai"
+_PROVIDER_CLAUDE = "claude"
 
 _GEMINI_UNSUPPORTED_SCHEMA_KEYS = frozenset(
     {
@@ -128,11 +178,17 @@ def classify_provider_error(exc: BaseException) -> ErrorClass:
         if code == 404:
             return ErrorClass.HARD_COOLDOWN
         if code == 429:
-            # Solo segnali espliciti di RPD/giorno → cooldown 24h.
-            # "RESOURCE_EXHAUSTED" / "quota" generici sono spesso RPM → RETRYABLE.
+            # RPD / free_tier day → cooldown 24h. RPM breve → RETRYABLE.
             if any(
                 token in message
-                for token in ("daily", "per day", "rpd", "requests per day")
+                for token in (
+                    "daily",
+                    "per day",
+                    "rpd",
+                    "requests per day",
+                    "free_tier_requests",
+                    "free tier",
+                )
             ):
                 return ErrorClass.HARD_COOLDOWN
             return ErrorClass.RETRYABLE
@@ -248,18 +304,25 @@ def _usage_token_count(response: Any) -> int | None:
         return None
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class _ModelRef:
     provider: str
     model: str
+    quota_lane: str  # simple | complex — which lane limits apply
+    # Distinguishes same model with different thinking (e.g. flash none vs high).
+    reasoning_effort: str = "high"
 
+    @property
+    def identity(self) -> tuple[str, str, str]:
+        return (self.provider, self.model, self.reasoning_effort)
 
 class ClassificationClient:
     """
     Classification with QuotaLedger reserve-before-every-attempt.
 
     - LLM_ROUTING_MODE=off / shadow: only SIMPLE lane chain.
-    - complexity: SIMPLE/BORDERLINE → LLM_SIMPLE_*; COMPLEX → LLM_COMPLEX_* then residual.
+    - complexity: SIMPLE → LLM_SIMPLE; BORDERLINE+COMPLEX → LLM_COMPLEX; escalate on validation.
+    Provider type (gemini|deepseek|openai|claude) selects the adapter.
     """
 
     def __init__(
@@ -269,52 +332,95 @@ class ClassificationClient:
         quota: QuotaLedger | None = None,
         cooldown: ModelCooldownStore | None = None,
         deepseek: DeepSeekClient | None = None,
+        gemini_sem: asyncio.Semaphore | None = None,
     ) -> None:
-        if not LLM_API_KEY:
-            raise ValueError("Chiave API LLM mancante. Configura GOOGLE_API_KEY o GEMINI_API_KEY.")
+        self._simple = LLM_SIMPLE
+        self._complex = LLM_COMPLEX
+
+        needs_gemini = (
+            self._simple.provider == _PROVIDER_GEMINI
+            or self._complex.provider == _PROVIDER_GEMINI
+        )
+        gemini_key = ""
+        if self._simple.provider == _PROVIDER_GEMINI:
+            gemini_key = self._simple.api_key
+        elif self._complex.provider == _PROVIDER_GEMINI:
+            gemini_key = self._complex.api_key
+        if not gemini_key:
+            gemini_key = LLM_API_KEY or ""
+
+        if needs_gemini and not gemini_key:
+            raise ValueError(
+                "Chiave API Gemini mancante. Imposta LLM_SIMPLE_API_KEY / "
+                "LLM_COMPLEX_API_KEY oppure GEMINI_API_KEY / GOOGLE_API_KEY."
+            )
         if quota is None and pool is None:
             raise ValueError("ClassificationClient richiede pool (asyncpg) o un QuotaLedger iniettato.")
 
         self.pool = pool
         self.quota = quota if quota is not None else QuotaLedger(pool)  # type: ignore[arg-type]
-        self.client = genai.Client(api_key=LLM_API_KEY)
-        self.model = LLM_SIMPLE_MODEL if LLM_SIMPLE_PROVIDER == _PROVIDER_GEMINI else (
-            GEMINI_MODEL or "gemma-4-31b"
+        self.client = genai.Client(api_key=gemini_key) if gemini_key else None
+        self.model = (
+            self._simple.model
+            if self._simple.provider == _PROVIDER_GEMINI
+            else (GEMINI_MODEL or "gemma-4-31b")
         )
-        self._request_timeout = float(GEMINI_REQUEST_TIMEOUT)
+        self._request_timeout = float(
+            max(self._simple.timeout, self._complex.timeout, float(GEMINI_REQUEST_TIMEOUT))
+        )
         self._estimated_tokens = int(ESTIMATED_TOKENS_PER_REQUEST)
         self.cooldown = cooldown or ModelCooldownStore(
             pool,
             default_hours=LLM_MODEL_COOLDOWN_HOURS,
         )
-        self.deepseek = deepseek if deepseek is not None else DeepSeekClient()
+        self.deepseek = deepseek  # optional test inject; otherwise built per-lane
+        self._compat_clients: dict[str, DeepSeekClient] = {}
+        self._gemini_sem = gemini_sem
 
         self._routing_mode = LLM_ROUTING_MODE
         self._shadow = bool(LLM_ROUTING_SHADOW)
         self._escalate = bool(LLM_COMPLEXITY_ESCALATE_ON_VALIDATION)
-        self._simple_provider = LLM_SIMPLE_PROVIDER
-        self._simple_model = LLM_SIMPLE_MODEL
-        self._complex_provider = LLM_COMPLEX_PROVIDER
-        self._complex_model = LLM_COMPLEX_MODEL
+        self._simple_provider = self._simple.provider
+        self._simple_model = self._simple.model
+        self._complex_provider = self._complex.provider
+        self._complex_model = self._complex.model
 
         self._complex_unavailable = False
-        if self._complex_provider == _PROVIDER_DEEPSEEK and not self.deepseek.available:
+        if self._complex.provider == _PROVIDER_CLAUDE:
+            msg = "LLM_COMPLEX_PROVIDER=claude non ancora supportato — COMPLEX userà SIMPLE"
+            if self._routing_mode == "complexity" and LLM_ROUTING_STRICT:
+                raise ValueError(msg)
+            logger.warning(msg)
+            self._complex_unavailable = True
+        elif self._complex.provider in OPENAI_COMPAT_PROVIDERS and not self._complex.available:
             msg = (
-                "LLM_COMPLEX_PROVIDER=deepseek ma DEEPSEEK_API_KEY assente — "
+                f"LLM_COMPLEX_PROVIDER={self._complex.provider} senza API key — "
                 "COMPLEX userà la lane SIMPLE"
             )
             if self._routing_mode == "complexity" and LLM_ROUTING_STRICT:
                 raise ValueError(msg)
             logger.warning(msg)
             self._complex_unavailable = True
-        if self._simple_provider == _PROVIDER_DEEPSEEK and not self.deepseek.available:
+        elif self._complex.provider == _PROVIDER_GEMINI and not self._complex.available:
+            msg = "LLM_COMPLEX_PROVIDER=gemini senza API key — COMPLEX userà SIMPLE"
+            if self._routing_mode == "complexity" and LLM_ROUTING_STRICT:
+                raise ValueError(msg)
+            logger.warning(msg)
+            self._complex_unavailable = True
+
+        if self._simple.provider == _PROVIDER_CLAUDE:
+            raise ValueError("LLM_SIMPLE_PROVIDER=claude non ancora supportato.")
+        if self._simple.provider in OPENAI_COMPAT_PROVIDERS and not self._simple.available:
             raise ValueError(
-                "LLM_SIMPLE_PROVIDER=deepseek richiede DEEPSEEK_API_KEY."
+                f"LLM_SIMPLE_PROVIDER={self._simple.provider} richiede LLM_SIMPLE_API_KEY "
+                "(o legacy DEEPSEEK_API_KEY / OPENAI_API_KEY)."
             )
+        if self._simple.provider == _PROVIDER_GEMINI and not self._simple.available and not gemini_key:
+            raise ValueError("LLM_SIMPLE_PROVIDER=gemini richiede una API key.")
 
         logger.info(
             "ClassificationClient pronto. simple=%s/%s complex=%s/%s routing=%s shadow=%s "
-            "timeout=%ss (RPM=%s TPM=%s)",
+            "timeout=%ss limits simple(RPM=%s RPD=%s budget=%s) complex(RPM=%s RPD=%s budget=%s)",
             self._simple_provider,
             self._simple_model,
             self._complex_provider,
@@ -322,9 +428,33 @@ class ClassificationClient:
             self._routing_mode,
             self._shadow,
             self._request_timeout,
-            LLM_RPM,
-            LLM_TPM,
+            self._simple.rpm,
+            self._simple.rpd,
+            self._simple.budget_usd_day,
+            self._complex.rpm,
+            self._complex.rpd,
+            self._complex.budget_usd_day,
         )
+
+    def _lane_cfg(self, quota_lane: str) -> LlmLaneConfig:
+        return self._simple if quota_lane == LANE_SIMPLE else self._complex
+
+    def _compat_client(self, quota_lane: str) -> DeepSeekClient:
+        if self.deepseek is not None and self._lane_cfg(quota_lane).provider == _PROVIDER_DEEPSEEK:
+            return self.deepseek
+        cached = self._compat_clients.get(quota_lane)
+        if cached is not None:
+            return cached
+        cfg = self._lane_cfg(quota_lane)
+        client = DeepSeekClient(
+            api_key=cfg.api_key,
+            base_url=cfg.base_url or None,
+            model=cfg.model,
+            effort=cfg.reasoning_effort,
+            timeout=cfg.timeout,
+        )
+        self._compat_clients[quota_lane] = client
+        return client
 
     async def _generate_content(
         self,
@@ -332,53 +462,107 @@ class ClassificationClient:
         contents: Any,
         model: str | None = None,
     ) -> Any:
-        """Call Gemini via async SDK under application deadline."""
+        """Call Gemini via async SDK under application deadline (+ optional concurrency sem)."""
         use_model = model or self.model
-        return await asyncio.wait_for(
-            self.client.aio.models.generate_content(
-                model=use_model,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    system_instruction=SYSTEM_PROMPT,
-                    response_mime_type="application/json",
-                    response_schema=build_gemini_response_schema(),
-                    temperature=0.3,
-                    max_output_tokens=2048,
-                ),
-            ),
-            timeout=self._request_timeout,
-        )
+        gemma = _is_gemma_model(use_model)
+        temperature = _GEMMA_TEMPERATURE if gemma else _DEFAULT_TEMPERATURE
+        max_output_tokens = _GEMMA_MAX_OUTPUT_TOKENS if gemma else _DEFAULT_MAX_OUTPUT_TOKENS
 
-    def _provider_refs(self, provider: str, model: str) -> list[_ModelRef]:
-        if provider == _PROVIDER_DEEPSEEK:
-            return [_ModelRef(_PROVIDER_DEEPSEEK, model)]
-        # Gemini: lane model + optional GEMINI_MODEL_FALLBACKS only (no forced GEMINI_MODEL).
-        models = [model]
-        for fb in GEMINI_MODEL_FALLBACKS:
-            if fb not in models:
-                models.append(fb)
-        return [_ModelRef(_PROVIDER_GEMINI, m) for m in models]
+        async def _call() -> Any:
+            if self.client is None:
+                raise ConfigError("Gemini client non configurato")
+            return await asyncio.wait_for(
+                self.client.aio.models.generate_content(
+                    model=use_model,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_PROMPT,
+                        response_mime_type="application/json",
+                        response_schema=build_gemini_response_schema(),
+                        temperature=temperature,
+                        max_output_tokens=max_output_tokens,
+                    ),
+                ),
+                timeout=self._request_timeout,
+            )
+
+        if self._gemini_sem is not None:
+            async with self._gemini_sem:
+                return await _call()
+        return await _call()
+
+    def _provider_refs(self, cfg: LlmLaneConfig) -> list[_ModelRef]:
+        if cfg.provider == _PROVIDER_CLAUDE:
+            return []
+        if cfg.provider in OPENAI_COMPAT_PROVIDERS:
+            return [
+                _ModelRef(cfg.provider, m, cfg.lane, cfg.reasoning_effort)
+                for m in cfg.models
+            ]
+        # gemini (and unknown → treat as gemini-shaped cascade)
+        return [
+            _ModelRef(_PROVIDER_GEMINI, m, cfg.lane, cfg.reasoning_effort)
+            for m in cfg.models
+        ]
 
     def _simple_chain(self) -> list[_ModelRef]:
-        return self._provider_refs(self._simple_provider, self._simple_model)
+        """
+        Catena lane SIMPLE.
+
+        - Primary: solo modelli di LLM_SIMPLE (niente CSV Gemini fallback).
+        - Residual: lane COMPLEX se diversa (provider/model/effort) — cooldown/esaurimento.
+        """
+        primary = self._provider_refs(self._simple)
+        simple_id = (
+            self._simple.provider,
+            self._simple.model,
+            self._simple.reasoning_effort,
+        )
+        complex_id = (
+            self._complex.provider,
+            self._complex.model,
+            self._complex.reasoning_effort,
+        )
+        if (
+            self._routing_mode == "complexity"
+            and not self._complex_unavailable
+            and simple_id != complex_id
+        ):
+            # Cross-lane residual only — no same-provider Gemini CSV fallbacks.
+            residual = self._provider_refs(self._complex)
+            out: list[_ModelRef] = []
+            seen: set[tuple[str, str, str]] = set()
+            for ref in [*primary, *residual]:
+                if ref.identity in seen:
+                    continue
+                seen.add(ref.identity)
+                out.append(ref)
+            return out
+        return primary
 
     def _complex_chain(self) -> list[_ModelRef]:
-        primary = self._provider_refs(self._complex_provider, self._complex_model)
-        residual = self._simple_chain()
+        """
+        Catena lane COMPLEX.
+
+        - Primary: LLM_COMPLEX.
+        - Residual: solo LLM_SIMPLE (viceversa su quota/cooldown COMPLEX).
+        """
+        primary = self._provider_refs(self._complex)
+        residual = self._provider_refs(self._simple)
         out: list[_ModelRef] = []
-        seen: set[tuple[str, str]] = set()
+        seen: set[tuple[str, str, str]] = set()
         for ref in [*primary, *residual]:
-            key = (ref.provider, ref.model)
-            if key in seen:
+            if ref.identity in seen:
                 continue
-            seen.add(key)
+            seen.add(ref.identity)
             out.append(ref)
         return out
 
     def _chain_for(self, lane: Lane, *, force_simple: bool) -> list[_ModelRef]:
         if force_simple or self._routing_mode != "complexity":
             return self._simple_chain()
-        if lane == Lane.COMPLEX and not self._complex_unavailable:
+        # BORDERLINE = schema risk (geo/entity/script) → thinking-capable lane.
+        if lane in (Lane.COMPLEX, Lane.BORDERLINE) and not self._complex_unavailable:
             return self._complex_chain()
         return self._simple_chain()
 
@@ -388,7 +572,12 @@ class ClassificationClient:
             if await self.cooldown.is_cooling_down(ref.provider, ref.model):
                 logger.info("Skip cooldown %s/%s", ref.provider, ref.model)
                 continue
-            if ref.provider == _PROVIDER_DEEPSEEK and not self.deepseek.available:
+            if ref.provider == _PROVIDER_CLAUDE:
+                continue
+            if ref.provider in OPENAI_COMPAT_PROVIDERS:
+                if not self._compat_client(ref.quota_lane).available:
+                    continue
+            if ref.provider == _PROVIDER_GEMINI and self.client is None:
                 continue
             out.append(ref)
         return out
@@ -407,7 +596,10 @@ class ClassificationClient:
         force_simple = (
             self._routing_mode != "complexity"
             or self._shadow
-            or (lane == Lane.COMPLEX and self._complex_unavailable)
+            or (
+                lane in (Lane.COMPLEX, Lane.BORDERLINE)
+                and self._complex_unavailable
+            )
         )
 
         logger.info(
@@ -426,11 +618,25 @@ class ClassificationClient:
         )
 
         chain = await self._eligible(self._chain_for(lane, force_simple=force_simple))
+        if chain:
+            primary = chain[0]
+            logger.info(
+                "route lane=%s → %s/%s effort=%s",
+                lane.value,
+                primary.provider,
+                primary.model,
+                primary.reasoning_effort,
+            )
         if not chain:
             logger.error("Nessun modello eleggibile (tutti in cooldown). Fallback.")
             return get_fallback_article(title, url, date)
 
-        escalate_ref = _ModelRef(self._complex_provider, self._complex_model)
+        escalate_ref = _ModelRef(
+            self._complex_provider,
+            self._complex_model,
+            LANE_COMPLEX,
+            self._complex.reasoning_effort,
+        )
         escalated = False
         for ref in chain:
             article, outcome = await self._run_model_attempts(
@@ -443,9 +649,10 @@ class ClassificationClient:
             )
             if article is not None:
                 logger.info(
-                    "OK model=%s/%s lane=%s escalated=%s",
+                    "OK model=%s/%s effort=%s lane=%s escalated=%s",
                     ref.provider,
                     ref.model,
+                    ref.reasoning_effort,
                     lane.value,
                     escalated,
                 )
@@ -460,13 +667,15 @@ class ClassificationClient:
                 and not escalated
                 and not force_simple
                 and not self._complex_unavailable
-                and (ref.provider, ref.model) != (escalate_ref.provider, escalate_ref.model)
+                and ref.identity != escalate_ref.identity
                 and not await self.cooldown.is_cooling_down(
                     escalate_ref.provider, escalate_ref.model
                 )
             )
-            if can_escalate and escalate_ref.provider == _PROVIDER_DEEPSEEK:
-                can_escalate = self.deepseek.available
+            if can_escalate and escalate_ref.provider in OPENAI_COMPAT_PROVIDERS:
+                can_escalate = self._compat_client(LANE_COMPLEX).available
+            if can_escalate and escalate_ref.provider == _PROVIDER_CLAUDE:
+                can_escalate = False
             if can_escalate:
                 escalated = True
                 article, _ = await self._run_model_attempts(
@@ -526,11 +735,22 @@ class ClassificationClient:
             self.model = ref.model
 
         for attempt in range(attempts):
-            reservation_id = await self.quota.reserve(
-                estimated_tokens=self._estimated_tokens,
-                model=ref.model,
-                purpose="classify_article",
-            )
+            try:
+                reservation_id = await self.quota.reserve(
+                    estimated_tokens=self._estimated_tokens,
+                    model=ref.model,
+                    lane=ref.quota_lane,
+                    provider=ref.provider,
+                )
+            except QuotaBudgetExceeded as budget_err:
+                logger.warning(
+                    "Skip %s/%s (budget): %s",
+                    ref.provider,
+                    ref.model,
+                    budget_err,
+                )
+                # Soft-cap USD: skip provider for this article — no 24h model cooldown.
+                return None, "exhausted"
             response_text: str | None = None
             provider_started = False
             try:
@@ -552,8 +772,9 @@ class ClassificationClient:
                     )
 
                 provider_started = True
-                if ref.provider == _PROVIDER_DEEPSEEK:
-                    response_text, tokens = await self.deepseek.classify_json(
+                if ref.provider in OPENAI_COMPAT_PROVIDERS:
+                    compat = self._compat_client(ref.quota_lane)
+                    response_text, tokens = await compat.classify_json(
                         title=title,
                         content=content,
                         url=url,
@@ -564,8 +785,15 @@ class ClassificationClient:
                     actual = tokens if tokens is not None else self._estimated_tokens
                     await self.quota.complete(reservation_id, actual)
                     reservation_id = -1
-                    extracted = GeopoliticalArticleSchema.model_validate_json(response_text)
+                    extracted = parse_llm_article_json(
+                        response_text,
+                        source_url=url,
+                        published_at=date,
+                    )
                     return extracted, "ok"
+
+                if ref.provider == _PROVIDER_CLAUDE:
+                    raise ConfigError("Provider claude non ancora supportato")
 
                 contents = history if attempt > 0 else user_message
                 response = await self._generate_content(contents=contents, model=ref.model)
@@ -575,8 +803,12 @@ class ClassificationClient:
                     actual_tokens if actual_tokens is not None else self._estimated_tokens,
                 )
                 reservation_id = -1
-                response_text = response.text
-                extracted = GeopoliticalArticleSchema.model_validate_json(response_text)
+                response_text = _extract_gemini_text(response)
+                extracted = parse_llm_article_json(
+                    response_text,
+                    source_url=url,
+                    published_at=date,
+                )
                 if attempt > 0:
                     logger.info(
                         "Auto-correzione riuscita al tentativo %d per '%s'",
@@ -601,7 +833,7 @@ class ClassificationClient:
                 raise
 
             except ValidationError as e:
-                error_msg = str(e)
+                error_msg = _exc_msg(e, 400)
                 validation_fails += 1
                 logger.error(
                     "Validazione tentativo %d %s/%s per '%s': %s",
@@ -609,7 +841,7 @@ class ClassificationClient:
                     ref.provider,
                     ref.model,
                     title[:50],
-                    error_msg[:150],
+                    error_msg[:200],
                 )
                 if reservation_id >= 0:
                     await self.quota.fail(reservation_id)
@@ -619,9 +851,8 @@ class ClassificationClient:
                     ref.provider == _PROVIDER_GEMINI
                     and response_text is None
                     and "response" in locals()
-                    and getattr(response, "text", None)
                 ):
-                    response_text = response.text
+                    response_text = _extract_gemini_text(response)
 
                 # BORDERLINE: escalate after first failed correction (any SIMPLE provider)
                 if (
@@ -672,7 +903,7 @@ class ClassificationClient:
                         ref.provider,
                         ref.model,
                         title[:50],
-                        str(e)[:150],
+                        _exc_msg(e),
                     )
                     return None, "fatal_auth"
 
@@ -680,7 +911,7 @@ class ClassificationClient:
                     await self.cooldown.set_cooldown(
                         ref.provider,
                         ref.model,
-                        reason=str(e)[:200],
+                        reason=_exc_msg(e),
                     )
                     if ref.provider == _PROVIDER_DEEPSEEK:
                         logger.warning(
@@ -694,15 +925,18 @@ class ClassificationClient:
                     (isinstance(e, genai_errors.APIError) and getattr(e, "code", None) == 429)
                     or (isinstance(e, DeepSeekError) and e.status_code == 429)
                 )
-                if retry_after is not None and is_429:
+                if is_429:
+                    # Floor avoids Retry-After=0 thundering herd against Studio RPM.
+                    delay = 5.0 if retry_after is None else max(float(retry_after), 5.0)
+                    delay = min(delay, _RETRY_AFTER_MAX_SECONDS)
                     logger.warning(
                         "429 Retry-After=%.1fs %s/%s per '%s'",
-                        retry_after,
+                        delay,
                         ref.provider,
                         ref.model,
                         title[:50],
                     )
-                    await asyncio.sleep(retry_after)
+                    await asyncio.sleep(delay)
                 elif attempt < attempts - 1:
                     backoff = float(attempt + 1) * 4.0
                     logger.warning(
@@ -710,7 +944,7 @@ class ClassificationClient:
                         attempt + 1,
                         ref.provider,
                         ref.model,
-                        str(e)[:150],
+                        _exc_msg(e),
                         backoff,
                     )
                     await asyncio.sleep(backoff)
@@ -722,7 +956,7 @@ class ClassificationClient:
                             await self.cooldown.set_cooldown(
                                 ref.provider,
                                 ref.model,
-                                reason=f"5xx exhausted: {e}"[:200],
+                                reason=f"5xx exhausted: {_exc_msg(e)}",
                             )
                             return None, "hard_cooldown"
                     logger.error(
@@ -730,15 +964,15 @@ class ClassificationClient:
                         ref.provider,
                         ref.model,
                         title[:50],
-                        str(e)[:150],
+                        _exc_msg(e),
                     )
 
-        # Validation exhausted on SIMPLE → escalate once
+        # Validation exhausted on SIMPLE lane primary → escalate once to COMPLEX
         if (
             lane == Lane.SIMPLE
             and self._escalate
             and validation_fails > 0
-            and ref.provider == _PROVIDER_GEMINI
+            and ref.quota_lane == LANE_SIMPLE
         ):
             return None, "escalate"
         return None, "exhausted"

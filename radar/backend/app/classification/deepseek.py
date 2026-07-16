@@ -62,8 +62,13 @@ class DeepSeekClient:
         self.base_url = (base_url or DEEPSEEK_BASE_URL).rstrip("/")
         self.model = model or DEEPSEEK_MODEL
         effort_raw = (effort or DEEPSEEK_REASONING_EFFORT or "high").lower()
-        # Never default to max (cost/verbosity).
-        self.effort = effort_raw if effort_raw in {"low", "medium", "high"} else "high"
+        # none/off/disabled = non-thinking (cheaper). low/medium kept for config compat.
+        if effort_raw in {"none", "off", "disabled"}:
+            self.effort = "none"
+        elif effort_raw in {"low", "medium", "high", "max"}:
+            self.effort = effort_raw
+        else:
+            self.effort = "high"
         self.timeout = float(timeout if timeout is not None else GEMINI_REQUEST_TIMEOUT)
 
     @property
@@ -96,11 +101,20 @@ class DeepSeekClient:
             date=date,
             content=content[:4000],
         )
-        # DeepSeek json_object richiede la parola "json" nel prompt (system o user).
+        # DeepSeek json_object richiede "json"; campi flat (SYSTEM_PROMPT parla di
+        # "coordinate" e il modello tende a nestare coordinates{}).
         user_message = (
             f"{user_message}\n\n"
-            "Output requirement: return a single valid JSON object matching the schema "
-            "(no markdown fences, no reasoning field)."
+            "Output requirement: return a single valid JSON object (the word json is required).\n"
+            "Use ONLY these top-level keys (no nested coordinates/coordinate object, no 'category'):\n"
+            "title, summary, published_at, source_url, country_code, latitude, longitude,\n"
+            "companies_involved, tags, primary_category, sentiment, infrastructural_entities,\n"
+            "relevance_level.\n"
+            "latitude and longitude MUST be separate top-level numbers (floats).\n"
+            "primary_category MUST be exactly one of the 10 allowed Italian category names.\n"
+            "Game/software/videogame reviews and entertainment products → Tecnologia "
+            "(never Geopolitica, Sicurezza, or Infrastrutture).\n"
+            "No markdown fences, no reasoning field."
         )
         if correction:
             user_message = (
@@ -109,8 +123,8 @@ class DeepSeekClient:
                 "(senza campo reasoning)."
             )
 
-        # Thinking mode: temperature/top_p non ammessi (API V4 → 400). Effort high|max only.
-        effort = self.effort if self.effort in {"high", "max"} else "high"
+        # Thinking off = cheaper / less capable path (bulk SIMPLE ≈ Gemma-class JSON).
+        # Thinking on: temperature/top_p non ammessi; effort high|max only (low→high).
         payload: dict[str, Any] = {
             "model": use_model,
             "messages": [
@@ -118,10 +132,14 @@ class DeepSeekClient:
                 {"role": "user", "content": user_message},
             ],
             "response_format": {"type": "json_object"},
-            "max_tokens": 8192,
-            "thinking": {"type": "enabled"},
-            "reasoning_effort": effort,
+            "max_tokens": 2048 if self.effort == "none" else 8192,
         }
+        if self.effort == "none":
+            payload["thinking"] = {"type": "disabled"}
+        else:
+            effort = self.effort if self.effort in {"high", "max"} else "high"
+            payload["thinking"] = {"type": "enabled"}
+            payload["reasoning_effort"] = effort
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",

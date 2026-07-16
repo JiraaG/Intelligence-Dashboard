@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import math
 import re
 from datetime import date
-from typing import Literal, Self
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -26,6 +27,13 @@ SENTIMENT_VALUES = ("Positivo", "Neutrale", "Negativo")
 
 ISO_DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 SOURCE_URL_PATTERN = re.compile(r"^https?://", re.IGNORECASE)
+# Soft remap: game / entertainment reviews often mislabeled as Geopolitica/Infrastrutture.
+_GAME_REVIEW_HINT = re.compile(
+    r"(videogioc\w*|video\s*game|videogame|game\s*review|"
+    r"recensione.{0,40}(gioco|game)|ps5|xbox|nintendo|steam\b|"
+    r"\bpc,\s*ps5\b|\bunreal\b|\bunity\b)",
+    re.IGNORECASE | re.DOTALL,
+)
 
 # ISO 3166-1 alpha-2 (~249) + sentinel XX for undetermined geography.
 ISO_ALPHA2_CODES: frozenset[str] = frozenset(
@@ -198,6 +206,181 @@ class GeopoliticalArticleSchema(BaseModel):
                 f"primo tag {first!r} != primary_category {self.primary_category!r}"
             )
         return self
+
+
+def normalize_llm_json_dict(data: dict[str, Any]) -> dict[str, Any]:
+    """
+    Provider-side shape fixes before strict Pydantic validate.
+    Does not change GeopoliticalArticleSchema; flattens common DeepSeek quirks
+    (nested coordinates, category alias, int lat/lon, float relevance).
+    """
+    out = dict(data)
+
+    for nest_key in ("coordinates", "coordinate", "coords", "geo", "location"):
+        nest = out.pop(nest_key, None)
+        if not isinstance(nest, dict):
+            continue
+        if "latitude" not in out:
+            for key in ("latitude", "lat"):
+                if key in nest:
+                    out["latitude"] = nest[key]
+                    break
+        if "longitude" not in out:
+            for key in ("longitude", "lon", "lng"):
+                if key in nest:
+                    out["longitude"] = nest[key]
+                    break
+
+    if "primary_category" not in out:
+        for alt in ("category", "categoria", "primaryCategory"):
+            if alt in out:
+                out["primary_category"] = out.pop(alt)
+                break
+    else:
+        out.pop("category", None)
+        out.pop("categoria", None)
+
+    for junk in ("reasoning", "reasoning_content", "confidence", "sources", "analysis"):
+        out.pop(junk, None)
+
+    for key in ("latitude", "longitude"):
+        val = out.get(key)
+        if isinstance(val, bool):
+            continue
+        if isinstance(val, int):
+            out[key] = float(val)
+        elif isinstance(val, str):
+            try:
+                out[key] = float(val.strip())
+            except ValueError:
+                pass
+
+    rel = out.get("relevance_level")
+    if isinstance(rel, bool):
+        pass
+    elif isinstance(rel, float) and rel.is_integer():
+        out["relevance_level"] = int(rel)
+    elif isinstance(rel, str) and rel.strip().isdigit():
+        out["relevance_level"] = int(rel.strip())
+
+    if isinstance(out.get("country_code"), str):
+        out["country_code"] = out["country_code"].strip().upper()
+
+    # Soft-normalize published_at: accept ISO datetime → YYYY-MM-DD.
+    pa = out.get("published_at")
+    if isinstance(pa, str):
+        pa_stripped = pa.strip()
+        if len(pa_stripped) >= 10 and ISO_DATE_PATTERN.match(pa_stripped[:10]):
+            out["published_at"] = pa_stripped[:10]
+
+    # Soft-clamp string lengths to schema limits (Gemma/DeepSeek verbosity).
+    for key, limit in (
+        ("title", 120),
+        ("summary", 2000),
+        ("companies_involved", 2000),
+        ("tags", 2000),
+        ("infrastructural_entities", 2000),
+        ("source_url", 2048),
+    ):
+        val = out.get(key)
+        if isinstance(val, str) and len(val) > limit:
+            out[key] = val[:limit]
+
+    # Soft remap: game/software reviews must not land in Geopolitica/Sicurezza/Infrastrutture.
+    pc = out.get("primary_category")
+    if isinstance(pc, str) and pc in ("Geopolitica", "Sicurezza", "Infrastrutture"):
+        hint_blob = " ".join(
+            str(out.get(k) or "")
+            for k in ("title", "summary", "tags", "companies_involved", "infrastructural_entities")
+        )
+        if _GAME_REVIEW_HINT.search(hint_blob):
+            out["primary_category"] = "Tecnologia"
+
+    # Enforce schema rule: first CSV tag must equal primary_category.
+    pc = out.get("primary_category")
+    tags = out.get("tags")
+    if isinstance(pc, str) and pc in PRIMARY_CATEGORIES:
+        if not isinstance(tags, str) or not tags.strip():
+            out["tags"] = pc
+        else:
+            parts = [x.strip() for x in tags.split(",") if x.strip()]
+            if not parts or parts[0] != pc:
+                rest = [p for p in parts if p != pc]
+                out["tags"] = ", ".join([pc, *rest]) if rest else pc
+
+    return out
+
+
+def parse_llm_article_json(
+    text: str | None,
+    *,
+    source_url: str | None = None,
+    published_at: str | None = None,
+) -> GeopoliticalArticleSchema:
+    """
+    Parse model JSON → normalize quirks → strict GeopoliticalArticleSchema.
+
+    Optional source_url / published_at override Miniflux ground truth before
+    validate (fixes Gemma truncating dates / inventing URLs).
+
+    Raises pydantic.ValidationError (not bare JSONDecodeError) so the client
+    correction / escalate path runs instead of blind retries.
+    """
+    from pydantic import ValidationError as PydanticValidationError
+
+    if text is None or not str(text).strip():
+        raise PydanticValidationError.from_exception_data(
+            "GeopoliticalArticleSchema",
+            [
+                {
+                    "type": "value_error",
+                    "loc": ("__json__",),
+                    "input": text,
+                    "ctx": {"error": ValueError("output JSON vuoto o assente")},
+                }
+            ],
+        )
+
+    cleaned = str(text).strip()
+    if cleaned.startswith("```"):
+        # Strip optional ```json fences Gemma sometimes emits.
+        lines = cleaned.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip().startswith("```"):
+            lines = lines[:-1]
+        cleaned = "\n".join(lines).strip()
+
+    try:
+        raw: Any
+        try:
+            raw = json.loads(cleaned)
+        except json.JSONDecodeError:
+            # Extra data / trailing junk: take the first JSON value.
+            raw, _end = json.JSONDecoder().raw_decode(cleaned)
+    except json.JSONDecodeError as exc:
+        raise PydanticValidationError.from_exception_data(
+            "GeopoliticalArticleSchema",
+            [
+                {
+                    "type": "value_error",
+                    "loc": ("__json__",),
+                    "input": cleaned[:500],
+                    "ctx": {"error": exc},
+                }
+            ],
+        ) from exc
+
+    if isinstance(raw, dict):
+        raw = normalize_llm_json_dict(raw)
+        if isinstance(source_url, str) and source_url.strip().lower().startswith(
+            ("http://", "https://")
+        ):
+            raw["source_url"] = source_url.strip()[:2048]
+        pub = (published_at or "").strip()
+        if len(pub) >= 10 and ISO_DATE_PATTERN.match(pub[:10]):
+            raw["published_at"] = pub[:10]
+    return GeopoliticalArticleSchema.model_validate(raw)
 
 
 def parse_csv_list(val: str) -> list[str]:

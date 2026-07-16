@@ -8,7 +8,7 @@ when_to_use:
   - Modifiche prompt / schema / client Gemini o DeepSeek
   - Cascata modelli, routing complexity, cooldown 24h
   - Debug ValidationError JSON LLM
-version: 1.4.0
+version: 1.5.0
 ---
 
 ## Quando Usare Questa Skill
@@ -17,7 +17,7 @@ Carica questa skill ogni volta che:
 - Modifichi `backend/app/worker.py` o `classification/` (client, prompts, validator, quota, complexity, cooldown, deepseek)
 - Ricevi `ValidationError` Pydantic o JSON incompleto dall'LLM
 - Cambi `GEMINI_MODEL` / fallbacks / `DEEPSEEK_*` / `LLM_ROUTING_*` /
-  `LLM_SIMPLE_PROVIDER|MODEL` / `LLM_COMPLEX_PROVIDER|MODEL`
+  `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (incluso `REASONING_EFFORT`)
 
 ---
 
@@ -27,7 +27,7 @@ Carica questa skill ogni volta che:
 
 ```
 1. Worker: advisory lock → reconcile outbox → fetch Miniflux
-2. dedup → sanitize → complexity lane (optional) → reserve(model=)
+2. dedup → sanitize → complexity lane v2.2 → reserve(model=, lane=)
    → Gemini (google-genai) e/o DeepSeek (httpx; no openai package)
 3. Pydantic strict; complete(reservation_id)
 4. Hard-fail → llm_model_cooldown 24h; 429 breve → Retry-After
@@ -37,14 +37,26 @@ Carica questa skill ogni volta che:
 **Invarianti:** schema/prompt immutabili; `content[:4000]`; package `openai` vietato;
 lane via `LLM_SIMPLE_*` / `LLM_COMPLEX_*`; DeepSeek `classify_json(model=ref.model)`.
 
-### Env lane (ops)
+### Complexity → modello (v2.2)
+
+| Condizione | Lane | Catena |
+|------------|------|--------|
+| 0 famiglie forti, o solo L | SIMPLE | `LLM_SIMPLE` (tipico effort=`none`) |
+| 1 di {G, E, X} | BORDERLINE | `LLM_COMPLEX` (tipico effort=`high`) |
+| ≥2 famiglie (L solo in combo) | COMPLEX | `LLM_COMPLEX` (tipico effort=`high`) |
+
+`geo_marker` da solo: solo se `body_len ≥ 1500`. ≥2 country → G sempre.
+
+### Env lane (ops tipico)
 
 ```text
 LLM_ROUTING_MODE=complexity
-LLM_SIMPLE_PROVIDER=gemini
-LLM_SIMPLE_MODEL=gemini-3.1-flash-lite
+LLM_SIMPLE_PROVIDER=deepseek
+LLM_SIMPLE_MODEL=deepseek-v4-flash
+LLM_SIMPLE_REASONING_EFFORT=none
 LLM_COMPLEX_PROVIDER=deepseek
 LLM_COMPLEX_MODEL=deepseek-v4-flash
+LLM_COMPLEX_REASONING_EFFORT=high
 ```
 
 SoT: `plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md`.

@@ -234,14 +234,15 @@ async def test_ten_thousand_entries_never_spawn_ten_thousand_tasks() -> None:
 
     with (
         patch("app.worker.reconcile_outbox", new_callable=AsyncMock),
-        patch("app.worker._ledger_rpd_used", new_callable=AsyncMock, return_value=0),
-        patch("app.worker.LLM_RPD", 20_000),
+        patch("app.worker._ledger_simple_rpd_used", new_callable=AsyncMock, return_value=0),
+        patch("app.worker.LLM_SIMPLE") as mock_simple,
         patch("app.worker.WORKER_ENTRY_CONCURRENCY", entry_concurrency),
         patch("app.worker.WORKER_QUEUE_DEPTH", queue_depth),
         patch("app.worker.process_single_entry", side_effect=tracked_process),
         patch("app.worker.asyncio.create_task", side_effect=spy_create_task),
         patch("app.worker.asyncio.Queue", SpyQueue),
     ):
+        mock_simple.rpd = 20_000
         await asyncio.wait_for(run_pipeline_cycle(state), timeout=30.0)
 
     assert queue_maxsizes == [queue_depth]

@@ -20,6 +20,8 @@ from app.core.config import ConfigError
 
 def _client_with_mock_quota() -> tuple[ClassificationClient, AsyncMock]:
     """Gemini-only client; routing off so tests non dipendono da .env live."""
+    from app.core.llm_lanes import LlmLaneConfig
+
     quota = AsyncMock()
     quota.reserve = AsyncMock(side_effect=[1, 2, 3, 4, 5, 6, 7, 8])
     quota.complete = AsyncMock()
@@ -30,8 +32,26 @@ def _client_with_mock_quota() -> tuple[ClassificationClient, AsyncMock]:
     client._shadow = False
     client._escalate = False
     client._complex_unavailable = True
+    client._simple = LlmLaneConfig(
+        lane="simple",
+        provider="gemini",
+        model="gemini-2.5-flash",
+        api_key="test-key",
+        base_url="",
+        rpm=30,
+        tpm=0,
+        rpd=100,
+        budget_usd_day=0.0,
+        usd_per_1m_tokens=0.0,
+        timeout=60.0,
+        reasoning_effort="high",
+        fallbacks=(),
+    )
     client._simple_provider = "gemini"
-    client._simple_model = client.model
+    client._simple_model = "gemini-2.5-flash"
+    client.model = "gemini-2.5-flash"
+    if client.client is None:
+        client.client = MagicMock()
     return client, quota
 
 
@@ -188,6 +208,18 @@ def test_classify_provider_error_policy() -> None:
         {"error": {"message": "daily quota exceeded / requests per day"}},
     )
     assert classify_provider_error(err_rpd) == ErrorClass.HARD_COOLDOWN
+    err_free_tier = genai_errors.APIError(
+        429,
+        {
+            "error": {
+                "message": (
+                    "Quota exceeded for metric: generativelanguage.googleapis.com/"
+                    "generate_content_free_tier_requests, limit: 500, model: gemini-3.1-flash-lite"
+                )
+            }
+        },
+    )
+    assert classify_provider_error(err_free_tier) == ErrorClass.HARD_COOLDOWN
 
     err_401 = genai_errors.APIError(401, {"error": {"message": "auth"}})
     assert classify_provider_error(err_401) == ErrorClass.FATAL
@@ -368,14 +400,29 @@ async def test_hard_cooldown_switches_to_fallback_model() -> None:
     """404 model → cooldown primary; secondary Gemini succeeds."""
     from google.genai import errors as genai_errors
 
+    from app.core.llm_lanes import LlmLaneConfig
+
     client, quota = _client_with_mock_quota()
+    client._simple = LlmLaneConfig(
+        lane="simple",
+        provider="gemini",
+        model="gemini-primary",
+        api_key="test-key",
+        base_url="",
+        rpm=10,
+        tpm=0,
+        rpd=100,
+        budget_usd_day=0.0,
+        usd_per_1m_tokens=0.0,
+        timeout=60.0,
+        reasoning_effort="high",
+        fallbacks=("gemini-secondary",),
+    )
+    client._simple_provider = "gemini"
     client._simple_model = "gemini-primary"
     client.model = "gemini-primary"
 
-    with patch(
-        "app.classification.client.GEMINI_MODEL_FALLBACKS",
-        ["gemini-secondary"],
-    ), patch.object(client, "_generate_content", new_callable=AsyncMock) as mock_gen, patch(
+    with patch.object(client, "_generate_content", new_callable=AsyncMock) as mock_gen, patch(
         "asyncio.sleep", new_callable=AsyncMock
     ):
         good = MagicMock()
@@ -450,3 +497,57 @@ async def test_short_429_does_not_write_cooldown() -> None:
         )
         assert article.country_code == "IT"
         assert await client.cooldown.is_cooling_down("gemini", client.model) is False
+
+
+def test_chain_for_borderline_uses_complex_lane() -> None:
+    """BORDERLINE must route to COMPLEX chain (thinking high), not SIMPLE."""
+    from app.classification.complexity import Lane
+    from app.core.llm_lanes import LlmLaneConfig
+
+    client, _quota = _client_with_mock_quota()
+    client._routing_mode = "complexity"
+    client._complex_unavailable = False
+    client._simple = LlmLaneConfig(
+        lane="simple",
+        provider="deepseek",
+        model="deepseek-v4-flash",
+        api_key="sk-test",
+        base_url="https://api.deepseek.com",
+        rpm=0,
+        tpm=0,
+        rpd=0,
+        budget_usd_day=0.0,
+        usd_per_1m_tokens=0.28,
+        timeout=60.0,
+        reasoning_effort="none",
+        fallbacks=(),
+    )
+    client._complex = LlmLaneConfig(
+        lane="complex",
+        provider="deepseek",
+        model="deepseek-v4-flash",
+        api_key="sk-test",
+        base_url="https://api.deepseek.com",
+        rpm=0,
+        tpm=0,
+        rpd=0,
+        budget_usd_day=0.0,
+        usd_per_1m_tokens=0.28,
+        timeout=60.0,
+        reasoning_effort="high",
+        fallbacks=(),
+    )
+    client._simple_provider = "deepseek"
+    client._simple_model = "deepseek-v4-flash"
+    client._complex_provider = "deepseek"
+    client._complex_model = "deepseek-v4-flash"
+
+    border = client._chain_for(Lane.BORDERLINE, force_simple=False)
+    simple = client._chain_for(Lane.SIMPLE, force_simple=False)
+    complex_chain = client._chain_for(Lane.COMPLEX, force_simple=False)
+
+    assert border[0].reasoning_effort == "high"
+    assert border[0].quota_lane == "complex"
+    assert simple[0].reasoning_effort == "none"
+    assert simple[0].quota_lane == "simple"
+    assert complex_chain[0].reasoning_effort == "high"

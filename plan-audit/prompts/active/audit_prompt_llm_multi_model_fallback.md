@@ -1,9 +1,9 @@
 # Prompt — Multi-model LLM fallback + cooldown 24h (ricerca free-tier)
 
-> **Stato 2026-07-16:** Fase A+B+C **implementate** (lane env v2.2). Questo file resta come **storico orchestratore**.  
-> **SoT operativo:** [`../../active/LLM_Multi_Model_Fallback_Phase_AB.md`](../../active/LLM_Multi_Model_Fallback_Phase_AB.md).  
+> **Stato 2026-07-16:** Fase A+B+C **implementate** + **complexity heuristic/routing v2.2** (BORDERLINE→`LLM_COMPLEX`; L-sola→SIMPLE). Questo file resta come **storico orchestratore**.  
+> **SoT operativo:** [`../../active/LLM_Multi_Model_Fallback_Phase_AB.md`](../../active/LLM_Multi_Model_Fallback_Phase_AB.md) — non usare le tabelle env Lite/DS di questo prompt come ops corrente.  
 > **Remediation:** [`../../remediation/audit_remediation_llm_multi_model_fallback.md`](../../remediation/audit_remediation_llm_multi_model_fallback.md).  
-> Non rieseguire Fase C da zero: estendere solo gap residui (es. soft-cap `DEEPSEEK_BUDGET_USD_DAY`).
+> Non rieseguire Fase C da zero: estendere solo gap residui.
 
 > **Uso (storico):** copia il blocco `text` sotto in un **nuovo** chat Agent (orchestratore).  
 > **Scope:** ricerca modelli free-tier adatti al Radar + design/implementazione fallback multi-modello con **cooldown 24h** prima del riutilizzo.  
@@ -41,8 +41,8 @@ compatibili. NON inventare quote: verifica fonti ufficiali + AI Studio.
 | Pezzo | Path | Nota |
 |-------|------|------|
 | Model env | `radar/backend/app/core/config.py` | `GEMINI_*` + `DEEPSEEK_*` + `LLM_ROUTING_*` + **`LLM_SIMPLE_*` / `LLM_COMPLEX_*`** |
-| Client | `radar/backend/app/classification/client.py` | Lane SIMPLE/BORDERLINE/COMPLEX; cascade; escalate; dual provider |
-| Complexity | `classification/complexity.py` | Quorum famiglie G/E/L/X/N |
+| Complexity | `classification/complexity.py` | Heuristic **v2.2**: L-sola→SIMPLE; G marker body≥1500; BORDERLINE=1 di G/E/X |
+| Client | `radar/backend/app/classification/client.py` | SIMPLE→`LLM_SIMPLE`; **BORDERLINE+COMPLEX→`LLM_COMPLEX`**; escalate; dual provider |
 | DeepSeek | `classification/deepseek.py` | httpx; `classify_json(model=)` da lane |
 | Cooldown | `classification/cooldown.py` + `009` | 24h durable |
 | Quote | `classification/quota.py` | `QuotaLedger` RPM/TPM/RPD; `reserve(..., model=)` |

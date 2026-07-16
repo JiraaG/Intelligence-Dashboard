@@ -15,12 +15,16 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.classification.client import ClassificationClient
-from app.classification.quota import QuotaLedger, compute_day_window
+from app.classification.quota import QuotaBudgetExceeded, QuotaLedger, compute_day_window
 
 
 # ─── In-memory fake asyncpg ───────────────────────────────────────────────────
 
 _ACTIVE = frozenset({"reserved", "completed", "failed"})
+
+
+def _is_deepseek_model(model: str | None) -> bool:
+    return model is not None and "deepseek" in model.lower()
 
 
 @dataclass
@@ -143,43 +147,74 @@ class FakeConnection:
             return "UPDATE 1"
 
         if "SUM(COALESCE" in q:
-            window_start = args[0]
-            statuses = set(args[1])
+            purpose_filter = args[-1] if "purpose =" in q and isinstance(args[-1], str) else None
+            status_arg = args[-2] if purpose_filter is not None else args[-1]
+            statuses = set(status_arg) if isinstance(status_arg, (list, tuple)) else set(args[1])
             total = 0
-            for row in self._store.rows.values():
-                if row.created_at > window_start and row.status in statuses:
+            if "created_at >=" in q and "created_at <" in q:
+                day_start, day_end = args[0], args[1]
+                for row in self._store.rows.values():
+                    if not (day_start <= row.created_at < day_end and row.status in statuses):
+                        continue
+                    if purpose_filter is not None and row.purpose != purpose_filter:
+                        continue
                     total += (
                         row.actual_tokens
                         if row.actual_tokens is not None
                         else row.reserved_tokens
                     )
+                return total
+            window_start = args[0]
+            for row in self._store.rows.values():
+                if not (row.created_at > window_start and row.status in statuses):
+                    continue
+                if purpose_filter is not None and row.purpose != purpose_filter:
+                    continue
+                total += (
+                    row.actual_tokens
+                    if row.actual_tokens is not None
+                    else row.reserved_tokens
+                )
             return total
 
         if "MIN(created_at)" in q:
+            purpose_filter = args[-1] if "purpose =" in q and isinstance(args[-1], str) else None
+            status_arg = args[-2] if purpose_filter is not None else args[1]
+            statuses = set(status_arg)
             window_start = args[0]
-            statuses = set(args[1])
             times = [
                 row.created_at
                 for row in self._store.rows.values()
-                if row.created_at > window_start and row.status in statuses
+                if row.created_at > window_start
+                and row.status in statuses
+                and (purpose_filter is None or row.purpose == purpose_filter)
             ]
             return min(times) if times else None
 
         if "COUNT(*)" in q:
-            statuses = set(args[-1])
+            purpose_filter = args[-1] if "purpose =" in q and isinstance(args[-1], str) else None
+            status_arg = args[-2] if purpose_filter is not None else args[-1]
+            statuses = set(status_arg)
+
+            def _match(row: _Row) -> bool:
+                if row.status not in statuses:
+                    return False
+                if purpose_filter is not None and row.purpose != purpose_filter:
+                    return False
+                return True
+
             if "created_at >=" in q and "created_at <" in q:
                 day_start, day_end = args[0], args[1]
                 return sum(
                     1
                     for row in self._store.rows.values()
-                    if day_start <= row.created_at < day_end and row.status in statuses
+                    if day_start <= row.created_at < day_end and _match(row)
                 )
-            # Rolling RPM window: created_at > $1
             window_start = args[0]
             return sum(
                 1
                 for row in self._store.rows.values()
-                if row.created_at > window_start and row.status in statuses
+                if row.created_at > window_start and _match(row)
             )
 
         raise AssertionError(f"Unhandled SQL in fake pool: {q[:120]}")
@@ -237,6 +272,10 @@ def _ledgers(
     n: int = 2,
     clock: ControllableClock | None = None,
     tz: timezone = timezone.utc,
+    deepseek_rpm: int = 0,
+    deepseek_tpm: int = 0,
+    deepseek_rpd: int = 0,
+    deepseek_budget_usd_day: float = 0.0,
 ) -> tuple[InMemoryLedgerStore, FakePool, ControllableClock, list[QuotaLedger]]:
     clock = clock or ControllableClock()
     store = InMemoryLedgerStore(utc_now=clock.utc_now)
@@ -248,6 +287,10 @@ def _ledgers(
             rpm=rpm,
             tpm=tpm,
             rpd=rpd,
+            deepseek_rpm=deepseek_rpm,
+            deepseek_tpm=deepseek_tpm,
+            deepseek_rpd=deepseek_rpd,
+            deepseek_budget_usd_day=deepseek_budget_usd_day,
             time_zone=tz,
             time_zone_name=getattr(tz, "key", str(tz)),
             sleep=clock.sleep,
@@ -421,12 +464,36 @@ async def test_complete_updates_own_reservation_not_latest() -> None:
 @pytest.mark.asyncio
 async def test_four_retry_attempts_consume_four_rpd_reservations() -> None:
     """ClassificationClient reserves once per attempt; 4 retryable failures → 4 reserves."""
+    from app.core.llm_lanes import LlmLaneConfig
+
     store, _pool, _clock, (ledger,) = _ledgers(rpm=50, tpm=0, rpd=100, n=1)
     real_reserve = ledger.reserve
     reserve_spy = AsyncMock(side_effect=real_reserve)
     ledger.reserve = reserve_spy  # type: ignore[method-assign]
 
     client = ClassificationClient(quota=ledger)
+    client._routing_mode = "off"
+    client._complex_unavailable = True
+    client._simple = LlmLaneConfig(
+        lane="simple",
+        provider="gemini",
+        model="gemini-2.5-flash",
+        api_key="test-key",
+        base_url="",
+        rpm=50,
+        tpm=0,
+        rpd=100,
+        budget_usd_day=0.0,
+        usd_per_1m_tokens=0.0,
+        timeout=60.0,
+        reasoning_effort="high",
+        fallbacks=(),
+    )
+    client._simple_provider = "gemini"
+    client._simple_model = "gemini-2.5-flash"
+    client.model = "gemini-2.5-flash"
+    if client.client is None:
+        client.client = MagicMock()
 
     with (
         patch.object(client, "_generate_content", new_callable=AsyncMock) as mock_gen,
@@ -441,10 +508,12 @@ async def test_four_retry_attempts_consume_four_rpd_reservations() -> None:
         )
 
     assert article.country_code == "XX"
-    assert reserve_spy.await_count == 4
     assert mock_gen.await_count == 4
-    assert len(store.rows) == 4
-    assert all(r.status == "failed" for r in store.rows.values())
+    gemini_rows = [r for r in store.rows.values() if not _is_deepseek_model(r.model)]
+    assert len(gemini_rows) == 4
+    assert all(r.status == "failed" for r in gemini_rows)
+    # Residual DeepSeek on SIMPLE chain may add one more reserve after Gemini exhausted.
+    assert reserve_spy.await_count >= 4
 
 
 @pytest.mark.unit
@@ -487,3 +556,71 @@ async def test_rpm_third_reserve_waits_until_window_slides() -> None:
         if r.created_at > window_start and r.status in _ACTIVE
     )
     assert in_window <= 2
+
+
+@pytest.mark.unit
+def test_min_interval_zero_when_rpm_unmanaged() -> None:
+    _store, pool, clock, (ledger,) = _ledgers(rpm=10, tpm=0, rpd=100, n=1, deepseek_rpm=0)
+    assert ledger.min_interval_seconds("simple") == 6.0
+    assert ledger.min_interval_seconds("complex") == 0.0
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_gemini_and_deepseek_rpd_independent() -> None:
+    """Simple RPD full must not block complex when complex RPD=0."""
+    store, _pool, _clock, (ledger,) = _ledgers(
+        rpm=50,
+        tpm=0,
+        rpd=2,
+        n=1,
+        deepseek_rpm=0,
+        deepseek_rpd=0,
+    )
+    await ledger.reserve(
+        estimated_tokens=1, model="gemini-3.1-flash-lite", lane="simple"
+    )
+    await ledger.reserve(
+        estimated_tokens=1, model="gemini-3.1-flash-lite", lane="simple"
+    )
+
+    rid = await asyncio.wait_for(
+        ledger.reserve(
+            estimated_tokens=1,
+            model="deepseek-v4-flash",
+            lane="complex",
+        ),
+        timeout=1.0,
+    )
+    assert rid in store.rows
+    assert store.rows[rid].purpose == "classify:complex"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_deepseek_budget_raises_when_exceeded() -> None:
+    store, _pool, clock, (ledger,) = _ledgers(
+        rpm=50,
+        tpm=0,
+        rpd=100,
+        n=1,
+        deepseek_budget_usd_day=0.01,
+    )
+    now = clock.utc_now()
+    store.rows[1] = _Row(
+        id=1,
+        reserved_tokens=100_000,
+        actual_tokens=100_000,
+        status="completed",
+        created_at=now,
+        model="deepseek-v4-flash",
+        purpose="classify:complex",
+    )
+    store.next_id = 2
+
+    with pytest.raises(QuotaBudgetExceeded):
+        await ledger.reserve(
+            estimated_tokens=1000,
+            model="deepseek-v4-flash",
+            lane="complex",
+        )

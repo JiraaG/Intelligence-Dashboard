@@ -1,9 +1,9 @@
 # LLM Multi-Model Fallback — Documento unico Fase A+B
 
-> **Stato:** SoT design A+B + **Fase C implementata** + **lane env v2.2** (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`).  
+> **Stato:** SoT design A+B + **Fase C implementata** + **lane env v2.2** + **heuristic complexity v2.2** (2026-07-16).  
 > **Skills:** `llm-json-extraction`, `radar-quota-ledger`.  
 > **Sostituisce come riferimento operativo:** stub in `archive/llm-stubs/`.  
-> **Canvas:** `article-complexity-routing.canvas.tsx` (UX deep-dive IDE).  
+> **Canvas:** `article-complexity-routing.canvas.tsx` + `complexity-routing-audit.canvas.tsx`.  
 > **Prompt:** `../prompts/active/audit_prompt_llm_multi_model_fallback.md` (storico; SoT = questo file).  
 > **Remediation:** `../remediation/audit_remediation_llm_multi_model_fallback.md`.  
 > **Indice cartelle:** [`../README.md`](../README.md).
@@ -16,8 +16,8 @@
 |---------|----------|
 | Cascata Gemini free ha senso? | **Sì** — ops tipico: Lite bulk; Flash pieni solo se RPD Studio ≥~500 |
 | Paid DeepSeek ha senso? | **Sì** — `deepseek-v4-flash` + `reasoning_effort=high` (~$0.001/art.), non Max |
-| Routing per complessità? | **Sì, a tre fasce** (SIMPLE / BORDERLINE / COMPLEX), non binario |
-| Provider/model per lane? | **Env** — `LLM_SIMPLE_PROVIDER\|MODEL` + `LLM_COMPLEX_PROVIDER\|MODEL` (`gemini` \| `deepseek`) |
+| Routing per complessità? | **Sì, a tre fasce** (SIMPLE / BORDERLINE / COMPLEX). Complessità = **rischio estrazione schema** (G/E/X), non lunghezza sola |
+| Provider/model per lane? | **Env** — `LLM_SIMPLE_*` (solo SIMPLE) + `LLM_COMPLEX_*` (**BORDERLINE + COMPLEX** + escalate) |
 | Free o paid come “path primario”? | **Vietato** — SLO mix + quorum famiglie + shadow ≥3g |
 | Cooldown 24h? | **SQL durable** `(provider, model, until_ts, reason)` |
 | Fase C? | **DONE** — vedi remediation; default codice `LLM_ROUTING_MODE=off` |
@@ -26,13 +26,17 @@
 
 ```text
 LLM_ROUTING_MODE=complexity
-LLM_ROUTING_SHADOW=false              # true solo calibrazione / primi giorni
-LLM_SIMPLE_PROVIDER=gemini
-LLM_SIMPLE_MODEL=gemini-3.1-flash-lite
+LLM_ROUTING_SHADOW=false
+# Bulk economico (thinking off)
+LLM_SIMPLE_PROVIDER=deepseek
+LLM_SIMPLE_MODEL=deepseek-v4-flash
+LLM_SIMPLE_REASONING_EFFORT=none
+# BORDERLINE + COMPLEX + escalate (thinking on)
 LLM_COMPLEX_PROVIDER=deepseek
 LLM_COMPLEX_MODEL=deepseek-v4-flash
-DEEPSEEK_REASONING_EFFORT=high
-GEMINI_MODEL_FALLBACKS=               # vuoto se Flash pieni ~20 RPD inutili
+LLM_COMPLEX_REASONING_EFFORT=high
+# Legacy Gemini ancora supportato se si ripunta SIMPLE/COMPLEX a gemini
+GEMINI_MODEL_FALLBACKS=
 
 # Swap COMPLEX → Google senza codice:
 #   LLM_COMPLEX_PROVIDER=gemini
@@ -163,7 +167,10 @@ High vs Max: stesso $/token; Max più verboso (reasoning) → costo↑ per +3 In
 
 ---
 
-## 4. Design routing v2.1 (anti-skew)
+## 4. Design routing (anti-skew) — algoritmo live **v2.2**
+
+> Storico: design iniziale “v2.1” (BORDERLINE=catena SIMPLE; L sola→BORDERLINE) è **superseded**.
+> Codice live = heuristic + chain **v2.2** sotto.
 
 ### 4.1 Definizione di “complesso”
 
@@ -187,27 +194,34 @@ Call LLM: sempre `content[:4000]` (tutte le lane).
 
 ### 4.3 Famiglie di segnale
 
-| Famiglia | Attivazione | Campo a rischio |
-|----------|-------------|-----------------|
-| **G** Geo | ≥2 nazioni lexicon EN/IT; marker disputed/border/NATO/UN/summit; ISO allowlist ≥2 | country_code, lat/lon |
-| **E** Entità | ≥3 org (`Inc\|Ltd\|GmbH\|SpA\|AG\|Corp\|PLC`) o ≥4 Capitalized multi-token | companies_involved |
-| **L** Lunghezza | `len(sanitized) ≥ 6000` (stack +12k solo punti log) | trim 4000 |
-| **X** Lingua | script non-latino dominante / charset misto | title/summary IT |
-| **N** Negative | title&lt;40 ∧ body&lt;800 ∧ nessuna G/E/X | forza SIMPLE |
+| Famiglia | Attivazione (codice live) | Campo a rischio |
+|----------|---------------------------|-----------------|
+| **G** Geo | ≥2 nazioni lexicon EN/IT **oppure** `geo_marker` con `body_len ≥ 1500` | country_code, lat/lon |
+| **E** Entità | ≥3 org suffix (`Inc\|Ltd\|LLC\|GmbH\|SpA\|AG\|Corp\|PLC\|SA`) | companies_involved |
+| **L** Lunghezza | `len(body) ≥ 6000` (+30 log se ≥12000) | trim 4000 |
+| **X** Lingua | ratio non-latino ≥0.15 su sample 4k | title/summary IT |
+| **N** Negative | title&lt;40 ∧ body&lt;800 ∧ nessuna famiglia positiva | forza SIMPLE |
 
-Punti (solo logging/calibrazione): L +20/+10 · G +25 · E +15 · X +20 · N −15.
+Punti (solo logging): L +20/+30 · G +25 · E +15 · X +20 · N −15.
 
-Implementazione: lexicon top ~40 paesi; ISO allowlist (no falso positivo “AI”); no nuova dipendenza `langdetect` in v1.
+Implementazione: lexicon paesi; ISO allowlist; no `langdetect` in v1.
 
-### 4.4 Algoritmo lane (deterministico)
+### 4.4 Algoritmo lane (deterministico) — heuristic **v2.2**
+
+Complessità = **rischio estrazione schema** (geo ambigua, multi-entità, script), **non** IQ e **non** lunghezza sola.
 
 ```text
 families = {G,E,L,X} attive  # N gestito a parte
+strong = families ∩ {G,E,X}
+
+# G: ≥2 country names → sempre; geo_marker da solo solo se body_len ≥ 1500
 if N and not families:
     lane = SIMPLE
+elif families == {L}:
+    lane = SIMPLE          # L sola non eleva (v2.2)
 elif len(families) >= 2:
-    lane = COMPLEX
-elif len(families) == 1:
+    lane = COMPLEX         # L conta solo in combo
+elif len(strong) == 1:
     lane = BORDERLINE
 else:
     lane = SIMPLE
@@ -215,21 +229,21 @@ else:
 
 | Lane | Catena (via env) | Escalation validation |
 |------|------------------|------------------------|
-| **SIMPLE** | `LLM_SIMPLE_*` (+ `GEMINI_MODEL_FALLBACKS` se provider=gemini) | Dopo `_MAX_ATTEMPTS` → **1×** `LLM_COMPLEX_*` |
-| **BORDERLINE** | Stessa catena SIMPLE | Dopo **1 correction fallita** → **1×** `LLM_COMPLEX_*` |
+| **SIMPLE** | `LLM_SIMPLE_*` (tipico `effort=none`) | Dopo `_MAX_ATTEMPTS` → **1×** `LLM_COMPLEX_*` |
+| **BORDERLINE** | **`LLM_COMPLEX_*`** (tipico `effort=high`) — v2.2 | Dopo **1 correction fallita** resta su COMPLEX (già high); escalate legacy se identity diversa |
 | **COMPLEX** | `LLM_COMPLEX_*` → residuale SIMPLE | Se COMPLEX down / no key → SIMPLE; poi fallback article |
 
-Provider ammessi: `gemini` \| `deepseek`. DeepSeek riceve `model=` dalla lane (non solo `DEEPSEEK_MODEL` default).
+Provider ammessi: `gemini` \| `deepseek` \| `openai` \| `claude` (claude stub). DeepSeek riceve `model=` + effort dalla lane (`LLM_*_REASONING_EFFORT`; `none` = thinking disabled).
 
 ### 4.5 SLO mix (anti “path primario”)
 
 | KPI | Banda | Fuori banda |
 |-----|-------|-------------|
-| Share COMPLEX (pre-call) | **20–40%** | &lt;15% → F1; &gt;50% → F2 → retune lexicon/soglie L |
-| Share BORDERLINE | **15–35%** | ~0% → di fatto binario |
-| Escalate / giorno | monitor | Spike → G debole o Gemini fragile su mid |
-| XX su lane SIMPLE | trend vs 24.8% (secondario) | Se peggiora senza motivo → rafforzare G |
-| USD DeepSeek / giorno | ≤ `DEEPSEEK_BUDGET_USD_DAY` | **Stub v1:** env letto, soft-cap **non ancora applicato** in codice |
+| Share COMPLEX (pre-call) | monitor | Con ops DeepSeek none/high tipicamente &lt;20% (G+L rari) |
+| Share BORDERLINE | monitor | Ora costa come COMPLEX (high); L-sola non gonfia più questa fascia |
+| Escalate / giorno | monitor | Spike → G debole o JSON fragile |
+| XX su lane SIMPLE | trend vs baseline | Se peggiora → rafforzare G |
+| USD DeepSeek / giorno | ≤ budget soft-cap | Soft-cap in `QuotaLedger` (`0` = off) |
 
 **Gate go-live:** shadow ≥**3 giorni** su Miniflux live (`LLM_ROUTING_SHADOW=true`: logga lane, call ancora Gemini-only) con COMPLEX share in 20–40%. Poi `SHADOW=false`.
 
@@ -239,7 +253,9 @@ Provider ammessi: `gemini` \| `deepseek`. DeepSeek riceve `model=` dalla lane (n
 |--------|----------------|
 | `LLM_COMPLEX_PROVIDER=deepseek` senza key | WARNING + COMPLEX usa SIMPLE; `LLM_ROUTING_STRICT=1` → fail startup |
 | Crediti / 402 | Cooldown DeepSeek + log `complex_lane deepseek cooldown` |
-| No length-only → COMPLEX | Solo L → BORDERLINE |
+| No length-only → COMPLEX | Solo L → **SIMPLE** (v2.2; non BORDERLINE) |
+| No length-only → BORDERLINE | Idem — L sola non è rischio schema |
+| geo_marker corto | Ignorato se `body_len < 1500` (anti FP pitch HN) |
 | No title-only | G dal body |
 | Stesso truncate | `[:4000]` ovunque in v1 |
 
@@ -265,16 +281,15 @@ Chiave: `provider`+`model` (+ opz. effort). Cooldown condiviso tra tutte le lane
 ```mermaid
 flowchart TD
   A[Sanitize] --> H[Famiglie G/E/L/X/N]
-  H -->|0| S[SIMPLE]
-  H -->|1| B[BORDERLINE]
-  H -->|≥2| C[COMPLEX]
-  S --> P1[LLM_SIMPLE chain]
-  B --> P1
-  P1 -->|ok| OK[Commit]
-  B -->|1 correction fail| P2[LLM_COMPLEX]
-  S -->|validation×N| P2
+  H -->|0 o solo L| S[SIMPLE]
+  H -->|1 di G/E/X| B[BORDERLINE]
+  H -->|≥2 famiglie| C[COMPLEX]
+  S --> P1[LLM_SIMPLE effort none]
+  B --> P2[LLM_COMPLEX effort high]
   C --> P2
+  P1 -->|ok| OK[Commit]
   P2 -->|ok| OK
+  S -->|validation×N| P2
   P2 -->|down| R[SIMPLE residual]
   R -->|fail| FB[fallback article]
 ```
@@ -288,12 +303,16 @@ flowchart TD
 GEMINI_MODEL=gemini-3.1-flash-lite
 GEMINI_MODEL_FALLBACKS=
 
-# DeepSeek (default model se LLM_*_MODEL omesso; effort; budget stub)
+# DeepSeek (default model se LLM_*_MODEL omesso; effort; limiti separati)
 DEEPSEEK_API_KEY=...                 # non commitare
 DEEPSEEK_MODEL=deepseek-v4-flash
 DEEPSEEK_REASONING_EFFORT=high
 DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_BUDGET_USD_DAY=0            # stub: non enforced in v1
+DEEPSEEK_RPM=0                       # paid: 0 = unmanaged
+DEEPSEEK_TPM=0
+DEEPSEEK_RPD=0
+DEEPSEEK_BUDGET_USD_DAY=0            # soft-cap USD/giorno (0 = off)
+DEEPSEEK_USD_PER_1M_TOKENS=0.28
 
 # Routing
 LLM_ROUTING_MODE=complexity          # off | complexity  (default codice: off)
@@ -307,7 +326,7 @@ LLM_SIMPLE_MODEL=gemini-3.1-flash-lite
 LLM_COMPLEX_PROVIDER=deepseek
 LLM_COMPLEX_MODEL=deepseek-v4-flash
 
-# Quote / cooldown
+# Quote Gemini / cooldown (DeepSeek: DEEPSEEK_* sopra)
 LLM_MODEL_COOLDOWN_HOURS=24
 LLM_RPM=10
 LLM_TPM=0
@@ -316,17 +335,18 @@ LLM_RPD=1400
 
 `off` / `shadow` = solo catena SIMPLE.  
 Default codice senza env: `LLM_ROUTING_MODE=off`, `LLM_ROUTING_SHADOW=true` (boot sicuro).  
-Env `T_LOW`/`T_HIGH` **non** richiesti in v2.1 (lane = quorum).
+Env `T_LOW`/`T_HIGH` **non** richiesti (lane = heuristic famiglie v2.2).
 
 ---
 
 ## 6. Quote ledger (invarianti)
 
-1. `reserve(model=…)` prima di **ogni** tentativo (anche switch lane/escalate).  
+1. `reserve(model=…, provider=…)` prima di **ogni** tentativo (anche switch lane/escalate).  
 2. `complete` / `fail` sulla stessa `reservation_id`.  
-3. Soft-trim worker: Gemini → RPD; DeepSeek → budget USD / 402.  
-4. Retry-After breve ≠ cooldown 24h.  
-5. System prompt + schema Pydantic **immutabili**.
+3. Limiti **per provider**: Gemini `LLM_*`; DeepSeek `DEEPSEEK_*` (`0` = dimensione off).  
+4. Soft-trim worker: solo Gemini RPD; DeepSeek → `DEEPSEEK_BUDGET_USD_DAY` / 402.  
+5. Retry-After breve ≠ cooldown 24h.  
+6. System prompt + schema Pydantic **immutabili**.
 
 ---
 
@@ -360,15 +380,17 @@ Env `T_LOW`/`T_HIGH` **non** richiesti in v2.1 (lane = quorum).
 ### 8.2 Test minimi
 
 - 0 famiglie → SIMPLE  
-- solo G (corto multi-paese) → BORDERLINE  
+- solo G (corto multi-paese ≥2 country) → BORDERLINE  
 - G+E o ≥2 → COMPLEX  
-- solo L lungo mono-US → BORDERLINE (non COMPLEX)  
+- solo L lungo mono-US → **SIMPLE** (v2.2; non BORDERLINE/COMPLEX)  
+- geo_marker su body corto (&lt;1500) → **non** G  
 - titolo mono + body multi → G dal body  
-- BORDERLINE escalate dopo 1 correction fail; SIMPLE dopo N  
+- `_chain_for(BORDERLINE)` → refs `LLM_COMPLEX` effort high  
+- BORDERLINE/SIMPLE escalate rules; SIMPLE dopo N validation fail  
 - `complexity` + no key → off+WARN o fail se strict  
-- 402 → cooldown + Gemini; 429 short → no cooldown  
+- 402 → cooldown; 429 short → no cooldown  
 - Shadow: lane loggata, catena sempre SIMPLE  
-- `LLM_COMPLEX_MODEL` passato a DeepSeek `classify_json(model=)` (non solo `DEEPSEEK_MODEL`)  
+- `LLM_COMPLEX_MODEL` passato a DeepSeek `classify_json(model=)` (+ effort lane)  
 
 ### 8.3 Gate
 
@@ -414,14 +436,14 @@ Poi: `docker compose up -d --build radar-worker` · VERIFY_IN_STUDIO · shadow 3
 
 ## 11. Raccomandazione finale
 
-Adottare design **v2.1** come specifica Fase C (implementazione in corso / done quando remediation report esiste):
+Adottare design **complexity + lane env v2.2** (implementato; vedi remediation):
 
 1. Cascata provider/model **per lane** via env (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`).  
-2. DeepSeek Flash **High** via **httpx** (no package `openai`) quando COMPLEX=deepseek.  
-3. Lane = **quorum famiglie** (0/1/≥2).  
-4. Shadow ≥3 giorni prima di go-live aggressivo; SLO COMPLEX 20–40%.  
-5. Cooldown SQL `009`; ledger invariato nei principi.  
-6. Soft-cap `DEEPSEEK_BUDGET_USD_DAY` = **post-v1** (env già presente).
+2. DeepSeek Flash via **httpx** (no package `openai`): SIMPLE tipico `effort=none`; BORDERLINE/COMPLEX tipico `high`.  
+3. Lane = heuristic v2.2: L-sola→SIMPLE; 1 di {G,E,X}→BORDERLINE→**catena COMPLEX**; ≥2→COMPLEX.  
+4. Shadow opzionale per calibrazione; KPI mix monitorati (non forzare 20–40% se feed corti).  
+5. Cooldown SQL `009`; ledger per `purpose=classify:{simple|complex}`.  
+6. Soft-cap budget USD se `BUDGET_USD_DAY` > 0; RPM/TPM/RPD tipicamente `0` su paid.
 
 ---
 
@@ -462,10 +484,10 @@ flowchart LR
 | File | Funzione / area | Cambio |
 |------|-----------------|--------|
 | `core/config.py` | LLM section | Chain, DeepSeek, routing, `LLM_SIMPLE_*` / `LLM_COMPLEX_*`, cooldown |
-| `classification/complexity.py` | **nuovo** | Famiglie G/E/L/X/N → lane |
+| `classification/complexity.py` | **nuovo** | Famiglie G/E/L/X/N → lane **v2.2** (L-sola→SIMPLE; G marker body≥1500) |
 | `classification/cooldown.py` | **nuovo** | SQL + memory fallback test |
-| `classification/deepseek.py` | **nuovo** | httpx chat completions JSON |
-| `classification/client.py` | `classify_article` | Outer model loop + escalate + shadow |
+| `classification/deepseek.py` | **nuovo** | httpx; thinking none\|high via `LLM_*_REASONING_EFFORT` |
+| `classification/client.py` | `classify_article` | Outer loop; BORDERLINE→COMPLEX chain; escalate; shadow |
 | `migrations/009_llm_model_cooldown.sql` | **nuovo** | PK (provider, model) |
 | `tests/test_complexity.py` | **nuovo** | Quorum lane |
 | `tests/test_cooldown.py` | **nuovo** | set/skip/expire |
@@ -475,13 +497,14 @@ flowchart LR
 ### 12.4 TO-BE (runtime)
 
 ```text
-sanitize → families → lane
+sanitize → families → lane (v2.2)
 if SHADOW or mode=off: log lane; chain = simple_chain (LLM_SIMPLE_*)
-else: chain = chain_for(lane)   # COMPLEX → LLM_COMPLEX_* + residual SIMPLE
+else: chain = chain_for(lane)
+  # SIMPLE → LLM_SIMPLE_*; BORDERLINE|COMPLEX → LLM_COMPLEX_* (+ residual SIMPLE)
 for ref in filter_cooldown(chain):
   for attempt in validation_loop:
-    reserve(model=ref.model)
-    call provider (gemini|deepseek)  # deepseek: classify_json(model=ref.model)
+    reserve(model=ref.model, lane=ref.quota_lane)
+    call provider (gemini|deepseek)  # deepseek: classify_json(model=) + thinking per effort
     …
 ```
 

@@ -1,7 +1,14 @@
 """Heuristic article complexity → routing lane (SIMPLE / BORDERLINE / COMPLEX).
 
-Complexity = risk of failing Radar schema fields (country_code, geo, companies, IT),
-not generic "IQ". Lane = family quorum (v2.1). Score is for logging only.
+Complexity = schema-extraction risk (ambiguous geo, multi-entity, non-Latin script),
+not body length alone and not generic "IQ".
+
+Families: G geo, E entities, L length, X script/language, N negative (anti-paid).
+Lane (v2.2):
+  - only L, or no strong families → SIMPLE
+  - exactly 1 of {G, E, X} → BORDERLINE
+  - ≥2 of {G, E, L, X} (L counts only in combination) → COMPLEX
+Score is for logging only.
 """
 
 from __future__ import annotations
@@ -15,6 +22,10 @@ class Lane(str, Enum):
     SIMPLE = "SIMPLE"
     BORDERLINE = "BORDERLINE"
     COMPLEX = "COMPLEX"
+
+
+# Min body length for geo_marker alone to count as G (avoids short HN pitch FPs).
+_GEO_MARKER_MIN_BODY = 1500
 
 
 # Top countries for Radar lexicon (EN + IT common forms).
@@ -285,7 +296,7 @@ def score_complexity(title: str, content: str) -> ComplexityResult:
     Compute routing lane from title + sanitized body.
 
     Families: G geo, E entities, L length, X script/language, N negative (anti-paid).
-    Lane: 0 → SIMPLE, 1 → BORDERLINE, ≥2 → COMPLEX.
+    Lane v2.2: L-alone → SIMPLE; 1 of {G,E,X} → BORDERLINE; ≥2 (L only in combo) → COMPLEX.
     """
     title = title or ""
     content = content or ""
@@ -308,11 +319,17 @@ def score_complexity(title: str, content: str) -> ComplexityResult:
     n_countries, geo_signals = _count_countries(blob, blob_lower)
     signals.extend(geo_signals)
     geo_marker = bool(_GEO_MARKERS.search(blob))
-    if n_countries >= 2 or geo_marker:
+    # ≥2 distinct countries → G even on short bodies; geo_marker alone needs length.
+    if n_countries >= 2:
         families.add("G")
         score += 25
-        if geo_marker:
-            signals.append("geo_marker")
+        signals.append("multi_country")
+    elif geo_marker and body_len >= _GEO_MARKER_MIN_BODY:
+        families.add("G")
+        score += 25
+        signals.append("geo_marker")
+    elif geo_marker and body_len < _GEO_MARKER_MIN_BODY:
+        signals.append("geo_marker_ignored_short_body")
 
     n_orgs = _count_orgs(blob)
     if n_orgs >= 3:
@@ -328,14 +345,20 @@ def score_complexity(title: str, content: str) -> ComplexityResult:
         signals.append(f"non_latin={ratio:.2f}")
 
     positive = families & {"G", "E", "L", "X"}
+    strong = positive & {"G", "E", "X"}
+
     if len(title) < 40 and body_len < 800 and not positive:
         families.add("N")
         score = max(0, score - 15)
         signals.append("negative_clip")
         lane = Lane.SIMPLE
+    elif positive == {"L"}:
+        # Length alone is not schema-extraction risk.
+        signals.append("l_alone_simple")
+        lane = Lane.SIMPLE
     elif len(positive) >= 2:
         lane = Lane.COMPLEX
-    elif len(positive) == 1:
+    elif len(strong) == 1:
         lane = Lane.BORDERLINE
     else:
         lane = Lane.SIMPLE

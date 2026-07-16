@@ -4,7 +4,8 @@ description: >
   Agente specializzato nell'implementazione e manutenzione della pipeline di ingestione dati del
   Radar Informativo Globale. Responsabile esclusivo del backend Python: worker ingest
   (`worker.py` / Compose `radar-worker`), integrazione Miniflux API, chiamate Gemini/DeepSeek
-  con schema Pydantic, QuotaLedger, complexity lane (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`) e
+  con schema Pydantic, QuotaLedger, complexity lane v2.2 (`LLM_SIMPLE_*` /
+  `LLM_COMPLEX_*`; BORDERLINE→COMPLEX) e
   scrittura idempotente su PostgreSQL. DEVE ESSERE USATO
   per qualsiasi modifica a `backend/app/worker.py`, `main.py` (API) e ai moduli di
   pipeline (extraction/, classification/, commit/, core/). Non tocca mai il frontend né i file Docker.
@@ -154,11 +155,14 @@ def strip_html_tags(html_content: str) -> str:
 ### 6. Quote LLM Durable (QuotaLedger) + lane env
 
 Ogni tentativo provider (Gemini **o** DeepSeek) riserva capacità su `llm_request_ledger` **prima** della chiamata.
-Lane: `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (`LLM_ROUTING_MODE=complexity`). Package `openai` vietato.
-Non basarsi solo su `asyncio.sleep(4)` in-memory. SoT: `plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md`.
+Lane: `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (`LLM_ROUTING_MODE=complexity`).
+**Complexity v2.2:** BORDERLINE usa catena COMPLEX (`purpose=classify:complex`); SIMPLE → `classify:simple`.
+Package `openai` vietato. SoT: `plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md`.
 
 ```python
-reservation_id = await self.quota.reserve(estimated_tokens=1500, model=ref.model)
+reservation_id = await self.quota.reserve(
+    estimated_tokens=1500, model=ref.model, lane=ref.quota_lane, provider=ref.provider
+)
 # ... gemini generate_content | deepseek.classify_json(model=ref.model) ...
 await self.quota.complete(reservation_id, actual_tokens)
 ```

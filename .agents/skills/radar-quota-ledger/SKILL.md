@@ -1,45 +1,41 @@
 ---
 name: radar-quota-ledger
 description: >
-  QuotaLedger durable: reserve/complete/fail su llm_request_ledger prima di ogni
-  tentativo provider (Gemini o DeepSeek); RPD half-open; 429 Retry-After breve;
-  hard-fail → llm_model_cooldown 24h (tabella separata, non il ledger).
-when_to_use:
-  - classification/quota.py, cooldown.py, llm_request_ledger, client cascade/retry
-version: 1.2.0
+  QuotaLedger durable: reserve/complete/fail su llm_request_ledger prima di ogni tentativo Gemini;
+  RPD half-open; rispettare 429 Retry-After. Complexity v2.2: BORDERLINE → purpose classify:complex.
 ---
 
-## Quando attivare
+## Limiti (obbligatorio)
 
-Modifiche a rate limit, ledger SQL, cooldown modelli, o retry del classification client.
+| Env | Uso |
+|-----|-----|
+| `LLM_SIMPLE_RPM/TPM/RPD` | Tentativi catena SIMPLE (`purpose=classify:simple`) |
+| `LLM_COMPLEX_RPM/TPM/RPD` | Tentativi catena COMPLEX — include **BORDERLINE + COMPLEX** (`purpose=classify:complex`) |
+| `0` | Quella dimensione **non** e enforced su quella lane |
+
+`LLM_RPM` / `DEEPSEEK_RPM` = **legacy alias** (default se il campo lane e assente). Non sono un tetto globale shared.
+
+Worker soft-trim usa solo `LLM_SIMPLE.rpd` (se > 0).
+
+## Complexity routing (v2.2)
+
+- SIMPLE → reserve `lane=simple`
+- BORDERLINE / COMPLEX → reserve `lane=complex`
 
 ## Protocollo
 
 ```python
-reservation_id = await self.quota.reserve(estimated_tokens=..., model=active_model)
-try:
-    response = await provider_call(...)  # gemini or deepseek
-    await self.quota.complete(reservation_id, actual_tokens)
-except asyncio.CancelledError:
-    await self.quota.fail(reservation_id)  # o release se provider non avviato
-    raise
+reservation_id = await self.quota.reserve(
+    estimated_tokens=..., model=ref.model, lane=ref.quota_lane, provider=ref.provider
+)
 ```
 
-1. **Reserve prima** di ogni tentativo provider (anche retry / switch modello / escalate / lane).
-2. **Complete/fail** sulla **stessa** `reservation_id` — mai “ultima riga”.
-3. Spacing in-process con `time.monotonic()`; RPD half-open su `RADAR_TIME_ZONE`.
-4. On **429** breve: rispettare `Retry-After` — **non** scrivere cooldown 24h.
-5. Hard-fail (RPD day, 402 crediti, 404 model, 5xx esauriti): `llm_model_cooldown` poi next model.
-6. Model string = lane env (`LLM_SIMPLE_MODEL` / `LLM_COMPLEX_MODEL` / fallbacks Gemini).
-
-## Anti-pattern
-
-- Solo `asyncio.sleep(4)` in-memory come unico rate limit
-- `date(created_at) = CURRENT_DATE` ingenuo per RPD
-- Skip reserve sui retry di validazione
-- Ignorare `ref.model` su DeepSeek (sempre passare `classify_json(model=…)`)
+1. Env preferito: `LLM_SIMPLE_*` / `LLM_COMPLEX_*`.
+2. Legacy riempie i gap se i campi lane sono assenti.
+3. `PROVIDER` ∈ {gemini, deepseek, openai, claude}.
+4. Budget exceeded → skip, no cooldown 24h.
 
 ## SoT
 
-`radar/.ecc/rules/backend.md` Regola 9 + 9b + `classification/quota.py` + migration `003_quota_ledger.sql`.  
-Lane: `plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md`.
+`radar/backend/app/core/llm_lanes.py` + `classification/quota.py` + `.env.example` +
+`plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md`.

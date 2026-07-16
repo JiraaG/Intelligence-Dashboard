@@ -29,7 +29,7 @@ in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categ
 | Layer       | Tecnologia                              | Note                                       |
 |-------------|------------------------------------------|---------------------------------------------|
 | Backend     | Python 3.12-slim (Docker) / 3.14 (locale) | Demone asincrono, polling ogni 15 minuti   |
-| LLM         | google-genai (Gemini) + httpx DeepSeek (no package `openai`) | Structured Output Pydantic. Lane env: `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (`gemini`\|`deepseek`). Ops tipico: Lite SIMPLE + DeepSeek High COMPLEX. Default storico Gemma → normalizza `-it`; non hardcodare segreti. |
+| LLM         | google-genai (Gemini) + httpx DeepSeek (no package `openai`) | Structured Output Pydantic. Lane env: `LLM_SIMPLE_*` (SIMPLE, tipico effort=`none`) / `LLM_COMPLEX_*` (**BORDERLINE+COMPLEX**, tipico `high`). Complexity **v2.2**: rischio schema G/E/X; L sola → SIMPLE. Ops tipico: DeepSeek Flash none/high. Non hardcodare segreti. |
 | Database    | PostgreSQL 15                            | Tabelle articles, companies, tags + sentiment, relevance + indici |
 | Feed Source | Miniflux REST API                       | Articoli non letti, deduplica per URL       |
 | Frontend    | Angular 21 (Standalone Components)      | Signals, lazy loading                       |

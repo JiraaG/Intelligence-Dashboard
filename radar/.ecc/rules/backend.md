@@ -270,21 +270,24 @@ except asyncio.CancelledError:
 
 ---
 
-## Regola 9b: Lane LLM via env (complexity routing)
+## Regola 9b: Lane LLM via env (complexity routing v2.2)
 
-Routing opzionale (`LLM_ROUTING_MODE=off|complexity`). Lane = quorum famiglie in
-`classification/complexity.py` (SIMPLE / BORDERLINE / COMPLEX).
+Routing opzionale (`LLM_ROUTING_MODE=off|complexity`). Lane = heuristic in
+`classification/complexity.py`: **rischio estrazione schema** (G/E/X), non lunghezza sola.
 
 | Env | Ruolo |
 |-----|--------|
-| `LLM_SIMPLE_PROVIDER` / `LLM_SIMPLE_MODEL` | SIMPLE + BORDERLINE (`gemini` \| `deepseek`) |
-| `LLM_COMPLEX_PROVIDER` / `LLM_COMPLEX_MODEL` | COMPLEX + escalate validation |
+| `LLM_SIMPLE_PROVIDER` / `LLM_SIMPLE_MODEL` / `*_REASONING_EFFORT` | Solo lane **SIMPLE** (tipico `effort=none`) |
+| `LLM_COMPLEX_PROVIDER` / `LLM_COMPLEX_MODEL` / `*_REASONING_EFFORT` | **BORDERLINE + COMPLEX** + escalate (tipico `effort=high`) |
 | `GEMINI_MODEL_FALLBACKS` | Cascata extra **solo** se provider lane = gemini |
-| `DEEPSEEK_*` | Key, default model, effort, base URL (budget USD = stub non enforced) |
+| `DEEPSEEK_*` | Legacy key/model/effort/base; `RPM/TPM/RPD` (0=unmanaged); budget soft-cap |
 | `LLM_ROUTING_SHADOW=true` | Logga lane; chiama sempre catena SIMPLE |
 
+**Lane v2.2:** L sola → SIMPLE; 1 di {G,E,X} → BORDERLINE; ≥2 famiglie (L solo in combo) → COMPLEX.
+`geo_marker` da solo richiede `body_len ≥ 1500`; ≥2 country names → G sempre.
+
 **Invarianti:** stesso `content[:4000]` su tutte le lane; schema/prompt immutabili;
-DeepSeek riceve `model=` dalla lane (`classify_json(model=ref.model)`);
+DeepSeek riceve `model=` + thinking da effort lane (`none` = thinking disabled);
 mai hardcodare API key; mai commit `.env`.
 
 SoT: `plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md`.

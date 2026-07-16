@@ -105,20 +105,45 @@ def _resolve_time_zone(name: str):
 RADAR_ENV = (_env_str("RADAR_ENV", "development") or "development").lower()
 IS_PRODUCTION = RADAR_ENV in {"production", "prod"}
 
-# ── LLM ──────────────────────────────────────────────────────────────────────
+# ── LLM (per-lane: SIMPLE / COMPLEX; provider = adapter type) ─────────────────
+from app.core.llm_lanes import (  # noqa: E402
+    LANE_COMPLEX,
+    LANE_SIMPLE,
+    LlmLaneConfig,
+    OPENAI_COMPAT_PROVIDERS,
+    load_lanes,
+)
+
+LLM_SIMPLE: LlmLaneConfig
+LLM_COMPLEX: LlmLaneConfig
+LLM_SIMPLE, LLM_COMPLEX = load_lanes()
+
+# Backward-compatible aliases (prefer LLM_SIMPLE / LLM_COMPLEX in new code).
 GOOGLE_API_KEY = _env_str("GOOGLE_API_KEY")
 GEMINI_API_KEY = _env_str("GEMINI_API_KEY")
-# Optional at import so API/FE can boot without a key (ready-to-run).
-# Production fail-fast and ClassificationClient still require a key.
-LLM_API_KEY = GOOGLE_API_KEY or GEMINI_API_KEY
+LLM_API_KEY = (
+    LLM_SIMPLE.api_key
+    if LLM_SIMPLE.provider == "gemini"
+    else (GOOGLE_API_KEY or GEMINI_API_KEY or LLM_SIMPLE.api_key)
+)
+# If simple is not gemini, still expose a gemini key for SDK boot when present.
+if not LLM_API_KEY:
+    LLM_API_KEY = GOOGLE_API_KEY or GEMINI_API_KEY or ""
 
-_raw_model = _env_str("GEMINI_MODEL", "gemma-4-31b") or "gemma-4-31b"
-GEMINI_MODEL = "gemma-4-31b-it" if _raw_model in ("gemma-4-31b", "gemma-4-31b-it") else _raw_model
-GEMINI_MODEL_FALLBACKS = _csv_models(_env_str("GEMINI_MODEL_FALLBACKS", ""))
+GEMINI_MODEL = LLM_SIMPLE.model if LLM_SIMPLE.provider == "gemini" else (
+    _env_str("GEMINI_MODEL", "gemma-4-31b") or "gemma-4-31b"
+)
+if GEMINI_MODEL in ("gemma-4-31b", "gemma-4-31b-it"):
+    GEMINI_MODEL = "gemma-4-31b-it"
+GEMINI_MODEL_FALLBACKS = list(LLM_SIMPLE.fallbacks) if LLM_SIMPLE.provider == "gemini" else (
+    _csv_models(_env_str("GEMINI_MODEL_FALLBACKS", ""))
+)
 
 
 def gemini_model_chain() -> list[str]:
-    """Primary + fallbacks, deduplicated, primary first."""
+    """Primary + fallbacks for the SIMPLE lane when provider=gemini."""
+    if LLM_SIMPLE.provider == "gemini":
+        return list(LLM_SIMPLE.models)
     chain = [GEMINI_MODEL]
     for model in GEMINI_MODEL_FALLBACKS:
         if model not in chain:
@@ -126,13 +151,13 @@ def gemini_model_chain() -> list[str]:
     return chain
 
 
-LLM_RPM = _env_int("LLM_RPM", 10, min_value=1, max_value=120)
-LLM_TPM = _env_int("LLM_TPM", 0, min_value=0, max_value=2_000_000, allow_zero=True)
-LLM_RPD = _env_int("LLM_RPD", 1400, min_value=1, max_value=100_000)
-
-# Application deadline around each Gemini generate_content call (seconds).
-GEMINI_REQUEST_TIMEOUT = _env_int("GEMINI_REQUEST_TIMEOUT", 60, min_value=1, max_value=600)
-# Token estimate reserved before each provider attempt (TPM accounting).
+# Aliases di sola comodita → valori della lane SIMPLE (NON sono limiti globali).
+# Nuovo codice: usare LLM_SIMPLE.rpm / .tpm / .rpd e LLM_COMPLEX.*.
+# 0 = dimensione non gestita su quella lane.
+LLM_RPM = LLM_SIMPLE.rpm
+LLM_TPM = LLM_SIMPLE.tpm
+LLM_RPD = LLM_SIMPLE.rpd
+GEMINI_REQUEST_TIMEOUT = int(max(LLM_SIMPLE.timeout, LLM_COMPLEX.timeout))
 ESTIMATED_TOKENS_PER_REQUEST = _env_int(
     "ESTIMATED_TOKENS_PER_REQUEST",
     1500,
@@ -140,18 +165,40 @@ ESTIMATED_TOKENS_PER_REQUEST = _env_int(
     max_value=100_000,
 )
 
-# DeepSeek (OpenAI-compatible via httpx) — used when lane provider = deepseek.
-DEEPSEEK_API_KEY = _env_str("DEEPSEEK_API_KEY", "") or ""
-DEEPSEEK_MODEL = _env_str("DEEPSEEK_MODEL", "deepseek-v4-flash") or "deepseek-v4-flash"
-DEEPSEEK_REASONING_EFFORT = (_env_str("DEEPSEEK_REASONING_EFFORT", "high") or "high").lower()
+DEEPSEEK_API_KEY = (
+    LLM_COMPLEX.api_key
+    if LLM_COMPLEX.provider == "deepseek"
+    else (_env_str("DEEPSEEK_API_KEY", "") or "")
+)
+DEEPSEEK_MODEL = (
+    LLM_COMPLEX.model
+    if LLM_COMPLEX.provider == "deepseek"
+    else (_env_str("DEEPSEEK_MODEL", "deepseek-v4-flash") or "deepseek-v4-flash")
+)
+DEEPSEEK_REASONING_EFFORT = (
+    LLM_COMPLEX.reasoning_effort
+    if LLM_COMPLEX.provider in OPENAI_COMPAT_PROVIDERS
+    else ((_env_str("DEEPSEEK_REASONING_EFFORT", "high") or "high").lower())
+)
 DEEPSEEK_BASE_URL = (
-    _env_str("DEEPSEEK_BASE_URL", "https://api.deepseek.com") or "https://api.deepseek.com"
+    LLM_COMPLEX.base_url
+    if LLM_COMPLEX.provider == "deepseek"
+    else (
+        _env_str("DEEPSEEK_BASE_URL", "https://api.deepseek.com") or "https://api.deepseek.com"
+    )
 ).rstrip("/")
-DEEPSEEK_BUDGET_USD_DAY = _env_float(
-    "DEEPSEEK_BUDGET_USD_DAY",
-    3.0,
-    min_value=0.0,
-    max_value=10_000.0,
+DEEPSEEK_RPM = LLM_COMPLEX.rpm if LLM_COMPLEX.provider == "deepseek" else 0
+DEEPSEEK_TPM = LLM_COMPLEX.tpm if LLM_COMPLEX.provider == "deepseek" else 0
+DEEPSEEK_RPD = LLM_COMPLEX.rpd if LLM_COMPLEX.provider == "deepseek" else 0
+DEEPSEEK_BUDGET_USD_DAY = (
+    LLM_COMPLEX.budget_usd_day
+    if LLM_COMPLEX.provider in OPENAI_COMPAT_PROVIDERS
+    else 0.0
+)
+DEEPSEEK_USD_PER_1M_TOKENS = (
+    LLM_COMPLEX.usd_per_1m_tokens
+    if LLM_COMPLEX.provider in OPENAI_COMPAT_PROVIDERS
+    else 0.28
 )
 
 # Routing: off = simple-lane chain only; complexity = heuristic lanes.
@@ -162,18 +209,10 @@ LLM_ROUTING_STRICT = _env_bool("LLM_ROUTING_STRICT", False)
 LLM_COMPLEXITY_ESCALATE_ON_VALIDATION = _env_bool("LLM_COMPLEXITY_ESCALATE_ON_VALIDATION", True)
 LLM_MODEL_COOLDOWN_HOURS = _env_int("LLM_MODEL_COOLDOWN_HOURS", 24, min_value=1, max_value=168)
 
-
-def _normalize_llm_provider(raw: str | None, default: str) -> str:
-    value = (raw or default).strip().lower()
-    return value if value in {"gemini", "deepseek"} else default
-
-
-# Lane model assignment (swap anytime without code changes).
-# SIMPLE/BORDERLINE → LLM_SIMPLE_*; COMPLEX → LLM_COMPLEX_*.
-LLM_SIMPLE_PROVIDER = _normalize_llm_provider(_env_str("LLM_SIMPLE_PROVIDER"), "gemini")
-LLM_SIMPLE_MODEL = _env_str("LLM_SIMPLE_MODEL") or GEMINI_MODEL
-LLM_COMPLEX_PROVIDER = _normalize_llm_provider(_env_str("LLM_COMPLEX_PROVIDER"), "deepseek")
-LLM_COMPLEX_MODEL = _env_str("LLM_COMPLEX_MODEL") or DEEPSEEK_MODEL
+LLM_SIMPLE_PROVIDER = LLM_SIMPLE.provider
+LLM_SIMPLE_MODEL = LLM_SIMPLE.model
+LLM_COMPLEX_PROVIDER = LLM_COMPLEX.provider
+LLM_COMPLEX_MODEL = LLM_COMPLEX.model
 
 # ── Database ─────────────────────────────────────────────────────────────────
 _DEFAULT_PG_PASSWORD = "radar_password_secure"
@@ -280,8 +319,8 @@ def _validate_production_secrets() -> None:
         return
 
     missing: list[str] = []
-    if not LLM_API_KEY:
-        missing.append("GEMINI_API_KEY o GOOGLE_API_KEY")
+    if not (LLM_SIMPLE.api_key or LLM_COMPLEX.api_key or LLM_API_KEY):
+        missing.append("LLM_SIMPLE_API_KEY / LLM_COMPLEX_API_KEY (o legacy GEMINI_/DEEPSEEK_)")
     if not MINIFLUX_API_KEY:
         missing.append("MINIFLUX_API_KEY")
     if not _env_str("DATABASE_URL") and not _env_str("POSTGRES_PASSWORD"):

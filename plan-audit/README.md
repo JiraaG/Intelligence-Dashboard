@@ -7,8 +7,8 @@ Cartella di audit, prompt orchestratore e SoT operativi del Radar.
 
 | Documento | Ruolo |
 |-----------|--------|
-| [LLM_Multi_Model_Fallback_Phase_AB.md](active/LLM_Multi_Model_Fallback_Phase_AB.md) | Multi-model LLM + routing lane (**v2.2**: `LLM_SIMPLE_*` / `LLM_COMPLEX_*`) |
-| [audit_remediation_llm_multi_model_fallback.md](remediation/audit_remediation_llm_multi_model_fallback.md) | Report implementazione Fase C + lane env |
+| [LLM_Multi_Model_Fallback_Phase_AB.md](active/LLM_Multi_Model_Fallback_Phase_AB.md) | Multi-model LLM + routing (**lane env + complexity heuristic v2.2**) |
+| [audit_remediation_llm_multi_model_fallback.md](remediation/audit_remediation_llm_multi_model_fallback.md) | Report Fase C + v2.2 BORDERLINE→COMPLEX |
 | [Final_Release_Gate_Plan.md](active/Final_Release_Gate_Plan.md) | Gate residuali Final Release |
 | [audit_problemi_documentazione.md](active/audit_problemi_documentazione.md) | Playbook audit/remediation |
 | [audit_problemi_documentazione_risoluzione.md](active/audit_problemi_documentazione_risoluzione.md) | Stati ticket P0–P2 |
@@ -38,5 +38,6 @@ plan-audit/
 ## Note
 
 - Stub LLM storici: `archive/llm-stubs/*.SUPERSEDED.md` → usare solo il SoT in `active/`.
-- Canvas IDE complessità: `canvases/article-complexity-routing.canvas.tsx` (fuori da plan-audit).
-- Lane swap ops: `LLM_COMPLEX_PROVIDER=gemini` + `LLM_COMPLEX_MODEL=…` senza codice.
+- Canvas IDE: `article-complexity-routing.canvas.tsx`, `complexity-routing-audit.canvas.tsx` (fuori da plan-audit).
+- Lane swap ops: `LLM_COMPLEX_PROVIDER=…` + `LLM_COMPLEX_MODEL=…` senza codice.
+- **Complexity v2.2:** SIMPLE = solo `LLM_SIMPLE`; BORDERLINE+COMPLEX = `LLM_COMPLEX` (effort tipico high); L sola → SIMPLE.
