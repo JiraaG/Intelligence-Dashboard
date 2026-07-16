@@ -1,11 +1,11 @@
 # Prompt — T-P0-02 REMEDIATION (ARCHIVIO — ticket DONE)
 
 > **Stato:** T-P0-02 **DONE** (2026-07-16) — ibrido + stress path **b1**.  
-> Report: `plan-audit/audit_remediation_T-P0-02.md`.  
+> Report: `plan-audit/remediation/audit_remediation_T-P0-02.md`.  
 > **Non rieseguire** questo prompt. Prossimo SoT: **T-P1-05** (T-P1-04 DONE).  
 > Blocco sotto = storico orchestratore multi-agente (congelato).
 
-> Analisi pregressa: `plan-audit/audit_remediation_T-P0-02.md` (§A–H, verifica Cursor PASS_WITH_GAPS).
+> Analisi pregressa: `plan-audit/remediation/audit_remediation_T-P0-02.md` (§A–H, verifica Cursor PASS_WITH_GAPS).
 
 ```text
 /goal Implementa T-P0-02 (script diagnostici / ClassificationClient) nel workspace
@@ -31,9 +31,9 @@ Policy: **Ibrido + path stress (b)**
 | Priorità P0→P1 | **Non** declassare in SoT in questo turno (opzionale post-DONE, decisione umana separata). |
 
 Skills: `.agents/skills/radar-quota-ledger` (anti-pattern: non reintrodurre sleep-only come unico gate).
-SoT: `plan-audit/audit_problemi_documentazione_risoluzione.md`
-Playbook: `plan-audit/audit_problemi_documentazione.md` §3.2 / §4.5 / Script I / App. F §F.2
-Report: aggiorna `plan-audit/audit_remediation_T-P0-02.md` (passa da ANALISI ONLY a DONE + gate).
+SoT: `plan-audit/active/audit_problemi_documentazione_risoluzione.md`
+Playbook: `plan-audit/active/audit_problemi_documentazione.md` §3.2 / §4.5 / Script I / App. F §F.2
+Report: aggiorna `plan-audit/remediation/audit_remediation_T-P0-02.md` (passa da ANALISI ONLY a DONE + gate).
 
 Branch tipico: `refactor/testing`. Gate: Phase 6 / Gate Verde.
 Constraint: `main.py` API-only; asyncpg; non toccare worker/outbox/FE map salvo necessità zero.
@@ -49,7 +49,7 @@ Lancia **tre** sotto-agenti specializzati. Preferisci parallelo A∥B; C solo do
 |----|------|-------|-----------------|---------|
 | **A** | `generalPurpose` o `shell` | **Diagnostics cleaner** | `radar/backend/scripts/diagnostics/test_500.py`, `…/test_rate_limiter.py` (+ delete/stub). Opzionale README `_obsolete` solo se serve. | `test_production_pipeline.py`, live tests, SoT DONE, `test_500_bot.py`, `test_500_debug.py` |
 | **B** | `generalPurpose` | **Pipeline + live adapter** | `radar/backend/scripts/test_production_pipeline.py`, `radar/backend/app/tests/test_integration_live.py`. Opzionale nota in `radar/.ecc/agents/pipeline-engineer.md` se il comando manuale resta valido. | diagnostics orfani (A), SoT conteggi (C), client.py/quota.py produzione |
-| **C** | `generalPurpose` | **Docs + Script I + gate** | `plan-audit/audit_remediation_T-P0-02.md`, `plan-audit/audit_problemi_documentazione_risoluzione.md` (§3 ticket + pie OPEN counts + § esito se esiste pattern §10–13), pezzi rilevanti di `plan-audit/audit_problemi_documentazione.md` (§3.2/§4.5 criteri spuntati / App. D se presente). Esegue gate comandi. | logica prodotto fuori script/test; commit |
+| **C** | `generalPurpose` | **Docs + Script I + gate** | `plan-audit/remediation/audit_remediation_T-P0-02.md`, `plan-audit/active/audit_problemi_documentazione_risoluzione.md` (§3 ticket + pie OPEN counts + § esito se esiste pattern §10–13), pezzi rilevanti di `plan-audit/active/audit_problemi_documentazione.md` (§3.2/§4.5 criteri spuntati / App. D se presente). Esegue gate comandi. | logica prodotto fuori script/test; commit |
 
 **Regola conflitti:** se A e B toccano lo stesso file → FAIL orchestratore; non deve succedere.
 **Regola Script I:** verifica solo su `*.py`; escludi `__pycache__` e `.pyc`.
@@ -165,12 +165,12 @@ pytest backend/app/tests/test_integration_live.py::test_live_rate_limiter_thrott
 
 ### C4 — Docs SoT
 Aggiorna:
-- plan-audit/audit_remediation_T-P0-02.md → stato DONE, policy ibrido+(b), gate table, handoff T-P1-04
-- plan-audit/audit_problemi_documentazione_risoluzione.md §3: T-P0-02 DONE; pie P0 OPEN=0;
+- plan-audit/remediation/audit_remediation_T-P0-02.md → stato DONE, policy ibrido+(b), gate table, handoff T-P1-04
+- plan-audit/active/audit_problemi_documentazione_risoluzione.md §3: T-P0-02 DONE; pie P0 OPEN=0;
   OPEN totali coerenti; §5 ordine; nuova § esito tipo §14 se il doc segue quel pattern
-- plan-audit/audit_problemi_documentazione.md: §3.2/§4.5 come AS-IS storico + criteri spuntati;
+- plan-audit/active/audit_problemi_documentazione.md: §3.2/§4.5 come AS-IS storico + criteri spuntati;
   App. D / handoff log se presenti
-- plan-audit/audit_prompt_T-P0-02.md: marca ANALISI archiviata; punta a questo remediation DONE
+- plan-audit/prompts/done/audit_prompt_T-P0-02.md: marca ANALISI archiviata; punta a questo remediation DONE
 
 Non declassare P0→P1. Non commit. Restituisci tabella gate PASS/FAIL + conteggio pytest.
 ```

@@ -288,7 +288,7 @@ Sidebar freeze: zero touch `radar-sidebar/**`.
 ### Audit remediation codice (post Gate Verde) — COMPLETATA
 
 Ordine SoT: T-P0-01…T-P2-08.  
-Fonte: `plan-audit/audit_problemi_documentazione_risoluzione.md` §3.
+Fonte: `plan-audit/active/audit_problemi_documentazione_risoluzione.md` §3.
 
 | Ticket | Stato | Note |
 |--------|-------|------|

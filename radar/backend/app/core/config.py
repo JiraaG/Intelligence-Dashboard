@@ -49,6 +49,49 @@ def _env_int(
     return value
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_float(
+    name: str,
+    default: float,
+    *,
+    min_value: float | None = None,
+    max_value: float | None = None,
+) -> float:
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        value = default
+    else:
+        try:
+            value = float(raw.strip())
+        except ValueError as exc:
+            raise ConfigError(f"{name} deve essere un numero (valore: {raw!r})") from exc
+    if min_value is not None and value < min_value:
+        raise ConfigError(f"{name} deve essere >= {min_value} (valore: {value})")
+    if max_value is not None and value > max_value:
+        raise ConfigError(f"{name} deve essere <= {max_value} (valore: {value})")
+    return value
+
+
+def _csv_models(raw: str | None) -> list[str]:
+    if not raw:
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for part in raw.split(","):
+        model = part.strip()
+        if not model or model in seen:
+            continue
+        seen.add(model)
+        out.append(model)
+    return out
+
+
 def _resolve_time_zone(name: str):
     """Resolve IANA timezone; UTC works without the tzdata package on Windows."""
     if name.upper() in {"UTC", "GMT"}:
@@ -71,6 +114,17 @@ LLM_API_KEY = GOOGLE_API_KEY or GEMINI_API_KEY
 
 _raw_model = _env_str("GEMINI_MODEL", "gemma-4-31b") or "gemma-4-31b"
 GEMINI_MODEL = "gemma-4-31b-it" if _raw_model in ("gemma-4-31b", "gemma-4-31b-it") else _raw_model
+GEMINI_MODEL_FALLBACKS = _csv_models(_env_str("GEMINI_MODEL_FALLBACKS", ""))
+
+
+def gemini_model_chain() -> list[str]:
+    """Primary + fallbacks, deduplicated, primary first."""
+    chain = [GEMINI_MODEL]
+    for model in GEMINI_MODEL_FALLBACKS:
+        if model not in chain:
+            chain.append(model)
+    return chain
+
 
 LLM_RPM = _env_int("LLM_RPM", 10, min_value=1, max_value=120)
 LLM_TPM = _env_int("LLM_TPM", 0, min_value=0, max_value=2_000_000, allow_zero=True)
@@ -85,6 +139,28 @@ ESTIMATED_TOKENS_PER_REQUEST = _env_int(
     min_value=1,
     max_value=100_000,
 )
+
+# DeepSeek (paid COMPLEX lane) — httpx OpenAI-compatible; no openai package.
+DEEPSEEK_API_KEY = _env_str("DEEPSEEK_API_KEY", "") or ""
+DEEPSEEK_MODEL = _env_str("DEEPSEEK_MODEL", "deepseek-v4-flash") or "deepseek-v4-flash"
+DEEPSEEK_REASONING_EFFORT = (_env_str("DEEPSEEK_REASONING_EFFORT", "high") or "high").lower()
+DEEPSEEK_BASE_URL = (
+    _env_str("DEEPSEEK_BASE_URL", "https://api.deepseek.com") or "https://api.deepseek.com"
+).rstrip("/")
+DEEPSEEK_BUDGET_USD_DAY = _env_float(
+    "DEEPSEEK_BUDGET_USD_DAY",
+    3.0,
+    min_value=0.0,
+    max_value=10_000.0,
+)
+
+# Routing: off = Gemini cascade only; complexity = 3-lane heuristic.
+_raw_routing = (_env_str("LLM_ROUTING_MODE", "off") or "off").lower()
+LLM_ROUTING_MODE = _raw_routing if _raw_routing in {"off", "complexity"} else "off"
+LLM_ROUTING_SHADOW = _env_bool("LLM_ROUTING_SHADOW", True)
+LLM_ROUTING_STRICT = _env_bool("LLM_ROUTING_STRICT", False)
+LLM_COMPLEXITY_ESCALATE_ON_VALIDATION = _env_bool("LLM_COMPLEXITY_ESCALATE_ON_VALIDATION", True)
+LLM_MODEL_COOLDOWN_HOURS = _env_int("LLM_MODEL_COOLDOWN_HOURS", 24, min_value=1, max_value=168)
 
 # ── Database ─────────────────────────────────────────────────────────────────
 _DEFAULT_PG_PASSWORD = "radar_password_secure"

@@ -1,7 +1,7 @@
 # Prompt — T-P1-04 REMEDIATION (ARCHIVIO — ticket DONE)
 
 > **Stato:** T-P1-04 **DONE** (2026-07-16) — commit `51225b5`.  
-> Report: `plan-audit/audit_remediation_T-P1-04.md`.  
+> Report: `plan-audit/remediation/audit_remediation_T-P1-04.md`.  
 > **Non rieseguire** questo prompt. Prossimo SoT: **T-P1-05**.  
 > Blocco sotto = storico orchestratore multi-agente (congelato).
 
@@ -29,12 +29,12 @@ Sintomo: fallimento `loadCountryArticles` → log + `closeSidebar()` senza banne
 Wiring già presente: `app.html` `[apiError]="!!state.error()"` → toolbar `@if (apiError())`.
 Oggi `error` = solo `mapSummaryResource.error()` → nation-fetch non arriva al banner.
 
-SoT: `plan-audit/audit_problemi_documentazione_risoluzione.md` §3
-Playbook: `plan-audit/audit_problemi_documentazione.md` §3.6 / §4.6 / Script J / U5
+SoT: `plan-audit/active/audit_problemi_documentazione_risoluzione.md` §3
+Playbook: `plan-audit/active/audit_problemi_documentazione.md` §3.6 / §4.6 / Script J / U5
 Evidenza: `plan-audit/scratch/frontend_audit.md` FE-AUD-001
 Skills: `.agents/skills/radar-sidebar-freeze`, `.agents/skills/angular-developer`
 ECC: `radar/.ecc/rules/frontend.md` (Regola MOCK/error → banner; no fallback mock)
-Report nuovo: `plan-audit/audit_remediation_T-P1-04.md`
+Report nuovo: `plan-audit/remediation/audit_remediation_T-P1-04.md`
 Branch: `refactor/testing`. Gate: Phase 6 / Gate Verde.
 
 ========================================================================
@@ -64,7 +64,7 @@ Lancia **tre** sotto-agenti. Preferisci A∥B in parallelo; C dopo merge A+B
 |----|-----------|-------|-----------------|---------|
 | **A** | `generalPurpose` | **State detailError** | `radar/frontend/src/app/services/state.service.ts` (+ spec state se esiste) | `app.ts`, `radar-sidebar/**`, `radar-map/**`, SoT DONE |
 | **B** | `generalPurpose` | **App catch + clear policy** | `radar/frontend/src/app/app.ts`, `radar/frontend/src/app/app.spec.ts` (e `app.html` solo se wiring apiError manca — oggi non dovrebbe) | `state.service.ts` (A), `radar-sidebar/**`, backend |
-| **C** | `generalPurpose` | **Docs + Script J + gate** | `plan-audit/audit_remediation_T-P1-04.md` (crea), `plan-audit/audit_problemi_documentazione_risoluzione.md` (§3 + conteggi + § esito), pezzi `audit_problemi_documentazione.md` (§3.6/§4.6 criteri), App. D se presente. Esegue Script J / `npm run test:ci`. | logica prodotto oltre verify; commit |
+| **C** | `generalPurpose` | **Docs + Script J + gate** | `plan-audit/remediation/audit_remediation_T-P1-04.md` (crea), `plan-audit/active/audit_problemi_documentazione_risoluzione.md` (§3 + conteggi + § esito), pezzi `audit_problemi_documentazione.md` (§3.6/§4.6 criteri), App. D se presente. Esegue Script J / `npm run test:ci`. | logica prodotto oltre verify; commit |
 
 **Regola conflitti:** A e B non editano lo stesso file. Se serve firma `clearDetailArticles`, A la introduce; B la consuma.
 **Skills da caricare nei prompt A/B:** radar-sidebar-freeze + angular-developer.
@@ -166,9 +166,9 @@ git diff --name-only | Select-String "radar-sidebar"
 
 ### C4 — Docs SoT
 Crea/aggiorna:
-- plan-audit/audit_remediation_T-P1-04.md → DONE + policy clearError + gate table + handoff T-P1-05
-- plan-audit/audit_problemi_documentazione_risoluzione.md §3: T-P1-04 DONE; P1 OPEN resta T-P1-05 (=1); totali OPEN coerenti; § esito
-- plan-audit/audit_problemi_documentazione.md: §3.6/§4.6 criteri spuntati; App. D riga log se presente
+- plan-audit/remediation/audit_remediation_T-P1-04.md → DONE + policy clearError + gate table + handoff T-P1-05
+- plan-audit/active/audit_problemi_documentazione_risoluzione.md §3: T-P1-04 DONE; P1 OPEN resta T-P1-05 (=1); totali OPEN coerenti; § esito
+- plan-audit/active/audit_problemi_documentazione.md: §3.6/§4.6 criteri spuntati; App. D riga log se presente
 
 NON commit. Restituisci tabella gate PASS/FAIL + conteggi SoT.
 ```

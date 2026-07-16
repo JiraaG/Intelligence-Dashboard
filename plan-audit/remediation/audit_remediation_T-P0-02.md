@@ -2,8 +2,8 @@
 
 > **Stato ticket:** **DONE** (2026-07-16) — codice/gate **PASS**; drift SoT manuale chiuso in riverifica Cursor  
 > **Repo:** `c:\Users\lucag\Documents\Dashboard finance` · app `radar/`  
-> **SoT ticket:** `plan-audit/audit_problemi_documentazione_risoluzione.md` §3 / §4 / §5  
-> **Playbook:** `plan-audit/audit_problemi_documentazione.md` §3.2 / §4.5 / Script I / App. F §F.2  
+> **SoT ticket:** `plan-audit/active/audit_problemi_documentazione_risoluzione.md` §3 / §4 / §5  
+> **Playbook:** `plan-audit/active/audit_problemi_documentazione.md` §3.2 / §4.5 / Script I / App. F §F.2  
 > **Skills di riferimento:** `.agents/skills/llm-json-extraction`, `.agents/skills/radar-quota-ledger`
 
 ---
@@ -113,7 +113,7 @@ Si raccomandava un approccio **Ibrido** (Riparare + Deprecare):
 ## G. Prompt remediation (canonico)
 
 Decisione umana: **ibrido + stress path (b)**.  
-Prompt multi-agente completo: **`plan-audit/audit_prompt_T-P0-02_remediation.md`** (orchestratore + agenti A/B/C).
+Prompt multi-agente completo: **`plan-audit/prompts/done/audit_prompt_T-P0-02_remediation.md`** (orchestratore + agenti A/B/C).
 
 Sintesi:
 1. Eliminare (o stub puliti) `diagnostics/test_500.py` + `test_rate_limiter.py` — no `_obsolete/` con pattern ancora matchati.

@@ -1,7 +1,7 @@
 # Prompt — T-P0-02 (DONE — archivio)
 
 > **Stato:** **DONE** (2026-07-16).  
-> Report: `plan-audit/audit_remediation_T-P0-02.md`.  
+> Report: `plan-audit/remediation/audit_remediation_T-P0-02.md`.  
 > **Remediation:** completata (ibrido + stress path **b1**). Prossimo ticket SoT: **T-P1-04**.  
 > **Non rieseguire** il blocco sotto come task operativo — è lo storico FASE 3 only (testo congelato pre-fix).
 
@@ -17,8 +17,8 @@ il fix, NON deprecare file, NON commitare, NON pushare.
 - Repo: `c:\Users\lucag\Documents\Dashboard finance` · app `radar/`
 - Branch tipico: `refactor/testing` (tracking `origin/refactor/testing`)
 - Gate progetto: Phase 6 / Gate Verde
-- SoT ticket: `plan-audit/audit_problemi_documentazione_risoluzione.md` §3 / §4 / §5
-- Playbook: `plan-audit/audit_problemi_documentazione.md` §3.2 / §4.5 / Script I / App. F §F.2
+- SoT ticket: `plan-audit/active/audit_problemi_documentazione_risoluzione.md` §3 / §4 / §5
+- Playbook: `plan-audit/active/audit_problemi_documentazione.md` §3.2 / §4.5 / Script I / App. F §F.2
 - Skills utili: `.agents/skills/llm-json-extraction`, `.agents/skills/radar-quota-ledger`
 - Constraint: `main.py` API-only; asyncpg; non toccare `radar-sidebar/**`
 
@@ -131,5 +131,5 @@ Es. abbassare a P1 se solo deprecazione; bisogno di `GOOGLE_API_KEY` / DB per ga
 ### G. Prompt remediation (bozza 5–10 righe)
 Blocco pronto da incollare nel turno successivo per implementare FASE 4+5.
 
-Non creare commit. Se scrivi un report file, usa `plan-audit/audit_remediation_T-P0-02.md` con header **ANALISI ONLY — remediation pending**.
+Non creare commit. Se scrivi un report file, usa `plan-audit/remediation/audit_remediation_T-P0-02.md` con header **ANALISI ONLY — remediation pending**.
 ```

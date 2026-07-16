@@ -176,7 +176,7 @@ def test_classify_provider_error_policy() -> None:
     assert classify_provider_error(err_401) == ErrorClass.FATAL
 
     err_404 = genai_errors.APIError(404, {"error": {"message": "model not found"}})
-    assert classify_provider_error(err_404) == ErrorClass.FATAL
+    assert classify_provider_error(err_404) == ErrorClass.HARD_COOLDOWN
 
 
 def test_extract_retry_after_header() -> None:
@@ -344,3 +344,93 @@ async def test_client_fatal_auth_fails_fast() -> None:
         assert mock_gen.call_count == 1
         assert article.country_code == "XX"
         quota.fail.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_hard_cooldown_switches_to_fallback_model() -> None:
+    """404 model → cooldown primary; secondary Gemini succeeds."""
+    from google.genai import errors as genai_errors
+
+    client, quota = _client_with_mock_quota()
+    client._routing_mode = "off"
+    client._shadow = False
+    client._paid_unavailable = True
+
+    with patch(
+        "app.classification.client.gemini_model_chain",
+        return_value=["gemini-primary", "gemini-secondary"],
+    ), patch.object(client, "_generate_content", new_callable=AsyncMock) as mock_gen, patch(
+        "asyncio.sleep", new_callable=AsyncMock
+    ):
+        good = MagicMock()
+        good.text = json.dumps({
+            "title": "OK",
+            "summary": "Sommario lungo abbastanza per lo schema minimo.",
+            "published_at": "2026-06-24",
+            "source_url": "https://example.com/ok",
+            "country_code": "DE",
+            "latitude": 51.0,
+            "longitude": 13.0,
+            "companies_involved": "Nessuno",
+            "tags": "Tecnologia",
+            "primary_category": "Tecnologia",
+            "sentiment": "Neutrale",
+            "infrastructural_entities": "Nessuno",
+            "relevance_level": 2,
+        })
+        good.usage_metadata = MagicMock(total_token_count=100)
+        mock_gen.side_effect = [
+            genai_errors.APIError(404, {"error": {"message": "model not found"}}),
+            good,
+        ]
+
+        article = await client.classify_article(
+            title="Switch model",
+            content="body",
+            url="https://example.com/ok",
+            date="2026-06-24",
+        )
+        assert article.country_code == "DE"
+        assert mock_gen.call_count == 2
+        assert await client.cooldown.is_cooling_down("gemini", "gemini-primary") is True
+
+
+@pytest.mark.asyncio
+async def test_short_429_does_not_write_cooldown() -> None:
+    from google.genai import errors as genai_errors
+
+    client, quota = _client_with_mock_quota()
+    err = genai_errors.APIError(429, {"error": {"message": "rate"}})
+    err.response = MagicMock()
+    err.response.headers = {"Retry-After": "1"}
+
+    good = MagicMock()
+    good.text = json.dumps({
+        "title": "OK",
+        "summary": "Sommario lungo abbastanza per lo schema minimo.",
+        "published_at": "2026-06-24",
+        "source_url": "https://example.com/ok",
+        "country_code": "IT",
+        "latitude": 41.0,
+        "longitude": 12.0,
+        "companies_involved": "Nessuno",
+        "tags": "Geopolitica",
+        "primary_category": "Geopolitica",
+        "sentiment": "Neutrale",
+        "infrastructural_entities": "Nessuno",
+        "relevance_level": 2,
+    })
+    good.usage_metadata = MagicMock(total_token_count=50)
+
+    with patch.object(client, "_generate_content", new_callable=AsyncMock) as mock_gen, patch(
+        "asyncio.sleep", new_callable=AsyncMock
+    ):
+        mock_gen.side_effect = [err, good]
+        article = await client.classify_article(
+            title="Retry after",
+            content="body",
+            url="https://example.com/ok",
+            date="2026-06-24",
+        )
+        assert article.country_code == "IT"
+        assert await client.cooldown.is_cooling_down("gemini", client.model) is False

@@ -21,10 +21,10 @@ Codice + gate = OK. Mancano solo questi residui:
 
 | ID | Residuo | File | Fix obbligatorio |
 |----|---------|------|------------------|
-| R1 | Manuale §2.4 stale | `plan-audit/audit_problemi_documentazione.md` | Titolo `## 2.4 P2 — OPEN (backlog)` → `## 2.4 P2 — DONE (chiusi)`; ogni riga tabella con ~~strike~~ o suffisso **DONE**; allineare a pie P2=0 |
-| R2 | Report G2 sovrastima | `plan-audit/audit_remediation_T-P2_batch.md` | Non dire che `"Nessuna"` è “completamente rimossa”. Scrivere: fallback non usa `"Nessuna"`; match in description/`parse_csv_list` (sinonimi) = **attesi e corretti** |
+| R1 | Manuale §2.4 stale | `plan-audit/active/audit_problemi_documentazione.md` | Titolo `## 2.4 P2 — OPEN (backlog)` → `## 2.4 P2 — DONE (chiusi)`; ogni riga tabella con ~~strike~~ o suffisso **DONE**; allineare a pie P2=0 |
+| R2 | Report G2 sovrastima | `plan-audit/remediation/audit_remediation_T-P2_batch.md` | Non dire che `"Nessuna"` è “completamente rimossa”. Scrivere: fallback non usa `"Nessuna"`; match in description/`parse_csv_list` (sinonimi) = **attesi e corretti** |
 | R3 | Report senza G3 + Nit FE | stesso report | Aggiungere sezione Focus Tecnico: G3 narrow except `(AttributeError, TypeError, IndexError, ValueError)`; Nit hoist `getComputedStyle` una volta in `parseGeoJsonIncremental` |
-| R4 | Handoff §C overclaim | `plan-audit/audit_remediation_final_release_handoff.md` | Compose health: db/backend/frontend/miniflux = healthy; **worker = running** (`healthcheck: disable: true` by design, no HTTP). Backup-restore = **residuale / non validato in questo turno** (non “validati”) |
+| R4 | Handoff §C overclaim | `plan-audit/remediation/audit_remediation_final_release_handoff.md` | Compose health: db/backend/frontend/miniflux = healthy; **worker = running** (`healthcheck: disable: true` by design, no HTTP). Backup-restore = **residuale / non validato in questo turno** (non “validati”) |
 | R5 | Wording Docker coerente | handoff (+ report se cita Compose) | Mai “all services healthy”. Usa tabella stato servizi. |
 
 Contesto già OK (non rifare):
@@ -65,9 +65,9 @@ Chiudi R1–R5. Solo plan-audit/**.
    - backup-restore = residuale non validato qui
    - menu D invariato
 4) Spot grep anti-regressione:
-   Select-String -Path plan-audit/audit_problemi_documentazione.md -Pattern "P2 — OPEN|P2 OPEN codice\" : 8|prossimo T-P2-01"
-   Select-String -Path plan-audit/audit_problemi_documentazione_risoluzione.md -Pattern "prossimo T-P2-01|T-P2-02 OPEN|T-P2-06 WEAK|P2 OPEN codice \| 8"
-   Select-String -Path plan-audit/audit_remediation_T-P2_batch.md -Pattern "completamente rimossa"
+   Select-String -Path plan-audit/active/audit_problemi_documentazione.md -Pattern "P2 — OPEN|P2 OPEN codice\" : 8|prossimo T-P2-01"
+   Select-String -Path plan-audit/active/audit_problemi_documentazione_risoluzione.md -Pattern "prossimo T-P2-01|T-P2-02 OPEN|T-P2-06 WEAK|P2 OPEN codice \| 8"
+   Select-String -Path plan-audit/remediation/audit_remediation_T-P2_batch.md -Pattern "completamente rimossa"
    # Atteso: 0 match sullo stato corrente (match storici in scratch/prompt OK)
 
 Output: diff summary per R1–R5 + esito grep.
@@ -88,19 +88,19 @@ Output: diff summary per R1–R5 + esito grep.
 cd "c:\Users\lucag\Documents\Dashboard finance"
 
 # Anti-stale (stato corrente)
-Select-String -Path plan-audit/audit_problemi_documentazione.md `
+Select-String -Path plan-audit/active/audit_problemi_documentazione.md `
   -Pattern 'P2 — OPEN \(backlog\)|"P2 OPEN codice" : 8|prossimo T-P2-01'
 # Atteso: 0
 
-Select-String -Path plan-audit/audit_remediation_T-P2_batch.md `
+Select-String -Path plan-audit/remediation/audit_remediation_T-P2_batch.md `
   -Pattern "completamente rimossa"
 # Atteso: 0
 
-Select-String -Path plan-audit/audit_remediation_T-P2_batch.md `
+Select-String -Path plan-audit/remediation/audit_remediation_T-P2_batch.md `
   -Pattern "AttributeError|_has_matching_close_tag|getComputedStyle|parseGeoJsonIncremental"
 # Atteso: match (G1/G3/Nit documentati)
 
-Select-String -Path plan-audit/audit_remediation_final_release_handoff.md `
+Select-String -Path plan-audit/remediation/audit_remediation_final_release_handoff.md `
   -Pattern "healthcheck: disable|running|backup-restore|residuale"
 # Atteso: worker wording + backup residuale presenti
 

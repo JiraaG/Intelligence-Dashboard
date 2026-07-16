@@ -35,11 +35,11 @@ Stato: Phase 6 GATE VERDE; §3 ticket P2 DONE; verifica precedente =
 PASS_WITH_GAPS. Obiettivo turno = **PASS** rigoroso + handoff.
 
 ### SoT
-1. `plan-audit/audit_problemi_documentazione_risoluzione.md`
-2. `plan-audit/audit_problemi_documentazione.md` (FASE 2 + F.8)
-3. `plan-audit/audit_remediation_T-P2_batch.md`
-4. `plan-audit/Implementation_Plan_Execution.md` §C
-5. `plan-audit/Implementation_Plan.md` → Final Release Gate
+1. `plan-audit/active/audit_problemi_documentazione_risoluzione.md`
+2. `plan-audit/active/audit_problemi_documentazione.md` (FASE 2 + F.8)
+3. `plan-audit/remediation/audit_remediation_T-P2_batch.md`
+4. `plan-audit/active/Implementation_Plan_Execution.md` §C
+5. `plan-audit/active/Implementation_Plan.md` → Final Release Gate
 6. `.agents/AGENTS.md` + `radar/.ecc/rules/{backend,frontend}.md`
 
 ### Gap (DoD)
@@ -49,7 +49,7 @@ PASS_WITH_GAPS. Obiettivo turno = **PASS** rigoroso + handoff.
 | G2 | Report Script M: fallback senza `"Nessuna"`; match description/`parse_csv_list` = attesi |
 | G3 | `parser.py`: narrow except come sopra |
 | G4 | SoT/manuale: niente “P2 OPEN=8”, “prossimo T-P2-01”, “T-P2-02 OPEN”, “T-P2-06 WEAK” come stato corrente |
-| G5 | NEW `plan-audit/audit_remediation_final_release_handoff.md` |
+| G5 | NEW `plan-audit/remediation/audit_remediation_final_release_handoff.md` |
 | Nit | Hoist `--color-map-stroke` fuori dal loop/RAF in `parseGeoJsonIncremental` |
 
 Frasi stale confermate da riparare (almeno):

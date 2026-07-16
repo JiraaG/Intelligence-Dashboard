@@ -60,9 +60,19 @@ Ingest / Gemini / outbox → **`radar-worker`**. API HTTP → `radar-backend`.
 Sintomi: log worker con wait/`429`/`Retry-After`; pochi articoli nuovi; ready può restare 200 se heartbeat fresco.
 
 - Ledger durable: `llm_request_ledger` (`LLM_RPM` / `LLM_TPM` / `LLM_RPD`, `RADAR_TIME_ZONE`)
+- Cascata modelli: `GEMINI_MODEL` + `GEMINI_MODEL_FALLBACKS` (CSV)
+- Cooldown 24h hard-fail: tabella `llm_model_cooldown` (`LLM_MODEL_COOLDOWN_HOURS`) — **non** per 429 brevi con Retry-After
+- Routing opzionale: `LLM_ROUTING_MODE=complexity` + `LLM_ROUTING_SHADOW=true` (calibrazione); DeepSeek via httpx (`DEEPSEEK_*`)
 - Senza `GEMINI_API_KEY`: API/FE avviano; worker degradato (heartbeat only)
+- Senza `DEEPSEEK_API_KEY` in mode complexity: warning (o fail se `LLM_ROUTING_STRICT=1`); Gemini-only
 
-Azioni: verificare key/model in `.env` e restart `radar-worker`; controllare quote provider; abbassare `MINIFLUX_LIMIT` se serve; **non** scalare worker multipli (single-leader).
+Azioni: verificare key/model in `.env` e restart `radar-worker`; controllare quote provider / AI Studio;  
+`SELECT * FROM llm_model_cooldown;`; abbassare `MINIFLUX_LIMIT` se serve; **non** scalare worker multipli (single-leader).
+
+```bash
+docker compose exec radar-db psql -U radar_user -d radar_db \
+  -c "SELECT provider, model, until_ts, reason FROM llm_model_cooldown;"
+```
 
 ---
 

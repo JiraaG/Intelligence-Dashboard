@@ -1,27 +1,29 @@
 ---
 name: llm-json-extraction
 description: >
-  Playbook per l'integrazione con Google Gemini API tramite l'SDK ufficiale google-genai.
+  Playbook per l'integrazione con Google Gemini API tramite l'SDK ufficiale google-genai,
+  e (opzionale) DeepSeek V4 Flash via httpx OpenAI-compatible (no package openai).
   Definisce il System Prompt immutabile (no Chain-of-Thought), lo schema Pydantic strict
   per gli Structured Outputs, i delimitatori <untrusted_article>, e il flusso commit+outbox.
-  Usare ogni volta che si modifica la logica di chiamata a Gemini in
+  Usare ogni volta che si modifica la logica di chiamata LLM in
   backend/app/worker.py, classification/, o commit/ (non main.py API-only).
 when_to_use:
-  - Modifiche al prompt di sistema per Gemini
+  - Modifiche al prompt di sistema per Gemini / DeepSeek
   - Aggiornamento dello schema Pydantic GeopoliticalArticleSchema
-  - Debug di errori di parsing JSON dalla risposta Gemini
+  - Debug di errori di parsing JSON dalla risposta LLM
+  - Cascata modelli, routing complexity, cooldown 24h
   - Aggiunta di nuovi campi al contratto di estrazione
-version: 1.2.0
+version: 1.3.0
 ---
 
 ## Quando Usare Questa Skill
 
 Carica questa skill ogni volta che:
-- Modifichi `backend/app/worker.py` o `classification/` (client, prompts, validator, quota)
+- Modifichi `backend/app/worker.py` o `classification/` (client, prompts, validator, quota, complexity, cooldown, deepseek)
 - Ricevi errori del tipo `ValidationError` da Pydantic
-- Gemini restituisce un JSON incompleto o con campi non presenti nello schema
+- Gemini/DeepSeek restituisce un JSON incompleto o con campi non presenti nello schema
 - Devi ottimizzare il System Prompt per ridurre le allucinazioni geografiche
-- Cambi `GEMINI_MODEL` / fallback ops (Gemma 500 → altro modello)
+- Cambi `GEMINI_MODEL` / fallbacks / `DEEPSEEK_*` / `LLM_ROUTING_*`
 
 ---
 
@@ -31,12 +33,16 @@ Carica questa skill ogni volta che:
 
 ```
 1. Worker (radar-worker): advisory lock → reconcile outbox → fetch Miniflux (coda bounded)
-2. Per entry: dedup → sanitize → QuotaLedger.reserve → Gemini (async, deadline)
+2. Per entry: dedup → sanitize → complexity lane (optional) → QuotaLedger.reserve(model=)
+   → Gemini (google-genai) e/o DeepSeek (httpx OpenAI-compatible; no package openai)
 3. Parsing/validazione Pydantic strict; complete(reservation_id) con usage reale
-4. Overwrite source_url + published_at da Miniflux
-5. Commit atomico DB + article_outbox
-6. Reconcile vault → mark-read Miniflux solo se durable completed
+4. Hard-fail → llm_model_cooldown 24h + next model; 429 breve → Retry-After same model
+5. Overwrite source_url + published_at da Miniflux
+6. Commit atomico DB + article_outbox
+7. Reconcile vault → mark-read Miniflux solo se durable completed
 ```
+
+**Invarianti:** schema/prompt immutabili; `content[:4000]` su tutte le lane; package `openai` vietato.
 
 ---
 

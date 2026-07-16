@@ -42,11 +42,11 @@ Quando aggiungi una nuova dipendenza al `requirements.txt`:
 
 | Componente          | Tecnologia Obbligatoria              | VIETATO                               |
 |---------------------|--------------------------------------|---------------------------------------|
-| LLM SDK             | `google-genai` (SDK ufficiale Google)| `openai`, `anthropic`, `langchain`    |
+| LLM SDK             | `google-genai` (Gemini) + **httpx** OpenAI-compatible per DeepSeek only | Package `openai`, `anthropic`, `langchain` |
 | Async               | `asyncio` + `asyncio.sleep()`        | `time.sleep()`, `threading.sleep()`   |
 | Validazione         | `pydantic` v2 + BaseModel            | Dict non tipizzati, `json.loads()` raw|
 | DB Driver           | `asyncpg` (async PostgreSQL)         | `psycopg2`, `SQLAlchemy` ORM          |
-| HTTP Client         | `httpx` (async)                      | `requests` (sincrono)                 |
+| HTTP Client         | `httpx` (async) — Miniflux + DeepSeek | `requests` (sincrono)                 |
 | HTML Sanitize       | `re` stdlib o `html.parser` stdlib   | `beautifulsoup4` come dipendenza extra |
 
 ---

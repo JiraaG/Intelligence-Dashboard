@@ -20,11 +20,11 @@ Sintomo: container FE gira come `root` (porta 80 privilegiata).
 Path A (preferito): `USER nginx` + `listen 8080` + Compose `80:8080` + healthcheck `wget …:8080/health`.
 Path B (alternativa umana): documentare eccezione SoT in `docker.md` / runbook (perché resta root) — **solo se decisione esplicita**.
 
-SoT: `plan-audit/audit_problemi_documentazione_risoluzione.md` §3
-Playbook: `plan-audit/audit_problemi_documentazione.md` §3.7 / §4.7 / Script E
+SoT: `plan-audit/active/audit_problemi_documentazione_risoluzione.md` §3
+Playbook: `plan-audit/active/audit_problemi_documentazione.md` §3.7 / §4.7 / Script E
 Skills: `.agents/skills/radar-docker-ops`
 ECC: `radar/.ecc/rules/docker.md`
-Report: crea `plan-audit/audit_remediation_T-P1-05.md`
+Report: crea `plan-audit/remediation/audit_remediation_T-P1-05.md`
 Branch: `refactor/testing`. Gate: Phase 6 / Gate Verde.
 
 ========================================================================
@@ -49,7 +49,7 @@ Branch: `refactor/testing`. Gate: Phase 6 / Gate Verde.
 |----|-------|-----------------|
 | **A** | Dockerfile + nginx.conf | `radar/frontend/Dockerfile`, `nginx.conf` |
 | **B** | Compose overlays | `docker-compose.yml`, `hardened.yml`, `lan.yml` |
-| **C** | Docs + Script E + gate | `plan-audit/audit_remediation_T-P1-05.md`, SoT §3, `docker.md` / docker-ops; esegue Script E |
+| **C** | Docs + Script E + gate | `plan-audit/remediation/audit_remediation_T-P1-05.md`, SoT §3, `docker.md` / docker-ops; esegue Script E |
 
 A∥B poi C.
 
