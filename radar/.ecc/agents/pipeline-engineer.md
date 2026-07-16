@@ -156,8 +156,12 @@ def strip_html_tags(html_content: str) -> str:
 
 Ogni tentativo provider (Gemini **o** DeepSeek) riserva capacità su `llm_request_ledger` **prima** della chiamata.
 Lane: `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (`LLM_ROUTING_MODE=complexity`).
+**Limiti per lane:** `LLM_SIMPLE_RPM/TPM/RPD` e `LLM_COMPLEX_*` (`0` = unmanaged).
+Legacy `LLM_RPM` / `DEEPSEEK_RPM` = alias fill-gap, non tetto globale.
+Soft-trim worker = solo `LLM_SIMPLE.rpd` se `> 0`. Free → RPM/RPD; paid → budget + 402.
+Residual SIMPLE↔COMPLEX se identity diversa (fattura `ref.quota_lane`).
 **Complexity v2.2:** BORDERLINE usa catena COMPLEX (`purpose=classify:complex`); SIMPLE → `classify:simple`.
-Package `openai` vietato. SoT: `plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md`.
+Package `openai` vietato. SoT: `plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md` + skill `radar-quota-ledger`.
 
 ```python
 reservation_id = await self.quota.reserve(

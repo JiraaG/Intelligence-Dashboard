@@ -248,9 +248,18 @@ Aggiornare **quella** reservation id con usage reale. Spacing in-process con
 `time.monotonic()`; RPD half-open su `RADAR_TIME_ZONE`. Rispettare `429` + `Retry-After`.
 Hard-fail (RPD day, 402, 404 model, 5xx esauriti) → `llm_model_cooldown` 24h, poi next model.
 
+**Limiti per lane (obbligatorio):**
+- `LLM_SIMPLE_RPM/TPM/RPD` e `LLM_COMPLEX_*` — contatori separati via `purpose=classify:{lane}`
+- `0` = dimensione unmanaged su quella lane
+- Legacy `LLM_RPM` / `DEEPSEEK_RPM` = **alias fill-gap**, non tetto globale
+- Soft-trim worker = solo `LLM_SIMPLE.rpd` se `> 0` (indipendente dal provider)
+- Free → RPM/RPD `> 0`; paid → RPM/RPD `= 0` + `*_BUDGET_USD_DAY` / 402
+
 **OBBLIGATORIO:**
 ```python
-reservation_id = await self.quota.reserve(estimated_tokens=..., model=ref.model)
+reservation_id = await self.quota.reserve(
+    estimated_tokens=..., model=ref.model, lane=ref.quota_lane, provider=ref.provider
+)
 try:
     # gemini: google-genai | deepseek: classification/deepseek.py (httpx)
     response = await provider_call(...)
@@ -266,6 +275,7 @@ except asyncio.CancelledError:
 # NO: date(created_at) = CURRENT_DATE per RPD
 # NO: complete() sull'"ultima" riga invece che sulla reservation_id
 # NO: package openai / anthropic / langchain
+# NO: trattare LLM_RPM come tetto globale shared tra lane
 ```
 
 ---
@@ -278,19 +288,23 @@ Routing opzionale (`LLM_ROUTING_MODE=off|complexity`). Lane = heuristic in
 | Env | Ruolo |
 |-----|--------|
 | `LLM_SIMPLE_PROVIDER` / `LLM_SIMPLE_MODEL` / `*_REASONING_EFFORT` | Solo lane **SIMPLE** (tipico `effort=none`) |
+| `LLM_SIMPLE_RPM/TPM/RPD` / `*_BUDGET_USD_DAY` | Limiti lane SIMPLE (`0` = unmanaged) |
 | `LLM_COMPLEX_PROVIDER` / `LLM_COMPLEX_MODEL` / `*_REASONING_EFFORT` | **BORDERLINE + COMPLEX** + escalate (tipico `effort=high`) |
-| `GEMINI_MODEL_FALLBACKS` | Cascata extra **solo** se provider lane = gemini |
-| `DEEPSEEK_*` | Legacy key/model/effort/base; `RPM/TPM/RPD` (0=unmanaged); budget soft-cap |
+| `LLM_COMPLEX_RPM/TPM/RPD` / `*_BUDGET_USD_DAY` | Limiti lane COMPLEX (`0` = unmanaged) |
+| `GEMINI_MODEL_FALLBACKS` | Cascata CSV extra **solo** se provider lane = gemini |
+| `DEEPSEEK_*` / `LLM_RPM` | Legacy key/model/effort/base + alias fill-gap quote |
 | `LLM_ROUTING_SHADOW=true` | Logga lane; chiama sempre catena SIMPLE |
+| `WORKER_POLL_INTERVAL_SECONDS` | Cadenza ciclo ingest (default 900) |
 
 **Lane v2.2:** L sola → SIMPLE; 1 di {G,E,X} → BORDERLINE; ≥2 famiglie (L solo in combo) → COMPLEX.
 `geo_marker` da solo richiede `body_len ≥ 1500`; ≥2 country names → G sempre.
+Residual SIMPLE↔COMPLEX se identity diversa (fattura `ref.quota_lane`).
 
 **Invarianti:** stesso `content[:4000]` su tutte le lane; schema/prompt immutabili;
 DeepSeek riceve `model=` + thinking da effort lane (`none` = thinking disabled);
-mai hardcodare API key; mai commit `.env`.
+mai hardcodare API key; mai commit `.env`; no package `openai`.
 
-SoT: `plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md`.
+SoT: `plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md` + skill `radar-quota-ledger`.
 
 ---
 

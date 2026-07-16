@@ -37,13 +37,13 @@ Moduli sotto `radar/backend/app/`:
 
 1. **`core/`** — config bounded, pool asyncpg, `migrations.py`, logging, heartbeat
 2. **`extraction/`** — client Miniflux (httpx, byte limits, retry), parser HTML, dedup
-3. **`classification/`** — client Gemini (`google-genai`), `quota.py`, prompts (no CoT), validator Pydantic strict
+3. **`classification/`** — client Gemini (`google-genai`) + DeepSeek (httpx), complexity v2.2, `quota.py` per-lane, prompts (no CoT), validator Pydantic strict
 4. **`commit/`** — commit atomico, outbox, vault `yaml.safe_dump` + write atomica
 5. **`api/`** — query helpers Phase 5 (`articles_query.py`)
 
 ---
 
-## Classification (Gemini)
+## Classification (LLM)
 
 - Schema: `GeopoliticalArticleSchema` — `ConfigDict(strict=True, extra="forbid")`
 - Campi multi-valore **`str` CSV** (`companies_involved`, `tags`, `infrastructural_entities`) — non `List[str]`
@@ -51,7 +51,9 @@ Moduli sotto `radar/backend/app/`:
 - `build_gemini_response_schema()` sanitizza lo schema per l’API Google
 - 10 categorie: Nucleare, Energia, Infrastrutture, Geopolitica, Economia, Tecnologia, Spazio, Ambiente, Salute, Sicurezza
 - Fallback geografico su fallimento irreversibile: paese `XX`, categoria `Infrastrutture` (vedi `validator.py`)
-- Quote: `llm_request_ledger` via `QuotaLedger` (RPM/TPM/RPD) — **non** `COUNT(*)` su `articles` per RPD
+- Quote: `llm_request_ledger` via `QuotaLedger` — limiti **per lane** `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (`0` = unmanaged); soft-trim worker = `LLM_SIMPLE.rpd` se >0; legacy `LLM_RPM`/`DEEPSEEK_*` = fill-gap — **non** `COUNT(*)` su `articles` per RPD
+- Routing: `LLM_ROUTING_MODE=complexity`; residual SIMPLE↔COMPLEX; DeepSeek via httpx (no package `openai`)
+- Periodicità ingest: `WORKER_POLL_INTERVAL_SECONDS` (default 900)
 
 ---
 

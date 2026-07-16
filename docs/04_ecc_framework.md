@@ -54,7 +54,7 @@ Non usare come piano vivo: `Fase2_Implementation_Plan.md`, `plan*.md`, `ecc_deep
 5. **radar-api-contract** — map-summary + envelope `{items,next_cursor,total}`; `MOCK_MODE`  
 6. **radar-docker-ops** — edge/data, live/ready, verify-geojson, `./data/postgres`  
 7. **radar-geojson-assets** — gitignore + `--fetch` in Docker build; `ASSET_LICENSE`  
-8. **radar-quota-ledger** — reserve/complete/fail; 429; RPD  
+8. **radar-quota-ledger** — reserve/complete/fail; limiti per-lane `LLM_SIMPLE_*`/`LLM_COMPLEX_*`; soft-trim = `LLM_SIMPLE.rpd`; 429; free vs paid budget
 
 ---
 

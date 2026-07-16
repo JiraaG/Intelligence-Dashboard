@@ -28,8 +28,8 @@ in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categ
 
 | Layer       | Tecnologia                              | Note                                       |
 |-------------|------------------------------------------|---------------------------------------------|
-| Backend     | Python 3.12-slim (Docker) / 3.14 (locale) | Demone asincrono, polling ogni 15 minuti   |
-| LLM         | google-genai (Gemini) + httpx DeepSeek (no package `openai`) | Structured Output Pydantic. Lane env: `LLM_SIMPLE_*` (SIMPLE, tipico effort=`none`) / `LLM_COMPLEX_*` (**BORDERLINE+COMPLEX**, tipico `high`). Complexity **v2.2**: rischio schema G/E/X; L sola → SIMPLE. Ops tipico: DeepSeek Flash none/high. Non hardcodare segreti. |
+| Backend     | Python 3.12-slim (Docker) / 3.14 (locale) | Demone asincrono; poll `WORKER_POLL_INTERVAL_SECONDS` (default 900) |
+| LLM         | google-genai (Gemini) + httpx DeepSeek (no package `openai`) | Lane env: `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (limiti per-lane; `0`=unmanaged). Soft-trim = `LLM_SIMPLE.rpd` se >0. Free=RPM/RPD; paid=budget. Complexity **v2.2**. Ops tipico: DeepSeek Flash none/high. Non hardcodare segreti. |
 | Database    | PostgreSQL 15                            | Tabelle articles, companies, tags + sentiment, relevance + indici |
 | Feed Source | Miniflux REST API                       | Articoli non letti, deduplica per URL       |
 | Frontend    | Angular 21 (Standalone Components)      | Signals, lazy loading                       |
@@ -81,7 +81,7 @@ radar/
 │       │   └── state.py           # is_article_duplicate() — SELECT EXISTS asyncpg
 │       ├── classification/        # Layer C: Gemini LLM + schema Pydantic + quota ledger
 │       │   ├── client.py          # ClassificationClient — async SDK, deadline, retry classificato
-│       │   ├── quota.py           # QuotaLedger durable RPM/TPM/RPD
+│       │   ├── quota.py           # QuotaLedger per-lane RPM/TPM/RPD (+ budget)
 │       │   ├── prompts.py         # System prompt (no CoT) + build_user_prompt(<untrusted_article>)
 │       │   └── validator.py       # GeopoliticalArticleSchema strict, extra=forbid, no reasoning
 │       ├── commit/                # Layer K: DB commit + outbox + Vault Obsidian
@@ -200,7 +200,7 @@ cd frontend && node scripts/verify-geojson.mjs
 ## Architettura della Pipeline Dati
 
 ```
-Miniflux API (ogni 15 min)
+Miniflux API (`WORKER_POLL_INTERVAL_SECONDS`, default 900)
         │
         ▼ [asyncio.sleep(WORKER_POLL_INTERVAL_SECONDS) loop in worker.py]
   Validate entry → sanitize HTML → dedup URL

@@ -1,13 +1,18 @@
 ---
 name: llm-json-extraction
 description: >
-  Playbook per Google Gemini (google-genai) e DeepSeek opzionale via httpx
-  (no package openai). System Prompt immutabile, schema Pydantic strict,
-  <untrusted_article>, commit+outbox. Usare su worker.py / classification /.
+  Playbook per l'integrazione con Google Gemini API tramite l'SDK ufficiale google-genai,
+  e (opzionale) DeepSeek V4 Flash via httpx OpenAI-compatible (no package openai).
+  Definisce il System Prompt immutabile (no Chain-of-Thought), lo schema Pydantic strict
+  per gli Structured Outputs, i delimitatori <untrusted_article>, e il flusso commit+outbox.
+  Usare ogni volta che si modifica la logica di chiamata LLM in
+  backend/app/worker.py, classification/, o commit/ (non main.py API-only).
 when_to_use:
-  - Modifiche prompt / schema / client Gemini o DeepSeek
+  - Modifiche al prompt di sistema per Gemini / DeepSeek
+  - Aggiornamento dello schema Pydantic GeopoliticalArticleSchema
+  - Debug di errori di parsing JSON dalla risposta LLM
   - Cascata modelli, routing complexity, cooldown 24h
-  - Debug ValidationError JSON LLM
+  - Aggiunta di nuovi campi al contratto di estrazione
 version: 1.5.0
 ---
 
@@ -15,7 +20,9 @@ version: 1.5.0
 
 Carica questa skill ogni volta che:
 - Modifichi `backend/app/worker.py` o `classification/` (client, prompts, validator, quota, complexity, cooldown, deepseek)
-- Ricevi `ValidationError` Pydantic o JSON incompleto dall'LLM
+- Ricevi errori del tipo `ValidationError` da Pydantic
+- Gemini/DeepSeek restituisce un JSON incompleto o con campi non presenti nello schema
+- Devi ottimizzare il System Prompt per ridurre le allucinazioni geografiche
 - Cambi `GEMINI_MODEL` / fallbacks / `DEEPSEEK_*` / `LLM_ROUTING_*` /
   `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (incluso `REASONING_EFFORT`)
 
@@ -23,18 +30,20 @@ Carica questa skill ogni volta che:
 
 ## Come Funziona
 
-### Flusso di Esecuzione
+### Flusso di Esecuzione (Phase 2)
 
 ```
-1. Worker: advisory lock → reconcile outbox → fetch Miniflux
-2. dedup → sanitize → complexity lane v2.2 → reserve(model=, lane=)
-   → Gemini (google-genai) e/o DeepSeek (httpx; no openai package)
-3. Pydantic strict; complete(reservation_id)
-4. Hard-fail → llm_model_cooldown 24h; 429 breve → Retry-After
-5. Overwrite source_url/published_at da Miniflux → commit + outbox → vault → mark-read
+1. Worker (radar-worker): advisory lock → reconcile outbox → fetch Miniflux (coda bounded)
+2. Per entry: dedup → sanitize → complexity lane v2.2 → QuotaLedger.reserve(model=, lane=)
+   → Gemini (google-genai) e/o DeepSeek (httpx OpenAI-compatible; no package openai)
+3. Parsing/validazione Pydantic strict; complete(reservation_id) con usage reale
+4. Hard-fail → llm_model_cooldown 24h + next model; 429 breve → Retry-After same model
+5. Overwrite source_url + published_at da Miniflux
+6. Commit atomico DB + article_outbox
+7. Reconcile vault → mark-read Miniflux solo se durable completed
 ```
 
-**Invarianti:** schema/prompt immutabili; `content[:4000]`; package `openai` vietato;
+**Invarianti:** schema/prompt immutabili; `content[:4000]` su tutte le lane; package `openai` vietato;
 lane via `LLM_SIMPLE_*` / `LLM_COMPLEX_*`; DeepSeek `classify_json(model=ref.model)`.
 
 ### Complexity → modello (v2.2)
@@ -47,19 +56,27 @@ lane via `LLM_SIMPLE_*` / `LLM_COMPLEX_*`; DeepSeek `classify_json(model=ref.mod
 
 `geo_marker` da solo: solo se `body_len ≥ 1500`. ≥2 country → G sempre.
 
-### Env lane (ops tipico)
+## Env lane (ops tipico — Profilo B)
 
 ```text
 LLM_ROUTING_MODE=complexity
+LLM_ROUTING_SHADOW=false
 LLM_SIMPLE_PROVIDER=deepseek
 LLM_SIMPLE_MODEL=deepseek-v4-flash
 LLM_SIMPLE_REASONING_EFFORT=none
+LLM_SIMPLE_RPM=0
+LLM_SIMPLE_RPD=0
 LLM_COMPLEX_PROVIDER=deepseek
 LLM_COMPLEX_MODEL=deepseek-v4-flash
 LLM_COMPLEX_REASONING_EFFORT=high
+LLM_COMPLEX_RPM=0
+LLM_COMPLEX_RPD=0
+# Soft-trim worker = LLM_SIMPLE.rpd se > 0; free=RPM/RPD>0; paid=0+BUDGET
+# Swap COMPLEX → Google: LLM_COMPLEX_PROVIDER=gemini + LLM_COMPLEX_MODEL=…
+# Profilo A (hybrid) documentato in .env.example (blocco commentato)
 ```
 
-SoT: `plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md`.
+SoT: `plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md` §5–§6.
 
 ---
 

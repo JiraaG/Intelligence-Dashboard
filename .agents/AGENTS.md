@@ -10,8 +10,8 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 * **Obiettivo:** Applicazione web self-hosted, containerizzata e plug-and-play che aggrega feed RSS, li arricchisce semanticamente via Google Gemini API e li visualizza su una mappa 2D interattiva in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categoria geopolitica).
 
 ### Stack Tecnologico Ufficiale
-* **Backend:** Python 3.12-slim (Docker) / 3.14 (locale). Demone asincrono con polling ogni 15 minuti.
-* **LLM:** `google-genai` SDK; default `GEMINI_MODEL=gemma-4-31b-it`. Output strutturato via schema Pydantic. Ops locale: se Gemma 31b dà HTTP 500, impostare in `.env` un fallback (es. `gemini-3.1-flash-lite`) — non hardcodare chiavi.
+* **Backend:** Python 3.12-slim (Docker) / 3.14 (locale). Demone asincrono con polling `WORKER_POLL_INTERVAL_SECONDS` (default 900).
+* **LLM:** `google-genai` SDK + DeepSeek via httpx (no package `openai`); default Gemini `GEMINI_MODEL=gemma-4-31b-it`. Lane: `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (limiti per-lane; soft-trim = `LLM_SIMPLE.rpd` se >0). Output strutturato via schema Pydantic. Ops locale: se Gemma 31b dà HTTP 500, impostare in `.env` un fallback (es. `gemini-3.1-flash-lite`) — non hardcodare chiavi.
 * **Database:** PostgreSQL 15 (`radar-db`). Accesso tramite driver asincrono `asyncpg` puro.
 * **Feed Source:** Miniflux REST API.
 * **Frontend:** Angular 21 (Standalone Components).
@@ -62,7 +62,7 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
    * Type hints obbligatori su tutte le funzioni pubbliche.
    * Utilizzare il logger centralizzato configurato in `core/logging.py`, evitando categoricamente l'uso di `print()`.
 6. **Rate Limiting & Rispetto delle Quote LLM:**
-   * Quote durable via `llm_request_ledger` + `classification/quota.py` (reserve RPM/TPM/RPD **prima di ogni** tentativo provider, anche retry). Spacing in-process con `time.monotonic()`; finestre giornaliere half-open su `RADAR_TIME_ZONE`. Rispettare `429` + `Retry-After`. Non basarsi solo su `asyncio.sleep(4)` in-memory.
+   * Quote durable via `llm_request_ledger` + `classification/quota.py` (reserve RPM/TPM/RPD **prima di ogni** tentativo provider, anche retry). Limiti **per lane**: `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (`0` = unmanaged). Legacy `LLM_RPM` / `DEEPSEEK_RPM` = alias fill-gap, non tetto globale. Soft-trim worker = solo `LLM_SIMPLE.rpd` se `> 0`. Free → RPM/RPD; paid → `*_BUDGET_USD_DAY` / 402. Spacing in-process con `time.monotonic()`; finestre giornaliere half-open su `RADAR_TIME_ZONE`. Rispettare `429` + `Retry-After`. Non basarsi solo su `asyncio.sleep(4)` in-memory.
 7. **Architettura Modulare Backend (Path: `backend/app/`):**
    * Layer: `core/`, `extraction/`, `classification/` (incluso `quota.py`), `commit/`, più `worker.py` (ingest) separato da `main.py` (API).
    * `core/logging.py`: il `RotatingFileHandler` e `makedirs` per `logs/` DEVONO essere in `try/except` — il container non-root con `WORKDIR=/app` può non avere permessi. Il fallback deve mantenere attivo il console handler.

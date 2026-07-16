@@ -2,6 +2,7 @@
 
 > **Stato 2026-07-16:** Fase A+B+C **implementate** + **complexity heuristic/routing v2.2** (BORDERLINE→`LLM_COMPLEX`; L-sola→SIMPLE). Questo file resta come **storico orchestratore**.  
 > **SoT operativo:** [`../../active/LLM_Multi_Model_Fallback_Phase_AB.md`](../../active/LLM_Multi_Model_Fallback_Phase_AB.md) — non usare le tabelle env Lite/DS di questo prompt come ops corrente.  
+> **Limiti / soft-trim / periodicità:** SoT aggiornato per-lane in Phase_AB §5–§6 + piano [`../../active/LLM_Limits_Periodicity_Docs_ECC_Plan.md`](../../active/LLM_Limits_Periodicity_Docs_ECC_Plan.md). Soft-trim = `LLM_SIMPLE.rpd` (non “solo Gemini RPD”).  
 > **Remediation:** [`../../remediation/audit_remediation_llm_multi_model_fallback.md`](../../remediation/audit_remediation_llm_multi_model_fallback.md).  
 > Non rieseguire Fase C da zero: estendere solo gap residui.
 

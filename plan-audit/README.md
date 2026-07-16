@@ -8,6 +8,7 @@ Cartella di audit, prompt orchestratore e SoT operativi del Radar.
 | Documento | Ruolo |
 |-----------|--------|
 | [LLM_Multi_Model_Fallback_Phase_AB.md](active/LLM_Multi_Model_Fallback_Phase_AB.md) | Multi-model LLM + routing (**lane env + complexity heuristic v2.2**) |
+| [LLM_Limits_Periodicity_Docs_ECC_Plan.md](active/LLM_Limits_Periodicity_Docs_ECC_Plan.md) | Periodicità ENV, limiti free/paid per-lane, residual, **allineamento docs/ECC** |
 | [audit_remediation_llm_multi_model_fallback.md](remediation/audit_remediation_llm_multi_model_fallback.md) | Report Fase C + v2.2 BORDERLINE→COMPLEX |
 | [Final_Release_Gate_Plan.md](active/Final_Release_Gate_Plan.md) | Gate residuali Final Release |
 | [audit_problemi_documentazione.md](active/audit_problemi_documentazione.md) | Playbook audit/remediation |
@@ -32,6 +33,7 @@ plan-audit/
 
 ## Prompt attivi
 
+- [audit_prompt_llm_limits_docs_ecc.md](prompts/active/audit_prompt_llm_limits_docs_ecc.md) — orchestratore supervisore/esecutore/verificatore per allineamento docs/ECC per-lane
 - [audit_prompt_llm_multi_model_fallback.md](prompts/active/audit_prompt_llm_multi_model_fallback.md) — storico ricerca/design; **SoT = active/LLM_…**
 - [audit_prompt_final_release_gate.md](prompts/active/audit_prompt_final_release_gate.md)
 
@@ -41,3 +43,4 @@ plan-audit/
 - Canvas IDE: `article-complexity-routing.canvas.tsx`, `complexity-routing-audit.canvas.tsx` (fuori da plan-audit).
 - Lane swap ops: `LLM_COMPLEX_PROVIDER=…` + `LLM_COMPLEX_MODEL=…` senza codice.
 - **Complexity v2.2:** SIMPLE = solo `LLM_SIMPLE`; BORDERLINE+COMPLEX = `LLM_COMPLEX` (effort tipico high); L sola → SIMPLE.
+- **Limiti:** per-lane `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (`0` = unmanaged); soft-trim = `LLM_SIMPLE.rpd`; free = RPM/RPD, paid = `BUDGET_USD_DAY`.

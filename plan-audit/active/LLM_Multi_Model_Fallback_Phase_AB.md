@@ -137,7 +137,9 @@ Quote RPM/RPD Google: **VERIFY_IN_STUDIO** sul progetto della `GOOGLE_API_KEY` (
 | OUT | `gemini-2.0-*` | — | Shut down 2026-06-01 |
 | OUT | Pro free tipico | — | RPD ≪1000 |
 
-**Env consigliati:** `LLM_RPM=10`, `LLM_RPD=1400` (ricalibrare post-Studio).
+**Env consigliati (Profilo A / Gemini free, VERIFY_IN_STUDIO):**  
+`LLM_SIMPLE_RPM` / `LLM_SIMPLE_RPD` (non i legacy `LLM_RPM`/`LLM_RPD` se i campi lane sono già settati).  
+Esempio di partenza storico: RPM≈10, RPD≈1000–1400 — **ricalibrare in AI Studio**.
 
 **Quote:** per **project**, non per API key; limiti tipicamente **per model variation** → switch modello può dare RPD fresco lo stesso giorno (VERIFY).
 
@@ -298,55 +300,73 @@ flowchart TD
 
 ## 5. Config env (SoT ops)
 
+Limiti e provider sono **per lane** (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`).  
+Legacy `LLM_RPM` / `DEEPSEEK_*` = fill-gap se il campo lane è assente — **non** un tetto globale.
+
+### Profilo B — DeepSeek-only (ops tipico / `.env.example` attivo)
+
 ```text
-# Gemini (legacy primary + optional CSV fallbacks per lane gemini)
-GEMINI_MODEL=gemini-3.1-flash-lite
-GEMINI_MODEL_FALLBACKS=
-
-# DeepSeek (default model se LLM_*_MODEL omesso; effort; limiti separati)
-DEEPSEEK_API_KEY=...                 # non commitare
-DEEPSEEK_MODEL=deepseek-v4-flash
-DEEPSEEK_REASONING_EFFORT=high
-DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEEPSEEK_RPM=0                       # paid: 0 = unmanaged
-DEEPSEEK_TPM=0
-DEEPSEEK_RPD=0
-DEEPSEEK_BUDGET_USD_DAY=0            # soft-cap USD/giorno (0 = off)
-DEEPSEEK_USD_PER_1M_TOKENS=0.28
-
-# Routing
 LLM_ROUTING_MODE=complexity          # off | complexity  (default codice: off)
 LLM_ROUTING_SHADOW=false             # true = log lane, call sempre SIMPLE
-LLM_ROUTING_STRICT=0                 # 1 = fail se COMPLEX=deepseek senza key
+LLM_ROUTING_STRICT=0
 LLM_COMPLEXITY_ESCALATE_ON_VALIDATION=1
+LLM_MODEL_COOLDOWN_HOURS=24
 
-# Lane assignment (gemini | deepseek) — swap senza codice
-LLM_SIMPLE_PROVIDER=gemini
-LLM_SIMPLE_MODEL=gemini-3.1-flash-lite
+# SIMPLE = Flash non-thinking; COMPLEX = stesso modello, effort high
+LLM_SIMPLE_PROVIDER=deepseek
+LLM_SIMPLE_MODEL=deepseek-v4-flash
+LLM_SIMPLE_REASONING_EFFORT=none
+LLM_SIMPLE_RPM=0                     # paid: 0 = unmanaged
+LLM_SIMPLE_TPM=0
+LLM_SIMPLE_RPD=0                     # soft-trim worker off se 0
+LLM_SIMPLE_BUDGET_USD_DAY=0
+
 LLM_COMPLEX_PROVIDER=deepseek
 LLM_COMPLEX_MODEL=deepseek-v4-flash
+LLM_COMPLEX_REASONING_EFFORT=high
+LLM_COMPLEX_RPM=0
+LLM_COMPLEX_TPM=0
+LLM_COMPLEX_RPD=0
+LLM_COMPLEX_BUDGET_USD_DAY=0
 
-# Quote Gemini / cooldown (DeepSeek: DEEPSEEK_* sopra)
-LLM_MODEL_COOLDOWN_HOURS=24
-LLM_RPM=10
-LLM_TPM=0
-LLM_RPD=1400
+DEEPSEEK_API_KEY=...                 # non commitare
+DEEPSEEK_BUDGET_USD_DAY=0            # legacy alias → COMPLEX budget se lane unset
 ```
 
+### Profilo A — Hybrid free Gemini + paid DeepSeek (commentato in `.env.example`)
+
+```text
+# Free Gemini → RPM/RPD > 0 (VERIFY_IN_STUDIO); paid DeepSeek → RPM/RPD=0 + BUDGET
+LLM_SIMPLE_PROVIDER=gemini
+LLM_SIMPLE_MODEL=gemini-3.1-flash-lite
+LLM_SIMPLE_RPM=10                    # VERIFY_IN_STUDIO
+LLM_SIMPLE_RPD=1000                  # VERIFY_IN_STUDIO — soft-trim usa questo se > 0
+LLM_COMPLEX_PROVIDER=deepseek
+LLM_COMPLEX_MODEL=deepseek-v4-flash
+LLM_COMPLEX_RPM=0
+LLM_COMPLEX_RPD=0
+LLM_COMPLEX_BUDGET_USD_DAY=5         # soft-cap USD/giorno (esempio)
+```
+
+Legacy opzionale (solo fill-gap): `GEMINI_*`, `LLM_RPM`/`LLM_TPM`/`LLM_RPD`, `DEEPSEEK_*`.  
 `off` / `shadow` = solo catena SIMPLE.  
 Default codice senza env: `LLM_ROUTING_MODE=off`, `LLM_ROUTING_SHADOW=true` (boot sicuro).  
+Periodicità ciclo: `WORKER_POLL_INTERVAL_SECONDS` (default **900**).  
 Env `T_LOW`/`T_HIGH` **non** richiesti (lane = heuristic famiglie v2.2).
 
 ---
 
 ## 6. Quote ledger (invarianti)
 
-1. `reserve(model=…, provider=…)` prima di **ogni** tentativo (anche switch lane/escalate).  
+1. `reserve(model=…, lane=…, provider=…)` prima di **ogni** tentativo (anche switch lane/escalate).  
 2. `complete` / `fail` sulla stessa `reservation_id`.  
-3. Limiti **per provider**: Gemini `LLM_*`; DeepSeek `DEEPSEEK_*` (`0` = dimensione off).  
-4. Soft-trim worker: solo Gemini RPD; DeepSeek → `DEEPSEEK_BUDGET_USD_DAY` / 402.  
-5. Retry-After breve ≠ cooldown 24h.  
-6. System prompt + schema Pydantic **immutabili**.
+3. Limiti **per lane**: `LLM_SIMPLE_RPM/TPM/RPD` e `LLM_COMPLEX_*` (`0` = dimensione unmanaged su quella lane).  
+4. Legacy `LLM_RPM` / `DEEPSEEK_RPM` = **alias fill-gap**, non tetto globale shared.  
+5. Soft-trim worker: solo `LLM_SIMPLE.rpd` se `> 0` (indipendente dal provider della lane SIMPLE).  
+6. Free tier → RPM/RPD `> 0`; paid → RPM/RPD `= 0` + `*_BUDGET_USD_DAY` / 402.  
+7. Residual cross-lane SIMPLE↔COMPLEX se identity diversa (fattura `ref.quota_lane`).  
+8. Retry-After breve ≠ cooldown 24h.  
+9. System prompt + schema Pydantic **immutabili**.
 
 ---
 
@@ -354,10 +374,10 @@ Env `T_LOW`/`T_HIGH` **non** richiesti (lane = heuristic famiglie v2.2).
 
 | Metrica | Attesa |
 |---------|--------|
-| Latenza p50 | ≈ oggi (Gemini) |
-| Latenza p95 COMPLEX | +0.5–3s (High reasoning) — ok worker async |
-| Costo @ 25% COMPLEX / 1500 art | **~$0.25–0.75/giorno** |
-| Mix | COMPLEX 20–40%, BORDERLINE 15–35% |
+| Latenza p50 (Profilo B DeepSeek none) | Tipicamente bassa (non-thinking) |
+| Latenza p95 COMPLEX / BORDERLINE | +0.5–3s (`effort=high`) — ok worker async |
+| Costo @ 25% COMPLEX / 1500 art (paid DeepSeek) | **~$0.25–0.75/giorno** |
+| Mix | COMPLEX 20–40%, BORDERLINE 15–35% (osservabile con shadow 3g) |
 | Qualità | Meno ValidationError / meno XX “sbagliati” su pezzi multi-paese |
 
 ---

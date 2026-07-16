@@ -56,7 +56,7 @@ lane via `LLM_SIMPLE_*` / `LLM_COMPLEX_*`; DeepSeek `classify_json(model=ref.mod
 
 `geo_marker` da solo: solo se `body_len ≥ 1500`. ≥2 country → G sempre.
 
-### Env lane (ops tipico)
+## Env lane (ops tipico — Profilo B)
 
 ```text
 LLM_ROUTING_MODE=complexity
@@ -64,13 +64,19 @@ LLM_ROUTING_SHADOW=false
 LLM_SIMPLE_PROVIDER=deepseek
 LLM_SIMPLE_MODEL=deepseek-v4-flash
 LLM_SIMPLE_REASONING_EFFORT=none
+LLM_SIMPLE_RPM=0
+LLM_SIMPLE_RPD=0
 LLM_COMPLEX_PROVIDER=deepseek
 LLM_COMPLEX_MODEL=deepseek-v4-flash
 LLM_COMPLEX_REASONING_EFFORT=high
+LLM_COMPLEX_RPM=0
+LLM_COMPLEX_RPD=0
+# Soft-trim worker = LLM_SIMPLE.rpd se > 0; free=RPM/RPD>0; paid=0+BUDGET
 # Swap COMPLEX → Google: LLM_COMPLEX_PROVIDER=gemini + LLM_COMPLEX_MODEL=…
+# Profilo A (hybrid) documentato in .env.example (blocco commentato)
 ```
 
-SoT: `plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md`.
+SoT: `plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md` §5–§6.
 
 ---
 

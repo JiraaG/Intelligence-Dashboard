@@ -1,11 +1,13 @@
 # Remediation — LLM multi-model fallback (Fase C + lane env + complexity v2.2)
 
-> **Data:** 2026-07-16 (aggiornato **complexity heuristic v2.2** + routing BORDERLINE→COMPLEX)  
+> **Data:** 2026-07-16 (aggiornato **complexity heuristic v2.2** + routing BORDERLINE→COMPLEX + **docs/ECC allineati per-lane**)  
 > **SoT:** [`../active/LLM_Multi_Model_Fallback_Phase_AB.md`](../active/LLM_Multi_Model_Fallback_Phase_AB.md)  
+> **Piano docs/ECC:** [`../active/LLM_Limits_Periodicity_Docs_ECC_Plan.md`](../active/LLM_Limits_Periodicity_Docs_ECC_Plan.md)  
 > **Canvas audit:** `canvases/complexity-routing-audit.canvas.tsx`  
 > **Stato:** IMPLEMENTED  
 > - Default codice: `LLM_ROUTING_MODE=off`, `LLM_ROUTING_SHADOW=true` (boot sicuro)  
-> - Ops tipico: `MODE=complexity`, `SHADOW=false`, DeepSeek Flash **none** SIMPLE + Flash **high** BORDERLINE/COMPLEX
+> - Ops tipico: `MODE=complexity`, `SHADOW=false`, DeepSeek Flash **none** SIMPLE + Flash **high** BORDERLINE/COMPLEX  
+> - **Docs/ECC allineati per-lane** (2026-07-16): Phase_AB §5–§6, AGENTS, skills, runbook, `.env.example` Profilo B attivo + A commentato
 
 ## Summary
 
@@ -77,8 +79,11 @@ python -m pytest app/tests/test_complexity.py app/tests/test_classification.py -
 |------|------|
 | Pitch HN con multi-country nel body lungo | Può restare COMPLEX (G+L) — non solo geo_marker corto |
 | Soft-cap budget | Enforced se `BUDGET_USD_DAY` > 0 |
-| Default codice vs `.env.example` | Codice: `MODE=off` / `SHADOW=true`; example = ops complexity |
+| Default codice vs `.env.example` | Codice: `MODE=off` / `SHADOW=true`; example = ops complexity Profilo B |
+| VERIFY_IN_STUDIO (Profilo A) | Se si attiva hybrid Gemini free: calibrare `LLM_SIMPLE_RPM/RPD` su AI Studio — non inventare |
+| Shadow 3g | Opzionale: `LLM_ROUTING_SHADOW=true` per ~3 giorni per osservare mix lane senza cambiare catena (log only) |
+| Phase_AB §3.2 / §7 | Pulizia cosmetica 2026-07-16: legacy RPM/RPD → lane; latenza Profilo B |
 
-## Non toccato
+## Docs/ECC allineati per-lane (2026-07-16)
 
-Sidebar, schema Pydantic campi, SYSTEM_PROMPT CoT, package openai, FE model_id, alzare `[:4000]`, commit `.env`.
+Propagati i principi unici (limiti `LLM_SIMPLE_*`/`LLM_COMPLEX_*`, soft-trim = `LLM_SIMPLE.rpd`, free vs paid, residual, `WORKER_POLL_INTERVAL_SECONDS`, v2.2) su Phase_AB §5–§6, ECC Regola 9/9b, CLAUDE, pipeline-engineer, skills mirror, AGENTS, docs/01–02/04, runbook, `.env.example`. Motore routing/quota **non** riscritto.

@@ -1,10 +1,10 @@
 ---
 name: radar-quota-ledger
 description: >
-  QuotaLedger per lane: LLM_SIMPLE_RPM/TPM/RPD e LLM_COMPLEX_RPM/TPM/RPD
-  (0=unmanaged, contatori separati via purpose classify:{lane});
-  provider type seleziona adapter; budget USD opzionale; hard-fail → cooldown 24h.
-  Complexity v2.2: BORDERLINE riserva su purpose=classify:complex.
+  QuotaLedger durable: reserve/complete/fail su llm_request_ledger prima di ogni tentativo
+  provider; limiti per-lane LLM_SIMPLE_* / LLM_COMPLEX_* (0=unmanaged); soft-trim =
+  LLM_SIMPLE.rpd se >0; free=RPM/RPD vs paid=BUDGET; RPD half-open; rispettare 429 Retry-After.
+  Complexity v2.2: BORDERLINE → purpose classify:complex.
 when_to_use:
   - classification/quota.py, cooldown.py, llm_request_ledger, client cascade/retry
 version: 2.2.0
@@ -20,12 +20,19 @@ version: 2.2.0
 
 `LLM_RPM` / `DEEPSEEK_RPM` = **legacy alias** (default se il campo lane e assente). Non sono un tetto globale shared.
 
-Worker soft-trim usa solo `LLM_SIMPLE.rpd` (se > 0).
+Worker soft-trim usa solo `LLM_SIMPLE.rpd` (se > 0) — indipendente dal provider della lane SIMPLE.
+
+| Tipo | Vincolo | Semantica |
+|------|---------|-----------|
+| Free (es. Gemini Studio) | RPM + RPD | `*_RPM` / `*_RPD` > 0 |
+| Paid (es. DeepSeek) | Credito / soft-cap | `*_RPM`/`*_RPD` = 0 + `*_BUDGET_USD_DAY` |
+
+Residual cross-lane fattura `ref.quota_lane` (SIMPLE↔COMPLEX se identity diversa).
 
 ## Complexity routing (v2.2)
 
 - SIMPLE → reserve `lane=simple`
-- BORDERLINE / COMPLEX → reserve `lane=complex` (stesso ledger COMPLEX)
+- BORDERLINE / COMPLEX → reserve `lane=complex`
 
 ## Protocollo
 

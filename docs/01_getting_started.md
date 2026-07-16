@@ -33,8 +33,8 @@ Categorie principali (dettaglio in `.env.example`):
 |------|--------|
 | Runtime | `RADAR_ENV`, `RADAR_TIME_ZONE` |
 | CORS | `CORS_ALLOW_ORIGINS` (vuoto in prod dietro Nginx; es. `http://localhost:4200` per `ng serve`) |
-| LLM | `GEMINI_MODEL` (default `gemma-4-31b-it`; ops: `gemini-3.1-flash-lite` se Gemma risponde 500), `LLM_RPM` / `LLM_TPM` / `LLM_RPD`, `GEMINI_REQUEST_TIMEOUT` |
-| Worker | coda/concorrenza, `WORKER_POLL_INTERVAL_SECONDS`, heartbeat |
+| LLM | Lane `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (provider/model/RPM/TPM/RPD/budget; `0`=unmanaged); soft-trim = `LLM_SIMPLE.rpd` se >0; legacy `GEMINI_*` / `LLM_RPM` / `DEEPSEEK_*` = fill-gap; `GEMINI_REQUEST_TIMEOUT` |
+| Worker | coda/concorrenza, `WORKER_POLL_INTERVAL_SECONDS` (default 900), heartbeat |
 | Miniflux | URL interno, API key, `MINIFLUX_LIMIT` (tipico **50**; `100` può superare `MAX_MINIFLUX_RESPONSE_BYTES=5MB`), timeout/byte caps |
 | Postgres | user/password/db, `DATABASE_URL` (Compose la costruisce in container) |
 
@@ -124,10 +124,10 @@ Con unread Miniflux alti, tenere `MINIFLUX_LIMIT` ≤ ~50 sotto il cap `MAX_MINI
 **Ciclo reale (worker, non API):**
 
 - Servizio `radar-worker` (`python -m app.worker`), leadership via advisory lock
-- Polling ~`WORKER_POLL_INTERVAL_SECONDS` (default 900)
+- Polling `WORKER_POLL_INTERVAL_SECONDS` (default **900** = 15 min)
 - Entry **unread** ultime ~48h, dedup URL in PostgreSQL
-- Classificazione Gemini → commit DB + outbox → vault atomico → mark-read Miniflux solo se completed
-- Quote durable: `llm_request_ledger` (`LLM_RPM` / `LLM_TPM` / `LLM_RPD`)
+- Complexity v2.2 → classificazione Gemini e/o DeepSeek → commit DB + outbox → vault atomico → mark-read Miniflux solo se completed
+- Quote durable per lane: `llm_request_ledger` (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`; soft-trim = `LLM_SIMPLE.rpd` se >0; free=RPM/RPD, paid=budget)
 
 Riavviare solo `radar-backend` **non** riavvia l’ingest: serve `radar-worker`.
 
@@ -142,7 +142,7 @@ Riavviare solo `radar-backend` **non** riavvia l’ingest: serve `radar-worker`.
 | `/health/ready` 503 | Normale finché il worker non scrive heartbeat (~30–90s) |
 | 429 Gemini | Ledger + Retry-After; verifica quote in AI Studio |
 | Mappa senza confini | Manca o SHA errato su `countries.geo.json` → `npm run verify-geojson:fetch` |
-| Nessun articolo nuovo | `MINIFLUX_API_KEY`, log `radar-worker`, `LLM_RPD` |
+| Nessun articolo nuovo | `MINIFLUX_API_KEY`, log `radar-worker`, quote lane (`LLM_SIMPLE_RPD` / budget) |
 | Payload Miniflux troppo grande / log 5MB | Abbassare `MINIFLUX_LIMIT` (tipico 50); non alzare cieco il cap |
 | Classificazione → fallback summary / HTTP 500 modello | Verificare `GEMINI_MODEL` in `.env`; ops tipico: `gemini-3.1-flash-lite` se `gemma-4-31b-it` fallisce |
 
