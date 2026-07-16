@@ -395,6 +395,8 @@ export class RadarMapComponent implements AfterViewInit {
     this.map.on('click', (e: Leaflet.LeafletMouseEvent) => {
       const original = e.originalEvent as (Event & { _radarHandled?: boolean }) | undefined;
       if (original?._radarHandled) return;
+      // Nation detail open: keep spiderfy as-is (no collapse-to-hub on hinterland clicks).
+      if (this.focusCountryCode() && this.articles().length > 0) return;
       this.collapseAllGraphs(true);
     });
 
@@ -520,6 +522,10 @@ export class RadarMapComponent implements AfterViewInit {
 
       this.categoryClusterGroups.set(cat, cg);
       this.map.addLayer(cg as unknown as Leaflet.Layer);
+      // MarkerCluster binds map click → unspiderfy in _spiderfierOnAdd; that collapses
+      // spider icons on nation hinterland clicks. Disable it — we unspiderfy explicitly
+      // via collapseAllGraphs / hub root / zoom handlers instead.
+      this.disableMarkerClusterMapClickUnspiderfy(cg);
     }
     this.geoJsonLayerGroup.addTo(this.map);
 
@@ -530,7 +536,10 @@ export class RadarMapComponent implements AfterViewInit {
       this.refreshHatchingStyles();
       this.syncSummaryMarkerVisibility();
 
-      if (zoom < 5 && !this.isNavigating) {
+      // fitBounds(nation) uses maxZoom: 4, so zoomend lands below 5 after open.
+      // Do NOT collapse/close while nation detail is open (would shut the sidebar).
+      const nationOpen = this.articles().length > 0 || !!this.focusCountryCode();
+      if (zoom < 5 && !this.isNavigating && !nationOpen) {
         this.collapseAllGraphs(true);
       }
     });
@@ -664,6 +673,8 @@ export class RadarMapComponent implements AfterViewInit {
 
     this.activeRootMarkers.push(rootMarker);
     newParent.spiderfy();
+    // spiderfy may leave/rebind map-click unspiderfy; keep nation hinterland clicks stable.
+    this.disableMarkerClusterMapClickUnspiderfy(cg);
 
     for (const m of realMarkers) {
       if (typeof m.setZIndexOffset === 'function') {
@@ -671,6 +682,20 @@ export class RadarMapComponent implements AfterViewInit {
       }
     }
     return true;
+  }
+
+  /**
+   * leaflet.markercluster registers map `click` → `_unspiderfyWrapper` on add.
+   * That closes the spider fan when clicking the open nation (outside emoji icons).
+   * Remove only that listener; zoom-based unspiderfy stays.
+   */
+  private disableMarkerClusterMapClickUnspiderfy(cg: MarkerClusterGroupLike): void {
+    if (!this.map) return;
+    const group = cg as MarkerClusterGroupLike & {
+      _unspiderfyWrapper?: (e?: Leaflet.LeafletMouseEvent) => void;
+    };
+    if (typeof group._unspiderfyWrapper !== 'function') return;
+    this.map.off('click', group._unspiderfyWrapper, group);
   }
 
   private loadGeoJson(): void {
@@ -729,6 +754,10 @@ export class RadarMapComponent implements AfterViewInit {
           if (e.originalEvent) {
             L.DomEvent.stopPropagation(e.originalEvent);
             (e.originalEvent as Event & { _radarHandled?: boolean })._radarHandled = true;
+          }
+          // Nation already open on this polygon: do not re-emit (avoids fitBounds + re-spiderfy).
+          if (this.focusCountryCode() === code && this.articles().length > 0) {
+            return;
           }
           // Emit code only — nation Article[] is fetched by App/StateService (Phase 5).
           this.countryClicked.emit({ countryCode: code });
