@@ -125,7 +125,7 @@
 | ID | Source | Requirement | Where to verify | Pass criteria |
 |----|--------|-------------|-----------------|---------------|
 | FE-MK-01 | `frontend.md` Regola 2b; `spatial-data-mocking`; `radar-api-contract`; `angular-map-expert.md` | Toggle mock solo via injection token `MOCK_MODE` in `services/mock-mode.token.ts`. | `services/mock-mode.token.ts`; `app.config.ts` | Token esiste; default produzione `false`. |
-| FE-MK-02 | stessi | **Vietato** `catchError` / fallback silenzioso che attiva mock su errore API. | `services/article.service.ts`; state loaders | Errore API → `StateService.error` / banner toolbar; data richiesta preservata. |
+| FE-MK-02 | stessi | **Vietato** `catchError` / fallback silenzioso mock. Errore API → `StateService.error` / banner. **T-P1-04:** nation-fetch via `detailError` + `closeSidebar(false)`. | `state.service.ts`; `app.ts`; toolbar `apiError` | `error()` include detail; catch non wipe; close utente clear. |
 | FE-MK-03 | `spatial-data-mocking` | Offline/demo: `{ provide: MOCK_MODE, useValue: true }` esplicito. | `app.config.ts` / TestBed | Mock attivo solo se provider esplicito `true`. |
 | FE-MK-04 | `spatial-data-mocking` | Tipi mock = tipi prod (`MapSummaryRow[]`, `ArticlesPage`). | `article-mock.service.ts` | Stesse firme di `ArticleService` per i metodi Phase 5. |
 

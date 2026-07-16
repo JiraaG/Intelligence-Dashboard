@@ -2,7 +2,7 @@
 
 > **Stato:** T-P0-02 **DONE** (2026-07-16) — ibrido + stress path **b1**.  
 > Report: `plan-audit/audit_remediation_T-P0-02.md`.  
-> **Non rieseguire** questo prompt. Prossimo SoT: **T-P1-04**.  
+> **Non rieseguire** questo prompt. Prossimo SoT: **T-P1-05** (T-P1-04 DONE).  
 > Blocco sotto = storico orchestratore multi-agente (congelato).
 
 > Analisi pregressa: `plan-audit/audit_remediation_T-P0-02.md` (§A–H, verifica Cursor PASS_WITH_GAPS).

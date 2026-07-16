@@ -35,7 +35,9 @@ L'interfaccia Angular non sa la differenza: riceve gli stessi tipi (`MapSummaryR
 **Phase 4–5:** il toggle è l'injection token esplicito `MOCK_MODE` (`services/mock-mode.token.ts`).
 Default `false` in `app.config.ts`. Per offline/demo, fornire `{ provide: MOCK_MODE, useValue: true }`.
 **Vietato** l'auto-fallback silenzioso su mock in caso di errore API: l'errore resta visibile
-(`StateService.error` → banner toolbar).
+(`StateService.error` → banner toolbar). Nation-fetch (T-P1-04): anche i fallimenti di
+`loadCountryArticles` popolano `detailError` (merge in `error()`); non chiudere la sidebar
+azzerando l'errore (`closeSidebar(false)` sul catch).
 
 Contratto API Phase 5 (allineato a `article.service.ts` / `article-mock.service.ts`):
 - Day view: `getMapSummary` → `GET /api/map-summary`
@@ -291,7 +293,7 @@ export class ArticleService {
 ```
 
 Offline: in `app.config.ts` (o TestBed) fornire `{ provide: MOCK_MODE, useValue: true }`.
-Produzione: `{ provide: MOCK_MODE, useValue: false }` — errori API restano in `StateService.error()`.
+Produzione: `{ provide: MOCK_MODE, useValue: false }` — errori API (map-summary **e** nation-fetch via `detailError`) restano in `StateService.error()`.
 
 ---
 

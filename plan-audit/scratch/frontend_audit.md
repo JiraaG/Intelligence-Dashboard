@@ -1,12 +1,12 @@
 # Frontend Code Audit — Radar Informativo Globale
 
-> **STORICO (2026-07-15):** snapshot pre–fix map. Claim «cap 24» / `SPIDERFY_MAX_ICONS` **non è più runtime** (2026-07-16): spiderfy mostra tutte le icone categoria; size/distanza adattivi; restore hub on failure. SoT attuale: `radar/.ecc/rules/frontend.md`, `Implementation_Plan.md` Map UX. Non usare questo file come checklist operativa senza riverifica.
+> **STORICO (2026-07-15):** snapshot pre–fix. Cap spiderfy 24 **stale** (2026-07-16: no hard cap). **FE-AUD-001 / T-P1-04 DONE** (2026-07-16, `51225b5`): `detailError` + banner. SoT: `radar/.ecc/rules/frontend.md` Regola 2b, `audit_remediation_T-P1-04.md`. Non usare come checklist operativa senza riverifica.
 
 > **Scope:** `radar/frontend/src/app/` (+ `angular.json` / `package.json` / `Dockerfile` solo dove richiesto dalla checklist)  
 > **Checklist:** `scratch/frontend_rules.md` (88 items, 16 domini)  
 > **Data:** 2026-07-15  
 > **Metodo:** walk checklist → pass/fail con evidenza; **nessuna modifica** al source app  
-> **Conteggi FAIL:** **P0 = 0** · **P1 = 1** · **P2 = 4**
+> **Conteggi FAIL (storico audit):** **P0 = 0** · **P1 = 1** *(FE-AUD-001 → poi DONE)* · **P2 = 4**
 
 ---
 
@@ -14,7 +14,7 @@
 
 Il frontend è **largamente conforme** alle governance rules: sidebar freeze rispettata nello stato attuale (`p-carousel`, no `article-list`), Leaflet via `window.L`, icone XSS-safe con `textContent`, day-view su `getMapSummary`, nation open con concatenazione cursor fino a `next_cursor == null`, overlay `100vw` + `invalidateSize`, bounds US/RU letterali, cluster `maxClusterRadius: 40` / `spiderfyOnMaxZoom: false`, spiderfy single-category ~~con cap 24~~ *(storico; runtime attuale = no hard cap)*.
 
-L’unico scostamento **P1** è la superficie errore nation-fetch: fallimenti di `loadCountryArticles` non popolano `StateService.error` / banner toolbar. Il resto dei gap è igiene o difesa in profondità (**P2**).
+~~L’unico scostamento **P1** è la superficie errore nation-fetch…~~ → **RISOLTO T-P1-04** (`detailError` / banner). Restano gap **P2** (igiene / difesa in profondità).
 
 ---
 
@@ -74,11 +74,12 @@ L’unico scostamento **P1** è la superficie errore nation-fetch: fallimenti di
 ## Findings FAIL
 
 ### [FE-AUD-001] Errore nation-fetch non arriva al banner toolbar
-- **Priorità:** P1
+- **Priorità:** P1 → **DONE** (T-P1-04, 2026-07-16, commit `51225b5`)
 - **Checklist:** FE-MK-02
 - **File e Range Righe:** `radar/frontend/src/app/services/state.service.ts#L110-L127`, `radar/frontend/src/app/app.ts#L122-L125`, `radar/frontend/src/app/app.html#L6-L7`
-- **Casistica Rilevata & Rischio:** `StateService.error` espone solo `mapSummaryResource.error()`. Un fallimento di `loadCountryArticles` logga, svuota `detailArticles`, rilancia; `App.onCountryClick` cattura e chiude la sidebar **senza** impostare uno stato errore. L’utente vede chiusura silenziosa (o paese “vuoto”) invece del banner `apiError` della toolbar. Non c’è fallback mock (conforme), ma manca la metà “Errore API → banner”.
-- **Evidenza (snippet attuale):**
+- **Casistica Rilevata & Rischio (AS-IS storico):** `StateService.error` esponeva solo `mapSummaryResource.error()`. Un fallimento di `loadCountryArticles` loggava, svuotava `detailArticles`, rilanciava; `App.onCountryClick` catturava e chiudeva la sidebar **senza** impostare uno stato errore.
+- **POST-FIX:** `detailError` + `error()` merge; `closeSidebar(false)` preserva banner. Vedi `audit_remediation_T-P1-04.md`.
+- **Evidenza (snippet AS-IS pre-fix):**
 ```typescript
 // state.service.ts
 } catch (err) {

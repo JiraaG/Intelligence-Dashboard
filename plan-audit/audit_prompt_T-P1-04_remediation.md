@@ -1,3 +1,10 @@
+# Prompt — T-P1-04 REMEDIATION (ARCHIVIO — ticket DONE)
+
+> **Stato:** T-P1-04 **DONE** (2026-07-16) — commit `51225b5`.  
+> Report: `plan-audit/audit_remediation_T-P1-04.md`.  
+> **Non rieseguire** questo prompt. Prossimo SoT: **T-P1-05**.  
+> Blocco sotto = storico orchestratore multi-agente (congelato).
+
 # Prompt — T-P1-04 REMEDIATION (orchestratore multi-agente)
 
 > **Uso:** copia il blocco `text` sotto in un nuovo chat Agent (orchestratore).  

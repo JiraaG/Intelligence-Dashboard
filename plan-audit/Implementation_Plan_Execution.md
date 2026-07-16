@@ -272,6 +272,20 @@ Sidebar freeze: zero touch `radar-sidebar/**`.
 
 ---
 
+### Audit remediation codice (post Gate Verde) — in corso / parziale
+
+Ordine SoT: T-P0-01…T-P0-02 → **T-P1-04** → **T-P1-05** → P2.  
+Fonte: `plan-audit/audit_problemi_documentazione_risoluzione.md` §3.
+
+| Ticket | Stato | Note |
+|--------|-------|------|
+| T-P0-01 … T-P0-02 | **DONE** | mark-read gate, quote_plus, advisory lock, outbox retry, script ClassificationClient |
+| **T-P1-04** | **DONE** (`51225b5`) | `detailError` + banner nation-fetch; test 30/30 |
+| **T-P1-05** | **OPEN** | Nginx unprivileged (`USER nginx` + listen 8080) **oppure** eccezione SoT |
+| P2 (8) | OPEN | backlog igiene |
+
+---
+
 ### ECC expansion wiring — DONE (2026-07-15)
 
 Harness Cursor + skill dominio selettive. Sorgente: `ECC_Expansion_Handoff.md`. **Nessun nuovo SHA inventato** — commit solo su richiesta utente.

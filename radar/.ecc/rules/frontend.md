@@ -125,11 +125,16 @@ private selectedArticle$ = new BehaviorSubject<Article | null>(null);
 
 ---
 
-## Regola 2b: MOCK_MODE esplicito (Phase 4)
+## Regola 2b: MOCK_MODE esplicito (Phase 4) + errori API (T-P1-04)
 
 Mock dati solo via injection token `MOCK_MODE` (`services/mock-mode.token.ts`).
 Default produzione: `false`. **Vietato** `catchError` che attiva mock silenziosamente.
-Errore API → `StateService.error` / banner toolbar; data richiesta preservata.
+
+Errore API → `StateService.error` / banner toolbar (`app.html` `[apiError]="!!state.error()"`); data richiesta preservata.
+
+**Nation-fetch (T-P1-04 DONE):** `detailError = signal<unknown>(null)`; `error = computed(() => mapSummaryResource.error() ?? detailError())`.
+`loadCountryArticles` valorizza `detailError` in catch. Sul fallimento, `App.onCountryClick` chiama `closeSidebar(false)` così la UI si chiude ma il banner resta.
+Close intenzionale utente (`closeSidebar()` / default `clearError: true`) azzera `detailError`. **Non** toccare `radar-sidebar/**`.
 
 ---
 

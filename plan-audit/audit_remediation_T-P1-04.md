@@ -28,7 +28,7 @@
 | Fase | Stato |
 |------|--------|
 | FASE 3 Riproduzione | DONE (confermato fallimento articles non mostrava il banner rosso in toolbar) |
-| FASE 4 Design + implementazione | DONE (`detailError` signal in StateService + parametro `clearError` in `closeSidebar` + 2 test unitari) |
+| FASE 4 Design + implementazione | DONE (`detailError` + `closeSidebar(clearError)` + test app + **4** StateService) |
 | FASE 5 Gate | DONE (test/build/Script J/freeze verificati con successo) |
 
 ---

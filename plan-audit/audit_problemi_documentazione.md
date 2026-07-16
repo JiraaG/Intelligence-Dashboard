@@ -413,6 +413,8 @@ await miniflux_client.mark_as_read([int(entry_id)])
 
 ## 3.7 T-P1-05 — Nginx root
 
+> **Stato:** **OPEN** — prossimo ticket codice. Prompt: `audit_prompt_T-P1-05_remediation.md`.
+
 ```powershell
 docker compose exec radar-frontend whoami
 docker compose exec radar-frontend ps aux
@@ -956,7 +958,7 @@ Usa questa checklist a ogni sessione di remediation.
 | 2026-07-15 | T-P1-02 | Antigravity + Cursor verify | No (su richiesta utente) | `pg_advisory_lock(ns, hash)` per-URL in `process_single_entry`; `test_worker_concurrency.py` 1/1; pytest not live 115/115; ruff OK. Docker rebuild **GAP** (daemon spento). Next: T-P0-02. |
 | 2026-07-16 | T-P0-02 | Multi-agente + Cursor verify | Sì (4 commit locali, no push) | Ibrido+(b1): delete `test_500.py`/`test_rate_limiter.py`; smoke `ClassificationClient(quota=mock)`; stress rimosso; live throttling SKIPPED; Script I 0 match; pytest not live **115** al close ticket. Next: T-P1-04. |
 | 2026-07-16 | OPS-FIX | Cursor | **No** (working tree; commit pending su richiesta) | Race `compose restart` → `CannotConnectNowError`. Fix: retry `init_pool` + `docker.md` Regola 4 + Compose comments + `docs/01_getting_started.md`. Rebuild backend/worker OK; restart ordinato OK (§J.1). Spiderfy «≤24» corretto in Implementation_Plan*. pytest not live **116** (+1 test retry). Miniflux 5MB cap osservato in log (fuori scope). |
-| 2026-07-16 | T-P1-04 | Antigravity + Cursor verify | No | Implementato `detailError` + `error` computed; `closeSidebar(false)` preserva banner. Test app + **4 StateService** (30/30). SoT §3.6/risoluzione allineati. Docker FE rebuild; 5 articoli delete+unread Miniflux → re-ingest OK. |
+| 2026-07-16 | T-P1-04 | Antigravity + Cursor verify | **Sì** (`51225b5`, pushed) | Implementato `detailError` + `error` computed; `closeSidebar(false)` preserva banner. Test app + **4 StateService** (30/30). SoT §3.6/risoluzione allineati. Docker FE rebuild; 5 articoli delete+unread Miniflux → re-ingest OK. Next: T-P1-05. |
 | | … | | | |
 
 ---

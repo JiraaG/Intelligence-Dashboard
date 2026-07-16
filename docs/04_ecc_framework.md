@@ -79,7 +79,7 @@ Prerequisito host per post-hook Python: `ruff` sul `PATH`.
 - Reti `radar-edge` / `radar-data`; health live vs ready
 - Cluster: radius **40**, `spiderfyOnMaxZoom: false`; nation hub disco + fan tutte le icone (no hard cap 24; size/distanza adattivi)
 - Pydantic CSV `str`; FE `string[]` solo post-API
-- `MOCK_MODE` esplicito; no fallback silenzioso
+- `MOCK_MODE` esplicito; no fallback silenzioso; nation-fetch `detailError` → banner (T-P1-04)
 - Docker: no tag `latest`; FE `npm ci --legacy-peer-deps`
 
 Dettaglio operativo: [`.agents/AGENTS.md`](../.agents/AGENTS.md), [`radar/.ecc/CLAUDE.md`](../radar/.ecc/CLAUDE.md).

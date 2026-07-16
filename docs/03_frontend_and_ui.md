@@ -66,6 +66,14 @@ Hatching SVG: owner in `radar-map.component.ts` (`getOrCreateComboPattern`) — 
 
 Offline: `{ provide: MOCK_MODE, useValue: true }`. Errori API restano visibili — **vietato** fallback silenzioso a mock.
 
+### Errori nation-fetch (T-P1-04)
+
+- `StateService.detailError` + `error = mapSummaryResource.error() ?? detailError()`
+- Wiring toolbar: `[apiError]="!!state.error()"`
+- Fallimento `loadCountryArticles` → set `detailError` → `closeSidebar(false)` (UI chiusa, banner visibile)
+- Close intenzionale → `closeSidebar()` / `clearError: true` azzera l’errore
+- Test: `app.spec.ts` + `state.service.spec.ts` (Script J)
+
 ---
 
 ## Leaflet + ESBuild

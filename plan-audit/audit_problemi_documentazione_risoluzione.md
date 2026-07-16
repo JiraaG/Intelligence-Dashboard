@@ -380,7 +380,7 @@ Select-String -Path "radar\.ecc\CLAUDE.md" -Pattern "radar-network|Phase 0–2|P
 - Gate FASE 5 (riverifica Cursor): ruff OK; pytest offline **115 passed** (al close T-P0-02); live throttling **SKIPPED**; Script I **ZERO match**.
 - Docs: pie FASE 2 / App. D / prompt F.8 / spot-check allineati post drift.
 - **Ops post-verify (2026-07-16):** race `compose restart` → follow-up OPS-FIX `init_pool` retry (+1 test → **116** not live). Vedi App. D + `audit_remediation_T-P0-02.md` §J/J.1. Non parte del diff scripts T-P0-02.
-- **Handoff:** **T-P1-04** (Banner nation-open / `detailError`).
+- **Handoff (storico):** **T-P1-04** — poi **DONE** in §15. **Prossimo:** T-P1-05.
 
 ---
 
@@ -390,8 +390,8 @@ Select-String -Path "radar\.ecc\CLAUDE.md" -Pattern "radar-network|Phase 0–2|P
 
 - Walkthrough: aggiunto il segnale `detailError` e aggiornato `error` computed in `StateService` per propagare correttamente gli errori di caricamento articoli nazione alla toolbar (banner `apiError`). Aggiornato `App.closeSidebar` per accettare un flag opzionale `clearError` (default `true`) che controlla se ripulire o meno `detailError`.
 - Catch `onCountryClick`: modificato per invocare `closeSidebar(false)`, chiudendo e riallineando l'UI senza eliminare l'errore dallo stato (così il banner rosso di errore rimane visibile in toolbar).
-- Test: esteso `app.spec.ts` introducendo test di rigetto per `loadCountryArticles` (verifica errore persistito) e di chiusura manuale (verifica errore rimosso).
-- Gate FASE 5: typecheck verde; unit test **30/30** passed (inclusi 4 StateService detailError); Script J superato; sidebar freeze rispettato al 100%.
+- Test: esteso `app.spec.ts` (reject + clear) e **`state.service.spec.ts`** (4 test sul catch reale / `clearError`).
+- Gate FASE 5: typecheck verde; unit test **30/30** passed; Script J superato; sidebar freeze rispettato; Docker FE rebuild + smoke re-ingest 5 articoli Miniflux OK.
 - **Handoff:** **T-P1-05** (Nginx frontend root).
-
+- Commit: `51225b5` su `refactor/testing`.
 

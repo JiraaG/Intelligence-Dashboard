@@ -1,7 +1,11 @@
-# Prompt — Allineamento docs MD + architettura ECC (post T-P0-02 / OPS-FIX)
+# Prompt — Allineamento docs MD + architettura ECC (ARCHIVIO — eseguito)
 
-> **Uso:** copia il blocco `text` sotto in un nuovo chat Agent (read-only prima, poi edit mirati).  
-> **Scope:** solo documentazione / regole ECC / skill — **non** remediation ticket codice (T-P1-04+).  
+> **Stato:** eseguito 2026-07-16 (commit `c358391` + follow-up post T-P1-04).  
+> **Non rieseguire** come remediation codice. Prossimo ticket codice SoT: **T-P1-05**.  
+> Blocco sotto = storico (post T-P0-02 / OPS-FIX).
+
+> **Uso storico:** copia il blocco `text` sotto in un nuovo chat Agent (read-only prima, poi edit mirati).  
+> **Scope:** solo documentazione / regole ECC / skill — **non** remediation ticket codice.  
 > **Non** commit/push salvo richiesta esplicita. **Non** toccare `radar-sidebar/**`. **Non** commitare `.env`.
 
 ```text

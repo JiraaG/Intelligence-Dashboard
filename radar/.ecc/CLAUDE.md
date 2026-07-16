@@ -15,7 +15,7 @@ in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categ
 ### Vincoli post–branch restore (2026-07-15)
 
 - **Phase 0–5 DONE**; Phase **6 DONE / GATE VERDE**. Vedi `Implementation_Plan.md` / `Implementation_Plan_Execution.md`.
-- **Presenti (Phase 1–5 + follow-up):** migrazioni `001`–`008` (incluso `008_outbox_miniflux_marked_at`), outbox, ledger quote, `radar-worker`, reti `radar-edge`/`radar-data`, `/health/live`+`/ready`, CSP Nginx, `ops/` backup, Gemini `build_gemini_response_schema()`, FE `MOCK_MODE` / DestroyRef / XSS-safe markers / read-unread senza rebuild cluster.
+- **Presenti (Phase 1–5 + follow-up):** migrazioni `001`–`008` (incluso `008_outbox_miniflux_marked_at`), outbox, ledger quote, `radar-worker`, reti `radar-edge`/`radar-data`, `/health/live`+`/ready`, CSP Nginx, `ops/` backup, Gemini `build_gemini_response_schema()`, FE `MOCK_MODE` / DestroyRef / XSS-safe markers / read-unread senza rebuild cluster / **`detailError` nation-fetch → banner toolbar (T-P1-04)**.
 - **Phase 5 API/FE:** `GET /api/map-summary` (`country×category`); `GET /api/articles` → `{items,next_cursor,total}` (keyset `id`, limit≤100, LATERAL); `backend/app/api/articles_query.py`; migrazioni `007`+. FE: giorno da summary + **pin nazione**; nazione = tutti gli articoli + hub disco compatto + spiderfy categoria attiva (tutte le icone, size/distanza adattivi; hub stabile al cambio categoria; restore hub se spiderfy fallisce). **Vietato** `article-list`. Sidebar freeze resta.
 - Pipeline ingest in `backend/app/worker.py`; `main.py` è API-only. Compose: 5 servizi su edge+data.
 - **Sidebar freeze:** non modificare `frontend/src/app/components/radar-sidebar/**`; tenere `p-carousel` + altezza via `article-card-{id}`; vietato `app-article-list`.
@@ -252,7 +252,7 @@ Non auto-dispatch: l’agente sceglie il Task esplicitamente.
 
 > **Note critiche per il frontend:**
 > - Nei **mock FE** `infrastructural_entities` / `companies_involved` / `tags` restano tipicamente `string[]`. Nello **schema Pydantic** Gemini sono `str` CSV — non convertire il validator a `List[str]`.
-> - Mock/prod: token `MOCK_MODE` esplicito (default `false`); **no** auto-fallback silenzioso su errore API.
+> - Mock/prod: token `MOCK_MODE` esplicito (default `false`); **no** auto-fallback silenzioso su errore API. Nation-fetch: `detailError` unito in `StateService.error()`; catch `closeSidebar(false)` preserva il banner (T-P1-04).
 > - Il componente mappa espone tre output: `markerClicked`, `clusterClicked`, `countryClicked`.
 > - **⚠️ Leaflet + esbuild:** caricare Leaflet e MarkerCluster come script globali in `angular.json` → `scripts[]`; accedere via `window.L`. Mai `import 'leaflet.markercluster'` nei componenti. Test: stub in `src/app/testing/leaflet.stub.ts`.
 > - **🗂️ Clustering attuale:** un `markerClusterGroup` **per categoria** con `maxClusterRadius: 40`, `spiderfyOnMaxZoom: false`. Day-view = pin nazione; nation open = hub `radar-spider-root` + fan emoji (tutte le icone della categoria, size/distanza adattivi). Non ripristinare i valori legacy 100/200 + spiderfy true / icona ad anello composita per-categoria.
