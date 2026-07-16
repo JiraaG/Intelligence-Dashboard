@@ -1,10 +1,10 @@
 # LLM Multi-Model Fallback — Documento unico Fase A+B
 
-> **Stato:** SoT design A+B + **Fase C implementata** (default `LLM_ROUTING_MODE=off`; complexity/shadow opt-in).  
+> **Stato:** SoT design A+B + **Fase C implementata** + **lane env v2.2** (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`).  
 > **Skills:** `llm-json-extraction`, `radar-quota-ledger`.  
 > **Sostituisce come riferimento operativo:** stub in `archive/llm-stubs/`.  
 > **Canvas:** `article-complexity-routing.canvas.tsx` (UX deep-dive IDE).  
-> **Prompt:** `../prompts/active/audit_prompt_llm_multi_model_fallback.md`.  
+> **Prompt:** `../prompts/active/audit_prompt_llm_multi_model_fallback.md` (storico; SoT = questo file).  
 > **Remediation:** `../remediation/audit_remediation_llm_multi_model_fallback.md`.  
 > **Indice cartelle:** [`../README.md`](../README.md).
 
@@ -14,19 +14,29 @@
 
 | Domanda | Verdetto |
 |---------|----------|
-| Cascata Gemini free ha senso? | **Sì** — primary `gemini-3.5-flash` → `gemini-2.5-flash` → `gemini-3.1-flash-lite` |
+| Cascata Gemini free ha senso? | **Sì** — ops tipico: Lite bulk; Flash pieni solo se RPD Studio ≥~500 |
 | Paid DeepSeek ha senso? | **Sì** — `deepseek-v4-flash` + `reasoning_effort=high` (~$0.001/art.), non Max |
 | Routing per complessità? | **Sì, a tre fasce** (SIMPLE / BORDERLINE / COMPLEX), non binario |
+| Provider/model per lane? | **Env** — `LLM_SIMPLE_PROVIDER\|MODEL` + `LLM_COMPLEX_PROVIDER\|MODEL` (`gemini` \| `deepseek`) |
 | Free o paid come “path primario”? | **Vietato** — SLO mix + quorum famiglie + shadow ≥3g |
 | Cooldown 24h? | **SQL durable** `(provider, model, until_ts, reason)` |
-| Fase C? | Solo dopo **conferma utente** su questo documento |
+| Fase C? | **DONE** — vedi remediation; default codice `LLM_ROUTING_MODE=off` |
 
-**Catena ops raccomandata**
+**Catena ops attuale (2026-07-16)**
 
 ```text
-SIMPLE / BORDERLINE:  gemini-3.5-flash → gemini-2.5-flash → gemini-3.1-flash-lite
-COMPLEX:              deepseek-v4-flash (high) → stessa coda Gemini
-Mode:                 LLM_ROUTING_MODE=complexity + LLM_ROUTING_SHADOW=true (≥3g)
+LLM_ROUTING_MODE=complexity
+LLM_ROUTING_SHADOW=false              # true solo calibrazione / primi giorni
+LLM_SIMPLE_PROVIDER=gemini
+LLM_SIMPLE_MODEL=gemini-3.1-flash-lite
+LLM_COMPLEX_PROVIDER=deepseek
+LLM_COMPLEX_MODEL=deepseek-v4-flash
+DEEPSEEK_REASONING_EFFORT=high
+GEMINI_MODEL_FALLBACKS=               # vuoto se Flash pieni ~20 RPD inutili
+
+# Swap COMPLEX → Google senza codice:
+#   LLM_COMPLEX_PROVIDER=gemini
+#   LLM_COMPLEX_MODEL=gemini-3.5-flash
 ```
 
 ---
@@ -49,8 +59,8 @@ Mode:                 LLM_ROUTING_MODE=complexity + LLM_ROUTING_SHADOW=true (≥
 
 | Componente | Path | Vincolo per Fase C |
 |------------|------|--------------------|
-| Config modello | `core/config.py` | Oggi un solo `GEMINI_MODEL`; aggiungere chain + DeepSeek + routing |
-| Client | `classification/client.py` | Un modello; `content[:4000]`; `_MAX_ATTEMPTS=4`; QuotaLedger; `get_fallback_article` |
+| Config modello | `core/config.py` | **TO-BE fatto:** Gemini + DeepSeek + routing + `LLM_SIMPLE_*` / `LLM_COMPLEX_*` |
+| Client | `classification/client.py` | Lane chain + escalate; `content[:4000]`; `_MAX_ATTEMPTS=4`; QuotaLedger; fallback |
 | Parser | `extraction/parser.py` | Score complessità **dopo** `strip_html_tags` |
 | Schema | `validator.py` | `GeopoliticalArticleSchema` strict — **immutabile** |
 | Worker | `worker.py` | sanitize → classify → commit/outbox; soft-trim RPD |
@@ -203,11 +213,13 @@ else:
     lane = SIMPLE
 ```
 
-| Lane | Catena | Escalation validation |
-|------|--------|------------------------|
-| **SIMPLE** | Gemini 3.5 → 2.5 → Lite | Dopo `_MAX_ATTEMPTS` sullo stesso modello → **1×** DeepSeek High |
-| **BORDERLINE** | Stessa coda Gemini | Dopo **1 correction fallita** → **1×** DeepSeek High |
-| **COMPLEX** | DeepSeek High → coda Gemini residua | Se DeepSeek down → Gemini; poi fallback article |
+| Lane | Catena (via env) | Escalation validation |
+|------|------------------|------------------------|
+| **SIMPLE** | `LLM_SIMPLE_*` (+ `GEMINI_MODEL_FALLBACKS` se provider=gemini) | Dopo `_MAX_ATTEMPTS` → **1×** `LLM_COMPLEX_*` |
+| **BORDERLINE** | Stessa catena SIMPLE | Dopo **1 correction fallita** → **1×** `LLM_COMPLEX_*` |
+| **COMPLEX** | `LLM_COMPLEX_*` → residuale SIMPLE | Se COMPLEX down / no key → SIMPLE; poi fallback article |
+
+Provider ammessi: `gemini` \| `deepseek`. DeepSeek riceve `model=` dalla lane (non solo `DEEPSEEK_MODEL` default).
 
 ### 4.5 SLO mix (anti “path primario”)
 
@@ -217,7 +229,7 @@ else:
 | Share BORDERLINE | **15–35%** | ~0% → di fatto binario |
 | Escalate / giorno | monitor | Spike → G debole o Gemini fragile su mid |
 | XX su lane SIMPLE | trend vs 24.8% (secondario) | Se peggiora senza motivo → rafforzare G |
-| USD DeepSeek / giorno | ≤ `DEEPSEEK_BUDGET_USD_DAY` | Soft-cap → skip COMPLEX temporaneo **visibile** |
+| USD DeepSeek / giorno | ≤ `DEEPSEEK_BUDGET_USD_DAY` | **Stub v1:** env letto, soft-cap **non ancora applicato** in codice |
 
 **Gate go-live:** shadow ≥**3 giorni** su Miniflux live (`LLM_ROUTING_SHADOW=true`: logga lane, call ancora Gemini-only) con COMPLEX share in 20–40%. Poi `SHADOW=false`.
 
@@ -225,8 +237,8 @@ else:
 
 | Regola | Comportamento |
 |--------|----------------|
-| `complexity` senza `DEEPSEEK_API_KEY` | Fail startup **oppure** force `off` + WARNING (env `LLM_ROUTING_STRICT=1` → fail) |
-| Crediti / 402 | Cooldown DeepSeek + `paid_unavailable=1` in log/health |
+| `LLM_COMPLEX_PROVIDER=deepseek` senza key | WARNING + COMPLEX usa SIMPLE; `LLM_ROUTING_STRICT=1` → fail startup |
+| Crediti / 402 | Cooldown DeepSeek + log `complex_lane deepseek cooldown` |
 | No length-only → COMPLEX | Solo L → BORDERLINE |
 | No title-only | G dal body |
 | Stesso truncate | `[:4000]` ovunque in v1 |
@@ -256,46 +268,55 @@ flowchart TD
   H -->|0| S[SIMPLE]
   H -->|1| B[BORDERLINE]
   H -->|≥2| C[COMPLEX]
-  S --> G1[Gemini chain]
-  B --> G1
-  G1 -->|ok| OK[Commit]
-  B -->|1 correction fail| DS[DeepSeek High]
-  S -->|validation×N| DS
-  C --> DS
-  DS -->|ok| OK
-  DS -->|down| G2[Gemini residua]
-  G2 -->|fail| FB[fallback article]
+  S --> P1[LLM_SIMPLE chain]
+  B --> P1
+  P1 -->|ok| OK[Commit]
+  B -->|1 correction fail| P2[LLM_COMPLEX]
+  S -->|validation×N| P2
+  C --> P2
+  P2 -->|ok| OK
+  P2 -->|down| R[SIMPLE residual]
+  R -->|fail| FB[fallback article]
 ```
 
 ---
 
-## 5. Config env proposta
+## 5. Config env (SoT ops)
 
 ```text
-# Free chain
-GEMINI_MODEL=gemini-3.5-flash
-GEMINI_MODEL_FALLBACKS=gemini-2.5-flash,gemini-3.1-flash-lite
+# Gemini (legacy primary + optional CSV fallbacks per lane gemini)
+GEMINI_MODEL=gemini-3.1-flash-lite
+GEMINI_MODEL_FALLBACKS=
 
-# Paid COMPLEX
+# DeepSeek (default model se LLM_*_MODEL omesso; effort; budget stub)
 DEEPSEEK_API_KEY=...                 # non commitare
 DEEPSEEK_MODEL=deepseek-v4-flash
 DEEPSEEK_REASONING_EFFORT=high
-DEEPSEEK_BUDGET_USD_DAY=3.00
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_BUDGET_USD_DAY=0            # stub: non enforced in v1
 
 # Routing
-LLM_ROUTING_MODE=complexity          # off | complexity
-LLM_ROUTING_SHADOW=true              # staging / primi 3g prod
-LLM_ROUTING_STRICT=0                 # 1 = fail startup se manca key DeepSeek
+LLM_ROUTING_MODE=complexity          # off | complexity  (default codice: off)
+LLM_ROUTING_SHADOW=false             # true = log lane, call sempre SIMPLE
+LLM_ROUTING_STRICT=0                 # 1 = fail se COMPLEX=deepseek senza key
 LLM_COMPLEXITY_ESCALATE_ON_VALIDATION=1
+
+# Lane assignment (gemini | deepseek) — swap senza codice
+LLM_SIMPLE_PROVIDER=gemini
+LLM_SIMPLE_MODEL=gemini-3.1-flash-lite
+LLM_COMPLEX_PROVIDER=deepseek
+LLM_COMPLEX_MODEL=deepseek-v4-flash
 
 # Quote / cooldown
 LLM_MODEL_COOLDOWN_HOURS=24
 LLM_RPM=10
+LLM_TPM=0
 LLM_RPD=1400
 ```
 
-`off` = cascata lineare Gemini-only (compat/debug).  
-Env `T_LOW`/`T_HIGH` **non** richiesti in v2.1 (lane = quorum); si possono aggiungere in fase 2 se servono soft-signal.
+`off` / `shadow` = solo catena SIMPLE.  
+Default codice senza env: `LLM_ROUTING_MODE=off`, `LLM_ROUTING_SHADOW=true` (boot sicuro).  
+Env `T_LOW`/`T_HIGH` **non** richiesti in v2.1 (lane = quorum).
 
 ---
 
@@ -346,7 +367,8 @@ Env `T_LOW`/`T_HIGH` **non** richiesti in v2.1 (lane = quorum); si possono aggiu
 - BORDERLINE escalate dopo 1 correction fail; SIMPLE dopo N  
 - `complexity` + no key → off+WARN o fail se strict  
 - 402 → cooldown + Gemini; 429 short → no cooldown  
-- Shadow: lane loggata, provider sempre Gemini  
+- Shadow: lane loggata, catena sempre SIMPLE  
+- `LLM_COMPLEX_MODEL` passato a DeepSeek `classify_json(model=)` (non solo `DEEPSEEK_MODEL`)  
 
 ### 8.3 Gate
 
@@ -394,11 +416,12 @@ Poi: `docker compose up -d --build radar-worker` · VERIFY_IN_STUDIO · shadow 3
 
 Adottare design **v2.1** come specifica Fase C (implementazione in corso / done quando remediation report esiste):
 
-1. Cascata Gemini free qualità-prima.  
-2. DeepSeek Flash **High** via **httpx** (no package `openai`) su lane COMPLEX.  
+1. Cascata provider/model **per lane** via env (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`).  
+2. DeepSeek Flash **High** via **httpx** (no package `openai`) quando COMPLEX=deepseek.  
 3. Lane = **quorum famiglie** (0/1/≥2).  
-4. Shadow ≥3 giorni; SLO COMPLEX 20–40%.  
-5. Cooldown SQL `009`; ledger invariato nei principi.
+4. Shadow ≥3 giorni prima di go-live aggressivo; SLO COMPLEX 20–40%.  
+5. Cooldown SQL `009`; ledger invariato nei principi.  
+6. Soft-cap `DEEPSEEK_BUDGET_USD_DAY` = **post-v1** (env già presente).
 
 ---
 
@@ -418,15 +441,15 @@ flowchart LR
   Val -->|fail x4| FB[get_fallback_article]
 ```
 
-| Pezzo | Path | Gap |
-|-------|------|-----|
-| Client | `classification/client.py` | Un `self.model`; no cascade/lane/DeepSeek |
+| Pezzo | Path | Stato post-Fase C / v2.2 |
+|-------|------|-------------------------|
+| Client | `classification/client.py` | Cascade + lane + escalate + dual provider |
 | Quota | `classification/quota.py` | `reserve(model=)` OK; cap **globali** |
-| Config | `core/config.py` | Solo `GEMINI_MODEL` + RPM/TPM/RPD |
+| Config | `core/config.py` | Gemini + DeepSeek + routing + lane env |
 | Worker | `worker.py` | Soft-trim RPD Gemini; heuristic nel client |
 | Schema/prompt | `validator.py`, `prompts.py` | **Immutabili** |
-| Cooldown | — | Assente → `009_llm_model_cooldown.sql` |
-| DeepSeek | — | Assente; ECC vieta package `openai` → **httpx** |
+| Cooldown | `cooldown.py` + `009_…sql` | Durable 24h |
+| DeepSeek | `deepseek.py` | httpx; `model=` da lane |
 | FE/API | DTO articles/map | Nessun `model_id` — out of scope |
 
 ### 12.2 Decisione ECC: DeepSeek via httpx
@@ -438,7 +461,7 @@ flowchart LR
 
 | File | Funzione / area | Cambio |
 |------|-----------------|--------|
-| `core/config.py` | LLM section | Chain, DeepSeek, routing, cooldown hours |
+| `core/config.py` | LLM section | Chain, DeepSeek, routing, `LLM_SIMPLE_*` / `LLM_COMPLEX_*`, cooldown |
 | `classification/complexity.py` | **nuovo** | Famiglie G/E/L/X/N → lane |
 | `classification/cooldown.py` | **nuovo** | SQL + memory fallback test |
 | `classification/deepseek.py` | **nuovo** | httpx chat completions JSON |
@@ -453,21 +476,22 @@ flowchart LR
 
 ```text
 sanitize → families → lane
-if SHADOW: log lane; chain = gemini_chain
-else: chain = chain_for(lane)
-for model in filter_cooldown(chain):
+if SHADOW or mode=off: log lane; chain = simple_chain (LLM_SIMPLE_*)
+else: chain = chain_for(lane)   # COMPLEX → LLM_COMPLEX_* + residual SIMPLE
+for ref in filter_cooldown(chain):
   for attempt in validation_loop:
-    reserve(model=model)
-    call provider (gemini|deepseek)
+    reserve(model=ref.model)
+    call provider (gemini|deepseek)  # deepseek: classify_json(model=ref.model)
     …
 ```
 
 ### 12.5 Attenzioni ops
 
 - RPD ledger globale 1400 vs Lite tipico ~1000 (VERIFY_IN_STUDIO).  
-- Budget USD DeepSeek soft-cap; 402 → cooldown + `paid_unavailable`.  
+- Budget USD DeepSeek: env presente, **enforcement post-v1**; 402 → cooldown SQL.  
 - Mai alzare `content[:4000]`.  
-- Default ship: `LLM_ROUTING_SHADOW=true` finché mix COMPLEX 20–40%.
+- Default codice: `LLM_ROUTING_SHADOW=true` / `MODE=off` finché mix calibrato; ops live può forzare `SHADOW=false`.  
+- Swap COMPLEX→Google: solo `LLM_COMPLEX_PROVIDER=gemini` + `LLM_COMPLEX_MODEL=…`.
 
 ---
 

@@ -13,7 +13,7 @@ when_to_use:
   - Debug di errori di parsing JSON dalla risposta LLM
   - Cascata modelli, routing complexity, cooldown 24h
   - Aggiunta di nuovi campi al contratto di estrazione
-version: 1.3.0
+version: 1.4.0
 ---
 
 ## Quando Usare Questa Skill
@@ -23,7 +23,8 @@ Carica questa skill ogni volta che:
 - Ricevi errori del tipo `ValidationError` da Pydantic
 - Gemini/DeepSeek restituisce un JSON incompleto o con campi non presenti nello schema
 - Devi ottimizzare il System Prompt per ridurre le allucinazioni geografiche
-- Cambi `GEMINI_MODEL` / fallbacks / `DEEPSEEK_*` / `LLM_ROUTING_*`
+- Cambi `GEMINI_MODEL` / fallbacks / `DEEPSEEK_*` / `LLM_ROUTING_*` /
+  `LLM_SIMPLE_PROVIDER|MODEL` / `LLM_COMPLEX_PROVIDER|MODEL`
 
 ---
 
@@ -42,7 +43,22 @@ Carica questa skill ogni volta che:
 7. Reconcile vault → mark-read Miniflux solo se durable completed
 ```
 
-**Invarianti:** schema/prompt immutabili; `content[:4000]` su tutte le lane; package `openai` vietato.
+**Invarianti:** schema/prompt immutabili; `content[:4000]` su tutte le lane; package `openai` vietato;
+lane via `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (`gemini`\|`deepseek`); DeepSeek `classify_json(model=ref.model)`.
+
+### Env lane (ops)
+
+```text
+LLM_ROUTING_MODE=complexity          # off | complexity
+LLM_ROUTING_SHADOW=false             # true = solo log lane + catena SIMPLE
+LLM_SIMPLE_PROVIDER=gemini
+LLM_SIMPLE_MODEL=gemini-3.1-flash-lite
+LLM_COMPLEX_PROVIDER=deepseek
+LLM_COMPLEX_MODEL=deepseek-v4-flash
+# Swap COMPLEX → Google: LLM_COMPLEX_PROVIDER=gemini + LLM_COMPLEX_MODEL=…
+```
+
+SoT: `plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md`.
 
 ---
 

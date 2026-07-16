@@ -8,7 +8,7 @@ when_to_use:
   - Modifiche prompt / schema / client Gemini o DeepSeek
   - Cascata modelli, routing complexity, cooldown 24h
   - Debug ValidationError JSON LLM
-version: 1.3.0
+version: 1.4.0
 ---
 
 ## Quando Usare Questa Skill
@@ -16,7 +16,8 @@ version: 1.3.0
 Carica questa skill ogni volta che:
 - Modifichi `backend/app/worker.py` o `classification/` (client, prompts, validator, quota, complexity, cooldown, deepseek)
 - Ricevi `ValidationError` Pydantic o JSON incompleto dall'LLM
-- Cambi `GEMINI_MODEL` / fallbacks / `DEEPSEEK_*` / `LLM_ROUTING_*`
+- Cambi `GEMINI_MODEL` / fallbacks / `DEEPSEEK_*` / `LLM_ROUTING_*` /
+  `LLM_SIMPLE_PROVIDER|MODEL` / `LLM_COMPLEX_PROVIDER|MODEL`
 
 ---
 
@@ -33,7 +34,20 @@ Carica questa skill ogni volta che:
 5. Overwrite source_url/published_at da Miniflux → commit + outbox → vault → mark-read
 ```
 
-**Invarianti:** schema/prompt immutabili; `content[:4000]`; package `openai` vietato.
+**Invarianti:** schema/prompt immutabili; `content[:4000]`; package `openai` vietato;
+lane via `LLM_SIMPLE_*` / `LLM_COMPLEX_*`; DeepSeek `classify_json(model=ref.model)`.
+
+### Env lane (ops)
+
+```text
+LLM_ROUTING_MODE=complexity
+LLM_SIMPLE_PROVIDER=gemini
+LLM_SIMPLE_MODEL=gemini-3.1-flash-lite
+LLM_COMPLEX_PROVIDER=deepseek
+LLM_COMPLEX_MODEL=deepseek-v4-flash
+```
+
+SoT: `plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md`.
 
 ---
 

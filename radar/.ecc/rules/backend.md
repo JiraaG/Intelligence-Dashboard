@@ -243,18 +243,17 @@ python -m app.worker
 ## Regola 9: Quote LLM Durable (QuotaLedger)
 
 Ogni tentativo provider (incluso retry/validazione) deve **reservare** capacità su
-`llm_request_ledger` via `classification/quota.py` **prima** della chiamata Gemini.
+`llm_request_ledger` via `classification/quota.py` **prima** della chiamata Gemini **o** DeepSeek.
 Aggiornare **quella** reservation id con usage reale. Spacing in-process con
 `time.monotonic()`; RPD half-open su `RADAR_TIME_ZONE`. Rispettare `429` + `Retry-After`.
+Hard-fail (RPD day, 402, 404 model, 5xx esauriti) → `llm_model_cooldown` 24h, poi next model.
 
 **OBBLIGATORIO:**
 ```python
-reservation_id = await self.quota.reserve(estimated_tokens=..., model=self.model)
+reservation_id = await self.quota.reserve(estimated_tokens=..., model=ref.model)
 try:
-    response = await asyncio.wait_for(
-        self.client.aio.models.generate_content(...),
-        timeout=GEMINI_REQUEST_TIMEOUT,
-    )
+    # gemini: google-genai | deepseek: classification/deepseek.py (httpx)
+    response = await provider_call(...)
     await self.quota.complete(reservation_id, actual_tokens)
 except asyncio.CancelledError:
     await self.quota.fail(reservation_id)  # o release se provider non avviato
@@ -266,7 +265,29 @@ except asyncio.CancelledError:
 # NO: solo asyncio.sleep(4) in-memory come unico rate limit
 # NO: date(created_at) = CURRENT_DATE per RPD
 # NO: complete() sull'"ultima" riga invece che sulla reservation_id
+# NO: package openai / anthropic / langchain
 ```
+
+---
+
+## Regola 9b: Lane LLM via env (complexity routing)
+
+Routing opzionale (`LLM_ROUTING_MODE=off|complexity`). Lane = quorum famiglie in
+`classification/complexity.py` (SIMPLE / BORDERLINE / COMPLEX).
+
+| Env | Ruolo |
+|-----|--------|
+| `LLM_SIMPLE_PROVIDER` / `LLM_SIMPLE_MODEL` | SIMPLE + BORDERLINE (`gemini` \| `deepseek`) |
+| `LLM_COMPLEX_PROVIDER` / `LLM_COMPLEX_MODEL` | COMPLEX + escalate validation |
+| `GEMINI_MODEL_FALLBACKS` | Cascata extra **solo** se provider lane = gemini |
+| `DEEPSEEK_*` | Key, default model, effort, base URL (budget USD = stub non enforced) |
+| `LLM_ROUTING_SHADOW=true` | Logga lane; chiama sempre catena SIMPLE |
+
+**Invarianti:** stesso `content[:4000]` su tutte le lane; schema/prompt immutabili;
+DeepSeek riceve `model=` dalla lane (`classify_json(model=ref.model)`);
+mai hardcodare API key; mai commit `.env`.
+
+SoT: `plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md`.
 
 ---
 

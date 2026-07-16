@@ -19,12 +19,19 @@ from app.core.config import ConfigError
 
 
 def _client_with_mock_quota() -> tuple[ClassificationClient, AsyncMock]:
+    """Gemini-only client; routing off so tests non dipendono da .env live."""
     quota = AsyncMock()
     quota.reserve = AsyncMock(side_effect=[1, 2, 3, 4, 5, 6, 7, 8])
     quota.complete = AsyncMock()
     quota.release = AsyncMock()
     quota.fail = AsyncMock()
     client = ClassificationClient(quota=quota)
+    client._routing_mode = "off"
+    client._shadow = False
+    client._escalate = False
+    client._complex_unavailable = True
+    client._simple_provider = "gemini"
+    client._simple_model = client.model
     return client, quota
 
 
@@ -352,13 +359,12 @@ async def test_hard_cooldown_switches_to_fallback_model() -> None:
     from google.genai import errors as genai_errors
 
     client, quota = _client_with_mock_quota()
-    client._routing_mode = "off"
-    client._shadow = False
-    client._paid_unavailable = True
+    client._simple_model = "gemini-primary"
+    client.model = "gemini-primary"
 
     with patch(
-        "app.classification.client.gemini_model_chain",
-        return_value=["gemini-primary", "gemini-secondary"],
+        "app.classification.client.GEMINI_MODEL_FALLBACKS",
+        ["gemini-secondary"],
     ), patch.object(client, "_generate_content", new_callable=AsyncMock) as mock_gen, patch(
         "asyncio.sleep", new_callable=AsyncMock
     ):

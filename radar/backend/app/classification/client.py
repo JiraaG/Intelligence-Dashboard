@@ -23,20 +23,22 @@ from app.classification.quota import QuotaLedger
 from app.classification.validator import GeopoliticalArticleSchema, get_fallback_article
 from app.core.config import (
     ConfigError,
-    DEEPSEEK_API_KEY,
-    DEEPSEEK_MODEL,
     ESTIMATED_TOKENS_PER_REQUEST,
     GEMINI_MODEL,
+    GEMINI_MODEL_FALLBACKS,
     GEMINI_REQUEST_TIMEOUT,
     LLM_API_KEY,
+    LLM_COMPLEX_MODEL,
+    LLM_COMPLEX_PROVIDER,
     LLM_COMPLEXITY_ESCALATE_ON_VALIDATION,
     LLM_MODEL_COOLDOWN_HOURS,
     LLM_ROUTING_MODE,
     LLM_ROUTING_SHADOW,
     LLM_ROUTING_STRICT,
     LLM_RPM,
+    LLM_SIMPLE_MODEL,
+    LLM_SIMPLE_PROVIDER,
     LLM_TPM,
-    gemini_model_chain,
 )
 
 logger = logging.getLogger("radar.classification.client")
@@ -255,9 +257,8 @@ class ClassificationClient:
     """
     Classification with QuotaLedger reserve-before-every-attempt.
 
-    - LLM_ROUTING_MODE=off: Gemini cascade (primary + fallbacks), no DeepSeek lane.
-    - complexity + shadow: log lane, still Gemini-only.
-    - complexity + !shadow: COMPLEX → DeepSeek first; escalate rules per lane.
+    - LLM_ROUTING_MODE=off / shadow: only SIMPLE lane chain.
+    - complexity: SIMPLE/BORDERLINE → LLM_SIMPLE_*; COMPLEX → LLM_COMPLEX_* then residual.
     """
 
     def __init__(
@@ -276,7 +277,9 @@ class ClassificationClient:
         self.pool = pool
         self.quota = quota if quota is not None else QuotaLedger(pool)  # type: ignore[arg-type]
         self.client = genai.Client(api_key=LLM_API_KEY)
-        self.model = GEMINI_MODEL or "gemma-4-31b"
+        self.model = LLM_SIMPLE_MODEL if LLM_SIMPLE_PROVIDER == _PROVIDER_GEMINI else (
+            GEMINI_MODEL or "gemma-4-31b"
+        )
         self._request_timeout = float(GEMINI_REQUEST_TIMEOUT)
         self._estimated_tokens = int(ESTIMATED_TOKENS_PER_REQUEST)
         self.cooldown = cooldown or ModelCooldownStore(
@@ -288,30 +291,38 @@ class ClassificationClient:
         self._routing_mode = LLM_ROUTING_MODE
         self._shadow = bool(LLM_ROUTING_SHADOW)
         self._escalate = bool(LLM_COMPLEXITY_ESCALATE_ON_VALIDATION)
+        self._simple_provider = LLM_SIMPLE_PROVIDER
+        self._simple_model = LLM_SIMPLE_MODEL
+        self._complex_provider = LLM_COMPLEX_PROVIDER
+        self._complex_model = LLM_COMPLEX_MODEL
 
-        if self._routing_mode == "complexity" and not self.deepseek.available:
+        self._complex_unavailable = False
+        if self._complex_provider == _PROVIDER_DEEPSEEK and not self.deepseek.available:
             msg = (
-                "LLM_ROUTING_MODE=complexity ma DEEPSEEK_API_KEY assente — "
-                "fallback a Gemini-only (mode effettivo off per paid lane)"
+                "LLM_COMPLEX_PROVIDER=deepseek ma DEEPSEEK_API_KEY assente — "
+                "COMPLEX userà la lane SIMPLE"
             )
-            if LLM_ROUTING_STRICT:
+            if self._routing_mode == "complexity" and LLM_ROUTING_STRICT:
                 raise ValueError(msg)
             logger.warning(msg)
-            self._paid_unavailable = True
-        else:
-            self._paid_unavailable = not self.deepseek.available
+            self._complex_unavailable = True
+        if self._simple_provider == _PROVIDER_DEEPSEEK and not self.deepseek.available:
+            raise ValueError(
+                "LLM_SIMPLE_PROVIDER=deepseek richiede DEEPSEEK_API_KEY."
+            )
 
         logger.info(
-            "ClassificationClient pronto. Modello=%s chain=%s routing=%s shadow=%s "
-            "timeout=%ss (RPM=%s TPM=%s) deepseek=%s",
-            self.model,
-            gemini_model_chain(),
+            "ClassificationClient pronto. simple=%s/%s complex=%s/%s routing=%s shadow=%s "
+            "timeout=%ss (RPM=%s TPM=%s)",
+            self._simple_provider,
+            self._simple_model,
+            self._complex_provider,
+            self._complex_model,
             self._routing_mode,
             self._shadow,
             self._request_timeout,
             LLM_RPM,
             LLM_TPM,
-            bool(self.deepseek.available),
         )
 
     async def _generate_content(
@@ -337,16 +348,38 @@ class ClassificationClient:
             timeout=self._request_timeout,
         )
 
-    def _gemini_chain_refs(self) -> list[_ModelRef]:
-        return [_ModelRef(_PROVIDER_GEMINI, m) for m in gemini_model_chain()]
+    def _provider_refs(self, provider: str, model: str) -> list[_ModelRef]:
+        if provider == _PROVIDER_DEEPSEEK:
+            return [_ModelRef(_PROVIDER_DEEPSEEK, model)]
+        # Gemini: lane model + optional GEMINI_MODEL_FALLBACKS only (no forced GEMINI_MODEL).
+        models = [model]
+        for fb in GEMINI_MODEL_FALLBACKS:
+            if fb not in models:
+                models.append(fb)
+        return [_ModelRef(_PROVIDER_GEMINI, m) for m in models]
 
-    def _chain_for(self, lane: Lane, *, force_gemini: bool) -> list[_ModelRef]:
-        gemini = self._gemini_chain_refs()
-        if force_gemini or self._routing_mode != "complexity" or self._paid_unavailable:
-            return gemini
-        if lane == Lane.COMPLEX:
-            return [_ModelRef(_PROVIDER_DEEPSEEK, DEEPSEEK_MODEL), *gemini]
-        return gemini
+    def _simple_chain(self) -> list[_ModelRef]:
+        return self._provider_refs(self._simple_provider, self._simple_model)
+
+    def _complex_chain(self) -> list[_ModelRef]:
+        primary = self._provider_refs(self._complex_provider, self._complex_model)
+        residual = self._simple_chain()
+        out: list[_ModelRef] = []
+        seen: set[tuple[str, str]] = set()
+        for ref in [*primary, *residual]:
+            key = (ref.provider, ref.model)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(ref)
+        return out
+
+    def _chain_for(self, lane: Lane, *, force_simple: bool) -> list[_ModelRef]:
+        if force_simple or self._routing_mode != "complexity":
+            return self._simple_chain()
+        if lane == Lane.COMPLEX and not self._complex_unavailable:
+            return self._complex_chain()
+        return self._simple_chain()
 
     async def _eligible(self, refs: list[_ModelRef]) -> list[_ModelRef]:
         out: list[_ModelRef] = []
@@ -370,27 +403,33 @@ class ClassificationClient:
         truncated = content[:4000]
         complexity = score_complexity(title, content)
         lane = complexity.lane
-        force_gemini = (
+        force_simple = (
             self._routing_mode != "complexity"
             or self._shadow
-            or self._paid_unavailable
+            or (lane == Lane.COMPLEX and self._complex_unavailable)
         )
 
         logger.info(
-            "classify lane=%s families=%s score=%s shadow=%s mode=%s title=%r",
+            "classify lane=%s families=%s score=%s shadow=%s mode=%s "
+            "simple=%s/%s complex=%s/%s title=%r",
             lane.value,
             sorted(complexity.families),
             complexity.score,
             self._shadow and self._routing_mode == "complexity",
             self._routing_mode,
+            self._simple_provider,
+            self._simple_model,
+            self._complex_provider,
+            self._complex_model,
             title[:50],
         )
 
-        chain = await self._eligible(self._chain_for(lane, force_gemini=force_gemini))
+        chain = await self._eligible(self._chain_for(lane, force_simple=force_simple))
         if not chain:
             logger.error("Nessun modello eleggibile (tutti in cooldown). Fallback.")
             return get_fallback_article(title, url, date)
 
+        escalate_ref = _ModelRef(self._complex_provider, self._complex_model)
         escalated = False
         for ref in chain:
             article, outcome = await self._run_model_attempts(
@@ -414,18 +453,23 @@ class ClassificationClient:
             if outcome == "fatal_auth":
                 return get_fallback_article(title, url, date)
 
-            if (
+            can_escalate = (
                 outcome == "escalate"
                 and self._escalate
                 and not escalated
-                and not force_gemini
-                and self.deepseek.available
-                and not await self.cooldown.is_cooling_down(_PROVIDER_DEEPSEEK, DEEPSEEK_MODEL)
-            ):
+                and not force_simple
+                and not self._complex_unavailable
+                and (ref.provider, ref.model) != (escalate_ref.provider, escalate_ref.model)
+                and not await self.cooldown.is_cooling_down(
+                    escalate_ref.provider, escalate_ref.model
+                )
+            )
+            if can_escalate and escalate_ref.provider == _PROVIDER_DEEPSEEK:
+                can_escalate = self.deepseek.available
+            if can_escalate:
                 escalated = True
-                ds_ref = _ModelRef(_PROVIDER_DEEPSEEK, DEEPSEEK_MODEL)
                 article, _ = await self._run_model_attempts(
-                    ds_ref,
+                    escalate_ref,
                     title=title,
                     content=truncated,
                     url=url,
@@ -434,11 +478,15 @@ class ClassificationClient:
                     max_attempts=2,
                 )
                 if article is not None:
-                    logger.info("Escalation DeepSeek OK per '%s'", title[:50])
+                    logger.info(
+                        "Escalation %s/%s OK per '%s'",
+                        escalate_ref.provider,
+                        escalate_ref.model,
+                        title[:50],
+                    )
                     return article
                 continue
 
-            # hard_cooldown / exhausted → next model in chain
             continue
 
         logger.error("Tutti i modelli esauriti per '%s'. Fallback.", title[:50])
@@ -510,6 +558,7 @@ class ClassificationClient:
                         url=url,
                         date=date,
                         correction=correction,
+                        model=ref.model,
                     )
                     actual = tokens if tokens is not None else self._estimated_tokens
                     await self.quota.complete(reservation_id, actual)
@@ -573,12 +622,11 @@ class ClassificationClient:
                 ):
                     response_text = response.text
 
-                # BORDERLINE: escalate after first failed correction
+                # BORDERLINE: escalate after first failed correction (any SIMPLE provider)
                 if (
                     lane == Lane.BORDERLINE
                     and self._escalate
                     and validation_fails >= 2
-                    and ref.provider == _PROVIDER_GEMINI
                 ):
                     return None, "escalate"
 
@@ -634,7 +682,10 @@ class ClassificationClient:
                         reason=str(e)[:200],
                     )
                     if ref.provider == _PROVIDER_DEEPSEEK:
-                        logger.warning("paid_unavailable=1 (DeepSeek cooldown)")
+                        logger.warning(
+                            "complex_lane deepseek cooldown model=%s",
+                            ref.model,
+                        )
                     return None, "hard_cooldown"
 
                 retry_after = extract_retry_after_seconds(e)

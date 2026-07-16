@@ -78,15 +78,18 @@ class DeepSeekClient:
         url: str,
         date: str,
         correction: str | None = None,
+        model: str | None = None,
     ) -> tuple[str, int | None]:
         """
         Return (json_text, usage_total_tokens_or_None).
 
+        ``model`` overrides the client default (lane env LLM_*_MODEL).
         Raises DeepSeekError on HTTP/provider failures.
         """
         if not self.api_key:
             raise DeepSeekError("DEEPSEEK_API_KEY mancante", status_code=401)
 
+        use_model = model or self.model
         user_message = build_user_prompt(
             title=title,
             url=url,
@@ -100,7 +103,7 @@ class DeepSeekClient:
             )
 
         payload: dict[str, Any] = {
-            "model": self.model,
+            "model": use_model,
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_message},
@@ -197,7 +200,7 @@ class DeepSeekClient:
 
         logger.info(
             "DeepSeek ok model=%s effort=%s tokens=%s",
-            self.model,
+            use_model,
             self.effort,
             tokens,
         )

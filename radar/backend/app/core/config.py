@@ -140,7 +140,7 @@ ESTIMATED_TOKENS_PER_REQUEST = _env_int(
     max_value=100_000,
 )
 
-# DeepSeek (paid COMPLEX lane) — httpx OpenAI-compatible; no openai package.
+# DeepSeek (OpenAI-compatible via httpx) — used when lane provider = deepseek.
 DEEPSEEK_API_KEY = _env_str("DEEPSEEK_API_KEY", "") or ""
 DEEPSEEK_MODEL = _env_str("DEEPSEEK_MODEL", "deepseek-v4-flash") or "deepseek-v4-flash"
 DEEPSEEK_REASONING_EFFORT = (_env_str("DEEPSEEK_REASONING_EFFORT", "high") or "high").lower()
@@ -154,13 +154,26 @@ DEEPSEEK_BUDGET_USD_DAY = _env_float(
     max_value=10_000.0,
 )
 
-# Routing: off = Gemini cascade only; complexity = 3-lane heuristic.
+# Routing: off = simple-lane chain only; complexity = heuristic lanes.
 _raw_routing = (_env_str("LLM_ROUTING_MODE", "off") or "off").lower()
 LLM_ROUTING_MODE = _raw_routing if _raw_routing in {"off", "complexity"} else "off"
 LLM_ROUTING_SHADOW = _env_bool("LLM_ROUTING_SHADOW", True)
 LLM_ROUTING_STRICT = _env_bool("LLM_ROUTING_STRICT", False)
 LLM_COMPLEXITY_ESCALATE_ON_VALIDATION = _env_bool("LLM_COMPLEXITY_ESCALATE_ON_VALIDATION", True)
 LLM_MODEL_COOLDOWN_HOURS = _env_int("LLM_MODEL_COOLDOWN_HOURS", 24, min_value=1, max_value=168)
+
+
+def _normalize_llm_provider(raw: str | None, default: str) -> str:
+    value = (raw or default).strip().lower()
+    return value if value in {"gemini", "deepseek"} else default
+
+
+# Lane model assignment (swap anytime without code changes).
+# SIMPLE/BORDERLINE → LLM_SIMPLE_*; COMPLEX → LLM_COMPLEX_*.
+LLM_SIMPLE_PROVIDER = _normalize_llm_provider(_env_str("LLM_SIMPLE_PROVIDER"), "gemini")
+LLM_SIMPLE_MODEL = _env_str("LLM_SIMPLE_MODEL") or GEMINI_MODEL
+LLM_COMPLEX_PROVIDER = _normalize_llm_provider(_env_str("LLM_COMPLEX_PROVIDER"), "deepseek")
+LLM_COMPLEX_MODEL = _env_str("LLM_COMPLEX_MODEL") or DEEPSEEK_MODEL
 
 # ── Database ─────────────────────────────────────────────────────────────────
 _DEFAULT_PG_PASSWORD = "radar_password_secure"

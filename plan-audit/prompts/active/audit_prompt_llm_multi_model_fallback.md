@@ -1,6 +1,11 @@
 # Prompt — Multi-model LLM fallback + cooldown 24h (ricerca free-tier)
 
-> **Uso:** copia il blocco `text` sotto in un **nuovo** chat Agent (orchestratore).  
+> **Stato 2026-07-16:** Fase A+B+C **implementate** (lane env v2.2). Questo file resta come **storico orchestratore**.  
+> **SoT operativo:** [`../../active/LLM_Multi_Model_Fallback_Phase_AB.md`](../../active/LLM_Multi_Model_Fallback_Phase_AB.md).  
+> **Remediation:** [`../../remediation/audit_remediation_llm_multi_model_fallback.md`](../../remediation/audit_remediation_llm_multi_model_fallback.md).  
+> Non rieseguire Fase C da zero: estendere solo gap residui (es. soft-cap `DEEPSEEK_BUDGET_USD_DAY`).
+
+> **Uso (storico):** copia il blocco `text` sotto in un **nuovo** chat Agent (orchestratore).  
 > **Scope:** ricerca modelli free-tier adatti al Radar + design/implementazione fallback multi-modello con **cooldown 24h** prima del riutilizzo.  
 > **Non** commit/push salvo richiesta. **Non** toccare `radar-sidebar/**`.  
 > **Skills obbligatorie:** `llm-json-extraction`, `radar-quota-ledger`.  
@@ -32,14 +37,16 @@ compatibili. NON inventare quote: verifica fonti ufficiali + AI Studio.
   (quota giorno, 429 persistenti, 5xx modello, NOT_FOUND), metterlo in
   **cooldown 24h** e passare al successivo; dopo 24h può tornare eleggibile
 
-### AS-IS codice
+### AS-IS codice (post-Fase C / v2.2)
 | Pezzo | Path | Nota |
 |-------|------|------|
-| Model env | `radar/backend/app/core/config.py` | `GEMINI_MODEL` (default storico `gemma-4-31b` → normalizza `-it`); ops attuale spesso `gemini-3.1-flash-lite` via `.env` |
-| Client | `radar/backend/app/classification/client.py` | **un solo** `self.model`; structured JSON + schema Pydantic; Retry-After su 429 |
-| Quote | `radar/backend/app/classification/quota.py` | `QuotaLedger` RPM/TPM/RPD su `llm_request_ledger`; `reserve(..., model=)` già passa il model string |
-| Ledger SQL | migrations `003`/`005` | colonna `model TEXT` già presente |
-| Env example | `radar/.env.example` | `GEMINI_MODEL`, `LLM_RPM=10`, `LLM_RPD=1400` |
+| Model env | `radar/backend/app/core/config.py` | `GEMINI_*` + `DEEPSEEK_*` + `LLM_ROUTING_*` + **`LLM_SIMPLE_*` / `LLM_COMPLEX_*`** |
+| Client | `radar/backend/app/classification/client.py` | Lane SIMPLE/BORDERLINE/COMPLEX; cascade; escalate; dual provider |
+| Complexity | `classification/complexity.py` | Quorum famiglie G/E/L/X/N |
+| DeepSeek | `classification/deepseek.py` | httpx; `classify_json(model=)` da lane |
+| Cooldown | `classification/cooldown.py` + `009` | 24h durable |
+| Quote | `classification/quota.py` | `QuotaLedger` RPM/TPM/RPD; `reserve(..., model=)` |
+| Env example | `radar/.env.example` | Lane + DeepSeek + routing documentati |
 | Worker soft-trim | `radar/backend/app/worker.py` | taglia lotto se RPD ledger vicino al cap |
 
 ### Skills / rules
@@ -141,17 +148,23 @@ Scelta da valutare (pro/contro nel design; raccomandare una):
 
 **Scelta raccomandata da adottare salvo controindicazioni:** **A (SQL durable)**.
 
-### Config proposta (env)
+### Config proposta (env) — SoT v2.2
 ```
-GEMINI_MODEL=gemini-3-flash          # primary (id esatto post-ricerca)
-GEMINI_MODEL_FALLBACKS=gemini-2.5-flash,gemini-3.1-flash-lite
+GEMINI_MODEL=gemini-3.1-flash-lite
+GEMINI_MODEL_FALLBACKS=
+LLM_SIMPLE_PROVIDER=gemini
+LLM_SIMPLE_MODEL=gemini-3.1-flash-lite
+LLM_COMPLEX_PROVIDER=deepseek
+LLM_COMPLEX_MODEL=deepseek-v4-flash
+LLM_ROUTING_MODE=complexity
+LLM_ROUTING_SHADOW=false
+DEEPSEEK_REASONING_EFFORT=high
 LLM_MODEL_COOLDOWN_HOURS=24
 LLM_RPM=10
-LLM_RPD=1400                         # o allineato al min RPD free della chain
+LLM_RPD=1400
 ```
-Lista fallback: CSV ordinata. Primary + fallbacks = catena completa.
-Cooldown: primary from `GEMINI_MODEL` for backward compat.
-
+Lane = provider+model per fascia; Gemini fallbacks solo se `*_PROVIDER=gemini`.
+Vedi SoT §5 per elenco completo.
 ### Quote ledger
 - Ogni tentativo (anche post-switch) → **nuovo** `reserve` con `model=` corretto
 - Soft-trim worker: considerare se RPD è globale o per-modello (allineare a ricerca)

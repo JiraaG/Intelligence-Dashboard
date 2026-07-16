@@ -60,11 +60,16 @@ Ingest / Gemini / outbox → **`radar-worker`**. API HTTP → `radar-backend`.
 Sintomi: log worker con wait/`429`/`Retry-After`; pochi articoli nuovi; ready può restare 200 se heartbeat fresco.
 
 - Ledger durable: `llm_request_ledger` (`LLM_RPM` / `LLM_TPM` / `LLM_RPD`, `RADAR_TIME_ZONE`)
-- Cascata modelli: `GEMINI_MODEL` + `GEMINI_MODEL_FALLBACKS` (CSV)
+- Cascata Gemini (lane SIMPLE se provider=gemini): `LLM_SIMPLE_MODEL` + `GEMINI_MODEL_FALLBACKS` (CSV)
 - Cooldown 24h hard-fail: tabella `llm_model_cooldown` (`LLM_MODEL_COOLDOWN_HOURS`) — **non** per 429 brevi con Retry-After
-- Routing opzionale: `LLM_ROUTING_MODE=complexity` + `LLM_ROUTING_SHADOW=true` (calibrazione); DeepSeek via httpx (`DEEPSEEK_*`)
+- Routing: `LLM_ROUTING_MODE=complexity` + lane env:
+  - `LLM_SIMPLE_PROVIDER` / `LLM_SIMPLE_MODEL` (SIMPLE + BORDERLINE)
+  - `LLM_COMPLEX_PROVIDER` / `LLM_COMPLEX_MODEL` (COMPLEX + escalate)
+  - Esempio COMPLEX → Google: `LLM_COMPLEX_PROVIDER=gemini` + `LLM_COMPLEX_MODEL=gemini-3.5-flash`
+  - `LLM_ROUTING_SHADOW=true` = solo log lane (usa sempre SIMPLE)
+- DeepSeek via httpx (`DEEPSEEK_*`); effort: `DEEPSEEK_REASONING_EFFORT`
 - Senza `GEMINI_API_KEY`: API/FE avviano; worker degradato (heartbeat only)
-- Senza `DEEPSEEK_API_KEY` in mode complexity: warning (o fail se `LLM_ROUTING_STRICT=1`); Gemini-only
+- Senza `DEEPSEEK_API_KEY` con COMPLEX=deepseek: warning (o fail se `LLM_ROUTING_STRICT=1`); COMPLEX usa SIMPLE
 
 Azioni: verificare key/model in `.env` e restart `radar-worker`; controllare quote provider / AI Studio;  
 `SELECT * FROM llm_model_cooldown;`; abbassare `MINIFLUX_LIMIT` se serve; **non** scalare worker multipli (single-leader).
