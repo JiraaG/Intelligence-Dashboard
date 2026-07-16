@@ -78,6 +78,7 @@ services:
     volumes:
       - ./vault:/app/vault
     depends_on:
+      # Honoured by `compose up`, NOT by `compose restart` (parallel). See docker.md Regola 4.
       radar-db:
         condition: service_healthy
     networks:
@@ -123,6 +124,7 @@ services:
     volumes:
       - ./vault:/app/vault
     depends_on:
+      # Same caveat as backend: restart-all can race Postgres "starting up".
       radar-db:
         condition: service_healthy
       radar-miniflux:

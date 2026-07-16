@@ -99,6 +99,10 @@ Compose healthcheck del backend = **`/health/live`** (non ready).
 Frontend `depends_on` backend healthy (= live). Worker attende db + Miniflux healthy.
 Miniflux: `["CMD", "/usr/bin/miniflux", "-healthcheck", "auto"]`.
 
+**Nota ops (2026-07-16):** `depends_on: condition: service_healthy` vale per `docker compose up`, **non** per `docker compose restart` (riavvio parallelo). Sintomo: `asyncpg.exceptions.CannotConnectNowError: the database system is starting up` su backend/worker/miniflux finché Postgres non completa il recovery. Mitigazioni:
+1. Preferire `docker compose up -d` (rispetta health) oppure riavviare in ordine: `radar-db` → wait healthy → altri servizi.
+2. `init_pool` in `app/core/database.py` ritenta errori transienti di startup (fino a ~10 tentativi) così backend/worker non dipendono solo dal restart loop del container.
+
 ```yaml
 # Backend liveness (Compose + Dockerfile)
 healthcheck:
@@ -300,6 +304,7 @@ README.md
 | Credenziali hardcoded in docker-compose  | Security violation                        |
 | Volume senza bind mount locale           | Dati persi al container restart           |
 | `depends_on` senza healthcheck           | Race condition all'avvio                  |
+| `compose restart` di tutti i servizi senza wait DB | Race `CannotConnectNowError` (depends_on non si applica al restart) |
 | Container che gira come `root`           | Security best practice Docker             |
 | Porta PostgreSQL (5432) esposta all'host | DB accessibile direttamente da Internet   |
 | Build Angular senza `--configuration=production` | Bundle non ottimizzato             |

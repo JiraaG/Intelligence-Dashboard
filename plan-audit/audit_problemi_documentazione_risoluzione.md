@@ -7,10 +7,10 @@
 * **Gate Progetto:** Phase 6 / Gate Verde (Stato post-branch restore)
 * **Stato Fase 0:** **FASE 0 DONE DEFINITIVA**
 * **Remediation codice:** T-P0-01 **DONE**, T-P1-03 **DONE**, T-P1-01 **DONE**, T-P1-02 **DONE**, T-P0-02 **DONE** (2026-07-16); resto OPEN; prossimo **T-P1-04**
-* **SoT stato ticket:** questo file §3 (stati `OPEN` / `DONE` / `CLOSED`). Playbook riprodurre/fix/gate = manuale FASI 3–5. Dopo ogni fix aggiornare §3 qui e la matrice FASE 2 del manuale.
+* **Follow-up ops (non ticket SoT):** OPS-FIX `init_pool` retry + doc Docker — codice/docs in working tree (commit su richiesta); pytest not live **116** post-fix.* **SoT stato ticket:** questo file §3 (stati `OPEN` / `DONE` / `CLOSED`). Playbook riprodurre/fix/gate = manuale FASI 3–5. Dopo ogni fix aggiornare §3 qui e la matrice FASE 2 del manuale.
 
 ### Definition of Done FASE 0 (firmata)
-1. Manuale v2.2 + App. F letti; conteggio OPEN codice = 2 P0 + 5 P1 + 8 P2; docs OPEN residui = 0 (T-DOC-01 CLOSED).
+1. Manuale v2.2 + App. F letti; conteggio OPEN codice **all’epoca FASE 0** = 2 P0 + 5 P1 + 8 P2; docs OPEN residui = 0 (T-DOC-01 CLOSED). **Oggi (post T-P0-02):** P0=0, P1=2, P2=8 → 10 OPEN (SoT §3).
 2. Invarianti §1.3 (Sidebar Freeze + read/unread separati) documentate senza contraddizioni.
 3. Matrice ticket con ID, finding scratch, priorità, file, dipendenze, stato `OPEN`/`CLOSED`.
 4. Elevazioni T-P0-02 / T-P1-05 e dipendenza T-P0-01→T-P1-03 esplicite.
@@ -19,7 +19,7 @@
 7. Happy path distingue **AS-IS** vs **POST-FIX**.
 8. Contratto LLM (prompt F.8) e definizioni P0/P1/P2 congelati in questo log.
 9. Zero modifiche remediation a `radar/backend/**`, `radar/frontend/**`, Dockerfile o migrazioni in FASE 0.
-10. Metadati: DONE DEFINITIVA + remediation NON iniziata.
+10. Metadati: DONE DEFINITIVA FASE 0; remediation codice **poi avviata** (header: T-P0-02 DONE; prossimo T-P1-04).
 
 ---
 
@@ -183,7 +183,7 @@ Se già nel DB (Duplicato)
 
 ## 4. Decisioni su Priorità Elevate (Appendix F §F.2)
 
-*   **T-P0-02 (Elevato da P1 a P0):** Script diagnostici / live test bloccano validazione quota e pipeline. Se si **deprecano** invece di ripararli, si può ridiscendere a P1 (decisione umana).
+* **T-P0-02 (Elevato da P1 a P0 — storico; ticket DONE 2026-07-16):** elevazione motivata da script/live bloccati; chiuso con ibrido+b1. Non riaprire senza regressione.
 *   **T-P1-05 (Elevato da P2 a P1):** Hardening produzione (UID 0). Alternativa ammessa: documentare eccezione SoT in `docker.md` → chiusura P2/DONE docs.
 
 ---
@@ -305,7 +305,7 @@ Select-String -Path "radar\.ecc\CLAUDE.md" -Pattern "radar-network|Phase 0–2|P
 
 - [x] Contesto applicativo + API Phase 5 + ordine autorità SoT documentati
 - [x] Invarianti hard-stop (10) con Sidebar Freeze e read/unread separati
-- [x] Conteggi pie / matrice: 2+5+8 OPEN codice; 0 docs OPEN; 12 FIXED; 14 PASS
+- [x] Conteggi pie / matrice FASE 0: 2+5+8 OPEN codice (snapshot storico); **oggi** P0=0 P1=2 P2=8; 0 docs OPEN; 12 FIXED; 14 PASS
 - [x] Tabella ticket con finding ID, stato `OPEN`/`CLOSED` (no `TODO`)
 - [x] T-DOC-01 CLOSED con evidenza grep su `CLAUDE.md`
 - [x] Docs FIXED elencati; regola «non riaprire» esplicita
@@ -368,7 +368,7 @@ Select-String -Path "radar\.ecc\CLAUDE.md" -Pattern "radar-network|Phase 0–2|P
 - Gate FASE 5 (riverifica): ruff OK; concurrency 1/1; gate 4/4; pytest not live **115/115**.
 - Gap: Docker Desktop spento → rebuild/`grep` container **non** riverificabili finché il daemon non riparte.
 - Nota design accettata: connessione (+ `db_sem`) tenuta per tutta la classify Gemini (session lock); pool `max_size=10`, entry/db concurrency default 4.
-- **Handoff:** **T-P0-02** — script diagnostici / `ClassificationClient()`.
+- **Handoff (storico):** T-P0-02 — poi **DONE** in §14. **Prossimo:** T-P1-04.
 
 ---
 
@@ -377,8 +377,9 @@ Select-String -Path "radar\.ecc\CLAUDE.md" -Pattern "radar-network|Phase 0–2|P
 **T-P0-02 DONE — PASS** (codice/gate orchestratore; SoT drift chiuso in riverifica Cursor 2026-07-16).
 
 - Walkthrough: eliminati gli script diagnostici orfani `test_500.py` e `test_rate_limiter.py` per non interferire con Script I; riparato `test_production_pipeline.py` istanziando `ClassificationClient(quota=quota)` con un `AsyncMock` della quota e rimuovendo lo stress test basato sul vecchio metodo `_wait_for_rate_limit`; configurato skip esplicito per `test_live_rate_limiter_throttling` in `test_integration_live.py`.
-- Gate FASE 5 (riverifica Cursor): ruff OK; pytest offline **115/115 passed**; pytest live test_live_rate_limiter_throttling **SKIPPED**; Script I **ZERO match**.
+- Gate FASE 5 (riverifica Cursor): ruff OK; pytest offline **115 passed** (al close T-P0-02); live throttling **SKIPPED**; Script I **ZERO match**.
 - Docs: pie FASE 2 / App. D / prompt F.8 / spot-check allineati post drift.
+- **Ops post-verify (2026-07-16):** race `compose restart` → follow-up OPS-FIX `init_pool` retry (+1 test → **116** not live). Vedi App. D + `audit_remediation_T-P0-02.md` §J/J.1. Non parte del diff scripts T-P0-02.
 - **Handoff:** **T-P1-04** (Banner nation-open / `detailError`).
 
 

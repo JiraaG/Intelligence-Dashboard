@@ -78,9 +78,9 @@ docker compose exec radar-backend curl -f .../health/live    → {"status":"ok",
 |------|----------|------|
 | Miniflux DATABASE_URL | Info/Ops | Miniflux non usa config.py; password speciali → pre-encoding o alfanumerica. Documentato in `.env.example`. |
 | T-P1-02 TOCTOU / advisory lock per-URL | **DONE** | Vedi `audit_remediation_T-P1-02.md` |
-| T-P0-02 Script diagnostici | **P0 next** | Riparare/deprecare `ClassificationClient` negli script |
+| T-P0-02 Script diagnostici | **DONE** | Chiuso 2026-07-16 — vedi `audit_remediation_T-P0-02.md`. Next: T-P1-04 |
 
-**Handoff one-liner T-P0-02:** *Script diagnostici: `ClassificationClient()` senza pool + `_wait_for_rate_limit` rimosso — riparare o deprecare.*
+**Handoff (storico→chiuso):** T-P0-02 DONE. **Prossimo:** T-P1-04.
 
 ---
 

@@ -70,9 +70,9 @@ docker compose build radar-worker                                             �
 | Item | Severità | Note |
 |------|----------|------|
 | Docker Daemon non attivo | Bassa / Ops | Docker Desktop non era attivo durante l'esecuzione dell'audit, impedendo il build dell'immagine Docker aggiornata per il worker. |
-| T-P0-02 Script diagnostici | **P0 next** | Prossimo ticket in coda di remediation. |
+| T-P0-02 Script diagnostici | **DONE** | Chiuso 2026-07-16 — vedi `audit_remediation_T-P0-02.md`. Next: T-P1-04 |
 
-**Handoff one-liner T-P0-02:** *Riparazione / deprecazione di `ClassificationClient` e `_wait_for_rate_limit` negli script diagnostici/live.*
+**Handoff (storico→chiuso):** T-P0-02 DONE. **Prossimo:** T-P1-04 — banner nation-open / `detailError`.
 
 ---
 

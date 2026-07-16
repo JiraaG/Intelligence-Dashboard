@@ -153,7 +153,7 @@ pie title Problematiche OPEN da remediation (post T-P0-02)
 > **v2.1→v2.2 (FASE 0):** `T-DOC-01` CLOSED — `radar/.ecc/CLAUDE.md` allineato Gate Verde (grep legacy = 0).  
 > **Post-remediation 2026-07-16:** T-P0-01 + T-P1-03 + T-P1-01 + T-P1-02 + T-P0-02 **DONE** → restano **10 ticket codice OPEN** (P0=0, P1=2, P2=8). Snapshot FASE 0 era 15. Dettaglio → **APPENDICE F** + `audit_problemi_documentazione_risoluzione.md` §3.
 
-## 2.2 P0 — OPEN (fix obbligatorio)
+## 2.2 P0 — (tutti DONE; nessun P0 OPEN)
 
 | ID | Titolo | File chiave | Finding audit |
 |----|--------|-------------|----------------|
@@ -768,12 +768,16 @@ WHERE created_at > NOW() - INTERVAL '1 hour' GROUP BY 1,2 ORDER BY 3 DESC;"
 ```
 
 ### Script I — Script rotti (T-P0-02)
+> **POST-FIX (DONE):** atteso **0 match** su `*.py` (escludere `__pycache__`). Il one-liner `ClassificationClient()` può ancora alzare `ValueError` (contratto API corretto) — non è regressione.
+
 ```powershell
 cd radar
 $env:PYTHONPATH = "backend"
-python -c "from app.classification.client import ClassificationClient; ClassificationClient()"
-# Deve fallire OGGI; post-fix non deve essere necessario chiamarlo così.
-Select-String -Path backend/scripts -Pattern "ClassificationClient\(\)|_wait_for_rate_limit" -Recurse
+# Gate ticket = call sites negli script, non il ctor vuoto isolato:
+Get-ChildItem -Path backend/scripts -Recurse -Filter *.py |
+  Where-Object { $_.FullName -notmatch '__pycache__' } |
+  Select-String -Pattern 'ClassificationClient\(\)|_wait_for_rate_limit'
+# Atteso: nessun output.
 ```
 
 ### Script J — detailError FE (T-P1-04)
@@ -947,7 +951,8 @@ Usa questa checklist a ogni sessione di remediation.
 | 2026-07-15 | T-P1-03 | Antigravity + Cursor verify | No (su richiesta utente) | Migrazione 008 + backfill; `outbox.py` retry completed unmarked; `test_outbox_mark_read_retry.py` 2/2; pytest not live 113/113; DB/worker sync OK. Docs drift (conteggi/handoff) allineati post PASS_WITH_GAPS. Next: T-P1-01. |
 | 2026-07-15 | T-P1-01 | Antigravity + Cursor verify | No (su richiesta utente) | `quote_plus` in `config.py`; Compose backend/worker → `POSTGRES_HOST` (no `DATABASE_URL` grezzo); `.env.example` + Miniflux note; `test_database_url.py` 1/1; pytest not live 114/114; Script F OK; container printenv/health OK. Next: T-P1-02. |
 | 2026-07-15 | T-P1-02 | Antigravity + Cursor verify | No (su richiesta utente) | `pg_advisory_lock(ns, hash)` per-URL in `process_single_entry`; `test_worker_concurrency.py` 1/1; pytest not live 115/115; ruff OK. Docker rebuild **GAP** (daemon spento). Next: T-P0-02. |
-| 2026-07-16 | T-P0-02 | Multi-agente + Cursor verify | No (su richiesta utente) | Ibrido+(b1): delete `test_500.py`/`test_rate_limiter.py`; smoke `ClassificationClient(quota=mock)`; stress rimosso; live throttling SKIPPED; Script I 0 match; pytest not live 115/115. Next: T-P1-04. |
+| 2026-07-16 | T-P0-02 | Multi-agente + Cursor verify | Sì (4 commit locali, no push) | Ibrido+(b1): delete `test_500.py`/`test_rate_limiter.py`; smoke `ClassificationClient(quota=mock)`; stress rimosso; live throttling SKIPPED; Script I 0 match; pytest not live **115** al close ticket. Next: T-P1-04. |
+| 2026-07-16 | OPS-FIX | Cursor | **No** (working tree; commit pending su richiesta) | Race `compose restart` → `CannotConnectNowError`. Fix: retry `init_pool` + `docker.md` Regola 4 + Compose comments + `docs/01_getting_started.md`. Rebuild backend/worker OK; restart ordinato OK (§J.1). Spiderfy «≤24» corretto in Implementation_Plan*. pytest not live **116** (+1 test retry). Miniflux 5MB cap osservato in log (fuori scope). |
 | | … | | | |
 
 ---
@@ -975,10 +980,10 @@ Questa appendice chiude i dubbi lasciati aperti tra consolidamento v2.0 e le fon
 |---------------|---------|-------------|----------------|-------------|------|
 | `backend_audit.md` | BE-AUD-001 | P0 | T-P0-01 | P0 | Allineato |
 | `backend_audit.md` | BE-AUD-002 | P1 | T-P1-01 | P1 | **DONE** — merge INF-AUD-01; `quote_plus` + Compose `POSTGRES_HOST` |
-| `backend_audit.md` | BE-AUD-003 | P1 | T-P1-02 | P1 | Allineato |
-| `backend_audit.md` | BE-AUD-004 | P1 | T-P1-03 | P1 | Dipende da T-P0-01 (FASE 4) |
-| `backend_audit.md` | BE-AUD-005 | P1 | T-P0-02 | **P0↑** | Elevato — §F.2 |
-| `backend_audit.md` | BE-AUD-006 | P1 | T-P0-02 | **P0↑** | Stesso ticket |
+| `backend_audit.md` | BE-AUD-003 | P1 | T-P1-02 | P1 | **DONE** |
+| `backend_audit.md` | BE-AUD-004 | P1 | T-P1-03 | P1 | **DONE** — dipendeva da T-P0-01 |
+| `backend_audit.md` | BE-AUD-005 | P1 | T-P0-02 | **P0↑ → DONE** | Elevato §F.2; chiuso 2026-07-16 (ibrido+b1) |
+| `backend_audit.md` | BE-AUD-006 | P1 | T-P0-02 | **P0↑ → DONE** | Stesso ticket |
 | `backend_audit.md` | BE-AUD-007…010 | P2 | T-P2-01…04 | P2 | Allineato |
 | `frontend_audit.md` | FE-AUD-001 | P1 | T-P1-04 | P1 | Allineato (FE-MK-02) |
 | `frontend_audit.md` | FE-AUD-002…005 | P2 | T-P2-05…08 | P2 | Allineato |
@@ -993,7 +998,7 @@ Questa appendice chiude i dubbi lasciati aperti tra consolidamento v2.0 e le fon
 
 | Ticket | Scratch | Manuale | Perché il manuale eleva |
 |--------|---------|---------|-------------------------|
-| **T-P0-02** | P1 | P0 | Script usati da operatori/CI/`test_integration_live`; `ValueError`/`AttributeError` bloccano diagnostica quota e pipeline live. Trattati come bloccanti operativi. Se si **deprecano** gli script invece di ripararli, si può ridiscendere a P1. |
+| **T-P0-02** | P1 | P0 | **DONE** (2026-07-16). Elevazione storica: script usati da operatori/CI/`test_integration_live`. Chiuso con ibrido+b1 (delete orfani + smoke mock + skip live stress). Non riabbassare/riaprire senza regressione. |
 | **T-P1-05** | P2 | P1 | Hardening produzione (UID 0). Checklist INF-USER-03 ammette **alternativa**: documentare eccezione SoT “nginx master as root”. Scegliere **una** delle due: USER nginx+8080 **oppure** commento eccezione in `docker.md` + Dockerfile → in quel caso chiudere come P2/DONE docs. |
 
 Un LLM **non** deve “riabbassare” queste priorità senza decisione umana esplicita.

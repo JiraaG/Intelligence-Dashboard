@@ -116,7 +116,7 @@ docker compose exec radar-db psql -U radar_user -d radar_db -c "\dt"
 
 1. Pubblica Miniflux (lan/hardened) e apri l’UI admin.
 2. **Settings → API Keys → Create** → copia in `.env` come `MINIFLUX_API_KEY`.
-3. `docker compose up -d` (o restart `radar-worker` / stack) per rileggere l’env.
+3. `docker compose up -d` (rispetta `depends_on` healthy) per rileggere l’env. Evitare `docker compose restart` su tutti i servizi insieme: Postgres può essere ancora in recovery mentre backend/worker aprono il pool (`CannotConnectNowError`).
 4. Aggiungi feed (catalogo: [RSS.txt](../RSS.txt)).
 
 **Ciclo reale (worker, non API):**
@@ -136,7 +136,7 @@ Riavviare solo `radar-backend` **non** riavvia l’ingest: serve `radar-worker`.
 | Sintomo | Cosa controllare |
 |---------|------------------|
 | `InvalidPasswordError` | `$` in password Compose |
-| Miniflux exit | DB non ready → `docker compose restart radar-miniflux` |
+| Miniflux exit | DB non ready → attendere `radar-db` healthy, poi `docker compose up -d radar-miniflux` (evitare `restart` di tutto lo stack in parallelo; vedi `docker.md` Regola 4) |
 | `/health/ready` 503 | Normale finché il worker non scrive heartbeat (~30–90s) |
 | 429 Gemini | Ledger + Retry-After; verifica quote in AI Studio |
 | Mappa senza confini | Manca o SHA errato su `countries.geo.json` → `npm run verify-geojson:fetch` |

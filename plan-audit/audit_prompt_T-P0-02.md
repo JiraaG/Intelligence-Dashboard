@@ -2,9 +2,8 @@
 
 > **Stato:** **DONE** (2026-07-16).  
 > Report: `plan-audit/audit_remediation_T-P0-02.md`.  
-> **Remediation:** completata con successo tramite design path ibrido (opzione stress path **b**).  
->
-> Blocco sotto = storico FASE 3 only (non usare per implementare).
+> **Remediation:** completata (ibrido + stress path **b1**). Prossimo ticket SoT: **T-P1-04**.  
+> **Non rieseguire** il blocco sotto come task operativo — è lo storico FASE 3 only (testo congelato pre-fix).
 
 ```text
 /goal Analizza il ticket T-P0-02 (script diagnostici / ClassificationClient) nel workspace
@@ -23,10 +22,11 @@ il fix, NON deprecare file, NON commitare, NON pushare.
 - Skills utili: `.agents/skills/llm-json-extraction`, `.agents/skills/radar-quota-ledger`
 - Constraint: `main.py` API-only; asyncpg; non toccare `radar-sidebar/**`
 
-## Stato coda remediation
+## Stato coda remediation (snapshot al momento dell’analisi — STORICO)
 
-DONE (non riaprire): T-P0-01, T-P1-03, T-P1-01, T-P1-02, T-DOC-01.
-OPEN prossimo: **T-P0-02** → poi T-P1-04 → T-P1-05 → P2.
+DONE (all’epoca): T-P0-01, T-P1-03, T-P1-01, T-P1-02, T-DOC-01.
+OPEN all’epoca: **T-P0-02** → poi T-P1-04 → T-P1-05 → P2.
+**POST-FIX oggi:** T-P0-02 **DONE**; prossimo = **T-P1-04**.
 
 Handoff one-liner: *Script diagnostici: `ClassificationClient()` senza pool + `_wait_for_rate_limit` rimosso — riparare o deprecare.*
 

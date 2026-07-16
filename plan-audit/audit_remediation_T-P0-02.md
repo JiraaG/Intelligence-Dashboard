@@ -57,7 +57,9 @@ Tramite scansione ricorsiva su `backend/scripts`, sono stati isolati i seguenti 
 ---
 
 ## D. Raccomandazione
-Si raccomanda un approccio **Ibrido** (Riparare + Deprecare):
+> **STORICO ANALISI (pre-decisione).** Implementato in §I: **Ibrido + path b1** (delete orfani; smoke mock; stress rimosso; live skip). Non usare più le opzioni sotto come TODO.
+
+Si raccomandava un approccio **Ibrido** (Riparare + Deprecare):
 
 * **Deprecare gli script orfani:** Spostare `test_500.py` e `test_rate_limiter.py` in `backend/scripts/diagnostics/_obsolete/` per ripulire il path di scansione, poiché la loro logica è interamente coperta da `test_classification.py` e `test_quota_concurrency.py`.
 * **Riparare lo script di produzione `test_production_pipeline.py`:**
@@ -69,6 +71,7 @@ Si raccomanda un approccio **Ibrido** (Riparare + Deprecare):
 ---
 
 ## E. Design sketch (Opzione Ibrida)
+> **STORICO ANALISI.** Il design sketch sotto (reserve/release su stress + mock) è **superseded** da path **b1** (§I): stress eliminato; timing = `test_quota_concurrency.py`.
 
 1. **Spostamento File:**
    * Creare la directory `backend/scripts/diagnostics/_obsolete/` (se non esiste).
@@ -169,4 +172,33 @@ La remediation è stata completata con successo seguendo la decisione del design
    - **Pytest live skip**: il test `test_live_rate_limiter_throttling` viene correttamente skippato come previsto.
 
 5. **Riverifica Cursor (post-orchestratore):** codice/gate riconfermati **PASS**. Drift docs residuo (pie FASE 2, App. D, prompt F.8, spot-check) allineato → SoT coerente. Handoff **T-P1-04**.
+
+---
+
+## J. Correzioni ops post-DONE (2026-07-16) — segnalate
+
+Durante il riavvio Docker di verifica T-P0-02:
+
+| Problema | Severità | Correzione |
+|----------|----------|------------|
+| `docker compose restart` parallelo → `CannotConnectNowError` (DB starting up) su backend/worker/miniflux | Ops / boot | `init_pool` ritenta errori transienti; nota in `radar/.ecc/rules/docker.md` Regola 4; commenti in `docker-compose.yml`. Preferire `up -d` o restart ordinato. |
+| Warning `Permission denied: 'logs'` RotatingFileHandler | Nota nota (già T-P0-01) | Solo console logging — non bloccante; nessuna nuova azione. |
+| Gemini HTTP 500 retryable in worker | Esterno | Già gestito da client retry; ingest ripreso OK. |
+| Doc stale spiderfy «cap 24» in `Implementation_Plan*.md` | Docs drift | Allineato al fix map `5a0a599` (tutte le icone; no `SPIDERFY_MAX_ICONS`). |
+
+Gate test aggiunti: `test_init_pool_retries_cannot_connect_now` in `test_database.py`.
+
+### J.1 Riverifica restart ordinato (2026-07-16 ~06:33 UTC)
+
+Procedura: `restart radar-db` → wait healthy → `restart` backend/worker/miniflux/frontend (DB già healthy).
+
+| Check | Esito |
+|-------|--------|
+| `CannotConnectNowError` al boot | **Assente** (pool OK al primo tentativo) |
+| backend `/health/live` + `/ready` | **200** ready (pool, migrations, heartbeat) |
+| frontend / miniflux / db | **healthy** |
+| Warning `Permission denied: 'logs'` | Presente, non bloccante (console only) |
+| Worker fetch Miniflux | **ERROR** `Corpo risposta Miniflux supera MAX_MINIFLUX_RESPONSE_BYTES=5000000` → ciclo trattato come “nessun unread”; **non** causato dal fix `init_pool`; backlog unread troppo grande per il cap 5MB. Prossimo poll tra 900s. |
+
+Azione consigliata (fuori OPS-FIX docker): ridurre unread Miniflux oppure alzare/paginare `MAX_MINIFLUX_RESPONSE_BYTES` in ticket dedicato — non mescolare con T-P0-02.
 

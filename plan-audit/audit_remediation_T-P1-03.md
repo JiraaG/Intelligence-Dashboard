@@ -68,9 +68,9 @@ docker compose exec radar-worker grep -n "miniflux_marked_at" app/commit/outbox.
 |------|----------|------|
 | T-P1-01 DATABASE_URL quote_plus | **DONE** | Vedi `audit_remediation_T-P1-01.md` |
 | T-P1-02 TOCTOU / advisory lock per-URL | **DONE** | Vedi `audit_remediation_T-P1-02.md` |
-| T-P0-02 Script diagnostici | **P0 next** | Riparare/deprecare `ClassificationClient` negli script |
+| T-P0-02 Script diagnostici | **DONE** | Chiuso 2026-07-16 — vedi `audit_remediation_T-P0-02.md`. Next: T-P1-04 |
 
-**Handoff one-liner T-P0-02:** *Script diagnostici: `ClassificationClient()` senza pool + `_wait_for_rate_limit` rimosso — riparare o deprecare.*
+**Handoff (storico→chiuso):** T-P0-02 DONE. **Prossimo:** T-P1-04.
 
 ---
 

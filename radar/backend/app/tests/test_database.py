@@ -45,6 +45,24 @@ async def test_init_pool() -> None:
         )
         assert pool == mock_pool
 
+
+@pytest.mark.asyncio
+async def test_init_pool_retries_cannot_connect_now() -> None:
+    """Compose restart race: retry CannotConnectNowError then succeed."""
+    mock_pool = MagicMock(spec=asyncpg.Pool)
+    with (
+        patch("asyncpg.create_pool", new_callable=AsyncMock) as mock_create_pool,
+        patch("app.core.database.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+    ):
+        mock_create_pool.side_effect = [
+            asyncpg.CannotConnectNowError("the database system is starting up"),
+            mock_pool,
+        ]
+        pool = await init_pool(db_url="postgresql://mock-host:5432/mock-db")
+        assert pool == mock_pool
+        assert mock_create_pool.await_count == 2
+        mock_sleep.assert_awaited()
+
 @pytest.mark.asyncio
 async def test_bootstrap_database() -> None:
     """Testa che bootstrap_database deleghi a run_migrations."""

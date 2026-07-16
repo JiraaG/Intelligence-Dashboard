@@ -1,4 +1,4 @@
-﻿# Implementation Plan Execution Log
+# Implementation Plan Execution Log
 
 Log operativo post–branch restore. Distingue **storico pre-restore** (lavoro perso col restore) da **stato attuale del codice**.
 
@@ -240,7 +240,7 @@ Sintomi: hub spariva al cambio categoria carosello/pill; fan troppo denso / icon
 Fix:
 - `unspiderfied` no-op se `restoreDetailHubOnUnspiderfy === false` (non wipe del root mid-transition).
 - Nation hub = disco compatto `radar-spider-root` (stesso chrome del root spiderfy).
-- Fan: `SPIDERFY_MAX_ICONS = 24`; `spiderfyIconSizeForCount` + `spiderfyDistanceForCount` adattivi.
+- Fan: tutte le icone della categoria (niente cap 24); `spiderfyIconSizeForCount` + `spiderfyDistanceForCount` adattivi; hub ripristinato se spiderfy fallisce.
 - `armSkipCountryFit` solo con `preserveZoom`; `refocusCountry` per stesso codice; poligono click sempre emette.
 - Docs ECC: `docs/03_frontend_and_ui.md`, `radar/.ecc/rules/frontend.md` Regola 7, `.agents/AGENTS.md`, README FE.
 

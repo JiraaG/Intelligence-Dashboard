@@ -1,4 +1,4 @@
-﻿# Consolidation Implementation Plan
+# Consolidation Implementation Plan
 
 This plan addresses the production blockers found during the code and architecture review. Execute phases in order. Do not release a later phase while an earlier acceptance gate is failing.
 
@@ -354,7 +354,7 @@ Do **not** truncate the nation carousel at 50. HTTP page size may be ≤100 for 
 1. [x] Paginated `/api/articles` with filters `date` (required), `country`, `category`, `sentiment`, `relevance_level`, `cursor`, `limit` (cap 100). Response `{ items, next_cursor, total }`. Companies/tags via LATERAL.
 2. [x] `GET /api/map-summary?date=…` → rows `country_code × primary_category` with counts + finite lat/lon.
 3. [x] Indexes migration `007`; seed script `seed_perf_articles.py` (EXPLAIN residual / optional on isolated DB).
-4. [x] **Map UX:** day = summary hatching + country pins; nation open = detail markers only for that country + compact hub disc; category pin / pill / active carousel category → `focusAndSpiderfyCategory`; carousel same-category scroll does **not** collapse/reopen spiderfy (`lastSpiderfyKey`); multi-pin race fixed (`invalidateSize` before spiderfy, `pendingGeometryRefresh`); hub survives category switch (`unspiderfied` no-op when `restoreDetailHubOnUnspiderfy` is false); spiderfy fan ≤24 with adaptive icon size/distance.
+4. [x] **Map UX:** day = summary hatching + country pins; nation open = detail markers only for that country + compact hub disc; category pin / pill / active carousel category → `focusAndSpiderfyCategory`; carousel same-category scroll does **not** collapse/reopen spiderfy (`lastSpiderfyKey`); multi-pin race fixed (`invalidateSize` before spiderfy, `pendingGeometryRefresh`); hub survives category switch (`unspiderfied` no-op when `restoreDetailHubOnUnspiderfy` is false); spiderfy shows **all** category icons (no hard cap 24; adaptive size/distance; restore hub on spiderfy failure).
 5. [x] ~~`article-list`~~ — **cancelled (sidebar freeze).**
 6. [x] Geographic contract: finite bounds BE+FE.
 7. [x] Seed script isolated to DB — no vault write, no Miniflux mark-read.

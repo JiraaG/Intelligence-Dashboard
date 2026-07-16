@@ -1,8 +1,10 @@
-# Prompt — T-P0-02 REMEDIATION (path ibrido + stress **b**)
+# Prompt — T-P0-02 REMEDIATION (ARCHIVIO — ticket DONE)
 
-> **Uso:** copia il blocco `text` sotto in un **nuovo chat Agent** (orchestratore).  
-> **Decisione umana già presa:** ibrido + path stress **(b)** — rimuovere/neutralizzare lo stress timing; quota reale resta in `test_quota_concurrency.py`.  
-> **Non** commit/push salvo richiesta esplicita dell’utente.  
+> **Stato:** T-P0-02 **DONE** (2026-07-16) — ibrido + stress path **b1**.  
+> Report: `plan-audit/audit_remediation_T-P0-02.md`.  
+> **Non rieseguire** questo prompt. Prossimo SoT: **T-P1-04**.  
+> Blocco sotto = storico orchestratore multi-agente (congelato).
+
 > Analisi pregressa: `plan-audit/audit_remediation_T-P0-02.md` (§A–H, verifica Cursor PASS_WITH_GAPS).
 
 ```text
