@@ -31,7 +31,7 @@ Rendere l’overlay Radar **enforced in Cursor** dove oggi è solo documentale, 
 2. Rules path-scoped caricate da Cursor via globs (o `.cursor/rules`)
 3. Almeno le skill P1 prioritizzate esistono sotto `.agents/skills/` + mirror `.ecc` + skill map CLAUDE
 4. Checklist §7 verde; sidebar diff vuoto
-5. Voce in `Implementation_Plan_Execution.md`: “ECC expansion wiring DONE” (senza inventare SHA)
+5. Voce in `plan_impl_phase_0_6_execution.md`: “ECC expansion wiring DONE” (senza inventare SHA)
 
 ---
 
@@ -127,7 +127,7 @@ radar/.ecc/CLAUDE.md               # skill map
 radar/.ecc/settings.json           # hooks.notes
 docs/04_ecc_framework.md
 ecc_deep_dive_analysis_v2.md       # stato “wiring DONE” breve
-Implementation_Plan_Execution.md   # voce expansion DONE
+plan_impl_phase_0_6_execution.md   # voce expansion DONE
 ```
 
 Possibile touch minimo a `pre/post-tool-use.py` **solo** se serve compat JSON Cursor (preferire wrapper).
@@ -165,7 +165,7 @@ Copiare il blocco in Agent mode:
 - Workspace: `c:\Users\lucag\Documents\Dashboard finance`
 - Branch: `refactor/enterprise-consolidation`
 - Tip: Phase 6 `56c2eff` · ECC remediation `526c856` (verifica con `git log -3`)
-- **Sorgente eseguibile:** `ECC_Expansion_Handoff.md` (leggerlo per intero PRIMA di patchare)
+- **Sorgente eseguibile:** `handoff_ecc_expansion.md` (leggerlo per intero PRIMA di patchare)
 - Manuale: `ecc_deep_dive_analysis_v2.md` §5–6
 - Skill Cursor hooks: leggere `C:\Users\lucag\.cursor\skills-cursor\create-hook\SKILL.md` prima di W2
 - Sidebar freeze NON negoziabile: zero touch `radar/frontend/src/app/components/radar-sidebar/**`
@@ -177,12 +177,12 @@ Chiudere gap harness: hooks auto in Cursor + rules path-scoped native + skill do
 Una sola verità: adapter Cursor sottili; logica security/lint resta in `radar/.ecc/hooks/*.py`.
 
 ## Ordine obbligatorio
-1. Leggere `ECC_Expansion_Handoff.md` + create-hook skill
+1. Leggere `handoff_ecc_expansion.md` + create-hook skill
 2. **P0:** `.cursor/hooks.json` (+ wrapper) che invoca pre/post Radar; smoke test; aggiornare AGENTS/docs/04/settings.hooks.notes; `.cursor/rules` globs → `.ecc/rules`
 3. **P1:** skill `radar-sidebar-freeze`, `radar-api-contract`, `radar-docker-ops` (+ opz. geojson/quota); mirror `.ecc`; skill map CLAUDE
 4. **P2:** solo se P0–P1 verdi — commands/note spawn profili (minimo)
 5. Checklist §7 handoff
-6. Aggiornare `Implementation_Plan_Execution.md` con “ECC expansion wiring DONE” (no SHA inventato)
+6. Aggiornare `plan_impl_phase_0_6_execution.md` con “ECC expansion wiring DONE” (no SHA inventato)
 
 ## Metodo
 - Patch minime; adapter > rewrite hook

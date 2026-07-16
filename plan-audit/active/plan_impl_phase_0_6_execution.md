@@ -1,4 +1,4 @@
-# Implementation Plan Execution Log
+# Log di Esecuzione Consolidamento — Phase 0-6
 
 Log operativo post–branch restore. Distingue **storico pre-restore** (lavoro perso col restore) da **stato attuale del codice**.
 
@@ -23,7 +23,7 @@ Log operativo post–branch restore. Distingue **storico pre-restore** (lavoro p
 
 > **Solo storico.** Prima del restore del branch, l’execution log dichiarava complete Phase 0–5 (+ 5.5). Quel lavoro era stato perso al restore e **poi rifatto** (vedi § B e scoreboard § C).  
 > **Non** usare questa tabella come stato attuale né come checklist da ripristinare.  
-> Piani eseguibili: `Implementation_Plan.md` + § B/C di questo file.  
+> Piani eseguibili: `plan_impl_phase_0_6.md` + § B/C di questo file.  
 > Anche `Fase2_Implementation_Plan.md` è archivio (claim falsi vs tree attuale).
 
 | Area | Cosa c’era (claim pre-restore) | Stato dopo restore (storico) |
@@ -270,7 +270,7 @@ Restore: `git checkout 1dfdf60`
 
 ### ECC remediation (post Phase 6 GATE VERDE) — DONE (2026-07-15)
 
-Allineamento `.agents/` + `radar/.ecc/` al codice reale (worker, Compose, API Phase 5, FE Phase 4–5). Sorgente: `ECC_Architecture_Audit_Handoff.md` §§5–8.
+Allineamento `.agents/` + `radar/.ecc/` al codice reale (worker, Compose, API Phase 5, FE Phase 4–5). Sorgente: `plan-audit/archive/ecc/handoff_ecc_architecture_audit.md` §§5–8.
 
 - [x] **P0:** `spatial-data-mocking` (entrambe le copie) — 10 categorie, overlay full-bleed, `getMapSummary`/`getArticlesPage`; `angular-map-expert` Chip→Tecnologia + prettier; `backend.md` Regola 3 sleep fuori da `finally`
 - [x] **P1:** `docker.md` = Dockerfile/compose reali; wording deferred post–Phase 6; `settings.json` ↔ hooks; `llm-json-extraction` SoT `.agents` → mirror `.ecc`; path references `angular-developer`
@@ -288,7 +288,7 @@ Sidebar freeze: zero touch `radar-sidebar/**`.
 ### Audit remediation codice (post Gate Verde) — COMPLETATA
 
 Ordine SoT: T-P0-01…T-P2-08.  
-Fonte: `plan-audit/active/audit_problemi_documentazione_risoluzione.md` §3.
+Fonte: `plan-audit/active/plan_docs_audit_ticket_status.md` §3.
 
 | Ticket | Stato | Note |
 |--------|-------|------|
@@ -301,7 +301,7 @@ Fonte: `plan-audit/active/audit_problemi_documentazione_risoluzione.md` §3.
 
 ### ECC expansion wiring — DONE (2026-07-15)
 
-Harness Cursor + skill dominio selettive. Sorgente: `ECC_Expansion_Handoff.md`. **Nessun nuovo SHA inventato** — commit solo su richiesta utente.
+Harness Cursor + skill dominio selettive. Sorgente: `plan-audit/archive/ecc/handoff_ecc_expansion.md`. **Nessun nuovo SHA inventato** — commit solo su richiesta utente.
 
 - [x] **P0:** `.cursor/hooks.json` + adapters → `radar/.ecc/hooks/*.py`; smoke allow/deny secret; `.cursor/rules/radar-*.mdc` globs → `.ecc/rules`; AGENTS/docs/04/`hooks.notes` allineati
 - [x] **P1:** skill `radar-sidebar-freeze`, `radar-api-contract`, `radar-docker-ops`, `radar-geojson-assets`, `radar-quota-ledger` + mirror `.ecc` + skill map CLAUDE
@@ -381,7 +381,7 @@ Tabella claim→realtà (docs/ECC vs codice @ tip post-`1dfdf60`) chiusa per i c
 | 5.5 | Completata (persa) | N/A nel piano master | Assorbita in 1–3 |
 | 6 | Non iniziata | **DONE / GATE VERDE** (`56c2eff`) | ECC remediation tip (commit successivo); push solo se chiesto |
 
-**Ordine:** Phase 6 `56c2eff` → ECC remediation (tip) → pin SHA esplicito in `Implementation_Plan.md` se serve.
+**Ordine:** Phase 6 `56c2eff` → ECC remediation (tip) → pin SHA esplicito in `plan_impl_phase_0_6.md` se serve.
 
 **Restore rapido a Phase 5:** `git checkout 1dfdf60` su `refactor/enterprise-consolidation`.  
 **Restore rapido a Phase 4:** `git checkout de9bd2f`.  

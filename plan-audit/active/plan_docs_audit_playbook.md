@@ -4,7 +4,7 @@
 > **Audience:** operatore umano **e** agente LLM  
 > **Root repo:** `c:\Users\lucag\Documents\Dashboard finance` · **App:** `radar/`  
 > **Check definitivo:** vedi **APPENDICE F** (riconciliazione vs `scratch/*`, divergenze priorità).  
-> **Stato ticket operativo:** `audit_problemi_documentazione_risoluzione.md` §3 (FASE 0 DONE DEFINITIVA).
+> **Stato ticket operativo:** `plan_docs_audit_ticket_status.md` §3 (FASE 0 DONE DEFINITIVA).
 
 Questo file **non** è solo un elenco di bug. È un **manuale operativo** per:
 
@@ -33,8 +33,8 @@ Copia/incolla all’inizio di una chat di remediation:
 
 ```text
 Sei un agente di remediation sul repo Radar Informativo Globale.
-Leggi e segui: audit_problemi_documentazione.md v2.2 (incluso APPENDICE F).
-Stato ticket operativo: audit_problemi_documentazione_risoluzione.md §3.
+Leggi e segui: plan_docs_audit_playbook.md v2.2 (incluso APPENDICE F).
+Stato ticket operativo: plan_docs_audit_ticket_status.md §3.
 Preferisci .agents/AGENTS.md + radar/.ecc/rules/*.md come guardrail (T-DOC-01 CLOSED — CLAUDE.md allineato Gate Verde).
 Vincoli non negoziabili:
 - Non modificare radar/frontend/src/app/components/radar-sidebar/**
@@ -59,12 +59,12 @@ Non commitare senza richiesta esplicita dell’utente.
 
 | Path | Ruolo |
 |------|--------|
-| `scratch/backend_rules.md` | Checklist governance BE (81 item) |
-| `scratch/frontend_rules.md` | Checklist governance FE (88 item) |
-| `scratch/infra_rules.md` | Checklist Docker/DB (83 item) |
-| `scratch/backend_audit.md` | Audit codice BE grezzo |
-| `scratch/frontend_audit.md` | Audit codice FE grezzo |
-| `scratch/infra_audit.md` | Audit infra grezzo |
+| `archive/scratch/scratch_backend_rules.md` | Checklist governance BE (81 item) |
+| `archive/scratch/scratch_frontend_rules.md` | Checklist governance FE (88 item) |
+| `archive/scratch/scratch_infra_rules.md` | Checklist Docker/DB (83 item) |
+| `archive/scratch/scratch_backend_audit.md` | Audit codice BE grezzo |
+| `archive/scratch/scratch_frontend_audit.md` | Audit codice FE grezzo |
+| `archive/scratch/scratch_infra_audit.md` | Audit infra grezzo |
 | `.agents/AGENTS.md` | Guardrail globali |
 | `radar/.ecc/rules/{backend,frontend,docker}.md` | SoT path-scoped |
 | `radar/docs/runbook.md` | Deploy / health / incident |
@@ -151,7 +151,7 @@ pie title Problematiche OPEN da remediation (CLOSED)
 ```
 
 > **v2.1→v2.2 (FASE 0):** `T-DOC-01` CLOSED — `radar/.ecc/CLAUDE.md` allineato Gate Verde (grep legacy = 0).  
-> **Post-remediation 2026-07-16:** Tutti i ticket (T-P0-01...T-P2-08) sono **DONE**. La remediation codice è **CLOSED**. Dettaglio → **APPENDICE F** + `audit_problemi_documentazione_risoluzione.md` §3.
+> **Post-remediation 2026-07-16:** Tutti i ticket (T-P0-01...T-P2-08) sono **DONE**. La remediation codice è **CLOSED**. Dettaglio → **APPENDICE F** + `plan_docs_audit_ticket_status.md` §3.
 
 ## 2.2 P0 — (tutti DONE; nessun P0 OPEN)
 
@@ -984,17 +984,17 @@ Questa appendice chiude i dubbi lasciati aperti tra consolidamento v2.0 e le fon
 
 | Fonte scratch | Finding | Pri scratch | Ticket manuale | Pri manuale | Note |
 |---------------|---------|-------------|----------------|-------------|------|
-| `backend_audit.md` | BE-AUD-001 | P0 | T-P0-01 | P0 | Allineato |
-| `backend_audit.md` | BE-AUD-002 | P1 | T-P1-01 | P1 | **DONE** — merge INF-AUD-01; `quote_plus` + Compose `POSTGRES_HOST` |
-| `backend_audit.md` | BE-AUD-003 | P1 | T-P1-02 | P1 | **DONE** |
-| `backend_audit.md` | BE-AUD-004 | P1 | T-P1-03 | P1 | **DONE** — dipendeva da T-P0-01 |
-| `backend_audit.md` | BE-AUD-005 | P1 | T-P0-02 | **P0↑ → DONE** | Elevato §F.2; chiuso 2026-07-16 (ibrido+b1) |
-| `backend_audit.md` | BE-AUD-006 | P1 | T-P0-02 | **P0↑ → DONE** | Stesso ticket |
-| `backend_audit.md` | BE-AUD-007…010 | P2 | T-P2-01…04 | P2 | Allineato |
-| `frontend_audit.md` | FE-AUD-001 | P1 | T-P1-04 | P1 | **DONE** (FE-MK-02) |
-| `frontend_audit.md` | FE-AUD-002…005 | P2 | T-P2-05…08 | P2 | Allineato |
-| `infra_audit.md` | INF-AUD-01 | P1 | T-P1-01 | P1 | **DONE** — dedup BE-AUD-002 |
-| `infra_audit.md` | INF-AUD-02 | P2 | T-P1-05 | **P1↑** | Elevato — §F.2 |
+| `scratch_backend_audit.md` | BE-AUD-001 | P0 | T-P0-01 | P0 | Allineato |
+| `scratch_backend_audit.md` | BE-AUD-002 | P1 | T-P1-01 | P1 | **DONE** — merge INF-AUD-01; `quote_plus` + Compose `POSTGRES_HOST` |
+| `scratch_backend_audit.md` | BE-AUD-003 | P1 | T-P1-02 | P1 | **DONE** |
+| `scratch_backend_audit.md` | BE-AUD-004 | P1 | T-P1-03 | P1 | **DONE** — dipendeva da T-P0-01 |
+| `scratch_backend_audit.md` | BE-AUD-005 | P1 | T-P0-02 | **P0↑ → DONE** | Elevato §F.2; chiuso 2026-07-16 (ibrido+b1) |
+| `scratch_backend_audit.md` | BE-AUD-006 | P1 | T-P0-02 | **P0↑ → DONE** | Stesso ticket |
+| `scratch_backend_audit.md` | BE-AUD-007…010 | P2 | T-P2-01…04 | P2 | Allineato |
+| `scratch_frontend_audit.md` | FE-AUD-001 | P1 | T-P1-04 | P1 | **DONE** (FE-MK-02) |
+| `scratch_frontend_audit.md` | FE-AUD-002…005 | P2 | T-P2-05…08 | P2 | Allineato |
+| `scratch_infra_audit.md` | INF-AUD-01 | P1 | T-P1-01 | P1 | **DONE** — dedup BE-AUD-002 |
+| `scratch_infra_audit.md` | INF-AUD-02 | P2 | T-P1-05 | **P1↑** | Elevato — §F.2 |
 | Check docs v2.1 | CLAUDE.md stale | — | **T-DOC-01** | P1 docs → **CLOSED** v2.2 | Sintomi legacy assenti su disco (FASE 0) |
 
 **Totale finding codice scratch:** 10 BE + 5 FE + 2 INF = 17 → **15 ticket codice** dopo merge quote_plus (BE+INF) e merge script (005+006).  
@@ -1028,10 +1028,10 @@ Un LLM **non** deve “riabbassare” queste priorità senza decisione umana esp
 
 | Origine | Item | Perché non è ticket OPEN |
 |---------|------|---------------------------|
-| `infra_audit.md` Deferred | Digest pin immagini SHA | Documentato **deferred** post–Phase 6 in `docker.md` — non-fail |
-| `infra_audit.md` Deferred | Drop `--legacy-peer-deps` | Stesso — attendere matrix Angular/CDK/PrimeNG |
-| `frontend_audit.md` residuali | `navigatingTargetZoom` dead; hatch `getComputedStyle` | Non elevati a FAIL dall’auditor; igiene opzionale |
-| `frontend_audit.md` residuali | Path `clusterclick` summary `arts.length===0` probabilmente morto | Difensivo innocuo |
+| `scratch_infra_audit.md` Deferred | Digest pin immagini SHA | Documentato **deferred** post–Phase 6 in `docker.md` — non-fail |
+| `scratch_infra_audit.md` Deferred | Drop `--legacy-peer-deps` | Stesso — attendere matrix Angular/CDK/PrimeNG |
+| `scratch_frontend_audit.md` residuali | `navigatingTargetZoom` dead; hatch `getComputedStyle` | Non elevati a FAIL dall’auditor; igiene opzionale |
+| `scratch_frontend_audit.md` residuali | Path `clusterclick` summary `arts.length===0` probabilmente morto | Difensivo innocuo |
 | Checklist rules PASS | ~76/81 BE, ~83/88 FE, 81/83 INF | Solo i FAIL hanno ticket |
 
 ## F.5 Gap di procedura nel manuale (accettati / mitigati)
@@ -1069,15 +1069,15 @@ Se in futuro riappaiono i pattern legacy: riaprire T-DOC-01, allineare ad AGENTS
 [x] Deferred infra non confusi con FAIL
 [x] Residual FE non elevati a ticket
 [x] Prompt LLM FASE 0 aggiornato (sotto)
-[x] FASE 0 handoff in audit_problemi_documentazione_risoluzione.md (DONE DEFINITIVA)
+[x] FASE 0 handoff in plan_docs_audit_ticket_status.md (DONE DEFINITIVA)
 ```
 
 ## F.8 Aggiornamento prompt LLM (sostituisce §0.2 in sessioni post-v2.2)
 
 ```text
 Sei un agente di remediation sul repo Radar Informativo Globale.
-SoT: audit_problemi_documentazione.md v2.2 + APPENDICE F.
-Stato ticket operativo: audit_problemi_documentazione_risoluzione.md §3.
+SoT: plan_docs_audit_playbook.md v2.2 + APPENDICE F.
+Stato ticket operativo: plan_docs_audit_ticket_status.md §3.
 Preferisci .agents/AGENTS.md + radar/.ecc/rules/*.md (T-DOC-01 CLOSED).
 Vincoli: sidebar freeze; main.py API-only; asyncpg; window.L; no commit senza richiesta.
 Ticket OPEN in ordine FASE 4 (T-P0-01..T-P2-08 DONE; prossimo = Final Release).

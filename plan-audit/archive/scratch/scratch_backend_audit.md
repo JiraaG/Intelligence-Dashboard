@@ -1,7 +1,7 @@
 # Audit backend — Radar Informativo Globale
 
 > **Data:** 2026-07-15  
-> **Scope:** `radar/backend/app/**`, `radar/backend/scripts/**` vs checklist `scratch/backend_rules.md` (81 item)  
+> **Scope:** `radar/backend/app/**`, `radar/backend/scripts/**` vs checklist `archive/scratch/scratch_backend_rules.md` (81 item)  
 > **Metodo:** lettura del codice sorgente reale; nessuna modifica applicativa in questo audit.  
 > **Lingua:** italiano (identificatori/codice in English)
 

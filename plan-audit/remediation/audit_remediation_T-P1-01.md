@@ -1,8 +1,8 @@
 # Audit Report — Ticket T-P1-01: DATABASE_URL quote_plus and Compose configuration
 
 > **Stato ticket:** **DONE** (verificato nel workspace principale 2026-07-15)  
-> **SoT stato:** `audit_problemi_documentazione_risoluzione.md` §3 / §12  
-> **Playbook:** `audit_problemi_documentazione.md` §3.3 / §4.2 / Script F
+> **SoT stato:** `plan_docs_audit_ticket_status.md` §3 / §12  
+> **Playbook:** `plan_docs_audit_playbook.md` §3.3 / §4.2 / Script F
 
 ---
 
@@ -93,6 +93,6 @@ docker compose exec radar-backend curl -f .../health/live    → {"status":"ok",
 - [x] 114/114 pytest passed
 - [x] ruff allineato e passante
 - [x] Rebuild Docker e restart OK (nessun bypass grezzo nel container)
-- [x] Aggiornato stato in `audit_problemi_documentazione_risoluzione.md`
+- [x] Aggiornato stato in `plan_docs_audit_ticket_status.md`
 - [x] Appendice D / FASE 2 manuale allineati (riverifica Cursor)
 - [x] Handoff T-P1-02 annotato (`audit_prompt_T-P1-02.md`)

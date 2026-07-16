@@ -20,7 +20,7 @@ Questo file è un **manuale di descrizione** dell’architettura ECC: cosa è EC
 | È allineato al codice? | **Sì** dopo remediation ECC (`526c856`); contenuti vs worker/Compose/API Phase 5/FE Phase 4–5 |
 | È “pienamente” in uso? | **Hooks/rules wiring DONE** (`.cursor/hooks.json` + `.cursor/rules` globs); skill dominio Radar in espansione selettiva; profili agent = ancora prompt/Task manuale |
 | Si può espandere? | **Sì**, seguendo la regola d’oro ECC: comportamento durevole in skill/rules/hooks; adapter harness sottili |
-| Piano eseguibile? | Expansion **DONE** — vedi `Implementation_Plan_Execution.md`; handoff [`ECC_Expansion_Handoff.md`](ECC_Expansion_Handoff.md) resta come audit trail |
+| Piano eseguibile? | Expansion **DONE** — vedi [`plan_impl_phase_0_6_execution.md`](plan-audit/active/plan_impl_phase_0_6_execution.md); handoff [`handoff_ecc_expansion.md`](plan-audit/archive/ecc/handoff_ecc_expansion.md) resta come audit trail |
 | Cosa non fare? | Non clonare i ~67 agent / ~278 skill upstream nel monorepo; non installare tutto ECC raw |
 
 ```mermaid
@@ -191,7 +191,7 @@ Dashboard finance/
 │
 ├── .cursor/                              ← hooks.json + rules/*.mdc (P0 wiring) + debug logs
 ├── docs/04_ecc_framework.md
-├── ECC_Architecture_Audit_Handoff.md     ← audit + remediation (chiusa)
+├── plan-audit/archive/ecc/handoff_ecc_architecture_audit.md     ← audit + remediation (chiusa)
 ├── ecc_deep_dive_analysis.md             ← V1 archivio
 └── ecc_deep_dive_analysis_v2.md          ← QUESTO FILE
 ```
@@ -516,10 +516,10 @@ Sidebar freeze: **sempre** zero touch `radar/frontend/src/app/components/radar-s
 | `.agents/AGENTS.md` | Vincoli immutabili prodotto |
 | `radar/.ecc/CLAUDE.md` | Entry sessione |
 | `docs/04_ecc_framework.md` | Panoramica operatori |
-| `ECC_Architecture_Audit_Handoff.md` | Audit + checklist remediation |
-| `Implementation_Plan.md` / `_Execution.md` | Fasi prodotto |
-| `ecc_deep_dive_analysis.md` | **V1 archivio** — non SoT |
-| `plan_backend_ecc.md` / `plan_frontend_ecc.md` | Archivi — claim stale |
+| `plan-audit/archive/ecc/handoff_ecc_architecture_audit.md` | Audit + checklist remediation |
+| `plan-audit/active/plan_impl_phase_0_6.md` / `_execution.md` | Fasi prodotto |
+| `ecc_deep_dive_analysis.md` | **V1 archivio** — non SoT (rimosso) |
+| `plan-audit/archive/plans/plan_backend_ecc.md` / `plan_frontend_ecc.md` | Archivi — claim stale |
 | `Fase2_Implementation_Plan.md` | Archivio |
 
 ---

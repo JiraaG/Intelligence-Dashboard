@@ -304,7 +304,7 @@ Residual SIMPLE↔COMPLEX se identity diversa (fattura `ref.quota_lane`).
 DeepSeek riceve `model=` + thinking da effort lane (`none` = thinking disabled);
 mai hardcodare API key; mai commit `.env`; no package `openai`.
 
-SoT: `plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md` + skill `radar-quota-ledger`.
+SoT: `plan-audit/active/sot_llm_multi_model_fallback.md` + skill `radar-quota-ledger`.
 
 ---
 

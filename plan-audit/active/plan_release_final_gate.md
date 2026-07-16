@@ -1,8 +1,8 @@
-# Final Release Gate Plan — Radar Informativo Globale
+# Piano Operativo — Final Release Gate
 
 > **Stato premesse (2026-07-16):** remediation codice P0–P2 **CLOSED**; Phase 6 GATE VERDE; smoke UI manuale **fatto**; commit/push su `refactor/testing` @ `7bb8ed8`.  
 > **Scopo di questo documento:** piano definitivo per i residui Final Release + deferred, con procedure, file, pro/contro e scelta raccomandata.  
-> **SoT correlati:** `Implementation_Plan.md` §Final Release Gate · `audit_remediation_final_release_handoff.md` · `radar/ops/README.md` · `radar/docs/runbook.md` · `radar/.ecc/rules/docker.md`
+> **SoT correlati:** `plan_impl_phase_0_6.md` §Final Release Gate · `audit_remediation_final_release_handoff.md` · `radar/ops/README.md` · `radar/docs/runbook.md` · `radar/.ecc/rules/docker.md`
 
 ---
 
@@ -10,7 +10,7 @@
 
 | Area | Evidenza |
 |------|----------|
-| Ticket SoT P0/P1/P2 | 0 OPEN — `audit_problemi_documentazione_risoluzione.md` §3 |
+| Ticket SoT P0/P1/P2 | 0 OPEN — `plan_docs_audit_ticket_status.md` §3 |
 | Unit/integration offline | pytest `not live` ~117; FE typecheck + test:ci 30 |
 | Docs/ECC vs deploy | Phase 6 + remediation docs CLOSED |
 | Smoke UI letta + spiderfy | Eseguito dall’utente post-rebuild |
@@ -91,7 +91,7 @@ gh pr create --base develop --head refactor/testing --title "…" --body "…"
 ## 3. Fase 1 — Backup / restore drill
 
 ### Obiettivo
-Dimostrare che backup e restore funzionano end-to-end (criterio Final Release ancora `[ ]` in `Implementation_Plan.md`).
+Dimostrare che backup e restore funzionano end-to-end (criterio Final Release ancora `[ ]` in `plan_impl_phase_0_6.md`).
 
 ### File e codice
 | Path | Ruolo |
@@ -149,7 +149,7 @@ docker compose exec radar-backend curl -sf http://127.0.0.1:8000/health/live
 **Non** usare il DB di “produzione personale” senza safety backup.
 
 ### Report
-Aggiornare `plan-audit/remediation/audit_remediation_final_release_F1_backup.md` (nuovo) + spuntare item in `Implementation_Plan.md` Final Release Gate se PASS.
+Aggiornare `plan-audit/remediation/audit_remediation_final_release_F1_backup.md` (nuovo) + spuntare item in `plan_impl_phase_0_6.md` Final Release Gate se PASS.
 
 ---
 
@@ -164,7 +164,7 @@ Caricare ~10 000 articoli sintetici per **una** `published_at` e misurare temp
 | `radar/backend/scripts/seed_perf_articles.py` | Seed idempotente SQL (DELETE date + INSERT); **non** tocca vault/Miniflux |
 | Migrazione indici | `radar/backend/migrations/007_*.sql` (già applicata in Phase 5) |
 | API sotto test | `GET /api/map-summary?date=…`, `GET /api/articles?date=&country=` |
-| Manuale | `Implementation_Plan.md` D8 / Phase 5 residuals |
+| Manuale | `plan_impl_phase_0_6.md` D8 / Phase 5 residuals |
 
 ### Best practice
 - Usare una **data dedicata** (es. `2099-01-01` o giorno non usato in UI) per non inquinare la day-view “oggi”.  
@@ -416,7 +416,7 @@ Questi **non** sono FAIL e **non** sono ticket SoT. Sono scelte di riproducibili
 | 3 | `plan-audit/remediation/audit_remediation_final_release_F3_chaos.md` |
 | 4 | `plan-audit/remediation/audit_remediation_final_release_F4_security.md` |
 | 5 | Nota decisione in handoff / `docker.md` (se si conferma deferred) |
-| Fine | Aggiornare `Implementation_Plan.md` Final Release checkbox + `audit_remediation_final_release_handoff.md` |
+| Fine | Aggiornare `plan_impl_phase_0_6.md` Final Release checkbox + `audit_remediation_final_release_handoff.md` |
 
 ---
 

@@ -76,7 +76,7 @@ LLM_COMPLEX_RPD=0
 # Profilo A (hybrid) documentato in .env.example (blocco commentato)
 ```
 
-SoT: `plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md` §5–§6.
+SoT: `plan-audit/active/sot_llm_multi_model_fallback.md` §5–§6.
 
 ---
 

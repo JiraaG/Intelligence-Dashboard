@@ -2,8 +2,8 @@
 
 > **Stato ticket:** **DONE** (2026-07-16) — codice/gate **PASS**; drift SoT manuale chiuso in riverifica Cursor  
 > **Repo:** `c:\Users\lucag\Documents\Dashboard finance` · app `radar/`  
-> **SoT ticket:** `plan-audit/active/audit_problemi_documentazione_risoluzione.md` §3 / §4 / §5  
-> **Playbook:** `plan-audit/active/audit_problemi_documentazione.md` §3.2 / §4.5 / Script I / App. F §F.2  
+> **SoT ticket:** `plan-audit/active/plan_docs_audit_ticket_status.md` §3 / §4 / §5  
+> **Playbook:** `plan-audit/active/plan_docs_audit_playbook.md` §3.2 / §4.5 / Script I / App. F §F.2  
 > **Skills di riferimento:** `.agents/skills/llm-json-extraction`, `.agents/skills/radar-quota-ledger`
 
 ---

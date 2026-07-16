@@ -161,7 +161,7 @@ Legacy `LLM_RPM` / `DEEPSEEK_RPM` = alias fill-gap, non tetto globale.
 Soft-trim worker = solo `LLM_SIMPLE.rpd` se `> 0`. Free → RPM/RPD; paid → budget + 402.
 Residual SIMPLE↔COMPLEX se identity diversa (fattura `ref.quota_lane`).
 **Complexity v2.2:** BORDERLINE usa catena COMPLEX (`purpose=classify:complex`); SIMPLE → `classify:simple`.
-Package `openai` vietato. SoT: `plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md` + skill `radar-quota-ledger`.
+Package `openai` vietato. SoT: `plan-audit/active/sot_llm_multi_model_fallback.md` + skill `radar-quota-ledger`.
 
 ```python
 reservation_id = await self.quota.reserve(

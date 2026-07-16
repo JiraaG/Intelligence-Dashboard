@@ -35,11 +35,11 @@ Stato: Phase 6 GATE VERDE; §3 ticket P2 DONE; verifica precedente =
 PASS_WITH_GAPS. Obiettivo turno = **PASS** rigoroso + handoff.
 
 ### SoT
-1. `plan-audit/active/audit_problemi_documentazione_risoluzione.md`
-2. `plan-audit/active/audit_problemi_documentazione.md` (FASE 2 + F.8)
+1. `plan-audit/active/plan_docs_audit_ticket_status.md`
+2. `plan-audit/active/plan_docs_audit_playbook.md` (FASE 2 + F.8)
 3. `plan-audit/remediation/audit_remediation_T-P2_batch.md`
-4. `plan-audit/active/Implementation_Plan_Execution.md` §C
-5. `plan-audit/active/Implementation_Plan.md` → Final Release Gate
+4. `plan-audit/active/plan_impl_phase_0_6_execution.md` §C
+5. `plan-audit/active/plan_impl_phase_0_6.md` → Final Release Gate
 6. `.agents/AGENTS.md` + `radar/.ecc/rules/{backend,frontend}.md`
 
 ### Gap (DoD)
@@ -100,9 +100,9 @@ Implementa G1, G2, G4, G5.
 
 Allowlist SOLO plan-audit/**:
 - audit_remediation_T-P2_batch.md (G1+G2+verdetto PASS)
-- audit_problemi_documentazione_risoluzione.md (G4 + header CLOSED)
-- audit_problemi_documentazione.md (conteggi/pie/F.8/coda)
-- Implementation_Plan_Execution.md (conferma P2 DONE)
+- plan_docs_audit_ticket_status.md (G4 + header CLOSED)
+- plan_docs_audit_playbook.md (conteggi/pie/F.8/coda)
+- plan_impl_phase_0_6_execution.md (conferma P2 DONE)
 - NEW audit_remediation_final_release_handoff.md (template §4 del prompt padre)
 
 Vietato: radar/** codice; commit/push.
@@ -163,7 +163,7 @@ Checklist:
 - FE typecheck + test:ci (30)
 - Phase 6 GATE VERDE (`56c2eff`)
 
-### C. Residui Final Release (`Implementation_Plan.md`)
+### C. Residui Final Release (`plan_impl_phase_0_6.md`)
 | Residuo | Azione |
 |---------|--------|
 | Compose health / backup-restore | ops manuale |

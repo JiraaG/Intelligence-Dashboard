@@ -1,8 +1,8 @@
 # Prompt orchestratore — chiusura fase LLM Limits / Docs-ECC
 
 > **Commit fase docs:** `5b1f6eb` — `docs(radar): align ECC/skills to per-lane LLM limits and ops profiles`  
-> **Piano SoT:** [`../../active/LLM_Limits_Periodicity_Docs_ECC_Plan.md`](../../active/LLM_Limits_Periodicity_Docs_ECC_Plan.md)  
-> **SoT design:** [`../../active/LLM_Multi_Model_Fallback_Phase_AB.md`](../../active/LLM_Multi_Model_Fallback_Phase_AB.md)  
+> **Piano SoT:** [`../../archive/plans/plan_llm_limits_periodicity_docs_ecc.md`](../../archive/plans/plan_llm_limits_periodicity_docs_ecc.md)  
+> **SoT design:** [`../../active/sot_llm_multi_model_fallback.md`](../../active/sot_llm_multi_model_fallback.md)  
 > **Uso:** nuova chat Agent — incolla il blocco sotto. Autonomia totale; non chiedere conferma per read/grep/docker/pytest; chiedi solo prima di commit/push o edit `.env` live.
 
 ---
@@ -27,7 +27,7 @@ CONTESTO (già fatto — non rieseguire allineamento docs da zero)
 
 SoT DA LEGGERE PRIMA
 1) plan-audit/active/LLM_Limits_Periodicity_Docs_ECC_Plan.md
-2) plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md  (§5–§6 obbligatori)
+2) plan-audit/active/sot_llm_multi_model_fallback.md  (§5–§6 obbligatori)
 3) .agents/skills/radar-quota-ledger/SKILL.md
 4) .agents/skills/llm-json-extraction/SKILL.md
 5) radar/.ecc/rules/backend.md (Regola 9 / 9b)
@@ -92,10 +92,12 @@ Verificare invarianti:
   5. Residual SIMPLE↔COMPLEX se identity diversa
   6. No package openai
 
-Smoke pytest (da radar/):
+Smoke pytest (da radar/ — path reale `backend/app/tests/`):
   $env:PYTHONPATH = "backend"
-  python -m pytest app/tests/test_complexity.py app/tests/test_classification.py `
-    app/tests/test_quota_concurrency.py -q
+  python -m pytest backend/app/tests/test_complexity.py `
+    backend/app/tests/test_classification.py `
+    backend/app/tests/test_quota_concurrency.py -q
+  # oppure: cd con pytest.ini che mappa già i path; verificare 38+ passed
 
 Se fallisce: fix minimo SOLO su allowlist codice sotto; ritestare.
 
@@ -130,12 +132,8 @@ A) Snapshot pre:
   - unread Miniflux total (via API nel container, no secret in output)
 
 B) Requeue controllato (N=20 tipico):
-  Se esiste script: docker compose exec -T radar-worker python -m app.scripts._tmp_requeue20 20
-  Altrimenti procedura equivalente:
-    - marca N entry Miniflux read → unread
-    - DELETE articles + outbox per quegli URL
-    - opz. delete vault md correlati
-  NON commitare script _tmp_ se non richiesti.
+  docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20
+  (script ufficiale; non usare più `_tmp_requeue*`)
 
 C) Forza ciclo: docker compose restart radar-worker
    (poll default 900s — restart = ciclo immediato)
@@ -166,8 +164,8 @@ F) Considerazioni aggiuntive se necessarie:
 Elenco residuali noti da confermare aperti/chiusi:
   - VERIFY_IN_STUDIO (solo Profilo A)
   - Shadow 3g opzionale (LLM_ROUTING_SHADOW=true → log lane, call sempre SIMPLE)
-  - Phase_AB sezioni storiche ancora “Gemini-first” fuori §5–§6
-  - Script _tmp_requeue* untracked (tenere fuori git o promuovere a tools/ops)
+  - Phase_AB §12 storico — chiuso (per-lane)
+  - Script requeue — ufficiale: `app.scripts.requeue_articles`
   - Commit .env vietato
 
 ALLOWLIST FIX (solo se bug verificato in questa chiusura)

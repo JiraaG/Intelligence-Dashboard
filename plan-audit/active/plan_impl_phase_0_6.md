@@ -1,4 +1,4 @@
-# Consolidation Implementation Plan
+# Piano di Consolidamento — Phase 0-6
 
 This plan addresses the production blockers found during the code and architecture review. Execute phases in order. Do not release a later phase while an earlier acceptance gate is failing.
 

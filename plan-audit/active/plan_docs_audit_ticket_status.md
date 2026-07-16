@@ -1,9 +1,9 @@
-# Audit Problemi Documentazione — Risoluzione
+# Stato Chiusura Ticket Documentazione
 
 ## Metadati di Stato
 * **Data di creazione:** 2026-07-15
 * **Data chiusura FASE 0:** 2026-07-15 (verifica aggiuntiva + riparazione handoff)
-* **Manuale operativo di riferimento:** `audit_problemi_documentazione.md` (v2.2 · FASI 0–2 + APPENDICE F)
+* **Manuale operativo di riferimento:** `plan_docs_audit_playbook.md` (v2.2 · FASI 0–2 + APPENDICE F)
 * **Gate Progetto:** Phase 6 / Gate Verde (Stato post-branch restore)
 * **Stato Fase 0:** **FASE 0 DONE DEFINITIVA**
 * **Remediation codice:** **CLOSED** · prossimo Final Release.
@@ -39,8 +39,8 @@ Le elevazioni T-P0-02 / T-P1-05 sono intenzionali (App. F §F.2). Un LLM **non**
 
 ```text
 Sei un agente di remediation sul repo Radar Informativo Globale.
-SoT: audit_problemi_documentazione.md v2.2 + APPENDICE F.
-Stato ticket operativo: audit_problemi_documentazione_risoluzione.md §3.
+SoT: plan_docs_audit_playbook.md v2.2 + APPENDICE F.
+Stato ticket operativo: plan_docs_audit_ticket_status.md §3.
 radar/.ecc/CLAUDE.md è allineato Gate Verde (T-DOC-01 CLOSED); preferisci comunque .agents/AGENTS.md + radar/.ecc/rules/*.md come guardrail.
 Vincoli: sidebar freeze; main.py API-only; asyncpg; window.L; no commit senza richiesta.
 Ticket OPEN in ordine FASE 4 (T-P0-01..T-P2-08 DONE; prossimo = Final Release).
@@ -52,12 +52,12 @@ Priorità elevate storiche: T-P0-02 chiuso; T-P1-05 chiuso Path A (App. F §F.2)
 
 | Path | Ruolo | Letto |
 |------|--------|:-----:|
-| `scratch/backend_rules.md` | Checklist governance BE (81 item) | ✓ |
-| `scratch/frontend_rules.md` | Checklist governance FE (88 item) | ✓ |
-| `scratch/infra_rules.md` | Checklist Docker/DB (83 item) | ✓ |
-| `scratch/backend_audit.md` | Audit codice BE grezzo | ✓ |
-| `scratch/frontend_audit.md` | Audit codice FE grezzo | ✓ |
-| `scratch/infra_audit.md` | Audit infra grezzo | ✓ |
+| `archive/scratch/scratch_backend_rules.md` | Checklist governance BE (81 item) | ✓ |
+| `archive/scratch/scratch_frontend_rules.md` | Checklist governance FE (88 item) | ✓ |
+| `archive/scratch/scratch_infra_rules.md` | Checklist Docker/DB (83 item) | ✓ |
+| `archive/scratch/scratch_backend_audit.md` | Audit codice BE grezzo | ✓ |
+| `archive/scratch/scratch_frontend_audit.md` | Audit codice FE grezzo | ✓ |
+| `archive/scratch/scratch_infra_audit.md` | Audit infra grezzo | ✓ |
 | `.agents/AGENTS.md` | Guardrail globali | ✓ |
 | `radar/.ecc/rules/{backend,frontend,docker}.md` | SoT path-scoped | ✓ |
 | `radar/docs/runbook.md` | Deploy / health / incident | ✓ |

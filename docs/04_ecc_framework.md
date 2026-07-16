@@ -33,9 +33,9 @@ Harness per vincolare l’agente alle regole di produzione. Overlay Radar a **tr
 | `rules/radar-*.mdc` | Globs nativi → puntano al SoT in `.ecc/rules` (no testo duplicato) |
 | `commands/` | Shortcut: `radar-verify`, `radar-smoke`, `radar-lint` |
 
-Piani eseguibili: [`Implementation_Plan.md`](../Implementation_Plan.md) + [`Implementation_Plan_Execution.md`](../Implementation_Plan_Execution.md) (voce **ECC expansion wiring — DONE**).  
+Piani eseguibili: [`Implementation_Plan.md`](../plan-audit/active/plan_impl_phase_0_6.md) + [`Implementation_Plan_Execution.md`](../plan-audit/active/plan_impl_phase_0_6_execution.md) (voce **ECC expansion wiring — DONE**).  
 Manuale ECC: [`ecc_deep_dive_analysis_v2.md`](../ecc_deep_dive_analysis_v2.md).  
-Handoff expansion (eseguito): [`ECC_Expansion_Handoff.md`](../ECC_Expansion_Handoff.md).  
+Handoff expansion (eseguito): [`ECC_Expansion_Handoff.md`](../plan-audit/archive/ecc/handoff_ecc_expansion.md).  
 Non usare come piano vivo: `Fase2_Implementation_Plan.md`, `plan*.md`, `ecc_deep_dive_analysis.md` (V1 archivio).
 
 ---

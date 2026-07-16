@@ -3,7 +3,7 @@
 > **STORICO (2026-07-15):** snapshot pre–fix. Cap spiderfy 24 **stale** (2026-07-16: no hard cap). **FE-AUD-001 / T-P1-04 DONE** (2026-07-16, `51225b5`): `detailError` + banner. SoT: `radar/.ecc/rules/frontend.md` Regola 2b, `audit_remediation_T-P1-04.md`. Non usare come checklist operativa senza riverifica.
 
 > **Scope:** `radar/frontend/src/app/` (+ `angular.json` / `package.json` / `Dockerfile` solo dove richiesto dalla checklist)  
-> **Checklist:** `scratch/frontend_rules.md` (88 items, 16 domini)  
+> **Checklist:** `archive/scratch/scratch_frontend_rules.md` (88 items, 16 domini)  
 > **Data:** 2026-07-15  
 > **Metodo:** walk checklist → pass/fail con evidenza; **nessuna modifica** al source app  
 > **Conteggi FAIL (storico audit):** **P0 = 0** · **P1 = 1** *(FE-AUD-001 → poi DONE)* · **P2 = 4**
@@ -311,7 +311,7 @@ style: () => ({
 
 | Campo | Valore |
 |-------|--------|
-| **Path audit** | `c:\Users\lucag\Documents\Dashboard finance\scratch\frontend_audit.md` |
+| **Path audit** | `c:\Users\lucag\Documents\Dashboard finance\scratch\scratch_frontend_audit.md` |
 | **P0** | **0** |
 | **P1** | **1** (FE-AUD-001 / FE-MK-02) |
 | **P2** | **4** (FE-AUD-002..005) |

@@ -1,6 +1,6 @@
 # Architettura e backend
 
-Stack post Phase 0–5 (governance Phase 6). Piano master: [`Implementation_Plan.md`](../Implementation_Plan.md). Codice: `radar/backend/`.
+Stack post Phase 0–5 (governance Phase 6). Piano master: [`Implementation_Plan.md`](../plan-audit/active/plan_impl_phase_0_6.md). Codice: `radar/backend/`.
 
 ---
 

@@ -29,13 +29,13 @@ NON regressare map UX spider-dezoom (`ed3d88f`) oltre i touch P2 elencati.
   docs pin `f439508` — vedi `plan-audit/remediation/audit_remediation_spider_dezoom.md`.
 
 ### SoT obbligatori (ordine autorità)
-1. `plan-audit/active/audit_problemi_documentazione_risoluzione.md` §3 (stati OPEN/DONE)
-2. `plan-audit/active/audit_problemi_documentazione.md` §4.8 (fix P2) + FASE 5 §5.0 + **Script M**
-3. Scratch findings: `plan-audit/scratch/backend_audit.md` (BE-AUD-007…010),
-   `plan-audit/scratch/frontend_audit.md` (FE-AUD-002…005)
+1. `plan-audit/active/plan_docs_audit_ticket_status.md` §3 (stati OPEN/DONE)
+2. `plan-audit/active/plan_docs_audit_playbook.md` §4.8 (fix P2) + FASE 5 §5.0 + **Script M**
+3. Scratch findings: `plan-audit/archive/scratch/scratch_backend_audit.md` (BE-AUD-007…010),
+   `plan-audit/archive/scratch/scratch_frontend_audit.md` (FE-AUD-002…005)
 4. Guardrail: `.agents/AGENTS.md` + `radar/.ecc/rules/{backend,frontend}.md`
-5. Scoreboard: `plan-audit/active/Implementation_Plan_Execution.md` §C (riga P2)
-6. Checklist: `plan-audit/scratch/backend_rules.md`, `frontend_rules.md`
+5. Scoreboard: `plan-audit/active/plan_impl_phase_0_6_execution.md` §C (riga P2)
+6. Checklist: `plan-audit/archive/scratch/scratch_backend_rules.md`, `scratch_frontend_rules.md`
 
 ### Skills / ECC da leggere (per area)
 | Area | Skill / agent |
@@ -70,9 +70,9 @@ Playbook: manuale §4.8. Gate BE: **Script M** (non Script I/J — quelli sono T
 - asyncpg puro; Leaflet via `window.L` / `angular.json` scripts[].
 - Un report batch: crea `plan-audit/remediation/audit_remediation_T-P2_batch.md`.
 - Aggiorna SoT §3: ogni ticket → DONE con nota + file touched.
-- Aggiorna header handoff in `audit_problemi_documentazione_risoluzione.md`
+- Aggiorna header handoff in `plan_docs_audit_ticket_status.md`
   (prossimo: Final Release residuali OPPURE “P2 chiusi → merge/PR”).
-- Allinea `Implementation_Plan_Execution.md` riga “P2 (8) OPEN” → DONE/0.
+- Allinea `plan_impl_phase_0_6_execution.md` riga “P2 (8) OPEN” → DONE/0.
 - Non espandere scope a chaos / image scan / seed 10k / spiderfy redesign.
 - Fuori scope intenzionale: `test_string_lists.py` Field description `'Nessuna'`
   (diagnostica isolata ≠ contratto produzione) — non è T-P2-01.
@@ -93,9 +93,9 @@ Workspace: c:\Users\lucag\Documents\Dashboard finance
 Branch: refactor/testing @ f439508+
 Implementa SOLO T-P2-01, T-P2-02, T-P2-03, T-P2-04.
 
-SoT: plan-audit/active/audit_problemi_documentazione_risoluzione.md §3
-Playbook: plan-audit/active/audit_problemi_documentazione.md §4.8 + Script M
-Scratch: plan-audit/scratch/backend_audit.md BE-AUD-007…010 (segui i diff)
+SoT: plan-audit/active/plan_docs_audit_ticket_status.md §3
+Playbook: plan-audit/active/plan_docs_audit_playbook.md §4.8 + Script M
+Scratch: plan-audit/archive/scratch/scratch_backend_audit.md BE-AUD-007…010 (segui i diff)
 Rules: radar/.ecc/rules/backend.md
 Skill: .agents/skills/llm-json-extraction/SKILL.md (T-P2-03 schema)
 
@@ -130,9 +130,9 @@ Workspace: c:\Users\lucag\Documents\Dashboard finance
 Branch: refactor/testing @ f439508+
 Implementa SOLO T-P2-05, T-P2-06, T-P2-07, T-P2-08.
 
-SoT: plan-audit/active/audit_problemi_documentazione_risoluzione.md §3
-Playbook: plan-audit/active/audit_problemi_documentazione.md §4.8
-Scratch: plan-audit/scratch/frontend_audit.md FE-AUD-002…005 (segui i diff)
+SoT: plan-audit/active/plan_docs_audit_ticket_status.md §3
+Playbook: plan-audit/active/plan_docs_audit_playbook.md §4.8
+Scratch: plan-audit/archive/scratch/scratch_frontend_audit.md FE-AUD-002…005 (segui i diff)
 Rules: radar/.ecc/rules/frontend.md
 Skills: .agents/skills/radar-sidebar-freeze/SKILL.md (ZERO touch sidebar);
   radar/.ecc/agents/angular-map-expert.md (solo lettura pattern);
@@ -173,7 +173,7 @@ Output: file touched, diff summary, npm typecheck/test se eseguiti, gap.
 2. Esegui gate §3.
 3. Scrivi `plan-audit/remediation/audit_remediation_T-P2_batch.md`.
 4. Marca T-P2-01…08 DONE in risoluzione §3; P2 OPEN → 0; aggiorna header handoff.
-5. Allinea `Implementation_Plan_Execution.md` riga P2.
+5. Allinea `plan_impl_phase_0_6_execution.md` riga P2.
 6. Output italiano all’utente (template §4).
 
 Se un sotto-agente fallisce un ticket: marca PASS_WITH_GAPS, lascia quel ID OPEN,

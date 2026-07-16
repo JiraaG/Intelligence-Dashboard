@@ -1,8 +1,8 @@
 # Audit Report — Ticket T-P1-04: detailError & Nation-Fetch Error Banner
 
 > **Stato ticket:** **DONE** (verificato nel workspace principale 2026-07-16)  
-> **SoT stato:** `audit_problemi_documentazione_risoluzione.md` §3 / §15  
-> **Playbook:** `audit_problemi_documentazione.md` §3.6 / §4.6
+> **SoT stato:** `plan_docs_audit_ticket_status.md` §3 / §15  
+> **Playbook:** `plan_docs_audit_playbook.md` §3.6 / §4.6
 
 ---
 
@@ -95,4 +95,4 @@ npm run typecheck
 - [x] Zero modifiche a files sotto `radar-sidebar/**` o `radar-map/**` (salvo stub test).
 - [x] `npm run test:ci` verde (30 passed: app + StateService detailError).
 - [x] typecheck verde.
-- [x] Aggiornato stato SoT in `audit_problemi_documentazione_risoluzione.md` ed evasi criteri in manuale.
+- [x] Aggiornato stato SoT in `plan_docs_audit_ticket_status.md` ed evasi criteri in manuale.

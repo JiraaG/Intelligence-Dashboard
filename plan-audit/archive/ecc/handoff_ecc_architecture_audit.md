@@ -268,7 +268,7 @@ Hook in più: GEMINI_API_KEY, GOOGLE_API_KEY, POSTGRES_PASSWORD
 
 ## 8. Piano remediation ordinato
 
-Eseguire in ordine; dopo ogni blocco: nessun touch `radar-sidebar/**`; aggiornare questo file o `Implementation_Plan_Execution.md` con checkbox.
+Eseguire in ordine; dopo ogni blocco: nessun touch `radar-sidebar/**`; aggiornare questo file o `plan_impl_phase_0_6_execution.md` con checkbox.
 
 ### P0 — Critico (obbligatorio prima di chiudere ECC)
 
@@ -333,8 +333,8 @@ Gate soft (opzionale): rilettura umana di `CLAUDE.md` + `AGENTS.md` + tre rules 
 
 | Doc / path | Uso |
 |------------|-----|
-| `Implementation_Plan.md` | Piano master; Phase 6 DONE / GATE VERDE |
-| `Implementation_Plan_Execution.md` | Scoreboard; commit Phase 6 pending |
+| `plan_impl_phase_0_6.md` | Piano master; Phase 6 DONE / GATE VERDE |
+| `plan_impl_phase_0_6_execution.md` | Scoreboard; commit Phase 6 pending |
 | `docs/04_ecc_framework.md` | Panoramica ECC per operatori |
 | `README.md` | Indice docs + mappa piani→codice |
 | `radar/docs/runbook.md` | Ops |
@@ -357,23 +357,23 @@ Copiare il blocco seguente in una nuova conversazione Agent:
 - Branch: `refactor/enterprise-consolidation`
 - Phase 0–5 DONE; Phase 6 DONE / GATE VERDE (docs/CI/GeoJSON/runbook) — **working tree uncommitted**
 - Restore Phase 5: `1dfdf60`
-- **Sorgente remediation:** `ECC_Architecture_Audit_Handoff.md` in root (leggerlo per intero PRIMA di patchare)
-- Piani: `Implementation_Plan.md`, `Implementation_Plan_Execution.md`
+- **Sorgente remediation:** `handoff_ecc_architecture_audit.md` in root (leggerlo per intero PRIMA di patchare)
+- Piani: `plan_impl_phase_0_6.md`, `plan_impl_phase_0_6_execution.md`
 - **Sidebar freeze NON negoziabile:** zero touch a `radar/frontend/src/app/components/radar-sidebar/**`
 - Niente commit/push finché non lo chiedo esplicitamente
 - Non rifattorizzare prodotto Phase 0–5 salvo blocco reale; scope = **solo ECC** (`.agents/`, `radar/.ecc/`, eventualmente `docs/04_ecc_framework.md` se serve una nota hooks)
 
 ## Obiettivo
-Chiudere tutte le incongruenze elencate in `ECC_Architecture_Audit_Handoff.md` §§5–8, in ordine P0 → P1 → P2.
+Chiudere tutte le incongruenze elencate in `handoff_ecc_architecture_audit.md` §§5–8, in ordine P0 → P1 → P2.
 Una sola verità: rules/agents/skills/hooks/settings = codice reale (worker, Compose, API Phase 5, FE Phase 4–5).
 
 ## Ordine di lavoro obbligatorio
-1. Leggere `ECC_Architecture_Audit_Handoff.md` (ground truth §4 + tabelle §5)
+1. Leggere `handoff_ecc_architecture_audit.md` (ground truth §4 + tabelle §5)
 2. **P0:** spatial-data-mocking (entrambe le copie) + angular-map-expert Chip/eslint + backend.md Regola 3 sleep
 3. **P1:** docker.md reale + wording deferred post–Phase 6 + settings.json sync hooks + llm-json-extraction unify + angular-developer references path
 4. **P2:** geo-data 007, AGENTS/backend map-summary bullets, hooks note, comandi verify/runbook/CI in CLAUDE/AGENTS
 5. Eseguire checklist accettazione §9 del handoff
-6. Aggiornare `Implementation_Plan_Execution.md` con voce “ECC remediation DONE” (senza inventare commit SHA)
+6. Aggiornare `plan_impl_phase_0_6_execution.md` con voce “ECC remediation DONE” (senza inventare commit SHA)
 
 ## Ground truth rapido (non inventare)
 - 10 categorie (no Chip/Acqua/Elettronica come primary_category)

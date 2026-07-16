@@ -50,4 +50,4 @@ reservation_id = await self.quota.reserve(
 ## SoT
 
 `radar/backend/app/core/llm_lanes.py` + `classification/quota.py` + `.env.example` +
-`plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md`.
+`plan-audit/active/sot_llm_multi_model_fallback.md`.

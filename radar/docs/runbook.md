@@ -85,6 +85,19 @@ docker compose exec radar-db psql -U radar_user -d radar_db \
 
 ---
 
+## Requeue articoli (ops / E2E)
+
+Per riprovare la classificazione su N entry già lette (unread + purge DB/vault):
+
+```bash
+docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20
+docker compose restart radar-worker   # ciclo immediato (poll tipico 900s)
+```
+
+Poi nei log: `route lane=SIMPLE … effort=none` e/o `COMPLEX|BORDERLINE … effort=high`.
+
+---
+
 ## Outbox pending / recovery
 
 Stati: `pending` → `writing` → `completed` | `failed`. Mark-read Miniflux solo dopo `completed`.

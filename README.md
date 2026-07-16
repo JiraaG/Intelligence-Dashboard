@@ -12,7 +12,7 @@
 
 **Stato piani (2026-07-15):** Phase **0–5 DONE**. Phase **6 DONE / GATE VERDE**.  
 **ECC expansion wiring DONE** (hooks/rules Cursor + skill dominio Radar) — working tree da commit su richiesta.  
-Sorgente di verità avanzamento: [`Implementation_Plan.md`](Implementation_Plan.md) + [`Implementation_Plan_Execution.md`](Implementation_Plan_Execution.md).  
+Sorgente di verità avanzamento: [`plan_impl_phase_0_6.md`](plan-audit/active/plan_impl_phase_0_6.md) + [`plan_impl_phase_0_6_execution.md`](plan-audit/active/plan_impl_phase_0_6_execution.md).  
 **Sidebar freeze:** non modificare `radar/frontend/src/app/components/radar-sidebar/`.
 
 ---
@@ -127,8 +127,8 @@ Build FE Docker: `npm ci --legacy-peer-deps` (peer matrix Angular/PrimeNG).
 
 | Documento | Ruolo |
 |-----------|--------|
-| [Implementation_Plan.md](Implementation_Plan.md) | Piano master Phase 0–6 + restore SHA |
-| [Implementation_Plan_Execution.md](Implementation_Plan_Execution.md) | Scoreboard post-restore (avanzamento reale) |
+| [plan_impl_phase_0_6.md](plan-audit/active/plan_impl_phase_0_6.md) | Piano master Phase 0–6 + restore SHA |
+| [plan_impl_phase_0_6_execution.md](plan-audit/active/plan_impl_phase_0_6_execution.md) | Scoreboard post-restore (avanzamento reale) |
 
 ### Governance agenti (ECC)
 
@@ -147,11 +147,11 @@ Build FE Docker: `npm ci --legacy-peer-deps` (peer matrix Angular/PrimeNG).
 
 Panoramica: [docs/04_ecc_framework.md](docs/04_ecc_framework.md).  
 Manuale descrittivo: [`ecc_deep_dive_analysis_v2.md`](ecc_deep_dive_analysis_v2.md).  
-Handoff expansion (eseguito): [`ECC_Expansion_Handoff.md`](ECC_Expansion_Handoff.md).
+Handoff expansion (eseguito): [`handoff_ecc_expansion.md`](plan-audit/archive/ecc/handoff_ecc_expansion.md).
 
 ### Archivio storico (non eseguire)
 
-Non sono checklist di implementazione: [`Fase2_Implementation_Plan.md`](Fase2_Implementation_Plan.md), [`plan.md`](plan.md), [`plan_backend_ecc.md`](plan_backend_ecc.md), [`plan_frontend_ecc.md`](plan_frontend_ecc.md), [`ecc_deep_dive_analysis.md`](ecc_deep_dive_analysis.md) (V1 archivio).  
+Non sono checklist di implementazione: `Fase2_Implementation_Plan.md` (se presente in archivio storico), [`plan_ecc_early_root.md`](plan-audit/archive/plans/plan_ecc_early_root.md), [`plan_backend_ecc.md`](plan-audit/archive/plans/plan_backend_ecc.md), [`plan_frontend_ecc.md`](plan-audit/archive/plans/plan_frontend_ecc.md), `ecc_deep_dive_analysis.md` (V1 archivio).  
 In Execution, la sezione **A (pre-restore)** è solo storico — usare **§ B/C**.
 
 ---
@@ -170,7 +170,7 @@ Branch: `refactor/enterprise-consolidation`
 | Phase 5 | `1dfdf60` | map-summary + articles cursor; nation markers; spiderfy categoria |
 | Phase 6 | `56c2eff` | GATE VERDE: docs, GeoJSON fetch+verify, CI, runbook, hooks |
 
-Esempio: `git checkout 56c2eff` (tip Phase 6 / GATE VERDE; tip successivo = ECC remediation). Dettaglio gate: [Implementation_Plan_Execution.md](Implementation_Plan_Execution.md).
+Esempio: `git checkout 56c2eff` (tip Phase 6 / GATE VERDE; tip successivo = ECC remediation). Dettaglio gate: [plan_impl_phase_0_6_execution.md](plan-audit/active/plan_impl_phase_0_6_execution.md).
 
 ---
 
@@ -216,10 +216,10 @@ Dettaglio: [docs/02_architecture_and_backend.md](docs/02_architecture_and_backen
 ```text
 Dashboard finance/
 ├── docs/                              # Manuali operatori 01–04
-├── Implementation_Plan.md             # Piano master Phase 0–6
-├── Implementation_Plan_Execution.md
+├── plan-audit/                        # SoT / prompt / remediation (vedi plan-audit/README.md)
+│   ├── active/plan_impl_phase_0_6*.md
+│   └── archive/ecc/handoff_ecc_*.md
 ├── ecc_deep_dive_analysis_v2.md       # Manuale ECC (descrizione)
-├── ECC_Expansion_Handoff.md           # Handoff wiring/skills (eseguito)
 ├── RSS.txt
 ├── LICENSE
 ├── .github/workflows/ci.yml

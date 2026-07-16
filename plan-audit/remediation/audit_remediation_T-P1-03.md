@@ -1,8 +1,8 @@
 # Audit Report — Ticket T-P1-03: Retry Mark-Read Miniflux post-completed
 
 > **Stato ticket:** **DONE** (verificato nel workspace principale 2026-07-15)  
-> **SoT stato:** `audit_problemi_documentazione_risoluzione.md` §3 / §8.2  
-> **Playbook:** `audit_problemi_documentazione.md` §3.5 / §4.4
+> **SoT stato:** `plan_docs_audit_ticket_status.md` §3 / §8.2  
+> **Playbook:** `plan_docs_audit_playbook.md` §3.5 / §4.4
 
 ---
 

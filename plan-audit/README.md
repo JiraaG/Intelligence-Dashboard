@@ -1,46 +1,42 @@
 # plan-audit — indice
 
-Cartella di audit, prompt orchestratore e SoT operativi del Radar.  
+Cartella di audit, prompt orchestratore e SoT operativi del modulo Radar.  
 **Non** è codice di produzione; i documenti vivi stanno in `active/`.
 
-## SoT correnti (`active/`)
+## SoT e Piani Correnti (`active/`)
 
 | Documento | Ruolo |
 |-----------|--------|
-| [LLM_Multi_Model_Fallback_Phase_AB.md](active/LLM_Multi_Model_Fallback_Phase_AB.md) | Multi-model LLM + routing (**lane env + complexity heuristic v2.2**) |
-| [LLM_Limits_Periodicity_Docs_ECC_Plan.md](active/LLM_Limits_Periodicity_Docs_ECC_Plan.md) | Periodicità ENV, limiti free/paid per-lane, residual, **allineamento docs/ECC** |
-| [audit_remediation_llm_multi_model_fallback.md](remediation/audit_remediation_llm_multi_model_fallback.md) | Report Fase C + v2.2 BORDERLINE→COMPLEX |
-| [Final_Release_Gate_Plan.md](active/Final_Release_Gate_Plan.md) | Gate residuali Final Release |
-| [audit_problemi_documentazione.md](active/audit_problemi_documentazione.md) | Playbook audit/remediation |
-| [audit_problemi_documentazione_risoluzione.md](active/audit_problemi_documentazione_risoluzione.md) | Stati ticket P0–P2 |
-| [Implementation_Plan.md](active/Implementation_Plan.md) | Consolidation Phase 0–6 |
-| [Implementation_Plan_Execution.md](active/Implementation_Plan_Execution.md) | Log esecuzione / scoreboard |
+| [sot_llm_multi_model_fallback.md](active/sot_llm_multi_model_fallback.md) | **Source of Truth** per Multi-model LLM + routing (lane env + complexity heuristic v2.2) |
+| [plan_release_final_gate.md](active/plan_release_final_gate.md) | Piano per la validazione dei Gate residuali Final Release |
+| [plan_docs_audit_playbook.md](active/plan_docs_audit_playbook.md) | Playbook operativo di audit & remediation documentazione |
+| [plan_docs_audit_ticket_status.md](active/plan_docs_audit_ticket_status.md) | Stato finale di chiusura e risoluzione dei ticket documentali |
+| [plan_impl_phase_0_6.md](active/plan_impl_phase_0_6.md) | Piano di consolidamento Phase 0–6 |
+| [plan_impl_phase_0_6_execution.md](active/plan_impl_phase_0_6_execution.md) | Log di esecuzione / scoreboard del consolidamento |
 
-## Layout
+## Layout Cartelle
 
 ```text
 plan-audit/
-  README.md                 ← questo file
-  active/                   SoT e piani vivi
-  prompts/active/           prompt orchestratore ancora utili
-  prompts/done/             prompt eseguiti (archivio operativo)
-  remediation/              report ticket DONE
-  archive/plans/            PRD / piani ECC early
-  archive/ecc/              handoff ECC storici
-  archive/llm-stubs/        stub superseduti dal SoT LLM
-  scratch/                  checklist/audit grezzi
+  README.md                 ← Questo file (indice SoT unico)
+  active/                   SoT e piani operativi correnti (vivi)
+  prompts/active/           Prompt orchestratore attivi / in esecuzione
+  prompts/done/             Archivio storico dei prompt già eseguiti
+  remediation/              Report di chiusura dei ticket di remediation (DONE)
+  archive/plans/            Piani operativi storici conclusi o PRD iniziali
+  archive/ecc/              Report e handoff storici dell'architettura ECC
+  archive/llm-stubs/        Vecchi stub e ricerche LLM superati dal SoT LLM
+  archive/scratch/          Checklist e log di audit grezzi (storico)
 ```
 
-## Prompt attivi
+## Prompt Attivi (`prompts/active/`)
 
-- [audit_prompt_llm_limits_docs_ecc.md](prompts/active/audit_prompt_llm_limits_docs_ecc.md) — orchestratore supervisore/esecutore/verificatore per allineamento docs/ECC per-lane
-- [audit_prompt_llm_multi_model_fallback.md](prompts/active/audit_prompt_llm_multi_model_fallback.md) — storico ricerca/design; **SoT = active/LLM_…**
-- [audit_prompt_final_release_gate.md](prompts/active/audit_prompt_final_release_gate.md)
+* [audit_prompt_final_release_gate.md](prompts/active/audit_prompt_final_release_gate.md) — Prompt per l'esecuzione e validazione dei gate finali di release.
 
-## Note
+## Note e Storico
 
-- Stub LLM storici: `archive/llm-stubs/*.SUPERSEDED.md` → usare solo il SoT in `active/`.
-- Canvas IDE: `article-complexity-routing.canvas.tsx`, `complexity-routing-audit.canvas.tsx` (fuori da plan-audit).
-- Lane swap ops: `LLM_COMPLEX_PROVIDER=…` + `LLM_COMPLEX_MODEL=…` senza codice.
-- **Complexity v2.2:** SIMPLE = solo `LLM_SIMPLE`; BORDERLINE+COMPLEX = `LLM_COMPLEX` (effort tipico high); L sola → SIMPLE.
-- **Limiti:** per-lane `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (`0` = unmanaged); soft-trim = `LLM_SIMPLE.rpd`; free = RPM/RPD, paid = `BUDGET_USD_DAY`.
+* **Limits Plan (DONE):** Il piano operativo LLM Limits è stato archiviato in [plan_llm_limits_periodicity_docs_ecc.md](archive/plans/plan_llm_limits_periodicity_docs_ecc.md).
+* **Remediation & Done Prompts:** Tutti i report di remediation dei singoli ticket (es. `audit_remediation_T-P*`) sono conservati nella cartella [remediation/](remediation/). I prompt storici eseguiti sono archiviati in [prompts/done/](prompts/done/).
+* **Stub LLM Storici:** Gli stub superati sono in [archive/llm-stubs/](archive/llm-stubs/) e non devono essere usati come riferimento.
+* **Complexity v2.2:** SIMPLE = solo `LLM_SIMPLE`; BORDERLINE+COMPLEX = `LLM_COMPLEX` (effort tipico high); L sola → SIMPLE.
+* **Limiti:** per-lane `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (`0` = unmanaged); soft-trim = `LLM_SIMPLE.rpd`; free = RPM/RPD, paid = `BUDGET_USD_DAY`.

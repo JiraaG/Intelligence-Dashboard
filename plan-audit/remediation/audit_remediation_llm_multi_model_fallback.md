@@ -1,8 +1,8 @@
 # Remediation — LLM multi-model fallback (Fase C + lane env + complexity v2.2)
 
 > **Data:** 2026-07-16 (aggiornato **complexity heuristic v2.2** + routing BORDERLINE→COMPLEX + **docs/ECC allineati per-lane**)  
-> **SoT:** [`../active/LLM_Multi_Model_Fallback_Phase_AB.md`](../active/LLM_Multi_Model_Fallback_Phase_AB.md)  
-> **Piano docs/ECC:** [`../active/LLM_Limits_Periodicity_Docs_ECC_Plan.md`](../active/LLM_Limits_Periodicity_Docs_ECC_Plan.md)  
+> **SoT:** [`../active/sot_llm_multi_model_fallback.md`](../active/sot_llm_multi_model_fallback.md)  
+> **Piano docs/ECC:** [`../archive/plans/plan_llm_limits_periodicity_docs_ecc.md`](../archive/plans/plan_llm_limits_periodicity_docs_ecc.md)  
 > **Canvas audit:** `canvases/complexity-routing-audit.canvas.tsx`  
 > **Stato:** IMPLEMENTED  
 > - Default codice: `LLM_ROUTING_MODE=off`, `LLM_ROUTING_SHADOW=true` (boot sicuro)  
@@ -29,7 +29,7 @@
 | `radar/backend/app/tests/test_classification.py` | `test_chain_for_borderline_uses_complex_lane` |
 | `radar/.env.example`, `radar/docs/runbook.md` | BORDERLINE → COMPLEX lane |
 | `radar/.ecc/rules/backend.md`, `CLAUDE.md`, skills | Allineamento v2.2 |
-| `plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md` | SoT aggiornato |
+| `plan-audit/active/sot_llm_multi_model_fallback.md` | SoT aggiornato |
 
 ## Ops enable (live tipico 2026-07-16)
 
@@ -82,8 +82,24 @@ python -m pytest app/tests/test_complexity.py app/tests/test_classification.py -
 | Default codice vs `.env.example` | Codice: `MODE=off` / `SHADOW=true`; example = ops complexity Profilo B |
 | VERIFY_IN_STUDIO (Profilo A) | Se si attiva hybrid Gemini free: calibrare `LLM_SIMPLE_RPM/RPD` su AI Studio — non inventare |
 | Shadow 3g | Opzionale: `LLM_ROUTING_SHADOW=true` per ~3 giorni per osservare mix lane senza cambiare catena (log only) |
-| Phase_AB §3.2 / §7 | Pulizia cosmetica 2026-07-16: legacy RPM/RPD → lane; latenza Profilo B |
+| Phase_AB §12 | **DONE** 2026-07-16 — tabella AS-IS allineata a per-lane / soft-trim `LLM_SIMPLE.rpd` |
+| Requeue ops | **DONE** — `python -m app.scripts.requeue_articles N` (ex `_tmp_requeue*`) |
 
 ## Docs/ECC allineati per-lane (2026-07-16)
 
 Propagati i principi unici (limiti `LLM_SIMPLE_*`/`LLM_COMPLEX_*`, soft-trim = `LLM_SIMPLE.rpd`, free vs paid, residual, `WORKER_POLL_INTERVAL_SECONDS`, v2.2) su Phase_AB §5–§6, ECC Regola 9/9b, CLAUDE, pipeline-engineer, skills mirror, AGENTS, docs/01–02/04, runbook, `.env.example`. Motore routing/quota **non** riscritto.
+
+## Phase close verification 2026-07-16
+
+| Gate | Esito |
+|------|--------|
+| Docs anti-regressione + coerenza soft-trim | PASS |
+| Mirror skills `.agents` ≡ `.ecc` | PASS |
+| Invarianti codice per-lane (6/6) | PASS |
+| Pytest complexity/classification/quota | PASS — 38 passed |
+| Docker live/ready + outbox clean | PASS |
+| E2E requeue 20 + log SIMPLE/COMPLEX/BORDERLINE | PASS — ledger 15m: simple 26 + complex 14 completed; articles_15m 39 |
+
+Profilo ops: **B**. Commit base docs: `5b1f6eb`. Prompt chiusura: `plan-audit/prompts/active/audit_prompt_llm_limits_phase_close.md`.
+Motore non modificato in chiusura. Residuali post-close: VERIFY_IN_STUDIO (solo A), shadow 3g opzionale.
+Phase_AB §12 e `requeue_articles` promossi (2026-07-16).

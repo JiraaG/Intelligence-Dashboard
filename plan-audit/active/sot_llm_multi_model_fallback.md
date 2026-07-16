@@ -1,4 +1,4 @@
-# LLM Multi-Model Fallback — Documento unico Fase A+B
+# Source of Truth — LLM Multi-Model Fallback
 
 > **Stato:** SoT design A+B + **Fase C implementata** + **lane env v2.2** + **heuristic complexity v2.2** (2026-07-16).  
 > **Skills:** `llm-json-extraction`, `radar-quota-ledger`.  
@@ -485,13 +485,13 @@ flowchart LR
 
 | Pezzo | Path | Stato post-Fase C / v2.2 |
 |-------|------|-------------------------|
-| Client | `classification/client.py` | Cascade + lane + escalate + dual provider |
-| Quota | `classification/quota.py` | `reserve(model=)` OK; cap **globali** |
-| Config | `core/config.py` | Gemini + DeepSeek + routing + lane env |
-| Worker | `worker.py` | Soft-trim RPD Gemini; heuristic nel client |
+| Client | `classification/client.py` | Cascade + lane + escalate + dual provider + residual |
+| Quota | `classification/quota.py` | `reserve(model=, lane=, provider=)`; limiti **per-lane** (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`; `0` = unmanaged); legacy fill-gap |
+| Config | `core/config.py` + `llm_lanes.py` | Gemini + DeepSeek + routing + lane env |
+| Worker | `worker.py` | Soft-trim = `LLM_SIMPLE.rpd` se `> 0`; heuristic nel client |
 | Schema/prompt | `validator.py`, `prompts.py` | **Immutabili** |
 | Cooldown | `cooldown.py` + `009_…sql` | Durable 24h |
-| DeepSeek | `deepseek.py` | httpx; `model=` da lane |
+| DeepSeek | `deepseek.py` | httpx; `model=` + effort da lane |
 | FE/API | DTO articles/map | Nessun `model_id` — out of scope |
 
 ### 12.2 Decisione ECC: DeepSeek via httpx
@@ -512,7 +512,8 @@ flowchart LR
 | `tests/test_complexity.py` | **nuovo** | Quorum lane |
 | `tests/test_cooldown.py` | **nuovo** | set/skip/expire |
 | `tests/test_classification.py` | esteso | cascade / escalate / shadow |
-| `.env.example`, `docs/runbook.md`, ECC/skills | docs | Ops dual-provider |
+| `.env.example`, `docs/runbook.md`, ECC/skills | docs | Ops dual-provider + per-lane limits |
+| `app/scripts/requeue_articles.py` | ops | Requeue Miniflux read→unread + purge DB/vault (E2E) |
 
 ### 12.4 TO-BE (runtime)
 

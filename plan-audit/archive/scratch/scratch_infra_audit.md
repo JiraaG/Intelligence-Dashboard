@@ -2,7 +2,7 @@
 
 **Data:** 2026-07-15  
 **STORICO:** scope migrazioni «001–007» = snapshot FASE 0; su disco esiste anche `008_outbox_miniflux_marked_at.sql` (post T-P1-03). Non usare come SoT migrazioni senza `ls backend/migrations`.  
-**Checklist:** `scratch/infra_rules.md` (83 item)  
+**Checklist:** `archive/scratch/scratch_infra_rules.md` (83 item)  
 **Scope:** Compose (+ override), Dockerfile backend/frontend, `nginx.conf`, migrazioni `001`–`007` *(+008 post-audit)*, `.dockerignore`, GeoJSON verify, `config.py`, logging, CI/runbook/ops correlati.  
 **Metodo:** walk checklist → pass/fail con evidenza; solo FAIL in sezione Findings.
 
@@ -415,4 +415,4 @@ CMD ["nginx", "-g", "daemon off;"]
 | P1 | **1** | INF-AUD-01 (INF-CRED-04) |
 | P2 | **1** | INF-AUD-02 (INF-USER-03) |
 
-**Output path:** `c:\Users\lucag\Documents\Dashboard finance\scratch\infra_audit.md`
+**Output path:** `c:\Users\lucag\Documents\Dashboard finance\scratch\scratch_infra_audit.md`

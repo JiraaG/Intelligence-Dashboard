@@ -28,7 +28,7 @@ Questo documento contiene i dettagli dell'handoff finale per la chiusura della r
 
 ---
 
-### C. Residui Final Release (`Implementation_Plan.md`)
+### C. Residui Final Release (`plan_impl_phase_0_6.md`)
 
 | Residuo | Azione |
 | :--- | :--- |

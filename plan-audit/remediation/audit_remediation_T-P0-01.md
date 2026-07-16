@@ -1,8 +1,8 @@
 # Audit Report — Ticket T-P0-01: Gate Mark-Read su Duplicato
 
 > **Stato ticket:** **DONE** (verificato nel workspace principale 2026-07-15)  
-> **SoT stato:** `audit_problemi_documentazione_risoluzione.md` §3 / §8.1  
-> **Playbook:** `audit_problemi_documentazione.md` §3.1 / §4.1 / Script G
+> **SoT stato:** `plan_docs_audit_ticket_status.md` §3 / §8.1  
+> **Playbook:** `plan_docs_audit_playbook.md` §3.1 / §4.1 / Script G
 
 ---
 

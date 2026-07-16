@@ -1,7 +1,7 @@
 # Prompt orchestratore — LLM limits + Docs/ECC align
 
-> **Piano SoT:** [`../../active/LLM_Limits_Periodicity_Docs_ECC_Plan.md`](../../active/LLM_Limits_Periodicity_Docs_ECC_Plan.md)  
-> **SoT design LLM:** [`../../active/LLM_Multi_Model_Fallback_Phase_AB.md`](../../active/LLM_Multi_Model_Fallback_Phase_AB.md)  
+> **Piano SoT:** [`../../archive/plans/plan_llm_limits_periodicity_docs_ecc.md`](../../archive/plans/plan_llm_limits_periodicity_docs_ecc.md)  
+> **SoT design LLM:** [`../../active/sot_llm_multi_model_fallback.md`](../../active/sot_llm_multi_model_fallback.md)  
 > **Uso:** incolla il blocco sotto in una nuova chat Agent (autonomia totale).  
 > **Default profilo ops da documentare:** entrambi A e B in `.env.example`; profilo **attivo** nell’example = B (DeepSeek-only) se coerente con live; A in blocco commentato.
 
@@ -21,7 +21,7 @@ PIANO SoT (leggere per primo)
 plan-audit/active/LLM_Limits_Periodicity_Docs_ECC_Plan.md
 
 SoT DESIGN (aggiornare §5–§6)
-plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md
+plan-audit/active/sot_llm_multi_model_fallback.md
 
 SKILL OBBLIGATORIE (Read + seguire)
 - .agents/skills/radar-quota-ledger/SKILL.md
@@ -76,7 +76,7 @@ RUOLI (obbligatori — Task tool o turni sequenziali espliciti)
    - Output: PASS / FAIL + lista path + eventuali residuali.
 
 ALLOWLIST EDIT (solo questi path, salvo fix bug minimo verificato)
-plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md
+plan-audit/active/sot_llm_multi_model_fallback.md
 plan-audit/active/LLM_Limits_Periodicity_Docs_ECC_Plan.md  (aggiorna stato todo se serve)
 plan-audit/remediation/audit_remediation_llm_multi_model_fallback.md
 plan-audit/README.md

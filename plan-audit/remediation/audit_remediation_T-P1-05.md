@@ -1,8 +1,8 @@
 # Audit Report — Ticket T-P1-05: Nginx Frontend non-root (unprivileged)
 
 > **Stato ticket:** **DONE** (verificato nel workspace principale 2026-07-16)  
-> **SoT stato:** `audit_problemi_documentazione_risoluzione.md` §3 / §16  
-> **Playbook:** `audit_problemi_documentazione.md` §3.7 / §4.7
+> **SoT stato:** `plan_docs_audit_ticket_status.md` §3 / §16  
+> **Playbook:** `plan_docs_audit_playbook.md` §3.7 / §4.7
 
 ---
 
@@ -110,4 +110,4 @@ Riverifica Cursor 2026-07-16: stessi esiti Script E / DoD (whoami=nginx, health 
 - [x] Compose: rimosso `cap_add` FE; tenuti `cap_drop: ALL` / `read_only` / tmpfs.
 - [x] Script E / DoD: whoami=`nginx`, wget `/health` ok, host HTTP 200, service healthy.
 - [x] Documentazione, regole operative (`docker.md`, `AGENTS.md`, `CLAUDE.md`) e skill (`radar-docker-ops`) sincronizzate.
-- [x] Stato SoT in `audit_problemi_documentazione_risoluzione.md` impostato su DONE.
+- [x] Stato SoT in `plan_docs_audit_ticket_status.md` impostato su DONE.

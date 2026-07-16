@@ -1,13 +1,13 @@
 # Prompt — Final Release Gate (orchestratore multi-fase)
 
 > **Uso:** copia il blocco `text` sotto in un **nuovo** chat Agent (orchestratore).  
-> **Piano SoT:** `plan-audit/active/Final_Release_Gate_Plan.md` (leggi per intero prima di agire).  
+> **Piano SoT:** `plan-audit/active/plan_release_final_gate.md` (leggi per intero prima di agire).  
 > **Default:** esegui **una fase per turno** (o più se l’utente lo chiede). **Non** merge PR. **Non** droppare deferred senza decisione esplicita.  
 > **Precondizioni:** P0–P2 CLOSED; smoke UI fatto; branch `refactor/testing` @ `7bb8ed8+` pushed.
 
 ```text
 /goal Esegui il Final Release Gate del Radar secondo
-`plan-audit/active/Final_Release_Gate_Plan.md` nel workspace
+`plan-audit/active/plan_release_final_gate.md` nel workspace
 `c:\Users\lucag\Documents\Dashboard finance`.
 Tu sei l’ORCHESTRATORE: una fase alla volta (salvo richiesta “esegui Fasi X–Y”),
 report per fase, aggiorna SoT. NON fare merge di PR.
@@ -22,7 +22,7 @@ in questo messaggio o dopo PASS di fase.
 ========================================================================
 
 - Remediation codice CLOSED; handoff: `audit_remediation_final_release_handoff.md`
-- Piano dettagliato: `plan-audit/active/Final_Release_Gate_Plan.md` (procedure, pro/contro, scelta best)
+- Piano dettagliato: `plan-audit/active/plan_release_final_gate.md` (procedure, pro/contro, scelta best)
 - Ops: `radar/ops/README.md`, `radar/docs/runbook.md`
 - Docker rules: `radar/.ecc/rules/docker.md` (deferred espliciti)
 - Branch: `refactor/testing`. Worker = running (no healthcheck HTTP).
@@ -42,7 +42,7 @@ altrimenti dalla prima fase senza report `audit_remediation_final_release_F*.md`
 - Seed: data dedicata `2099-01-01` (non cancellare dati “oggi”).
 - Script ops `*.sh`: Git Bash/WSL, non PowerShell raw.
 - Report obbligatorio per ogni fase PASS/FAIL/SKIP.
-- Aggiorna checkbox in `Implementation_Plan.md` §Final Release Gate solo su PASS.
+- Aggiorna checkbox in `plan_impl_phase_0_6.md` §Final Release Gate solo su PASS.
 - Aggiorna `audit_remediation_final_release_handoff.md` stato residui.
 
 ========================================================================

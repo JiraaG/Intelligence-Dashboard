@@ -1,8 +1,8 @@
-# LLM Limits, Periodicità, Docs & ECC — Piano operativo
+# Piano Operativo — LLM Limits, Periodicità, Docs & ECC (DONE)
 
 > **Stato:** SoT piano (2026-07-16). **Esecuzione docs/ECC: DONE** (allineamento per-lane).  
-> **Prompt orchestratore:** [`../prompts/active/audit_prompt_llm_limits_docs_ecc.md`](../prompts/active/audit_prompt_llm_limits_docs_ecc.md)  
-> **SoT design LLM:** [`LLM_Multi_Model_Fallback_Phase_AB.md`](LLM_Multi_Model_Fallback_Phase_AB.md)  
+> **Prompt orchestratore:** [`../../prompts/done/audit_prompt_llm_limits_docs_ecc.md`](../../prompts/done/audit_prompt_llm_limits_docs_ecc.md)  
+> **SoT design LLM:** [`../../active/sot_llm_multi_model_fallback.md`](../../active/sot_llm_multi_model_fallback.md)  
 > **Skills:** `llm-json-extraction`, `radar-quota-ledger`  
 > **Profilo ops documentato:** **B (DeepSeek-only)** attivo in `.env.example`; **A (hybrid)** commentato. Live coerente con B (non commit `.env`).
 
@@ -163,7 +163,7 @@ Fonti: Phase_AB, remediation LLM, ECC backend/skills, `.agents/skills/*`.
 
 **plan-audit**
 
-- `plan-audit/active/LLM_Multi_Model_Fallback_Phase_AB.md` (§5–§6)
+- `plan-audit/active/sot_llm_multi_model_fallback.md` (§5–§6)
 - `plan-audit/remediation/audit_remediation_llm_multi_model_fallback.md`
 - `plan-audit/README.md`
 - `plan-audit/prompts/active/audit_prompt_llm_multi_model_fallback.md` (nota SoT)
