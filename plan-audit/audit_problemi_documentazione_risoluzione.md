@@ -6,11 +6,11 @@
 * **Manuale operativo di riferimento:** `audit_problemi_documentazione.md` (v2.2 · FASI 0–2 + APPENDICE F)
 * **Gate Progetto:** Phase 6 / Gate Verde (Stato post-branch restore)
 * **Stato Fase 0:** **FASE 0 DONE DEFINITIVA**
-* **Remediation codice:** T-P0-01 **DONE**, T-P1-03 **DONE**, T-P1-01 **DONE**, T-P1-02 **DONE**, T-P0-02 **DONE**, T-P1-04 **DONE** (2026-07-16); resto OPEN; prossimo **T-P1-05**
-* **Follow-up ops (non ticket SoT):** OPS-FIX `init_pool` retry + doc Docker — codice/docs in working tree (commit su richiesta); pytest not live **116** post-fix.* **SoT stato ticket:** questo file §3 (stati `OPEN` / `DONE` / `CLOSED`). Playbook riprodurre/fix/gate = manuale FASI 3–5. Dopo ogni fix aggiornare §3 qui e la matrice FASE 2 del manuale.
+* **Remediation codice:** T-P0-01 **DONE**, T-P1-03 **DONE**, T-P1-01 **DONE**, T-P1-02 **DONE**, T-P0-02 **DONE**, T-P1-04 **DONE**, T-P1-05 **DONE** (2026-07-16); resto OPEN; prossimo **T-P2-01**
+* **Follow-up ops (non ticket SoT):** OPS-FIX `init_pool` retry + doc Docker — codice/docs in working tree (commit su richiesta); pytest not live **116** post-fix.* SoT stato ticket: questo file §3 (stati `OPEN` / `DONE` / `CLOSED`). Playbook riprodurre/fix/gate = manuale FASI 3–5. Dopo ogni fix aggiornare §3 qui e la matrice FASE 2 del manuale.
 
 ### Definition of Done FASE 0 (firmata)
-1. Manuale v2.2 + App. F letti; conteggio OPEN codice **all’epoca FASE 0** = 2 P0 + 5 P1 + 8 P2; docs OPEN residui = 0 (T-DOC-01 CLOSED). **Oggi (post T-P1-04):** P0=0, P1=1, P2=8 → 9 OPEN (SoT §3).
+1. Manuale v2.2 + App. F letti; conteggio OPEN codice **all’epoca FASE 0** = 2 P0 + 5 P1 + 8 P2; docs OPEN residui = 0 (T-DOC-01 CLOSED). **Oggi (post T-P1-05):** P0=0, P1=0, P2=8 → 8 OPEN (SoT §3).
 2. Invarianti §1.3 (Sidebar Freeze + read/unread separati) documentate senza contraddizioni.
 3. Matrice ticket con ID, finding scratch, priorità, file, dipendenze, stato `OPEN`/`CLOSED`.
 4. Elevazioni T-P0-02 / T-P1-05 e dipendenza T-P0-01→T-P1-03 esplicite.
@@ -19,7 +19,7 @@
 7. Happy path distingue **AS-IS** vs **POST-FIX**.
 8. Contratto LLM (prompt F.8) e definizioni P0/P1/P2 congelati in questo log.
 9. Zero modifiche remediation a `radar/backend/**`, `radar/frontend/**`, Dockerfile o migrazioni in FASE 0.
-10. Metadati: DONE DEFINITIVA FASE 0; remediation codice **poi avviata** (header: T-P1-04 DONE; prossimo T-P1-05).
+10. Metadati: DONE DEFINITIVA FASE 0; remediation codice **poi avviata** (header: T-P1-05 DONE; prossimo T-P2-01).
 
 ---
 
@@ -43,9 +43,9 @@ SoT: audit_problemi_documentazione.md v2.2 + APPENDICE F.
 Stato ticket operativo: audit_problemi_documentazione_risoluzione.md §3.
 radar/.ecc/CLAUDE.md è allineato Gate Verde (T-DOC-01 CLOSED); preferisci comunque .agents/AGENTS.md + radar/.ecc/rules/*.md come guardrail.
 Vincoli: sidebar freeze; main.py API-only; asyncpg; window.L; no commit senza richiesta.
-Ticket OPEN in ordine FASE 4 (T-P0-01..T-P1-04 DONE; prossimo T-P1-05 → P2).
+Ticket OPEN in ordine FASE 4 (T-P0-01..T-P1-05 DONE; prossimo T-P2-01).
 Ticket per turno: riproduci → fix → gate FASE 5 → marca DONE in risoluzione §3 e aggiorna manuale FASE 2.
-Priorità elevate storiche: T-P0-02 chiuso; T-P1-05 resta P1 (App. F §F.2).
+Priorità elevate storiche: T-P0-02 chiuso; T-P1-05 chiuso Path A (App. F §F.2).
 ```
 
 ### 0.3 Artefatti correlati (letture FASE 0)
@@ -143,7 +143,7 @@ Se già nel DB (Duplicato)
 | Classe | Count |
 |--------|------:|
 | P0 OPEN codice | 0 |
-| P1 OPEN codice | 1 (T-P1-03, T-P1-01, T-P1-02, T-P1-04 DONE; resta T-P1-05) |
+| P1 OPEN codice | 0 (T-P1-03, T-P1-01, T-P1-02, T-P1-04, T-P1-05 DONE) |
 | P2 OPEN codice | 8 |
 | Docs OPEN residui | 0 |
 | Docs FIXED / non riaprire | 12 (11 storici + T-DOC-01) |
@@ -161,7 +161,7 @@ Se già nel DB (Duplicato)
 | **T-P1-02** | BE-AUD-003 | P1 | `worker.py` | **DONE** | — | Race TOCTOU multi-consumer; pg_advisory_lock per-URL. Vedi §13 + `audit_remediation_T-P1-02.md`. |
 | **T-P1-03** | BE-AUD-004 | P1 | `commit/outbox.py` (`reconcile_outbox` + `_update_miniflux_marked_at`) | **DONE** | **T-P0-01** | Mark-read post-`completed` ritentabile via `miniflux_marked_at` (migrazione 008). Vedi §8.2 + `audit_remediation_T-P1-03.md`. |
 | **T-P1-04** | FE-AUD-001 | P1 | `state.service.ts`, `app.ts` | **DONE** | — | `detailError` + `error()` merge; catch `closeSidebar(false)` preserva banner. Vedi §15 + `audit_remediation_T-P1-04.md`. |
-| **T-P1-05** | INF-AUD-02 | P1 | `frontend/Dockerfile`, `nginx.conf` | OPEN | — | Nginx root / porta 80. Path: USER nginx+8080 **oppure** eccezione SoT in `docker.md`. |
+| **T-P1-05** | INF-AUD-02 | P1 | `frontend/Dockerfile`, `nginx.conf` | **DONE** | — | Nginx non-root su porta 8080, chown dir cache/log/run/html, COPY chown nginx, host mapped 80:8080. Vedi §16 + `audit_remediation_T-P1-05.md`. |
 | **T-DOC-01** | Check docs v2.1 | P1 Docs | `radar/.ecc/CLAUDE.md` | **CLOSED** | — | Sintomi legacy (Phase 0–2 / `radar-network`) **non più presenti** su disco (verifica FASE 0). File allineato Gate Verde. |
 | **T-P2-01** | BE-AUD-007 | P2 | `classification/validator.py#L227-L231` | OPEN | — | Fallback `'Nessuna'` → `'Nessuno'`. |
 | **T-P2-02** | BE-AUD-008 | P2 | `extraction/parser.py#L22-L25` | OPEN | — | Aggiungere `img`/`picture`/`source` a `content_ignored_tags`. |
@@ -198,7 +198,7 @@ Ordine FASE 4 (T-DOC-01 escluso: già CLOSED):
 4. **`T-P1-02`** — Advisory lock per-URL — **DONE**
 5. **`T-P0-02`** — Script diagnostici. — **DONE**
 6. **`T-P1-04`** — Banner nation-open / `detailError`.
-7. **`T-P1-05`** — Nginx non-root **oppure** eccezione SoT.
+7. **`T-P1-05`** — Nginx non-root — **DONE**
 8. **P2 in blocco** (`T-P2-01` → `T-P2-08`).
 
 ---
@@ -230,7 +230,7 @@ Deferred infra (digest pin, `--legacy-peer-deps`) ≠ FAIL — non aprire ticket
 
 ### 7.1 Letture e evidenze
 * Manuale v2.1→v2.2, scratch×6, AGENTS.md, `.ecc/rules/*`, `runbook.md`, `CLAUDE.md`.
-* Spot-check codice (FASE 0 + verifica aggiuntiva): `worker.py` gate T-P0-01 DONE; `config.py` `quote_plus` + Compose `POSTGRES_HOST` (T-P1-01 DONE); `outbox.py` retry `miniflux_marked_at` (T-P1-03 DONE); script diagnostici T-P0-02 DONE; `state.service.ts` / `app.ts` (`detailError`, T-P1-04 **DONE**); Dockerfile/nginx (T-P1-05 OPEN); `CLAUDE.md` Gate Verde (T-DOC-01 CLOSED).
+* Spot-check codice (FASE 0 + verifica aggiuntiva): `worker.py` gate T-P0-01 DONE; `config.py` `quote_plus` + Compose `POSTGRES_HOST` (T-P1-01 DONE); `outbox.py` retry `miniflux_marked_at` (T-P1-03 DONE); script diagnostici T-P0-02 DONE; `state.service.ts` / `app.ts` (`detailError`, T-P1-04 **DONE**); Dockerfile/nginx (T-P1-05 **DONE**); `CLAUDE.md` Gate Verde (T-DOC-01 CLOSED).
 * P2 spot-check: T-P2-01/02/05 CONFIRMED; T-P2-06 WEAK (difesa in profondità); T-P2-08 path residuo da verificare prima del delete.
 
 ### 7.2 Multi-agente (FASE 0 iniziale + verifica chiusura)
@@ -305,7 +305,7 @@ Select-String -Path "radar\.ecc\CLAUDE.md" -Pattern "radar-network|Phase 0–2|P
 
 - [x] Contesto applicativo + API Phase 5 + ordine autorità SoT documentati
 - [x] Invarianti hard-stop (10) con Sidebar Freeze e read/unread separati
-- [x] Conteggi pie / matrice FASE 0: 2+5+8 OPEN codice (snapshot storico); **oggi** P0=0 P1=1 P2=8 (post T-P1-04); 0 docs OPEN; 12 FIXED; 14 PASS
+- [x] Conteggi pie / matrice FASE 0: 2+5+8 OPEN codice (snapshot storico); **oggi** P0=0 P1=0 P2=8 (post T-P1-05); 0 docs OPEN; 12 FIXED; 14 PASS
 - [x] Tabella ticket con finding ID, stato `OPEN`/`CLOSED` (no `TODO`)
 - [x] T-DOC-01 CLOSED con evidenza grep su `CLAUDE.md`
 - [x] Docs FIXED elencati; regola «non riaprire» esplicita
@@ -392,6 +392,23 @@ Select-String -Path "radar\.ecc\CLAUDE.md" -Pattern "radar-network|Phase 0–2|P
 - Catch `onCountryClick`: modificato per invocare `closeSidebar(false)`, chiudendo e riallineando l'UI senza eliminare l'errore dallo stato (così il banner rosso di errore rimane visibile in toolbar).
 - Test: esteso `app.spec.ts` (reject + clear) e **`state.service.spec.ts`** (4 test sul catch reale / `clearError`).
 - Gate FASE 5: typecheck verde; unit test **30/30** passed; Script J superato; sidebar freeze rispettato; Docker FE rebuild + smoke re-ingest 5 articoli Miniflux OK.
-- **Handoff:** **T-P1-05** (Nginx frontend root).
+- **Handoff:** **T-P1-05** (Nginx frontend root) — poi **DONE** in §16.
 - Commit: `51225b5` su `refactor/testing`.
+
+---
+
+## 16. Esito Remediation Ticket T-P1-05
+
+**T-P1-05 DONE — PASS** (verificato nel workspace `Dashboard finance` + Script E / DoD Docker).
+
+- Path A: container `radar-frontend` come `USER nginx`, listen interno `8080`, host `80:8080`.
+- Cambiamenti:
+  - `frontend/Dockerfile`: `COPY --chown=nginx:nginx`, `RUN chown -R nginx:nginx` su cache/log/run/html, `USER nginx`, `EXPOSE 8080`, HEALTHCHECK `wget -qO- http://127.0.0.1:8080/health`.
+  - `frontend/nginx.conf`: `listen 8080;`.
+  - `docker-compose.yml`: ports `"80:8080"`, HC `:8080/health`, **rimosso `cap_add`** (tenuti `cap_drop: ALL`, `read_only`, tmpfs, `no-new-privileges`).
+  - `docker-compose.hardened.yml`: `"127.0.0.1:80:8080"`.
+  - `docker-compose.lan.yml`: **N/A / no edit** (solo Miniflux).
+  - Docs/ECC: `docker.md`, `AGENTS.md` §4.3, `infra_rules` INF-NET-06/HC-08/NGX-01, skill `radar-docker-ops` §8 (+ mirror), `01_getting_started`, `CLAUDE.md`.
+- Gate FASE 5: Script E `whoami=nginx`; wget `:8080/health` → `ok`; `curl.exe -sI http://localhost/health` → 200; `ps` → healthy. Report: `audit_remediation_T-P1-05.md`.
+- **Handoff:** Fine ticket P1. Prossimo: batch P2 (T-P2-01…).
 

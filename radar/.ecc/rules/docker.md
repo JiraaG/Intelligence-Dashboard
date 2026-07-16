@@ -114,7 +114,7 @@ healthcheck:
 
 # Frontend healthcheck (Nginx Alpine → wget)
 healthcheck:
-  test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/health"]
+  test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
   interval: 30s
   timeout: 5s
   retries: 3
@@ -206,10 +206,12 @@ RUN npm run build
 FROM nginx:1.27-alpine AS production
 RUN rm /etc/nginx/conf.d/default.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=builder /app/dist/radar-frontend/browser /usr/share/nginx/html
+RUN chown -R nginx:nginx /var/cache/nginx /var/log/nginx /var/run /usr/share/nginx/html
+COPY --chown=nginx:nginx --from=builder /app/dist/radar-frontend/browser /usr/share/nginx/html
+USER nginx
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -qO- http://localhost:80/ || exit 1
-EXPOSE 80
+    CMD wget -qO- http://127.0.0.1:8080/health || exit 1
+EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]
 ```
 
@@ -221,7 +223,7 @@ CMD ["nginx", "-g", "daemon off;"]
 
 ```nginx
 server {
-    listen 80;
+    listen 8080;
     server_name localhost;
     root /usr/share/nginx/html;
     index index.html;

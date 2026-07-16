@@ -281,7 +281,7 @@ Fonte: `plan-audit/audit_problemi_documentazione_risoluzione.md` §3.
 |--------|-------|------|
 | T-P0-01 … T-P0-02 | **DONE** | mark-read gate, quote_plus, advisory lock, outbox retry, script ClassificationClient |
 | **T-P1-04** | **DONE** (`51225b5`) | `detailError` + banner nation-fetch; test 30/30 |
-| **T-P1-05** | **OPEN** | Nginx unprivileged (`USER nginx` + listen 8080) **oppure** eccezione SoT |
+| **T-P1-05** | **DONE** | Nginx unprivileged (`USER nginx` + listen 8080 internally, Compose port map 80:8080, cap_drop ALL, read_only/tmpfs) |
 | P2 (8) | OPEN | backlog igiene |
 
 ---

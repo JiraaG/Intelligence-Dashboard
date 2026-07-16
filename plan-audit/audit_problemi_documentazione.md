@@ -142,16 +142,16 @@ flowchart LR
 ## 2.1 Sintesi conteggi OPEN
 
 ```mermaid
-pie title Problematiche OPEN da remediation (post T-P1-04)
+pie title Problematiche OPEN da remediation (post T-P1-05)
     "P0 OPEN codice" : 0
-    "P1 OPEN codice" : 1
+    "P1 OPEN codice" : 0
     "P2 OPEN codice" : 8
     "Docs FIXED / non riaprire" : 12
     "Aree PASS (non toccare)" : 14
 ```
 
 > **v2.1→v2.2 (FASE 0):** `T-DOC-01` CLOSED — `radar/.ecc/CLAUDE.md` allineato Gate Verde (grep legacy = 0).  
-> **Post-remediation 2026-07-16:** T-P0-01 + T-P1-03 + T-P1-01 + T-P1-02 + T-P0-02 + T-P1-04 **DONE** → restano **9 ticket codice OPEN** (P0=0, P1=1, P2=8). Snapshot FASE 0 era 15. Dettaglio → **APPENDICE F** + `audit_problemi_documentazione_risoluzione.md` §3.
+> **Post-remediation 2026-07-16:** T-P0-01 + T-P1-03 + T-P1-01 + T-P1-02 + T-P0-02 + T-P1-04 + T-P1-05 **DONE** → restano **8 ticket codice OPEN** (P0=0, P1=0, P2=8). Snapshot FASE 0 era 15. Dettaglio → **APPENDICE F** + `audit_problemi_documentazione_risoluzione.md` §3.
 
 ## 2.2 P0 — (tutti DONE; nessun P0 OPEN)
 
@@ -168,7 +168,7 @@ pie title Problematiche OPEN da remediation (post T-P1-04)
 | **T-P1-02** | ~~Race TOCTOU dedup multi-consumer~~ → **DONE** (`pg_advisory_lock` per-URL) | `worker.py` | BE-AUD-003 |
 | **T-P1-03** | ~~Mark-read post-`completed` non ritentabile~~ → **DONE** (miniflux_marked_at + retry) | `commit/outbox.py` (`reconcile` + `_update_miniflux_marked_at`) | BE-AUD-004 |
 | **T-P1-04** | ~~Errore nation-fetch senza banner toolbar~~ → **DONE** (`detailError` + non-silent catch) | `state.service.ts#L99-L127`, `app.ts#L122-L125` | FE-AUD-001 |
-| **T-P1-05** | Nginx frontend come root | `frontend/Dockerfile`, `nginx.conf` | INF-AUD-02 *(scratch=P2; elevato a P1 — vedi App. F §F.2; alternativa: documentare eccezione SoT)* |
+| **T-P1-05** | ~~Nginx frontend come root~~ → **DONE** (USER nginx + port 8080) | `frontend/Dockerfile`, `nginx.conf` | INF-AUD-02 *(scratch=P2; elevato a P1 — vedi App. F §F.2)* |
 
 ## 2.4 P2 — OPEN (backlog)
 
@@ -413,14 +413,14 @@ await miniflux_client.mark_as_read([int(entry_id)])
 
 ## 3.7 T-P1-05 — Nginx root
 
-> **Stato:** **OPEN** — prossimo ticket codice. Prompt: `audit_prompt_T-P1-05_remediation.md`.
+> **Stato:** **DONE** (USER nginx + listen 8080; vedi audit_remediation_T-P1-05.md).
 
 ```powershell
 docker compose exec radar-frontend whoami
 docker compose exec radar-frontend ps aux
 ```
 
-**Sintomo BUG:** `root`. **POST-FIX:** `nginx` + listen 8080 (o eccezione documentata SoT).
+**Sintomo BUG:** `root`. **POST-FIX:** `nginx` + listen 8080.
 
 ---
 
@@ -959,7 +959,7 @@ Usa questa checklist a ogni sessione di remediation.
 | 2026-07-16 | T-P0-02 | Multi-agente + Cursor verify | Sì (4 commit locali, no push) | Ibrido+(b1): delete `test_500.py`/`test_rate_limiter.py`; smoke `ClassificationClient(quota=mock)`; stress rimosso; live throttling SKIPPED; Script I 0 match; pytest not live **115** al close ticket. Next: T-P1-04. |
 | 2026-07-16 | OPS-FIX | Cursor | **No** (working tree; commit pending su richiesta) | Race `compose restart` → `CannotConnectNowError`. Fix: retry `init_pool` + `docker.md` Regola 4 + Compose comments + `docs/01_getting_started.md`. Rebuild backend/worker OK; restart ordinato OK (§J.1). Spiderfy «≤24» corretto in Implementation_Plan*. pytest not live **116** (+1 test retry). Miniflux 5MB cap osservato in log (fuori scope). |
 | 2026-07-16 | T-P1-04 | Antigravity + Cursor verify | **Sì** (`51225b5`, pushed) | Implementato `detailError` + `error` computed; `closeSidebar(false)` preserva banner. Test app + **4 StateService** (30/30). SoT §3.6/risoluzione allineati. Docker FE rebuild; 5 articoli delete+unread Miniflux → re-ingest OK. Next: T-P1-05. |
-| | … | | | |
+| 2026-07-16 | T-P1-05 | Cursor | No (working tree) | Nginx non-root su porta 8080 internally, chown cache/log/run/html, COPY --chown=nginx:nginx, EXPOSE/HEALTHCHECK 8080, Compose port map 80:8080, cap_drop ALL, read_only/tmpfs, Script E PASS. |
 
 ---
 
@@ -1080,11 +1080,11 @@ SoT: audit_problemi_documentazione.md v2.2 + APPENDICE F.
 Stato ticket operativo: audit_problemi_documentazione_risoluzione.md §3.
 Preferisci .agents/AGENTS.md + radar/.ecc/rules/*.md (T-DOC-01 CLOSED).
 Vincoli: sidebar freeze; main.py API-only; asyncpg; window.L; no commit senza richiesta.
-Ticket OPEN in ordine FASE 4 (T-P0-01..T-P1-04 DONE; prossimo T-P1-05 → P2).
+Ticket OPEN in ordine FASE 4 (T-P0-01..T-P1-05 DONE; prossimo T-P2-01).
 Un ticket per turno: riproduci → fix → gate FASE 5 → marca DONE in risoluzione §3.
-Priorità elevate storiche: T-P0-02 chiuso; T-P1-05 resta P1 (App. F §F.2).
+Priorità elevate storiche: T-P0-02 chiuso; T-P1-05 chiuso (App. F §F.2).
 ```
 
 ---
 
-**Esito check definitivo:** il manuale è **coerente** con `scratch/*_audit.md` e `scratch/*_rules.md`. I dubbi di v2.0 sono **chiusi**. Docs: **T-DOC-01 CLOSED** (FASE 0). Snapshot FASE 0: 15 OPEN; **post T-P1-04: 9 ticket codice OPEN** (P0=0, P1=1, P2=8; SoT = risoluzione §3).
+**Esito check definitivo:** il manuale è **coerente** con `scratch/*_audit.md` e `scratch/*_rules.md`. I dubbi di v2.0 sono **chiusi**. Docs: **T-DOC-01 CLOSED** (FASE 0). Snapshot FASE 0: 15 OPEN; **post T-P1-05: 8 ticket codice OPEN (P0=0, P1=0, P2=8; SoT = risoluzione §3).

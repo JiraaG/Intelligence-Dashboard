@@ -36,7 +36,7 @@ in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categ
 | UI Library  | PrimeNG 17+                             | p-sidebar, p-carousel, p-calendar           |
 | Mappa       | Leaflet + CartoDB Dark Positron          | GeoJSON locale in assets/data/             |
 | Container   | Docker + docker-compose                  | Cinque servizi su `radar-edge` + `radar-data` |
-| Web Server  | Nginx (Alpine)                          | Serve build Angular, porta 80; CSP Phase 3  |
+| Web Server  | Nginx (Alpine)                          | Serve build Angular, porta 8080 (mappa host 80→8080); CSP Phase 3  |
 
 ---
 

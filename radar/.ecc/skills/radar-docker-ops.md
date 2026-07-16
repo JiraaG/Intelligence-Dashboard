@@ -22,6 +22,7 @@ Modifiche a containerizzazione, reti, health, o build FE in Docker.
 5. FE Dockerfile: multi-stage; builder `npm ci --legacy-peer-deps`; **obbligatorio** `node scripts/verify-geojson.mjs --fetch` prima del build (GeoJSON gitignored).
 6. No tag `latest` su immagini base; versioni pinnate.
 7. Nginx: resolver `127.0.0.11` + variabile per `proxy_pass` (anti-502).
+8. Frontend runs as unprivileged nginx user listening on port 8080 (host mapped 80:8080).
 
 ## Deferred (non inventare come fatto)
 

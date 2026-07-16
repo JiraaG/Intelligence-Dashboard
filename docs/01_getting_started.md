@@ -69,7 +69,7 @@ Servizi: `radar-frontend`, `radar-backend`, `radar-worker`, `radar-db`, `radar-m
 Build note:
 
 - Backend: Python **3.12-slim**, utente non-root `radar`
-- Frontend: `npm ci --legacy-peer-deps` → fetch/verify GeoJSON → Nginx **1.27-alpine**
+- Frontend: `npm ci --legacy-peer-deps` → fetch/verify GeoJSON → Nginx **1.27-alpine**, utente non-root `nginx`
 
 ### Overlay
 

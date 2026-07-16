@@ -16,7 +16,7 @@
 | INF-NET-03 | `radar/.ecc/rules/docker.md` Regola 3 | `radar-backend` è su **entrambe** le reti (`radar-edge` + `radar-data`). | Compose → `radar-backend.networks` | Entrambe le reti elencate. |
 | INF-NET-04 | `radar/.ecc/rules/docker.md` Regola 3 | `radar-worker`, `radar-db`, `radar-miniflux` sono **solo** su `radar-data`. | Compose → networks di ciascun servizio | Solo `radar-data`; nessuna membership a `radar-edge`. |
 | INF-NET-05 | `radar/.ecc/rules/docker.md` Regola 3 | `radar-data` non deve essere `internal: true` (egress necessario per Gemini / fetch Miniflux). | Compose → `networks.radar-data` | Assente `internal: true` (o documentato come `internal: false`). |
-| INF-NET-06 | AGENTS §4.3; `docker.md` principio | Default plug-and-play: frontend pubblica `80:80` su tutte le interfacce. | Compose → `radar-frontend.ports` | Mapping `80:80` (o equivalente host:80 → container:80). |
+| INF-NET-06 | AGENTS §4.3; `docker.md` principio | Default plug-and-play: frontend pubblica `80:8080` su tutte le interfacce. | Compose → `radar-frontend.ports` | Mapping `80:8080` (o equivalente host:80 → container:8080). |
 | INF-NET-07 | AGENTS §4.3; `docker.md` principio | Miniflux **non** pubblica porte host di default. | Compose base (non override) → `radar-miniflux.ports` | Nessuna `ports:` nel compose base; override solo via `docker-compose.lan.yml` / `docker-compose.hardened.yml`. |
 | INF-NET-08 | `docker.md` criteri accettazione | Porta PostgreSQL `5432` **non** esposta sull’host. | Compose → `radar-db.ports` | Assente pubblicazione `5432` verso host. |
 | INF-NET-09 | AGENTS §4.3 | Loopback hardening / admin Miniflux LAN solo tramite override dedicati. | `docker-compose.hardened.yml`, `docker-compose.lan.yml` | File presenti e usati solo come override (non sostituiscono il default plug-and-play). |
@@ -50,7 +50,7 @@
 | INF-HC-05 | `docker.md` Regola 4 | Miniflux healthcheck: `["CMD", "/usr/bin/miniflux", "-healthcheck", "auto"]`. | Compose `radar-miniflux.healthcheck` | Comando esatto (o equivalente ufficiale documentato). |
 | INF-HC-06 | AGENTS §4.10; `docker.md` Regola 4; skill docker-ops | Su immagini **Alpine** (Nginx frontend) usare `wget`, **non** `curl`. | Dockerfile frontend HEALTHCHECK; Compose FE healthcheck | `wget` presente; assente `curl` negli healthcheck Alpine. |
 | INF-HC-07 | `docker.md` Regola 6 | Backend (Debian slim) può usare `curl` su `/health/live`; pacchetto `curl` installato nell’immagine production. | Dockerfile backend | `curl` installato + HEALTHCHECK con `curl -f .../health/live`. |
-| INF-HC-08 | `docker.md` Regola 4 (esempio FE) | Frontend healthcheck tipico: `wget -qO-` su porta 80 (`/` o `/health` secondo config reale). | Dockerfile/Compose FE | Healthcheck usa wget verso `127.0.0.1`/`localhost:80`; interval/timeout/retries coerenti. |
+| INF-HC-08 | `docker.md` Regola 4 (esempio FE) | Frontend healthcheck tipico: `wget -qO-` su porta 8080 (`/` o `/health` secondo config reale). | Dockerfile/Compose FE | Healthcheck usa wget verso `127.0.0.1`/`localhost:8080`; interval/timeout/retries coerenti. |
 | INF-HC-09 | `docker.md` criteri accettazione | `depends_on` senza healthcheck correlato è vietato dove richiesto (race all’avvio). | Compose depends_on di backend/worker/frontend | Dipendenze critiche usano `service_healthy`, non solo start order. |
 
 **Conteggio dominio healthcheck: 9**
@@ -158,7 +158,7 @@
 
 | ID | Source | Requirement | Where to verify | Pass criteria |
 |----|--------|-------------|-----------------|---------------|
-| INF-NGX-01 | `docker.md` Regola 8 | `listen 80;` — porta HTTP container. | `radar/frontend/nginx.conf` | `listen 80` (o 80 default conf.d). |
+| INF-NGX-01 | `docker.md` Regola 8 | `listen 8080;` — porta HTTP container. | `radar/frontend/nginx.conf` | `listen 8080` (o 8080 default conf.d). |
 | INF-NGX-02 | `docker.md` Regola 8 | SPA fallback: `try_files $uri $uri/ /index.html;`. | `nginx.conf` `location /` | Presente try_files verso `index.html`. |
 | INF-NGX-03 | AGENTS §4.7; `docker.md` Regola 8; skill docker-ops | DNS dinamico anti-502: `resolver 127.0.0.11 valid=10s;` + variabile `$backend_upstream` + `proxy_pass $backend_upstream$request_uri`. | `nginx.conf` `location /api/` | Resolver + `set $backend_upstream` + `$request_uri`; **vietato** proxy_pass statico solo-resolve-at-start. |
 | INF-NGX-04 | `docker.md` Regola 8; criteri accettazione | Proxy `/api/` verso `http://radar-backend:8000`. | `nginx.conf` | Location `/api/` con proxy headers Host/X-Real-IP/X-Forwarded-*. |
