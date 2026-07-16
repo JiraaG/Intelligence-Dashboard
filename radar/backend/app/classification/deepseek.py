@@ -96,10 +96,17 @@ class DeepSeekClient:
             date=date,
             content=content[:4000],
         )
+        # DeepSeek json_object richiede la parola "json" nel prompt (system o user).
+        user_message = (
+            f"{user_message}\n\n"
+            "Output requirement: return a single valid JSON object matching the schema "
+            "(no markdown fences, no reasoning field)."
+        )
         if correction:
             user_message = (
                 f"{user_message}\n\nCORREZIONE OBBLIGATORIA:\n{correction}\n"
-                "Restituisci SOLO un JSON valido secondo lo schema (senza campo reasoning)."
+                "Correggi e restituisci SOLO un JSON valido secondo lo schema "
+                "(senza campo reasoning)."
             )
 
         # Thinking mode: temperature/top_p non ammessi (API V4 → 400). Effort high|max only.
