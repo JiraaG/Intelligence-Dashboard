@@ -285,9 +285,9 @@ Sidebar freeze: zero touch `radar-sidebar/**`.
 
 ---
 
-### Audit remediation codice (post Gate Verde) — in corso / parziale
+### Audit remediation codice (post Gate Verde) — COMPLETATA
 
-Ordine SoT: T-P0-01…T-P0-02 → **T-P1-04** → **T-P1-05** → P2.  
+Ordine SoT: T-P0-01…T-P2-08.  
 Fonte: `plan-audit/audit_problemi_documentazione_risoluzione.md` §3.
 
 | Ticket | Stato | Note |
@@ -295,7 +295,7 @@ Fonte: `plan-audit/audit_problemi_documentazione_risoluzione.md` §3.
 | T-P0-01 … T-P0-02 | **DONE** | mark-read gate, quote_plus, advisory lock, outbox retry, script ClassificationClient |
 | **T-P1-04** | **DONE** (`51225b5`) | `detailError` + banner nation-fetch; test 30/30 |
 | **T-P1-05** | **DONE** | Nginx unprivileged (`USER nginx` + listen 8080 internally, Compose port map 80:8080, cap_drop ALL, read_only/tmpfs) |
-| P2 (8) | OPEN | backlog igiene |
+| P2 (8) | **DONE** | backlog igiene chiuso in blocco (T-P2-01 … T-P2-08) |
 
 ---
 

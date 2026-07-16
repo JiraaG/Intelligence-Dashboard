@@ -5,9 +5,9 @@ from __future__ import annotations
 import math
 import re
 from datetime import date
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 PRIMARY_CATEGORIES = (
     "Nucleare",
@@ -188,6 +188,17 @@ class GeopoliticalArticleSchema(BaseModel):
             raise ValueError("longitude deve essere compresa tra -180 e 180")
         return value
 
+    @model_validator(mode="after")
+    def first_tag_matches_primary(self) -> Self:
+        first = (self.tags.split(",")[0].strip() if self.tags else "")
+        if first.lower() in {"nessuno", "nessuna", "none", ""}:
+            raise ValueError("tags deve iniziare con primary_category")
+        if first != self.primary_category:
+            raise ValueError(
+                f"primo tag {first!r} != primary_category {self.primary_category!r}"
+            )
+        return self
+
 
 def parse_csv_list(val: str) -> list[str]:
     """Trasforma una stringa separata da virgole in una lista, gestendo i valori vuoti/Nessuno."""
@@ -224,10 +235,10 @@ def get_fallback_article(title: str, source_url: str, published_at: str) -> Geop
         country_code="XX",
         latitude=0.0,
         longitude=0.0,
-        companies_involved="Nessuna",
+        companies_involved="Nessuno",
         tags="Infrastrutture",
         primary_category="Infrastrutture",
         sentiment="Neutrale",
-        infrastructural_entities="Nessuna",
+        infrastructural_entities="Nessuno",
         relevance_level=1,
     )

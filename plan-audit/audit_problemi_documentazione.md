@@ -142,16 +142,16 @@ flowchart LR
 ## 2.1 Sintesi conteggi OPEN
 
 ```mermaid
-pie title Problematiche OPEN da remediation (post T-P1-05)
+pie title Problematiche OPEN da remediation (CLOSED)
     "P0 OPEN codice" : 0
     "P1 OPEN codice" : 0
-    "P2 OPEN codice" : 8
+    "P2 OPEN codice" : 0
     "Docs FIXED / non riaprire" : 12
     "Aree PASS (non toccare)" : 14
 ```
 
 > **v2.1→v2.2 (FASE 0):** `T-DOC-01` CLOSED — `radar/.ecc/CLAUDE.md` allineato Gate Verde (grep legacy = 0).  
-> **Post-remediation 2026-07-16:** T-P0-01 + T-P1-03 + T-P1-01 + T-P1-02 + T-P0-02 + T-P1-04 + T-P1-05 **DONE** → restano **8 ticket codice OPEN** (P0=0, P1=0, P2=8). Snapshot FASE 0 era 15. Dettaglio → **APPENDICE F** + `audit_problemi_documentazione_risoluzione.md` §3.
+> **Post-remediation 2026-07-16:** Tutti i ticket (T-P0-01...T-P2-08) sono **DONE**. La remediation codice è **CLOSED**. Dettaglio → **APPENDICE F** + `audit_problemi_documentazione_risoluzione.md` §3.
 
 ## 2.2 P0 — (tutti DONE; nessun P0 OPEN)
 
@@ -170,18 +170,18 @@ pie title Problematiche OPEN da remediation (post T-P1-05)
 | **T-P1-04** | ~~Errore nation-fetch senza banner toolbar~~ → **DONE** (`detailError` + non-silent catch) | `state.service.ts#L99-L127`, `app.ts#L122-L125` | FE-AUD-001 |
 | **T-P1-05** | ~~Nginx frontend come root~~ → **DONE** (USER nginx + port 8080) | `frontend/Dockerfile`, `nginx.conf` | INF-AUD-02 *(scratch=P2; elevato a P1 — vedi App. F §F.2)* |
 
-## 2.4 P2 — OPEN (backlog)
+## 2.4 P2 — (tutti DONE; nessun P2 OPEN)
 
-| ID | Titolo | File |
-|----|--------|------|
-| **T-P2-01** | Fallback `'Nessuna'` vs `'Nessuno'` | `classification/validator.py#L227-L231` |
-| **T-P2-02** | `img` assente da `content_ignored_tags` | `extraction/parser.py#L22-L25` |
-| **T-P2-03** | No `@model_validator` primo tag == primary | `validator.py` |
-| **T-P2-04** | Bare `except:` script diagnostici | `scripts/diagnostics/test_500_*.py` |
-| **T-P2-05** | `UI_OFFSETS` dead code | `radar-map.component.ts#L148+` |
-| **T-P2-06** | `clusterclick` senza filtro esplicito category | `radar-map.component.ts#L456-L494` |
-| **T-P2-07** | Stroke GeoJSON `rgba` hardcoded | `radar-map.component.ts` style |
-| **T-P2-08** | Dir vuota `shared/directives/` | path FE |
+| ID | Titolo | File chiave | Finding |
+|----|--------|-------------|---------|
+| **T-P2-01** | ~~Fallback `'Nessuna'` vs `'Nessuno'`~~ → **DONE** (corretto fallback in `validator.py`) | `classification/validator.py#L227-L231` | BE-AUD-007 |
+| **T-P2-02** | ~~`img` assente da `content_ignored_tags`~~ → **DONE** (aggiunti in `parser.py`) | `extraction/parser.py#L22-L25` | BE-AUD-008 |
+| **T-P2-03** | ~~No `@model_validator` primo tag == primary~~ → **DONE** (aggiunto in `validator.py`) | `validator.py` | BE-AUD-009 |
+| **T-P2-04** | ~~Bare `except:` script diagnostici~~ → **DONE** (sostituiti con `except OSError`) | `scripts/diagnostics/test_500_*.py` | BE-AUD-010 |
+| **T-P2-05** | ~~`UI_OFFSETS` dead code~~ → **DONE** (rimosso in component e spec) | `radar-map.component.ts#L148+` | FE-AUD-002 |
+| **T-P2-06** | ~~`clusterclick` senza filtro esplicito category~~ → **DONE** (aggiunto filtro `primary_category`) | `radar-map.component.ts#L456-L494` | FE-AUD-003 |
+| **T-P2-07** | ~~Stroke GeoJSON `rgba` hardcoded~~ → **DONE** (usata CSS var `--color-map-stroke`) | `radar-map.component.ts` style | FE-AUD-004 |
+| **T-P2-08** | ~~Dir vuota `shared/directives/`~~ → **DONE** (rimossa dal filesystem) | path FE | FE-AUD-005 |
 
 ## 2.5 Docs — FIXED (non riaprire salvo regressione)
 
@@ -1080,11 +1080,11 @@ SoT: audit_problemi_documentazione.md v2.2 + APPENDICE F.
 Stato ticket operativo: audit_problemi_documentazione_risoluzione.md §3.
 Preferisci .agents/AGENTS.md + radar/.ecc/rules/*.md (T-DOC-01 CLOSED).
 Vincoli: sidebar freeze; main.py API-only; asyncpg; window.L; no commit senza richiesta.
-Ticket OPEN in ordine FASE 4 (T-P0-01..T-P1-05 DONE; prossimo T-P2-01).
+Ticket OPEN in ordine FASE 4 (T-P0-01..T-P2-08 DONE; prossimo = Final Release).
 Un ticket per turno: riproduci → fix → gate FASE 5 → marca DONE in risoluzione §3.
 Priorità elevate storiche: T-P0-02 chiuso; T-P1-05 chiuso (App. F §F.2).
 ```
 
 ---
 
-**Esito check definitivo:** il manuale è **coerente** con `scratch/*_audit.md` e `scratch/*_rules.md`. I dubbi di v2.0 sono **chiusi**. Docs: **T-DOC-01 CLOSED** (FASE 0). Snapshot FASE 0: 15 OPEN; **post T-P1-05: 8 ticket codice OPEN (P0=0, P1=0, P2=8; SoT = risoluzione §3).
+**Esito check definitivo:** il manuale è **coerente** con `scratch/*_audit.md` e `scratch/*_rules.md`. I dubbi di v2.0 sono **chiusi**. Docs: **T-DOC-01 CLOSED** (FASE 0). Remediation codice: **CLOSED** (SoT = risoluzione §3).

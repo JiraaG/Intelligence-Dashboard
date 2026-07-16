@@ -1,6 +1,13 @@
 import {
-  Component, AfterViewInit, DestroyRef, input, output,
-  signal, computed, effect, inject
+  Component,
+  AfterViewInit,
+  DestroyRef,
+  input,
+  output,
+  signal,
+  computed,
+  effect,
+  inject,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
@@ -55,9 +62,10 @@ interface ArticleMarkerMeta {
   summaryCategory?: string;
 }
 
-type ArticleMarker = Leaflet.Marker & ArticleMarkerMeta & {
-  _icon?: HTMLElement | null;
-};
+type ArticleMarker = Leaflet.Marker &
+  ArticleMarkerMeta & {
+    _icon?: HTMLElement | null;
+  };
 
 function getLeaflet(): LeafletGlobal | null {
   const L = (window as unknown as { L?: LeafletGlobal }).L;
@@ -72,52 +80,52 @@ function getLeaflet(): LeafletGlobal | null {
   standalone: true,
   imports: [CommonModule],
   templateUrl: './radar-map.component.html',
-  styleUrl: './radar-map.component.scss'
+  styleUrl: './radar-map.component.scss',
 })
 export class RadarMapComponent implements AfterViewInit {
   private readonly http = inject(HttpClient);
   private readonly destroyRef = inject(DestroyRef);
 
-  articles         = input.required<Article[]>();
-  countries        = input.required<CountrySummary[]>();
+  articles = input.required<Article[]>();
+  countries = input.required<CountrySummary[]>();
   /** Day aggregates — used for numbered cluster balls before a nation is opened. */
-  mapSummary       = input<MapSummaryRow[]>([]);
+  mapSummary = input<MapSummaryRow[]>([]);
   focusCountryCode = input<string | null>(null);
 
-  markerClicked  = output<Article>();
+  markerClicked = output<Article>();
   clusterClicked = output<Article[]>();
   /** Nation open — optional category + preserveZoom for summary pallini. */
   countryClicked = output<CountryOpenRequest>();
 
   currentZoomLevel = signal<number>(3);
-  isZoomedOut      = computed(() => this.currentZoomLevel() < 5);
+  isZoomedOut = computed(() => this.currentZoomLevel() < 5);
   isParsingGeoJson = signal<boolean>(true);
-  mapUnavailable   = signal<boolean>(false);
+  mapUnavailable = signal<boolean>(false);
 
   private readonly CATEGORY_ICONS: Record<string, string> = {
-    'Nucleare':       '☢️',
-    'Energia':        '⚡',
-    'Infrastrutture': '🏗️',
-    'Geopolitica':    '🌍',
-    'Economia':       '📈',
-    'Tecnologia':     '💻',
-    'Spazio':         '🚀',
-    'Ambiente':       '🌿',
-    'Salute':         '⚕️',
-    'Sicurezza':      '🛡️'
+    Nucleare: '☢️',
+    Energia: '⚡',
+    Infrastrutture: '🏗️',
+    Geopolitica: '🌍',
+    Economia: '📈',
+    Tecnologia: '💻',
+    Spazio: '🚀',
+    Ambiente: '🌿',
+    Salute: '⚕️',
+    Sicurezza: '🛡️',
   };
 
   private readonly CATEGORY_CSS_VARS: Record<string, string> = {
-    'Nucleare':       '--color-nucleare',
-    'Energia':        '--color-energia',
-    'Infrastrutture': '--color-infrastrutture',
-    'Geopolitica':    '--color-geopolitica',
-    'Economia':       '--color-economia',
-    'Tecnologia':     '--color-tecnologia',
-    'Spazio':         '--color-spazio',
-    'Ambiente':       '--color-ambiente',
-    'Salute':         '--color-salute',
-    'Sicurezza':      '--color-sicurezza'
+    Nucleare: '--color-nucleare',
+    Energia: '--color-energia',
+    Infrastrutture: '--color-infrastrutture',
+    Geopolitica: '--color-geopolitica',
+    Economia: '--color-economia',
+    Tecnologia: '--color-tecnologia',
+    Spazio: '--color-spazio',
+    Ambiente: '--color-ambiente',
+    Salute: '--color-salute',
+    Sicurezza: '--color-sicurezza',
   };
 
   readonly legendItems = [
@@ -130,27 +138,11 @@ export class RadarMapComponent implements AfterViewInit {
     { label: 'Spazio', icon: '🚀', cssVar: '--color-spazio' },
     { label: 'Ambiente', icon: '🌿', cssVar: '--color-ambiente' },
     { label: 'Salute', icon: '⚕️', cssVar: '--color-salute' },
-    { label: 'Sicurezza', icon: '🛡️', cssVar: '--color-sicurezza' }
+    { label: 'Sicurezza', icon: '🛡️', cssVar: '--color-sicurezza' },
   ];
 
   /** Day-view / nation-hub pin pixel box (tip at bottom). */
   private readonly COUNTRY_PIN_SIZE = { w: 64, h: 76 } as const;
-  /**
-   * Pixel offsets kept for legacy cluster math; day/detail pins no longer
-   * use CSS rings (they drift into neighbouring countries).
-   */
-  private readonly UI_OFFSETS: Record<string, [number, number]> = {
-    'Nucleare':       [34, 0],
-    'Energia':        [28, 20],
-    'Infrastrutture': [11, 32],
-    'Geopolitica':    [-11, 32],
-    'Economia':       [-28, 20],
-    'Tecnologia':     [-34, 0],
-    'Spazio':         [-28, -20],
-    'Ambiente':       [-11, -32],
-    'Salute':         [11, -32],
-    'Sicurezza':      [28, -20],
-  };
 
   private map: Leaflet.Map | null = null;
   private L: LeafletGlobal | null = null;
@@ -265,7 +257,9 @@ export class RadarMapComponent implements AfterViewInit {
       return (
         'detail:' +
         articles
-          .map((a) => `${a.id}|${a.primary_category}|${a.country_code}|${a.latitude}|${a.longitude}`)
+          .map(
+            (a) => `${a.id}|${a.primary_category}|${a.country_code}|${a.latitude}|${a.longitude}`,
+          )
           .sort()
           .join(';')
       );
@@ -320,11 +314,7 @@ export class RadarMapComponent implements AfterViewInit {
     return 1;
   }
 
-  private createSafeMarkerIcon(
-    L: LeafletGlobal,
-    article: Article,
-    sizePx = 28,
-  ): Leaflet.DivIcon {
+  private createSafeMarkerIcon(L: LeafletGlobal, article: Article, sizePx = 28): Leaflet.DivIcon {
     const box = Math.max(16, Math.round(sizePx));
     const fontPx = Math.max(12, Math.round(box * 0.55));
     const emoji = this.CATEGORY_ICONS[article.primary_category] ?? '📍';
@@ -388,7 +378,7 @@ export class RadarMapComponent implements AfterViewInit {
       maxBounds: L.latLngBounds(L.latLng(-85, -180), L.latLng(85, 180)),
       maxBoundsViscosity: 1.0,
       zoomControl: false,
-      attributionControl: true
+      attributionControl: true,
     });
 
     this.geoJsonLayerGroup = L.layerGroup();
@@ -406,7 +396,7 @@ export class RadarMapComponent implements AfterViewInit {
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
       attribution: '© OpenStreetMap contributors © CARTO',
       subdomains: 'abcd',
-      maxZoom: 19
+      maxZoom: 19,
     }).addTo(this.map);
 
     const labelsPane = this.map.createPane('labelsPane');
@@ -416,7 +406,7 @@ export class RadarMapComponent implements AfterViewInit {
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
       pane: 'labelsPane',
       subdomains: 'abcd',
-      maxZoom: 19
+      maxZoom: 19,
     }).addTo(this.map);
 
     const categories = Object.keys(this.CATEGORY_CSS_VARS);
@@ -432,7 +422,7 @@ export class RadarMapComponent implements AfterViewInit {
           // No category pallini — day view uses summary pins; nation open uses
           // hub pin + spiderfy emoji graph for the active carousel category.
           return L.divIcon({ className: 'hidden', iconSize: [0, 0] });
-        }
+        },
       });
 
       cg.on('unspiderfied', () => {
@@ -469,10 +459,12 @@ export class RadarMapComponent implements AfterViewInit {
 
         this.collapseAllGraphs(false, false);
 
-        const articleMarkers = childMarkers.filter((m) => !m.isDummy && !m.isSummary && m.articleData);
+        const articleMarkers = childMarkers.filter(
+          (m) => !m.isDummy && !m.isSummary && m.articleData,
+        );
         const arts = articleMarkers
           .map((m) => m.articleData)
-          .filter((a): a is Article => !!a);
+          .filter((a): a is Article => !!a && a.primary_category === cat);
 
         // Day-view summary clusters: open nation on this category, keep zoom, then spiderfy.
         if (arts.length === 0) {
@@ -543,12 +535,7 @@ export class RadarMapComponent implements AfterViewInit {
       // MC zoom-unspiderfy is disabled; re-spiderfy after zoom to refresh leg positions.
       const nationOpen = this.articles().length > 0 || !!this.focusCountryCode();
       // Require lastSpiderfy so fitBounds(maxZoom:4) open race cannot close the sidebar.
-      if (
-        !this.isNavigating &&
-        nationOpen &&
-        zoom < 5 &&
-        !!this.lastSpiderfyCategory
-      ) {
+      if (!this.isNavigating && nationOpen && zoom < 5 && !!this.lastSpiderfyCategory) {
         this.collapseAllGraphs(true);
       } else if (
         !this.isNavigating &&
@@ -623,16 +610,11 @@ export class RadarMapComponent implements AfterViewInit {
     if (generation !== this.spiderfyGeneration) return false;
     if (!childMarkers || childMarkers.length === 0) return false;
 
-    const realMarkers = childMarkers.filter(
-      (m) => !m.isDummy && !m.isSummary && !!m.articleData,
-    );
+    const realMarkers = childMarkers.filter((m) => !m.isDummy && !m.isSummary && !!m.articleData);
     if (realMarkers.length === 0) return false;
 
     // Prefer a marker that still has a cluster parent (first may be orphaned after races).
-    let newParent:
-      | (Leaflet.Marker & { spiderfy?: () => void })
-      | null
-      | undefined;
+    let newParent: (Leaflet.Marker & { spiderfy?: () => void }) | null | undefined;
     for (const m of realMarkers) {
       const parent = cg.getVisibleParent(m) as
         | (Leaflet.Marker & { spiderfy?: () => void })
@@ -677,9 +659,7 @@ export class RadarMapComponent implements AfterViewInit {
     this.clearDetailHubPin();
     this.restoreDetailHubOnUnspiderfy = false;
 
-    const categoryArts = realMarkers
-      .map((m) => m.articleData)
-      .filter((a): a is Article => !!a);
+    const categoryArts = realMarkers.map((m) => m.articleData).filter((a): a is Article => !!a);
     // Compact disc (not the tall hub pin) so spider legs stay clear.
     const rootIcon = this.createSpiderfyRootIcon(this.L, categoryArts);
 
@@ -755,7 +735,7 @@ export class RadarMapComponent implements AfterViewInit {
         error: (err) => {
           console.error('[RadarMap] Errore GeoJSON:', err);
           this.isParsingGeoJson.set(false);
-        }
+        },
       });
   }
 
@@ -769,6 +749,9 @@ export class RadarMapComponent implements AfterViewInit {
     const features = geoData.features;
     let index = 0;
     const batchSize = 15;
+    const stroke =
+      getComputedStyle(document.documentElement).getPropertyValue('--color-map-stroke').trim() ||
+      'rgba(0, 212, 255, 0.15)';
 
     const processBatch = () => {
       this.geoJsonRafId = null;
@@ -780,7 +763,8 @@ export class RadarMapComponent implements AfterViewInit {
       const end = Math.min(index + batchSize, features.length);
       for (let i = index; i < end; i++) {
         const feature = features[i];
-        let code = feature.properties?.['ISO3166-1-Alpha-2'] ?? feature.properties?.['ISO_A2'] ?? 'XX';
+        let code =
+          feature.properties?.['ISO3166-1-Alpha-2'] ?? feature.properties?.['ISO_A2'] ?? 'XX';
         if (code === '-99' || !code || code === 'XX') {
           const name = feature.properties?.['name'];
           if (name === 'France') code = 'FR';
@@ -789,12 +773,12 @@ export class RadarMapComponent implements AfterViewInit {
 
         const layer = L.geoJSON(feature, {
           style: () => ({
-            color: 'rgba(0, 212, 255, 0.15)',
+            color: stroke,
             weight: 0.5,
             fillOpacity: 0,
             fillColor: 'transparent',
-            className: 'country-fill'
-          })
+            className: 'country-fill',
+          }),
         });
 
         layer.on('click', (e: Leaflet.LeafletMouseEvent) => {
@@ -849,6 +833,14 @@ export class RadarMapComponent implements AfterViewInit {
     }
 
     const baseUrl = window.location.href.split('#')[0];
+    const stroke =
+      getComputedStyle(document.documentElement).getPropertyValue('--color-map-stroke').trim() ||
+      'rgba(0, 212, 255, 0.15)';
+    const strokeActive =
+      getComputedStyle(document.documentElement)
+        .getPropertyValue('--color-map-stroke-active')
+        .trim() || 'rgba(0, 212, 255, 0.25)';
+
     this.countryLayersMap.forEach((layers, code) => {
       const summary = ctrs.find((c) => c.country_code === code);
 
@@ -858,12 +850,12 @@ export class RadarMapComponent implements AfterViewInit {
           layer.setStyle({
             fillColor: `url(${baseUrl}#${patternId})`,
             fillOpacity: 0.35,
-            color: 'rgba(0, 212, 255, 0.25)'
+            color: strokeActive,
           });
         } else {
           layer.setStyle({
             fillOpacity: 0,
-            color: 'rgba(0, 212, 255, 0.15)'
+            color: stroke,
           });
         }
       });
@@ -909,7 +901,11 @@ export class RadarMapComponent implements AfterViewInit {
     };
 
     const appendLine = (
-      x1: string, y1: string, x2: string, y2: string, strokeColor: string,
+      x1: string,
+      y1: string,
+      x2: string,
+      y2: string,
+      strokeColor: string,
     ): void => {
       const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       line.setAttribute('x1', x1);
@@ -994,7 +990,7 @@ export class RadarMapComponent implements AfterViewInit {
       this.map.fitBounds(bounds, {
         maxZoom: 4,
         animate: true,
-        duration: 1.0
+        duration: 1.0,
       });
 
       let cleaned = false;
@@ -1046,9 +1042,7 @@ export class RadarMapComponent implements AfterViewInit {
     categoryCounts: { category: string; count: number }[],
   ): Leaflet.DivIcon {
     const { w, h } = this.COUNTRY_PIN_SIZE;
-    const segments = categoryCounts
-      .filter((c) => c.count > 0)
-      .sort((a, b) => b.count - a.count);
+    const segments = categoryCounts.filter((c) => c.count > 0).sort((a, b) => b.count - a.count);
     let cursor = 0;
     const parts: string[] = [];
     for (const s of segments) {
@@ -1093,10 +1087,7 @@ export class RadarMapComponent implements AfterViewInit {
    * Compact centered disc used as spiderfy root — tall hub pin would cover
    * northern spider legs (icons appear under the pin).
    */
-  private createSpiderfyRootIcon(
-    L: LeafletGlobal,
-    articles: Article[],
-  ): Leaflet.DivIcon {
+  private createSpiderfyRootIcon(L: LeafletGlobal, articles: Article[]): Leaflet.DivIcon {
     const categories = new Map<string, number>();
     for (const a of articles) {
       categories.set(a.primary_category, (categories.get(a.primary_category) ?? 0) + 1);
@@ -1369,12 +1360,12 @@ export class RadarMapComponent implements AfterViewInit {
         html: '',
         className: '',
         iconSize: [0, 0],
-        iconAnchor: [0, 0]
+        iconAnchor: [0, 0],
       });
 
       const dummyMarker = L.marker([baseLat, baseLng], {
         icon: invisibleIcon,
-        interactive: false
+        interactive: false,
       }) as ArticleMarker;
       dummyMarker.isDummy = true;
 
@@ -1412,11 +1403,7 @@ export class RadarMapComponent implements AfterViewInit {
     }
   }
 
-  public focusAndSpiderfyCategory(
-    countryCode: string,
-    category: string,
-    attempt = 0,
-  ): void {
+  public focusAndSpiderfyCategory(countryCode: string, category: string, attempt = 0): void {
     if (!this.map || this.destroyed) return;
     const cg = this.categoryClusterGroups.get(category);
     if (!cg) return;
@@ -1455,9 +1442,10 @@ export class RadarMapComponent implements AfterViewInit {
     const currentZoom = this.map.getZoom();
     const targetZoom = 6;
     const visibleParent = cg.getVisibleParent(firstMarker) ?? firstMarker;
-    const latLng = typeof visibleParent.getLatLng === 'function'
-      ? visibleParent.getLatLng()
-      : firstMarker.getLatLng();
+    const latLng =
+      typeof visibleParent.getLatLng === 'function'
+        ? visibleParent.getLatLng()
+        : firstMarker.getLatLng();
     const gen = ++this.spiderfyGeneration;
 
     // Detail zoom already (markers visible): spiderfy in place — never fitBounds/dezoom.
@@ -1514,10 +1502,7 @@ export class RadarMapComponent implements AfterViewInit {
     }
 
     if (attempt < 10) {
-      this.scheduleTimeout(
-        () => this.focusAndSpiderfyCountry(countryCode, attempt + 1),
-        50,
-      );
+      this.scheduleTimeout(() => this.focusAndSpiderfyCountry(countryCode, attempt + 1), 50);
     }
   }
 

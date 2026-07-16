@@ -14,7 +14,7 @@ from app.classification.client import (
     sanitize_gemini_response_schema,
 )
 from app.classification.quota import compute_day_window
-from app.classification.validator import GeopoliticalArticleSchema
+from app.classification.validator import GeopoliticalArticleSchema, get_fallback_article
 from app.core.config import ConfigError
 
 
@@ -113,6 +113,45 @@ def test_schema_rejects_invalid_relevance() -> None:
     }
     with pytest.raises(ValidationError):
         GeopoliticalArticleSchema(**data)
+
+
+def test_schema_first_tag_validation() -> None:
+    """Verifica che il primo tag debba corrispondere a primary_category e che il fallback sia valido."""
+    base_data = {
+        "title": "Titolo",
+        "summary": "Riassunto.",
+        "published_at": "2026-06-24",
+        "source_url": "https://example.com",
+        "country_code": "IT",
+        "latitude": 41.87,
+        "longitude": 12.56,
+        "companies_involved": "Nessuno",
+        "sentiment": "Neutrale",
+        "infrastructural_entities": "Nessuno",
+        "relevance_level": 1,
+    }
+
+    # Match OK
+    data_ok = {**base_data, "tags": "Tecnologia, Semiconduttori", "primary_category": "Tecnologia"}
+    article = GeopoliticalArticleSchema(**data_ok)
+    assert article.primary_category == "Tecnologia"
+
+    # Mismatch primo tag REJECT
+    data_mismatch = {**base_data, "tags": "Geopolitica, Tecnologia", "primary_category": "Tecnologia"}
+    with pytest.raises(ValidationError, match="primo tag"):
+        GeopoliticalArticleSchema(**data_mismatch)
+
+    # Empty tags or Nessuno REJECT
+    data_empty = {**base_data, "tags": "Nessuno", "primary_category": "Tecnologia"}
+    with pytest.raises(ValidationError, match="tags deve iniziare con primary_category"):
+        GeopoliticalArticleSchema(**data_empty)
+
+    # Fallback get_fallback_article ancora valido (tags=primary)
+    fallback = get_fallback_article("Titolo fallback", "https://example.com/fallback", "2026-07-16")
+    assert fallback.primary_category == "Infrastrutture"
+    assert fallback.tags == "Infrastrutture"
+    assert fallback.companies_involved == "Nessuno"
+    assert fallback.infrastructural_entities == "Nessuno"
 
 
 def test_day_window_half_open_utc() -> None:

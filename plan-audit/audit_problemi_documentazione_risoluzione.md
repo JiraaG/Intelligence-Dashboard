@@ -6,11 +6,11 @@
 * **Manuale operativo di riferimento:** `audit_problemi_documentazione.md` (v2.2 · FASI 0–2 + APPENDICE F)
 * **Gate Progetto:** Phase 6 / Gate Verde (Stato post-branch restore)
 * **Stato Fase 0:** **FASE 0 DONE DEFINITIVA**
-* **Remediation codice:** T-P0-01 **DONE**, T-P1-03 **DONE**, T-P1-01 **DONE**, T-P1-02 **DONE**, T-P0-02 **DONE**, T-P1-04 **DONE**, T-P1-05 **DONE** (2026-07-16); resto OPEN; prossimo **T-P2-01**
-* **Follow-up ops (non ticket SoT):** OPS-FIX `init_pool` retry + doc Docker — codice/docs in working tree (commit su richiesta); pytest not live **116** post-fix.* SoT stato ticket: questo file §3 (stati `OPEN` / `DONE` / `CLOSED`). Playbook riprodurre/fix/gate = manuale FASI 3–5. Dopo ogni fix aggiornare §3 qui e la matrice FASE 2 del manuale.
+* **Remediation codice:** **CLOSED** · prossimo Final Release.
+* **Follow-up ops (non ticket SoT):** OPS-FIX `init_pool` retry + doc Docker — codice/docs in working tree (commit su richiesta); pytest not live **117** post-fix.* SoT stato ticket: questo file §3 (stati `OPEN` / `DONE` / `CLOSED`). Playbook riprodurre/fix/gate = manuale FASI 3–5. Dopo ogni fix aggiornare §3 qui e la matrice FASE 2 del manuale.
 
 ### Definition of Done FASE 0 (firmata)
-1. Manuale v2.2 + App. F letti; conteggio OPEN codice **all’epoca FASE 0** = 2 P0 + 5 P1 + 8 P2; docs OPEN residui = 0 (T-DOC-01 CLOSED). **Oggi (post T-P1-05):** P0=0, P1=0, P2=8 → 8 OPEN (SoT §3).
+1. Manuale v2.2 + App. F letti; conteggio OPEN codice **all’epoca FASE 0** = 2 P0 + 5 P1 + 8 P2; docs OPEN residui = 0 (T-DOC-01 CLOSED). **Oggi (post T-P2-08):** P0=0, P1=0, P2=0 → 0 OPEN (SoT §3).
 2. Invarianti §1.3 (Sidebar Freeze + read/unread separati) documentate senza contraddizioni.
 3. Matrice ticket con ID, finding scratch, priorità, file, dipendenze, stato `OPEN`/`CLOSED`.
 4. Elevazioni T-P0-02 / T-P1-05 e dipendenza T-P0-01→T-P1-03 esplicite.
@@ -19,7 +19,7 @@
 7. Happy path distingue **AS-IS** vs **POST-FIX**.
 8. Contratto LLM (prompt F.8) e definizioni P0/P1/P2 congelati in questo log.
 9. Zero modifiche remediation a `radar/backend/**`, `radar/frontend/**`, Dockerfile o migrazioni in FASE 0.
-10. Metadati: DONE DEFINITIVA FASE 0; remediation codice **poi avviata** (header: T-P1-05 DONE; prossimo T-P2-01).
+10. Metadati: DONE DEFINITIVA FASE 0; remediation codice **poi avviata** (header: T-P2-08 DONE; prossimo: Final Release Handoff).
 
 ---
 
@@ -43,7 +43,7 @@ SoT: audit_problemi_documentazione.md v2.2 + APPENDICE F.
 Stato ticket operativo: audit_problemi_documentazione_risoluzione.md §3.
 radar/.ecc/CLAUDE.md è allineato Gate Verde (T-DOC-01 CLOSED); preferisci comunque .agents/AGENTS.md + radar/.ecc/rules/*.md come guardrail.
 Vincoli: sidebar freeze; main.py API-only; asyncpg; window.L; no commit senza richiesta.
-Ticket OPEN in ordine FASE 4 (T-P0-01..T-P1-05 DONE; prossimo T-P2-01).
+Ticket OPEN in ordine FASE 4 (T-P0-01..T-P2-08 DONE; prossimo = Final Release).
 Ticket per turno: riproduci → fix → gate FASE 5 → marca DONE in risoluzione §3 e aggiorna manuale FASE 2.
 Priorità elevate storiche: T-P0-02 chiuso; T-P1-05 chiuso Path A (App. F §F.2).
 ```
@@ -101,7 +101,7 @@ Il **Radar Informativo Globale** è un'applicazione web containerizzata self-hos
 **Happy path entry nuove (AS-IS = corretto, da non rompere):**
 ```
 [Miniflux] → [radar-worker]
-  dedup SQL → sanitize HTML (strip tag; gap img/picture/source = T-P2-02 OPEN)
+  dedup SQL → sanitize HTML (strip tag; gap img/picture/source = T-P2-02 DONE)
   → QuotaLedger reserve → Gemini → complete/fail ledger
   → TX article + outbox → vault atomic → outbox completed → mark-read Miniflux
 ```
@@ -144,7 +144,7 @@ Se già nel DB (Duplicato)
 |--------|------:|
 | P0 OPEN codice | 0 |
 | P1 OPEN codice | 0 (T-P1-03, T-P1-01, T-P1-02, T-P1-04, T-P1-05 DONE) |
-| P2 OPEN codice | 8 |
+| P2 OPEN codice | 0 (T-P2-01...T-P2-08 DONE) |
 | Docs OPEN residui | 0 |
 | Docs FIXED / non riaprire | 12 (11 storici + T-DOC-01) |
 | Aree PASS | 14 |
@@ -163,14 +163,14 @@ Se già nel DB (Duplicato)
 | **T-P1-04** | FE-AUD-001 | P1 | `state.service.ts`, `app.ts` | **DONE** | — | `detailError` + `error()` merge; catch `closeSidebar(false)` preserva banner. Vedi §15 + `audit_remediation_T-P1-04.md`. |
 | **T-P1-05** | INF-AUD-02 | P1 | `frontend/Dockerfile`, `nginx.conf` | **DONE** | — | Nginx non-root su porta 8080, chown dir cache/log/run/html, COPY chown nginx, host mapped 80:8080. Vedi §16 + `audit_remediation_T-P1-05.md`. |
 | **T-DOC-01** | Check docs v2.1 | P1 Docs | `radar/.ecc/CLAUDE.md` | **CLOSED** | — | Sintomi legacy (Phase 0–2 / `radar-network`) **non più presenti** su disco (verifica FASE 0). File allineato Gate Verde. |
-| **T-P2-01** | BE-AUD-007 | P2 | `classification/validator.py#L227-L231` | OPEN | — | Fallback `'Nessuna'` → `'Nessuno'`. |
-| **T-P2-02** | BE-AUD-008 | P2 | `extraction/parser.py#L22-L25` | OPEN | — | Aggiungere `img`/`picture`/`source` a `content_ignored_tags`. |
-| **T-P2-03** | BE-AUD-009 | P2 | `classification/validator.py` | OPEN | — | `@model_validator` primo tag == `primary_category`. |
-| **T-P2-04** | BE-AUD-010 | P2 | `scripts/diagnostics/test_500_*.py` | OPEN | — | `except:` nudo → `except OSError`. |
-| **T-P2-05** | FE-AUD-002 | P2 | `radar-map.component.ts#L148+` | OPEN | — | Rimuovere `UI_OFFSETS` dead. |
-| **T-P2-06** | FE-AUD-003 | P2 | `radar-map.component.ts#L456-L494` | OPEN | — | Filtro esplicito `primary_category === cat` su clusterclick. |
-| **T-P2-07** | FE-AUD-004 | P2 | `radar-map.component.ts` style | OPEN | — | Stroke GeoJSON via `--color-map-stroke`. |
-| **T-P2-08** | FE-AUD-005 | P2 | path FE `shared/directives/` | OPEN | — | Rimuovere dir residua (verificare vuota prima del delete). |
+| **T-P2-01** | BE-AUD-007 | P2 | `classification/validator.py#L227-L231` | **DONE** | — | Fallback `'Nessuna'` → `'Nessuno'`. Touched: `validator.py`. |
+| **T-P2-02** | BE-AUD-008 | P2 | `extraction/parser.py#L22-L25` | **DONE** | — | Aggiungere `img`/`picture`/`source` a `content_ignored_tags`. Touched: `parser.py`, `test_extraction.py`. |
+| **T-P2-03** | BE-AUD-009 | P2 | `classification/validator.py` | **DONE** | — | `@model_validator` primo tag == `primary_category`. Touched: `validator.py`, `test_classification.py`, `test_commit.py`. |
+| **T-P2-04** | BE-AUD-010 | P2 | `scripts/diagnostics/test_500_*.py` | **DONE** | — | `except:` nudo → `except OSError`. Touched: `test_500_bot.py`, `test_500_debug.py`, `test_string_lists.py`. |
+| **T-P2-05** | FE-AUD-002 | P2 | `radar-map.component.ts#L148+` | **DONE** | — | Rimuovere `UI_OFFSETS` dead. Touched: `radar-map.component.ts`, `radar-map.component.spec.ts`. |
+| **T-P2-06** | FE-AUD-003 | P2 | `radar-map.component.ts#L456-L494` | **DONE** | — | Filtro esplicito `primary_category === cat` su clusterclick. Touched: `radar-map.component.ts`. |
+| **T-P2-07** | FE-AUD-004 | P2 | `radar-map.component.ts` style | **DONE** | — | Stroke GeoJSON via `--color-map-stroke`. Touched: `radar-map.component.ts`, `styles.scss`. |
+| **T-P2-08** | FE-AUD-005 | P2 | path FE `shared/directives/` | **DONE** | — | Rimuovere dir residua (verificare vuota prima del delete). Touched: `directives/` (rimossa dal disco). |
 
 ### 3.2 Docs FIXED (non riaprire salvo regressione)
 
@@ -231,7 +231,7 @@ Deferred infra (digest pin, `--legacy-peer-deps`) ≠ FAIL — non aprire ticket
 ### 7.1 Letture e evidenze
 * Manuale v2.1→v2.2, scratch×6, AGENTS.md, `.ecc/rules/*`, `runbook.md`, `CLAUDE.md`.
 * Spot-check codice (FASE 0 + verifica aggiuntiva): `worker.py` gate T-P0-01 DONE; `config.py` `quote_plus` + Compose `POSTGRES_HOST` (T-P1-01 DONE); `outbox.py` retry `miniflux_marked_at` (T-P1-03 DONE); script diagnostici T-P0-02 DONE; `state.service.ts` / `app.ts` (`detailError`, T-P1-04 **DONE**); Dockerfile/nginx (T-P1-05 **DONE**); `CLAUDE.md` Gate Verde (T-DOC-01 CLOSED).
-* P2 spot-check: T-P2-01/02/05 CONFIRMED; T-P2-06 WEAK (difesa in profondità); T-P2-08 path residuo da verificare prima del delete.
+* P2 spot-check: T-P2-01/02/05/06/07/08 conclusi con successo. Dir directives rimossa.
 
 ### 7.2 Multi-agente (FASE 0 iniziale + verifica chiusura)
 Sintesi iniziale via tre context mapper (BE / FE / Infra-Docs). UUID storici non usati come audit trail verificabile.
@@ -411,4 +411,24 @@ Select-String -Path "radar\.ecc\CLAUDE.md" -Pattern "radar-network|Phase 0–2|P
   - Docs/ECC: `docker.md`, `AGENTS.md` §4.3, `infra_rules` INF-NET-06/HC-08/NGX-01, skill `radar-docker-ops` §8 (+ mirror), `01_getting_started`, `CLAUDE.md`.
 - Gate FASE 5: Script E `whoami=nginx`; wget `:8080/health` → `ok`; `curl.exe -sI http://localhost/health` → 200; `ps` → healthy. Report: `audit_remediation_T-P1-05.md`.
 - **Handoff:** Fine ticket P1. Prossimo: batch P2 (T-P2-01…).
+
+---
+
+## 17. Esito Remediation P2 Batch (T-P2-01 … T-P2-08)
+
+**P2 BATCH DONE — PASS** (verificato nel workspace `Dashboard finance` + Script M + Vitest/Pytest).
+
+- Walkthrough: implementazione in parallelo per BE e FE dei ticket P2.
+- Backend:
+  - T-P2-01: fallbacks `"Nessuna"` -> `"Nessuno"` in `validator.py`.
+  - T-P2-02: content_ignored_tags += `img`, `picture`, `source` in `parser.py`, ed estesi unit test.
+  - T-P2-03: `@model_validator` in `validator.py` per allineare tags e primary_category, con annessi unit test.
+  - T-P2-04: bare `except:` -> `except OSError:` nei file diagnostici.
+- Frontend:
+  - T-P2-05: rimozione dead `UI_OFFSETS` e relativi spec assert.
+  - T-P2-06: filtro esplicito su arts (`primary_category === cat`) per click cluster.
+  - T-P2-07: stroke GeoJSON via CSS var `--color-map-stroke` integrato dinamico.
+  - T-P2-08: rimozione filesystem cartella directives vuota.
+- Gate FASE 5: pytest not live 117 pass; Script M conforme; FE typecheck verde; Vitest 30/30 pass; sidebar freeze rispettato.
+- **Handoff:** Fine ticket P2. Prossimo: Final Release (PR merge to develop/main).
 

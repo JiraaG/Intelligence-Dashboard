@@ -37,18 +37,22 @@ def test_strip_html_tags_junk_tags() -> None:
     assert res == "Inizio. Fine."
 
 def test_strip_html_tags_media_tags() -> None:
-    """Verifica che tag multimediali (img, video, audio) siano purgati con attributi e fallback."""
+    """Verifica che tag multimediali (img, video, audio, picture, source) siano purgati con attributi e fallback."""
     html = (
         "Testo iniziale. "
         "<img src='https://example.com/logo.png' alt='Logo' style='width:100px;'>"
         " Testo centrale. "
         "<video controls src='movie.mp4'>Your browser does not support video.</video>"
+        " <img>fallback interno</img>"
+        " <picture><source srcset='pic.webp'>fallback picture</picture>"
         " Testo finale."
     )
     res = strip_html_tags(html)
     assert "Logo" not in res
     assert "movie.mp4" not in res
     assert "Your browser does not support video." not in res
+    assert "fallback interno" not in res
+    assert "fallback picture" not in res
     assert res == "Testo iniziale. Testo centrale. Testo finale."
 
 

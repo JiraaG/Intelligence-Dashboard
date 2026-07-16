@@ -1,7 +1,6 @@
 import os
-import json
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 import asyncpg
 
 from app.classification.validator import GeopoliticalArticleSchema
@@ -176,7 +175,7 @@ async def test_commit_article_to_db_conflict_fallback() -> None:
     mock_transaction.__aexit__ = AsyncMock()
 
     mock_conn.fetchval = AsyncMock()
-    mock_conn.fetchval.side_effect = [None, 105, 201]
+    mock_conn.fetchval.side_effect = [None, 105, 201, 301]
     mock_conn.execute = AsyncMock()
 
     article = GeopoliticalArticleSchema(
@@ -188,7 +187,7 @@ async def test_commit_article_to_db_conflict_fallback() -> None:
         latitude=51.0,
         longitude=13.0,
         companies_involved="TSMC",
-        tags="Nessuno",
+        tags="Tecnologia",
         primary_category="Tecnologia",
         sentiment="Positivo",
         infrastructural_entities="Nessuno",

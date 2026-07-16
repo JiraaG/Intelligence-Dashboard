@@ -1,13 +1,13 @@
 import asyncio
 from google import genai
 from google.genai import types
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import List
 
 try:
     with open('classification/prompts.py', 'r', encoding='utf-8') as f:
         SYSTEM_PROMPT = f.read().split('SYSTEM_PROMPT = ')[1].strip('\"\"\"\n')
-except:
+except OSError:
     SYSTEM_PROMPT = "Sei un assistente."
 
 class SchemaFull(BaseModel):

@@ -21,14 +21,48 @@ class HTMLStripper(HTMLParser):
         # Tag di cui vogliamo ignorare sia il tag che tutto il contenuto testuale interno
         self.content_ignored_tags = {
             "script", "style", "iframe", "svg", "noscript", "meta", 
-            "video", "audio", "embed", "object"
+            "video", "audio", "embed", "object", "img", "picture", "source"
         }
         self.ignored_stack: list[str] = []
+
+    def _has_matching_close_tag(self, tag_lower: str) -> bool:
+        try:
+            raw = self.rawdata
+            line, offset = self.getpos()
+            idx = 0
+            lines = raw.splitlines(keepends=True)
+            if line - 1 < len(lines):
+                idx = sum(len(line_str) for line_str in lines[:line - 1]) + offset
+            remaining = raw[idx:]
+            close_tag = f"</{tag_lower}>"
+            close_idx = remaining.find(close_tag)
+            if close_idx == -1:
+                return False
+            
+            start_tag_end = remaining.find(">")
+            if start_tag_end != -1:
+                next_start_search = remaining[start_tag_end:]
+                next_start_idx = -1
+                for pattern in (f"<{tag_lower} ", f"<{tag_lower}>", f"<{tag_lower}/"):
+                    p_idx = next_start_search.find(pattern)
+                    if p_idx != -1:
+                        actual_p_idx = p_idx + start_tag_end
+                        if next_start_idx == -1 or actual_p_idx < next_start_idx:
+                            next_start_idx = actual_p_idx
+                if next_start_idx != -1 and next_start_idx < close_idx:
+                    return False
+            return True
+        except (AttributeError, TypeError, IndexError, ValueError):
+            return False
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         tag_lower = tag.lower()
         if tag_lower in self.content_ignored_tags:
-            self.ignored_stack.append(tag_lower)
+            if tag_lower in {"img", "source", "meta", "embed"}:
+                if self._has_matching_close_tag(tag_lower):
+                    self.ignored_stack.append(tag_lower)
+            else:
+                self.ignored_stack.append(tag_lower)
 
     def handle_endtag(self, tag: str) -> None:
         tag_lower = tag.lower()

@@ -506,10 +506,5 @@ describe('RadarMapComponent (Phase 4)', () => {
       mapCmp as unknown as { summaryMarkerGroup: { getLayers(): unknown[] } }
     ).summaryMarkerGroup;
     expect(group.getLayers().length).toBe(2);
-
-    const offsets = (
-      mapCmp as unknown as { UI_OFFSETS: Record<string, [number, number]> }
-    ).UI_OFFSETS;
-    expect(offsets['Nucleare']).toEqual([34, 0]);
   });
 });
