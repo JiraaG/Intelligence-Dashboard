@@ -37,7 +37,7 @@ Non rinominarli senza aggiornare anche le variabili d'ambiente e il codice Pytho
 |-------------------|------------------------|---------------------------------------|
 | `radar-db`        | `postgres:15-alpine`   | Database PostgreSQL persistente       |
 | `radar-backend`   | Custom Python 3.12     | API REST FastAPI (no ingest)          |
-| `radar-worker`    | Stessa immagine backend | Ingest Miniflux→Gemini→DB/Vault (`python -m app.worker`) |
+| `radar-worker`    | Stessa immagine backend | Ingest Miniflux→LLM→DB/Vault (`python -m app.worker`) |
 | `radar-frontend`  | Custom Node + Nginx    | Build Angular 21 + web server Nginx   |
 | `radar-miniflux`  | `miniflux/miniflux:2.3.2` | Aggregatore RSS integrato nello stack |
 
@@ -84,7 +84,7 @@ networks:
     driver: bridge
   radar-data:
     driver: bridge
-    # internal: false — worker/backend need egress (Gemini / Miniflux fetch)
+    # internal: false — worker/backend need egress (LLM providers / Miniflux fetch)
 
 # frontend: solo radar-edge
 # backend: radar-edge + radar-data

@@ -1,6 +1,7 @@
 # Frontend e UI
 
 SPA Angular 21 (standalone + signals). Codice: `radar/frontend/`.  
+Stack allineato a Phase **6 DONE / GATE VERDE**.  
 **Freeze:** non modificare `radar/frontend/src/app/components/radar-sidebar/**` (niente `article-list` / infinite scroll / restyle carousel).
 
 ---

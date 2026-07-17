@@ -3,8 +3,8 @@
 > **Stato:** SoT design A+B + **Fase C implementata** + **lane env v2.2** + **heuristic complexity v2.2** + **OpenAI-compat dialect / provider aliases** (`openai`|`glm`|`grok`, 2026-07-16).  
 > **Skills:** `llm-json-extraction`, `radar-quota-ledger`.  
 > **Sostituisce come riferimento operativo:** stub in `archive/llm-stubs/`.  
-> **Canvas:** `article-complexity-routing.canvas.tsx` + `complexity-routing-audit.canvas.tsx`.  
-> **Prompt:** `../prompts/active/audit_prompt_llm_multi_model_fallback.md` (storico; SoT = questo file).  
+> **Canvas:** non presenti in questo monorepo (riferimenti storici rimossi).  
+> **Prompt storico:** [`../prompts/done/audit_prompt_llm_multi_model_fallback_research.md`](../prompts/done/audit_prompt_llm_multi_model_fallback_research.md) (SoT = questo file).  
 > **Remediation:** `../remediation/audit_remediation_llm_multi_model_fallback.md`.  
 > **Indice cartelle:** [`../README.md`](../README.md).
 
@@ -605,6 +605,6 @@ Vedi `../archive/llm-stubs/audit_llm_model_research.SUPERSEDED.md` (redirect). R
 |------|--------|
 | **Questo file** | SoT Fase A+B + blueprint C |
 | `../archive/llm-stubs/*.SUPERSEDED.md` | Stub superseduti |
-| `../prompts/active/audit_prompt_llm_multi_model_fallback.md` | Prompt orchestratore |
+| `../prompts/done/audit_prompt_llm_multi_model_fallback_research.md` | Prompt storico (research) |
 | `../remediation/audit_remediation_llm_multi_model_fallback.md` | Report post-ship |
-| `canvases/article-complexity-routing.canvas.tsx` | Deep-dive UX |
+| Canvas `.canvas.tsx` | Non presenti in questo monorepo |

@@ -1,6 +1,6 @@
 # Architettura e backend
 
-Stack post Phase 0–5 (governance Phase 6). Piano master: [`Implementation_Plan.md`](../plan-audit/active/plan_impl_phase_0_6.md). Codice: `radar/backend/`.
+Stack Phase **0–6 DONE / GATE VERDE**. Piano master: [`plan_impl_phase_0_6.md`](../plan-audit/active/plan_impl_phase_0_6.md). Scoreboard: [`plan_impl_phase_0_6_execution.md`](../plan-audit/active/plan_impl_phase_0_6_execution.md). SoT LLM: [`sot_llm_multi_model_fallback.md`](../plan-audit/active/sot_llm_multi_model_fallback.md). Codice: `radar/backend/`.
 
 ---
 
@@ -9,7 +9,7 @@ Stack post Phase 0–5 (governance Phase 6). Piano master: [`Implementation_Plan
 | Processo | Entry | Ruolo |
 |----------|-------|--------|
 | API | `python -m uvicorn` / `main.py` | FastAPI: pool, migrazioni, REST, health |
-| Ingest | `python -m app.worker` (`radar-worker`) | Polling Miniflux, coda bounded, LLM (Gemini / OpenAI-compat), commit/outbox, heartbeat |
+| Ingest | `python -m app.worker` (`radar-worker`) | Polling Miniflux, coda bounded, LLM multi-provider, commit/outbox, heartbeat |
 
 Non avviare due worker leader: advisory lock session-level. L’API non esegue ingest nel lifespan.
 
@@ -35,11 +35,12 @@ flowchart TD
 
 Moduli sotto `radar/backend/app/`:
 
-1. **`core/`** — config bounded, pool asyncpg, `migrations.py`, logging, heartbeat
+1. **`core/`** — config bounded, pool asyncpg, `migrations.py`, logging, heartbeat, **`llm_lanes.py`** (provider/dialect/lane)
 2. **`extraction/`** — client Miniflux (httpx, byte limits, retry), parser HTML, dedup
-3. **`classification/`** — client Gemini (`google-genai`) + OpenAI-compat httpx (`deepseek`/`openai`/`glm`/`grok`; dialect), complexity v2.2, `quota.py` per-lane, prompts (no CoT), validator Pydantic strict
+3. **`classification/`** — client Gemini (`google-genai`) + OpenAI-compat httpx (`deepseek`/`openai`/`glm`/`grok`; dialect); `claude` = stub; **`complexity.py`** v2.2; **`cooldown.py`**; `quota.py` per-lane; prompts (no CoT); validator Pydantic strict
 4. **`commit/`** — commit atomico, outbox, vault `yaml.safe_dump` + write atomica
 5. **`api/`** — query helpers Phase 5 (`articles_query.py`)
+6. **`scripts/`** — ops (`requeue_articles`, …) — dettaglio [runbook](../radar/docs/runbook.md)
 
 ---
 
@@ -51,9 +52,15 @@ Moduli sotto `radar/backend/app/`:
 - `build_gemini_response_schema()` sanitizza lo schema per l’API Google
 - 10 categorie: Nucleare, Energia, Infrastrutture, Geopolitica, Economia, Tecnologia, Spazio, Ambiente, Salute, Sicurezza
 - Fallback geografico su fallimento irreversibile: paese `XX`, categoria `Infrastrutture` (vedi `validator.py`)
-- Quote: `llm_request_ledger` via `QuotaLedger` — limiti **per lane** `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (`0` = unmanaged); soft-trim worker = `LLM_SIMPLE.rpd` se >0; legacy `LLM_RPM`/`DEEPSEEK_*` = fill-gap — **non** `COUNT(*)` su `articles` per RPD
-- Routing: `LLM_ROUTING_MODE=complexity`; residual SIMPLE↔COMPLEX; OpenAI-compat via httpx (no package `openai`); provider swap env-only (SoT §5 Profili A–E)
+- Provider: `gemini` \| `deepseek` \| `openai` \| `glm` \| `grok` \| `claude` (**stub**; Messages API non implementata)
+- Dialect OpenAI-compat: deepseek=`thinking`; openai/glm/grok=`stock`; via httpx (**no** package `openai`)
+- Quote: `llm_request_ledger` via `QuotaLedger` — limiti **per lane** `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (`0` = unmanaged); soft-trim worker = `LLM_SIMPLE.rpd` se >0; free=RPM/RPD, paid=BUDGET; legacy fill-gap — **non** `COUNT(*)` su `articles` per RPD
+- Routing: SIMPLE → `LLM_SIMPLE_*`; BORDERLINE+COMPLEX → `LLM_COMPLEX_*`; residual SIMPLE↔COMPLEX se identity diversa; Profili A–E in `.env.example` + SoT
 - Periodicità ingest: `WORKER_POLL_INTERVAL_SECONDS` (default 900)
+
+### Cooldown modelli
+
+Hard-fail prolungati: tabella `llm_model_cooldown` (migrazione `009_llm_model_cooldown.sql`), codice `classification/cooldown.py`, knob `LLM_MODEL_COOLDOWN_HOURS`. Non confondere con `429` + `Retry-After` brevi. Clear / requeue: `python -m app.scripts.requeue_articles` — [runbook](../radar/docs/runbook.md).
 
 ---
 
@@ -63,15 +70,21 @@ Schema applicato da `core/migrations.py` + SQL ordinati in `radar/backend/migrat
 
 | File | Ruolo |
 |------|--------|
-| `001_initial.sql` | Tabelle base articles/companies/tags |
-| `002_pipeline_outbox_and_quotas.sql` | outbox (+ quote legacy shape) |
+| `001_initial.sql` | Schema base articles/companies/tags |
+| `002_pipeline_outbox_and_quotas.sql` | article_outbox |
 | `003_quota_ledger.sql` | `llm_request_ledger` |
-| `004_worker_heartbeat.sql` | heartbeat readiness |
-| `005_quota_ledger_align.sql` | allineamento ledger |
-| `006_quota_ledger_legacy_nulls.sql` | null legacy ledger |
-| `007_articles_query_indexes.sql` | indici query Phase 5 |
+| `004_worker_heartbeat.sql` | heartbeat leader |
+| `005_quota_ledger_align.sql` | allinea ledger legacy |
+| `006_quota_ledger_legacy_nulls.sql` | null legacy + request_type |
+| `007_articles_query_indexes.sql` | indici Phase 5 |
+| `008_outbox_miniflux_marked_at.sql` | mark-read retry / `miniflux_marked_at` |
+| `009_llm_model_cooldown.sql` | cooldown durable (provider, model) |
 
 Commit: transazione DB + riga outbox → reconcile vault → mark-read Miniflux **solo** se outbox `completed`.
+
+### Ops scripts
+
+Da container/`PYTHONPATH=backend`: `python -m app.scripts.requeue_articles` (e altri sotto `app/scripts/`). Procedura: [runbook](../radar/docs/runbook.md).
 
 ---
 

@@ -33,10 +33,12 @@ Harness per vincolare l’agente alle regole di produzione. Overlay Radar a **tr
 | `rules/radar-*.mdc` | Globs nativi → puntano al SoT in `.ecc/rules` (no testo duplicato) |
 | `commands/` | Shortcut: `radar-verify`, `radar-smoke`, `radar-lint` |
 
-Piani eseguibili: [`Implementation_Plan.md`](../plan-audit/active/plan_impl_phase_0_6.md) + [`Implementation_Plan_Execution.md`](../plan-audit/active/plan_impl_phase_0_6_execution.md) (voce **ECC expansion wiring — DONE**).  
-Manuale ECC: [`ecc_deep_dive_analysis_v2.md`](../ecc_deep_dive_analysis_v2.md).  
+Piani eseguibili: [`plan_impl_phase_0_6.md`](../plan-audit/active/plan_impl_phase_0_6.md) + [`plan_impl_phase_0_6_execution.md`](../plan-audit/active/plan_impl_phase_0_6_execution.md) (Phase **6 DONE / GATE VERDE**; voce **ECC expansion wiring — DONE**).  
+Final Release (residui, **≠** GATE): [`plan_release_final_gate.md`](../plan-audit/active/plan_release_final_gate.md).  
+Checklist docs: [`plan_docs_monorepo_source.md`](../plan-audit/active/plan_docs_monorepo_source.md).  
+Manuale ECC: [`ecc_deep_dive_analysis_v2.md`](../ecc_deep_dive_analysis_v2.md) — descrittivo; per LLM multi-model / skill map aggiornata preferire SoT LLM + `.agents/skills/` (deep-dive può essere stale).  
 Handoff expansion (eseguito): [`ECC_Expansion_Handoff.md`](../plan-audit/archive/ecc/handoff_ecc_expansion.md).  
-Non usare come piano vivo: `Fase2_Implementation_Plan.md`, `plan*.md`, `ecc_deep_dive_analysis.md` (V1 archivio).
+Non usare come piano vivo: `Fase2_Implementation_Plan.md`, `plan*.md` in archive, `ecc_deep_dive_analysis.md` (V1 assente).
 
 ---
 
@@ -45,7 +47,7 @@ Non usare come piano vivo: `Fase2_Implementation_Plan.md`, `plan*.md`, `ecc_deep
 **Core**
 
 1. **angular-developer** — Signals, standalone, pattern Angular 21  
-2. **llm-json-extraction** — Gemini SDK, schema Pydantic **strict**, CSV `str`, no CoT; path: `classification/` + `worker.py`  
+2. **llm-json-extraction** — Gemini SDK (`google-genai`) + OpenAI-compat httpx (`deepseek`/`openai`/`glm`/`grok`; dialect); schema Pydantic **strict**, CSV `str`, no CoT; path: `classification/` + `worker.py`  
 3. **spatial-data-mocking** — offline FE via `MOCK_MODE` esplicito; sidebar freeze  
 
 **Dominio Radar** (SoT `.agents/skills/radar-*/SKILL.md`)
@@ -54,7 +56,7 @@ Non usare come piano vivo: `Fase2_Implementation_Plan.md`, `plan*.md`, `ecc_deep
 5. **radar-api-contract** — map-summary + envelope `{items,next_cursor,total}`; `MOCK_MODE`  
 6. **radar-docker-ops** — edge/data, live/ready, verify-geojson, `./data/postgres`  
 7. **radar-geojson-assets** — gitignore + `--fetch` in Docker build; `ASSET_LICENSE`  
-8. **radar-quota-ledger** — reserve/complete/fail; limiti per-lane `LLM_SIMPLE_*`/`LLM_COMPLEX_*`; soft-trim = `LLM_SIMPLE.rpd`; 429; free vs paid budget; provider `gemini`\|`deepseek`\|`openai`\|`glm`\|`grok`\|`claude`
+8. **radar-quota-ledger** — reserve/complete/fail; limiti per-lane `LLM_SIMPLE_*`/`LLM_COMPLEX_*`; soft-trim = `LLM_SIMPLE.rpd`; 429; free vs paid budget; provider `gemini`\|`deepseek`\|`openai`\|`glm`\|`grok`\|`claude` (**stub**)
 
 ---
 

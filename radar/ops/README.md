@@ -6,11 +6,14 @@
 
 ```bash
 cd radar
-cp .env.example .env   # set POSTGRES_PASSWORD, GEMINI_API_KEY, MINIFLUX_*
+cp .env.example .env   # POSTGRES_PASSWORD, LLM lane keys (Profili A–E), MINIFLUX_*
 docker compose up -d --build
 ```
 
-Open **http://localhost/** (port 80 on all interfaces).
+Open **http://localhost/** (host port **80** → FE container **8080**).
+
+LLM knobs / Profili A–E: [`.env.example`](../.env.example) + SoT [`sot_llm_multi_model_fallback.md`](../../plan-audit/active/sot_llm_multi_model_fallback.md).  
+Requeue / incident: [`docs/runbook.md`](../docs/runbook.md) (`python -m app.scripts.requeue_articles`).
 
 Remote / internet exposure: put a TLS reverse proxy with auth and ACLs in front — do not publish `:80` raw to the public internet.
 

@@ -8,11 +8,11 @@ Companion operativo a [`../ops/README.md`](../ops/README.md). Usa ops per overla
 
 ```bash
 cd radar
-cp .env.example .env   # POSTGRES_PASSWORD, GEMINI_API_KEY, MINIFLUX_*
+cp .env.example .env   # POSTGRES_PASSWORD, LLM lane keys (Profili A–E), MINIFLUX_*
 docker compose up -d --build
 ```
 
-- UI: **http://localhost/** (porta **80**).
+- UI: **http://localhost/** (porta **80** → Nginx FE **8080**).
 - Non pubblicare `:80` grezzo su Internet — TLS reverse proxy + auth/ACL.
 - Miniflux **senza** porte host di default (hardened / lan / exec: vedi ops README).
 - Hardened: `docker compose -f docker-compose.yml -f docker-compose.hardened.yml up -d`
@@ -51,7 +51,7 @@ docker compose logs -f --tail=200 radar-db
 docker compose logs -f --tail=200 radar-miniflux
 ```
 
-Ingest / Gemini / outbox → **`radar-worker`**. API HTTP → `radar-backend`.
+Ingest / LLM / outbox → **`radar-worker`**. API HTTP → `radar-backend`.
 
 ---
 
@@ -162,7 +162,7 @@ Frontend **mai** su data. CORS allowlist vuota in prod dietro Nginx. Secret solo
 | P1 UI down | `:80` down | `docker compose ps`, log FE/backend, `/health/live` |
 | P1 API live fail | restart loop backend | live + log + `pg_isready` — **non** cambiare healthcheck in ready |
 | P2 ready stale | ready 503 > ~2 min | worker up? heartbeat? migrazione `004`+? |
-| P2 ingest stuck | zero articoli | API key Miniflux/Gemini, quota, outbox, log worker |
+| P2 ingest stuck | zero articoli | API key Miniflux/LLM lane, quota, outbox, log worker |
 | P2 outbox backlog | `failed`/`pending` alti | vault mount, reconcile |
 | P3 data | corruzione | restore drill ops su stack usa-e-getta |
 

@@ -1,8 +1,8 @@
 # Radar Informativo Globale
 
-> **Intelligence Dashboard** — Applicazione web self-hosted e containerizzata: aggrega feed RSS (Miniflux), li arricchisce via Google Gemini e li visualizza su una mappa Leaflet.  
-> UI: `http://localhost/` (porta **80**). Miniflux admin **non** è pubblicato di default (overlay hardened/lan).  
-> Dipendenze esterne: feed RSS, Gemini API, tile Carto.
+> **Intelligence Dashboard** — Applicazione web self-hosted e containerizzata: aggrega feed RSS (Miniflux), li arricchisce via LLM multi-provider (Gemini SDK e/o OpenAI-compat httpx) e li visualizza su una mappa Leaflet.  
+> UI: `http://localhost/` (porta **80** → Nginx container **8080**). Miniflux admin **non** è pubblicato di default (overlay hardened/lan).  
+> Dipendenze esterne: feed RSS, API LLM (Gemini / DeepSeek / OpenAI / GLM / Grok), tile Carto.
 
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
@@ -11,8 +11,10 @@
 [![Docker](https://img.shields.io/badge/Docker-5_services-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 
 **Stato piani (2026-07-15):** Phase **0–5 DONE**. Phase **6 DONE / GATE VERDE**.  
-**ECC expansion wiring DONE** (hooks/rules Cursor + skill dominio Radar) — working tree da commit su richiesta.  
-Sorgente di verità avanzamento: [`plan_impl_phase_0_6.md`](plan-audit/active/plan_impl_phase_0_6.md) + [`plan_impl_phase_0_6_execution.md`](plan-audit/active/plan_impl_phase_0_6_execution.md).  
+**Final Release** ≠ Phase GATE: residui ancora aperti — [`plan_release_final_gate.md`](plan-audit/active/plan_release_final_gate.md).  
+**ECC expansion wiring DONE** (hooks/rules Cursor + skill dominio Radar).  
+Sorgente di verità avanzamento: [`plan_impl_phase_0_6_execution.md`](plan-audit/active/plan_impl_phase_0_6_execution.md).  
+Checklist allineamento docs: [`plan_docs_monorepo_source.md`](plan-audit/active/plan_docs_monorepo_source.md).  
 **Sidebar freeze:** non modificare `radar/frontend/src/app/components/radar-sidebar/`.
 
 ---
@@ -21,11 +23,11 @@ Sorgente di verità avanzamento: [`plan_impl_phase_0_6.md`](plan-audit/active/pl
 
 ```bash
 cd radar
-cp .env.example .env   # GEMINI_API_KEY, password DB/Miniflux (no `$` nelle password)
+cp .env.example .env   # lane keys LLM (Profili A–E) + password DB/Miniflux (no `$` nelle password)
 docker compose up --build -d
 ```
 
-Apri **http://localhost/**. Dettagli env, health e Miniflux: [docs/01_getting_started.md](docs/01_getting_started.md) e [radar/ops/README.md](radar/ops/README.md).
+Apri **http://localhost/**. Knobs LLM / Profili A–E: [`radar/.env.example`](radar/.env.example) + SoT [`sot_llm_multi_model_fallback.md`](plan-audit/active/sot_llm_multi_model_fallback.md). Dettagli env, health e Miniflux: [docs/01_getting_started.md](docs/01_getting_started.md) e [radar/ops/README.md](radar/ops/README.md). Requeue ops: [radar/docs/runbook.md](radar/docs/runbook.md) (`python -m app.scripts.requeue_articles`).
 
 La build frontend richiede l’asset GeoJSON `radar/frontend/src/assets/data/countries.geo.json` (gitignored). Provisioning: [`ASSET_LICENSE.md`](radar/frontend/src/assets/data/ASSET_LICENSE.md) + `npm run verify-geojson:fetch` (Docker lo esegue in build).
 
@@ -61,7 +63,7 @@ flowchart LR
     MF[radar-miniflux]
   end
   Vault[(Vault Obsidian)]
-  Gemini([Google Gemini])
+  LLM([LLM multi-provider])
   Carto[(Carto tiles)]
   RSS[(Feed RSS)]
   User -->|HTTP :80| FE
@@ -70,16 +72,18 @@ flowchart LR
   API --- DB
   W --- DB
   W --- MF
-  W -->|structured output| Gemini
+  W -->|structured output| LLM
   W --> Vault
   API --> Vault
   MF --- DB
   MF -->|fetch| RSS
 ```
 
+LLM: `gemini` (`google-genai`) e/o OpenAI-compat httpx (`deepseek`/`openai`/`glm`/`grok`); `claude` = stub. Ops tipico: Profilo B in `.env.example`.
+
 | Servizio | Ruolo | Porta host (base) |
 |----------|--------|-------------------|
-| `radar-frontend` | Nginx + SPA Angular | **80** |
+| `radar-frontend` | Nginx + SPA Angular (listen **8080** in container) | **80** |
 | `radar-backend` | FastAPI (API + health) | nessuna (raggiungibile via Nginx su edge; anche su `radar-data`) |
 | `radar-worker` | Polling Miniflux + LLM + commit/outbox | nessuna |
 | `radar-db` | PostgreSQL 15 | nessuna |
@@ -127,8 +131,11 @@ Build FE Docker: `npm ci --legacy-peer-deps` (peer matrix Angular/PrimeNG).
 
 | Documento | Ruolo |
 |-----------|--------|
+| [plan_docs_monorepo_source.md](plan-audit/active/plan_docs_monorepo_source.md) | Checklist allineamento docs (questa passata) |
+| [sot_llm_multi_model_fallback.md](plan-audit/active/sot_llm_multi_model_fallback.md) | SoT LLM multi-provider + Profili A–E |
 | [plan_impl_phase_0_6.md](plan-audit/active/plan_impl_phase_0_6.md) | Piano master Phase 0–6 + restore SHA |
-| [plan_impl_phase_0_6_execution.md](plan-audit/active/plan_impl_phase_0_6_execution.md) | Scoreboard post-restore (avanzamento reale) |
+| [plan_impl_phase_0_6_execution.md](plan-audit/active/plan_impl_phase_0_6_execution.md) | Scoreboard post-restore (GATE VERDE) |
+| [plan_release_final_gate.md](plan-audit/active/plan_release_final_gate.md) | Residui Final Release (**≠** Phase 6 GATE) |
 
 ### Governance agenti (ECC)
 
@@ -179,8 +186,12 @@ Esempio: `git checkout 56c2eff` (tip Phase 6 / GATE VERDE; tip successivo = ECC 
 | Tema | Path |
 |------|------|
 | Worker ingest / quota | `radar/backend/app/worker.py`, `radar/backend/app/classification/quota.py` |
+| LLM lanes / dialect | `radar/backend/app/core/llm_lanes.py` |
+| Complexity v2.2 | `radar/backend/app/classification/complexity.py` |
+| Cooldown modelli | `radar/backend/app/classification/cooldown.py` |
+| Requeue ops | `radar/backend/app/scripts/requeue_articles.py` |
 | API FastAPI (no ingest) | `radar/backend/app/main.py` |
-| Migrazioni / outbox | `radar/backend/migrations/`, `radar/backend/app/core/migrations.py`, `radar/backend/app/commit/outbox.py` |
+| Migrazioni / outbox | `radar/backend/migrations/` (001–009), `radar/backend/app/core/migrations.py`, `radar/backend/app/commit/outbox.py` |
 | Query articles / map-summary | `radar/backend/app/api/articles_query.py` |
 | Compose + overlay | `radar/docker-compose.yml`, `radar/docker-compose.hardened.yml`, `radar/docker-compose.lan.yml` |
 | Ops backup/restore | `radar/ops/` |
@@ -191,7 +202,7 @@ Esempio: `git checkout 56c2eff` (tip Phase 6 / GATE VERDE; tip successivo = ECC 
 | Sidebar (**frozen**) | `radar/frontend/src/app/components/radar-sidebar/` |
 | ECC (SoT + wiring) | `.agents/`, `radar/.ecc/`, `.cursor/hooks.json`, `.cursor/rules/`, `.cursor/commands/` |
 | Env template | `radar/.env.example` |
-| CI | `.github/workflows/ci.yml` |
+| CI | `.github/workflows/ci.yml` (FE+BE+secret-scan best-effort) |
 
 ---
 
@@ -217,9 +228,11 @@ Dettaglio: [docs/02_architecture_and_backend.md](docs/02_architecture_and_backen
 Dashboard finance/
 ├── docs/                              # Manuali operatori 01–04
 ├── plan-audit/                        # SoT / prompt / remediation (vedi plan-audit/README.md)
+│   ├── active/plan_docs_monorepo_source.md
+│   ├── active/sot_llm_multi_model_fallback.md
 │   ├── active/plan_impl_phase_0_6*.md
 │   └── archive/ecc/handoff_ecc_*.md
-├── ecc_deep_dive_analysis_v2.md       # Manuale ECC (descrizione)
+├── ecc_deep_dive_analysis_v2.md       # Manuale ECC (descrizione; skill map può essere stale → SoT LLM)
 ├── RSS.txt
 ├── LICENSE
 ├── .github/workflows/ci.yml
@@ -233,14 +246,17 @@ Dashboard finance/
     ├── ops/                           # backup/restore + README ops
     ├── docs/runbook.md
     ├── backend/
-    │   ├── migrations/                # 001–007
+    │   ├── migrations/                # 001–009
     │   └── app/
     │       ├── main.py                # API-only
     │       ├── worker.py              # ingest
     │       ├── api/                   # articles_query (Phase 5)
-    │       ├── core/ extraction/ classification/ commit/
+    │       ├── core/                  # incl. llm_lanes.py, heartbeat
+    │       ├── extraction/ classification/ commit/
+    │       ├── scripts/               # requeue_articles, …
     │       └── tests/
     ├── frontend/
+    │   ├── nginx.conf                 # listen 8080, resolver DNS, CSP
     │   ├── scripts/verify-geojson.mjs
     │   ├── src/app/components/        # radar-map, toolbar, radar-sidebar (frozen)
     │   ├── src/app/services/          # StateService, ArticleService, MOCK_MODE

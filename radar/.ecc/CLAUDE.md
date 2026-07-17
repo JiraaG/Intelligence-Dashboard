@@ -9,7 +9,7 @@
 **Nome:** Radar Informativo Globale (Intelligence Dashboard)
 **Versione:** 0.2.0
 **Obiettivo:** Applicazione web self-hosted, containerizzata e plug-and-play che aggrega feed RSS,
-li arricchisce semanticamente via Google Gemini API e li visualizza su una mappa 2D interattiva
+li arricchisce semanticamente via LLM multi-provider (Gemini SDK e/o OpenAI-compat httpx) e li visualizza su una mappa 2D interattiva
 in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categoria geopolitica).
 
 ### Vincoli post–branch restore (2026-07-15)
@@ -60,19 +60,23 @@ radar/
 │   │   ├── 004_worker_heartbeat.sql
 │   │   ├── 005–006 (ledger/legacy alignment)
 │   │   ├── 007_articles_query_indexes.sql
-│   │   └── 008_outbox_miniflux_marked_at.sql
+│   │   ├── 008_outbox_miniflux_marked_at.sql
+│   │   └── 009_llm_model_cooldown.sql
 │   └── app/
 │       ├── __init__.py
 │       ├── main.py                # FastAPI API-only (pool + migrations + REST)
 │       ├── worker.py              # Ingest daemon (coda bounded, advisory lock)
 │       ├── api/                   # Query helpers Phase 5 (articles cursor + map-summary)
 │       │   └── articles_query.py
+│       ├── scripts/               # Ops: requeue_articles, …
+│       │   └── requeue_articles.py
 │       ├── requirements.txt
-│       ├── core/                  # Configurazione, DB pool asyncpg, logging, heartbeat
-│       │   ├── config.py          # Variabili d'ambiente bounded; knobs worker + Gemini timeout
+│       ├── core/                  # Configurazione, DB pool asyncpg, logging, heartbeat, lanes
+│       │   ├── config.py          # Variabili d'ambiente bounded; knobs worker + LLM
 │       │   ├── database.py        # init_pool(), bootstrap_database() → run_migrations()
 │       │   ├── migrations.py      # schema_migrations + checksum SHA-256; applica SQL ordinato
 │       │   ├── heartbeat.py       # worker heartbeat per /health/ready
+│       │   ├── llm_lanes.py       # Provider set, dialect, LlmLaneConfig SIMPLE/COMPLEX
 │       │   └── logging.py         # setup_logging() con fallback se logs/ non scrivibile
 │       ├── extraction/            # Layer E: fetch Miniflux + HTML sanitize + dedup check
 │       │   ├── client.py          # MinifluxClient (httpx async, lifespan, byte limits, retry)
@@ -80,8 +84,10 @@ radar/
 │       │   ├── parser.py          # strip_html_tags() — purge totale media tags
 │       │   └── state.py           # is_article_duplicate() — SELECT EXISTS asyncpg
 │       ├── classification/        # Layer C: Gemini + OpenAI-compat LLM + schema Pydantic + quota ledger
-│       │   ├── client.py          # ClassificationClient — lanes, cascade, dialect
+│       │   ├── client.py          # ClassificationClient — lanes, cascade, dialect; claude=stub
 │       │   ├── deepseek.py        # httpx OpenAI-compat (deepseek/openai/glm/grok)
+│       │   ├── complexity.py      # Heuristic v2.2 → lane SIMPLE/BORDERLINE/COMPLEX
+│       │   ├── cooldown.py        # llm_model_cooldown durable (migrazione 009)
 │       │   ├── quota.py           # QuotaLedger per-lane RPM/TPM/RPD (+ budget)
 │       │   ├── prompts.py         # System prompt (no CoT) + build_user_prompt(<untrusted_article>)
 │       │   └── validator.py       # GeopoliticalArticleSchema strict, extra=forbid, no reasoning

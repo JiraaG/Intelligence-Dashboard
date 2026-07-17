@@ -9,7 +9,8 @@ Guida per portare su **Radar Informativo Globale** con Docker. Fonte knobs: [`ra
 - Docker + Docker Compose
 - RAM consigliata ≥ 4 GB
 - Porte host (compose base): **80** (frontend). Backend, DB e Miniflux restano interni.
-- Accesso rete a: feed RSS, Google Gemini API, tile Carto
+- Accesso rete a: feed RSS, API LLM (Gemini e/o OpenAI-compat: DeepSeek / OpenAI / GLM / Grok), tile Carto
+- Ops tipico LLM: **Profilo B** in [`radar/.env.example`](../radar/.env.example) (DeepSeek-only). Default codice boot-safe: `LLM_ROUTING_MODE=off` — non confondere con il profilo ops.
 
 Miniflux UI su host solo con overlay:
 
@@ -33,7 +34,7 @@ Categorie principali (dettaglio in `.env.example`):
 |------|--------|
 | Runtime | `RADAR_ENV`, `RADAR_TIME_ZONE` |
 | CORS | `CORS_ALLOW_ORIGINS` (vuoto in prod dietro Nginx; es. `http://localhost:4200` per `ng serve`) |
-| LLM | Lane `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (provider=`gemini`\|`deepseek`\|`openai`\|`glm`\|`grok`\|`claude`; model/RPM/TPM/RPD/budget; `0`=unmanaged); dialect OpenAI-compat: deepseek=`thinking`, openai/glm/grok=stock; soft-trim = `LLM_SIMPLE.rpd` se >0; legacy `GEMINI_*` / `LLM_RPM` / `DEEPSEEK_*` / `OPENAI_API_KEY` = fill-gap; Profili A–E in `.env.example` |
+| LLM | Lane `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (provider=`gemini`\|`deepseek`\|`openai`\|`glm`\|`grok`\|`claude` **stub**; model/RPM/TPM/RPD/budget; `0`=unmanaged); dialect OpenAI-compat: deepseek=`thinking`, openai/glm/grok=stock; soft-trim = `LLM_SIMPLE.rpd` se >0; free=RPM/RPD, paid=BUDGET; legacy fill-gap; Profili A–E in `.env.example` + SoT LLM |
 | Worker | coda/concorrenza, `WORKER_POLL_INTERVAL_SECONDS` (default 900), heartbeat |
 | Miniflux | URL interno, API key, `MINIFLUX_LIMIT` (tipico **50**; `100` può superare `MAX_MINIFLUX_RESPONSE_BYTES=5MB`), timeout/byte caps |
 | Postgres | user/password/db, `DATABASE_URL` (Compose la costruisce in container) |
@@ -126,8 +127,9 @@ Con unread Miniflux alti, tenere `MINIFLUX_LIMIT` ≤ ~50 sotto il cap `MAX_MINI
 - Servizio `radar-worker` (`python -m app.worker`), leadership via advisory lock
 - Polling `WORKER_POLL_INTERVAL_SECONDS` (default **900** = 15 min)
 - Entry **unread** ultime ~48h, dedup URL in PostgreSQL
-- Complexity v2.2 → classificazione Gemini e/o DeepSeek → commit DB + outbox → vault atomico → mark-read Miniflux solo se completed
+- Complexity v2.2 → QuotaLedger reserve → classificazione multi-provider (lane SIMPLE / COMPLEX) → eventuale cooldown modello → commit DB + outbox → vault atomico → mark-read Miniflux solo se completed
 - Quote durable per lane: `llm_request_ledger` (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`; soft-trim = `LLM_SIMPLE.rpd` se >0; free=RPM/RPD, paid=budget)
+- Requeue ops (stati outbox / cooldown): `python -m app.scripts.requeue_articles` — vedi [runbook](../radar/docs/runbook.md)
 
 Riavviare solo `radar-backend` **non** riavvia l’ingest: serve `radar-worker`.
 
@@ -140,10 +142,12 @@ Riavviare solo `radar-backend` **non** riavvia l’ingest: serve `radar-worker`.
 | `InvalidPasswordError` | `$` in password Compose |
 | Miniflux exit | DB non ready → attendere `radar-db` healthy, poi `docker compose up -d radar-miniflux` (evitare `restart` di tutto lo stack in parallelo; vedi `docker.md` Regola 4) |
 | `/health/ready` 503 | Normale finché il worker non scrive heartbeat (~30–90s) |
-| 429 Gemini | Ledger + Retry-After; verifica quote in AI Studio |
+| 429 / rate limit LLM | Ledger + Retry-After; quote lane (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`); Studio / dashboard provider |
+| Auth / key LLM | Key lane o legacy (`GEMINI_*` / `DEEPSEEK_*` / `OPENAI_*`) allineate al `PROVIDER` della lane |
+| Articoli bloccati / requeue | [runbook](../radar/docs/runbook.md) — `python -m app.scripts.requeue_articles` |
 | Mappa senza confini | Manca o SHA errato su `countries.geo.json` → `npm run verify-geojson:fetch` |
-| Nessun articolo nuovo | `MINIFLUX_API_KEY`, log `radar-worker`, quote lane (`LLM_SIMPLE_RPD` / budget) |
+| Nessun articolo nuovo | `MINIFLUX_API_KEY`, log `radar-worker`, quote lane (`LLM_SIMPLE_RPD` / budget), cooldown |
 | Payload Miniflux troppo grande / log 5MB | Abbassare `MINIFLUX_LIMIT` (tipico 50); non alzare cieco il cap |
-| Classificazione → fallback summary / HTTP 500 modello | Verificare `GEMINI_MODEL` in `.env`; ops tipico: `gemini-3.1-flash-lite` se `gemma-4-31b-it` fallisce |
+| Classificazione → fallback / HTTP 500 modello | Verificare `LLM_*_MODEL` / legacy `GEMINI_MODEL` in `.env`; riavviare `radar-worker` — **non** commitare `.env` |
 
 Backup/restore: [radar/ops/README.md](../radar/ops/README.md) (`radar/ops/backup-postgres.sh`, `restore-postgres.sh`). Persistenza: `radar/data/postgres/`, `radar/vault/`.

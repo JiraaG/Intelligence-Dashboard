@@ -3,10 +3,14 @@
 Cartella di audit, prompt orchestratore e SoT operativi del modulo Radar.  
 **Non** è codice di produzione; i documenti vivi stanno in `active/`.
 
+**Product docs (manuali operatori):** root [`README.md`](../README.md) + [`docs/01–04`](../docs/).  
+**Checklist allineamento docs (questa passata):** [`plan_docs_monorepo_source.md`](active/plan_docs_monorepo_source.md).
+
 ## SoT e Piani Correnti (`active/`)
 
 | Documento | Ruolo |
 |-----------|--------|
+| [plan_docs_monorepo_source.md](active/plan_docs_monorepo_source.md) | **Checklist operativa** allineamento README/docs/ops/ECC (non sostituisce SoT LLM) |
 | [sot_llm_multi_model_fallback.md](active/sot_llm_multi_model_fallback.md) | **Source of Truth** per Multi-model LLM + routing (lane env + complexity heuristic v2.2) |
 | [plan_release_final_gate.md](active/plan_release_final_gate.md) | Piano per la validazione dei Gate residuali Final Release |
 | [plan_docs_audit_playbook.md](active/plan_docs_audit_playbook.md) | Playbook operativo di audit & remediation documentazione |

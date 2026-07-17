@@ -7,7 +7,7 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 ## 1. Identità del Progetto & Stack Tecnologico
 
 * **Nome:** Radar Informativo Globale (Intelligence Dashboard)
-* **Obiettivo:** Applicazione web self-hosted, containerizzata e plug-and-play che aggrega feed RSS, li arricchisce semanticamente via Google Gemini API e li visualizza su una mappa 2D interattiva in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categoria geopolitica).
+* **Obiettivo:** Applicazione web self-hosted, containerizzata e plug-and-play che aggrega feed RSS, li arricchisce semanticamente via LLM multi-provider (Gemini SDK e/o OpenAI-compat httpx) e li visualizza su una mappa 2D interattiva in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categoria geopolitica).
 
 ### Stack Tecnologico Ufficiale
 * **Backend:** Python 3.12-slim (Docker) / 3.14 (locale). Demone asincrono con polling `WORKER_POLL_INTERVAL_SECONDS` (default 900).
