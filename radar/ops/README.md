@@ -81,6 +81,8 @@ Frontend is **never** on `radar-data`. Worker is **only** on `radar-data`.
 ./ops/backup-postgres.sh
 ```
 
+Scripts load `radar/.env` via `ops/_load_dotenv.sh` (KEY=VALUE only — safe if comments contain `()`). Defaults: `POSTGRES_USER=radar_user`, `POSTGRES_DB=radar_db`.
+
 Produces `backups/<UTC-stamp>/`:
 
 - `radar_<db>.dump` — `pg_dump -Fc`

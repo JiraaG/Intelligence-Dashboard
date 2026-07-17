@@ -1,9 +1,10 @@
 # Piano Operativo — Final Release Gate
 
-> **Stato premesse (2026-07-16):** remediation codice P0–P2 **CLOSED**; Phase 6 GATE VERDE; smoke UI manuale **fatto**; commit/push su `refactor/testing` @ `7bb8ed8`.  
-> **Scopo di questo documento:** piano definitivo per i residui Final Release + deferred, con procedure, file, pro/contro e scelta raccomandata.  
-> **SoT correlati:** [`../complete/plan_impl_phase_0_6.md`](../complete/plan_impl_phase_0_6.md) §Final Release Gate · [`../remediation/audit_remediation_final_release_handoff.md`](../remediation/audit_remediation_final_release_handoff.md) · `radar/ops/README.md` · `radar/docs/runbook.md` · `radar/.ecc/rules/docker.md`  
-> **Quadro fatto/da fare:** [`../STATUS.md`](../STATUS.md)
+> **Stato (2026-07-17):** **F1–F4 PASS**; Fase 5 **DEFERRED ACCETTATO**; residuo operativo = **Fase 0 PR** (senza merge auto).  
+> **Premesse (2026-07-16):** remediation codice P0–P2 **CLOSED**; Phase 6 GATE VERDE; smoke UI manuale **fatto**.  
+> **Scopo:** procedure, report e decisioni Final Release (documento vivo finché resta la PR; poi archiviabile).  
+> **Report:** [`../remediation/audit_remediation_final_release_F1_backup.md`](../remediation/audit_remediation_final_release_F1_backup.md) · [F2](../remediation/audit_remediation_final_release_F2_seed10k.md) · [F3](../remediation/audit_remediation_final_release_F3_chaos.md) · [F4](../remediation/audit_remediation_final_release_F4_security.md) · [handoff](../remediation/audit_remediation_final_release_handoff.md)  
+> **Quadro:** [`../STATUS.md`](../STATUS.md) · checkbox master [`../complete/plan_impl_phase_0_6.md`](../complete/plan_impl_phase_0_6.md) §Final Release Gate
 
 ---
 
@@ -92,7 +93,7 @@ gh pr create --base develop --head refactor/testing --title "…" --body "…"
 ## 3. Fase 1 — Backup / restore drill
 
 ### Obiettivo
-Dimostrare che backup e restore funzionano end-to-end (criterio Final Release ancora `[ ]` in [`../complete/plan_impl_phase_0_6.md`](../complete/plan_impl_phase_0_6.md)).
+Dimostrare che backup e restore funzionano end-to-end (criterio Final Release — **PASS** 2026-07-17, report F1).
 
 ### File e codice
 | Path | Ruolo |
@@ -132,10 +133,10 @@ docker compose exec radar-backend curl -sf http://127.0.0.1:8000/health/live
 ```
 
 ### Criteri di PASS
-- [ ] Directory backup con `.dump`, `SHA256SUMS`, (opz.) `vault.tar.gz`  
-- [ ] Restore completa senza errore fatale  
-- [ ] Servizi: db/backend/frontend/miniflux **healthy**; worker **running**  
-- [ ] API live OK; UI carica; dati attesi presenti (o documentare delta outbox)
+- [x] Directory backup con `.dump`, `SHA256SUMS`, (opz.) `vault.tar.gz`  
+- [x] Restore completa senza errore fatale  
+- [x] Servizi: db/backend/frontend/miniflux **healthy**; worker **running**  
+- [x] API live OK; UI carica; dati attesi presenti (o documentare delta outbox)
 
 ### Pro / contro
 
@@ -268,10 +269,10 @@ docker compose exec radar-db psql -U radar_user -d radar_db -c "SELECT status, c
 ```
 
 ### Criteri PASS
-- [ ] Nessun articolo “perso” (URL in DB senza percorso di recovery)  
-- [ ] Nessun mark-read Miniflux senza vault/`completed` (spot-check log + outbox)  
-- [ ] Worker riprende leadership; demone vivo  
-- [ ] Report con esito per C1–C5 (SKIP ammesso se precondizione assente, es. no Miniflux entries)
+- [x] Nessun articolo “perso” (URL in DB senza percorso di recovery)  
+- [x] Nessun mark-read Miniflux senza vault/`completed` (spot-check log + outbox)  
+- [x] Worker riprende leadership; demone vivo  
+- [x] Report con esito per C1–C5 (SKIP ammesso se precondizione assente, es. no Miniflux entries)
 
 ### Pro / contro
 
@@ -397,13 +398,13 @@ Questi **non** sono FAIL e **non** sono ticket SoT. Sono scelte di riproducibili
 
 | Item | Fare ora? | Scelta raccomandata |
 |------|-----------|---------------------|
-| PR → develop | **Sì** | Aprire, **non** merge auto |
-| Backup/restore | **Sì** | Drill DB (+ vault opz.) su stack dev con safety backup |
-| Seed 10k | **Sì** (o subito dopo backup) | Data `2099-01-01` + EXPLAIN + smoke FE |
-| Chaos | **Sì** dopo backup | C1–C3 minimi |
-| SAST/scan | **Sì** (anche //) | Trivy + pip-audit + XSS spot |
-| Digest pin | **No** | Deferred fino a requisito compliance |
-| Drop legacy-peer-deps | **No** | Deferred fino ad allineamento matrix |
+| PR → develop | **Sì (residuo)** | Aprire, **non** merge auto |
+| Backup/restore | **Fatto PASS** | Report F1 |
+| Seed 10k | **Fatto PASS** | Report F2 |
+| Chaos | **Fatto PASS** | Report F3 (C1–C3; C4/C5 SKIP) |
+| SAST/scan | **Fatto PASS** | Report F4 (CRITICAL perl base accettato) |
+| Digest pin | **No** | Deferred accettato |
+| Drop legacy-peer-deps | **No** | Deferred accettato |
 
 ---
 
@@ -433,15 +434,18 @@ Questi **non** sono FAIL e **non** sono ticket SoT. Sono scelte di riproducibili
 
 ## 11. Definizione di “Final Release COMPLETE”
 
-**Minimum viable release (consigliato):**
+**Stato 2026-07-17 (full gate ops):**
+- Fase 1–4 **PASS** (report F1–F4)
+- Fase 5 **DEFERRED ACCETTATO**
+- Fase 0 PR: **ancora da aprire** (non blocca le prove live post-push)
+
+**Minimum viable release (storico):**
 - Fase 0 PR aperta  
 - Fase 1 PASS  
 - Fase 2 PASS (misure documentate)  
 - Smoke UI già fatto  
 
-**Full gate (piano master):**
-- Minimum + Fase 3 PASS + Fase 4 PASS  
-- Fase 5 esplicitamente **DEFERRED accettato** (o eseguita)
+**Full gate (piano master):** raggiunto per F1–F4 + deferred esplicito; manca solo apertura PR.
 
 ---
 

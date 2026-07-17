@@ -1,7 +1,8 @@
 # plan-audit — STATUS (fatto vs da fare)
 
 Quadro operativo aggiornato **2026-07-17**.  
-Indice cartelle: [`README.md`](README.md).
+Indice cartelle: [`README.md`](README.md).  
+Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`](remediation/audit_remediation_final_release_handoff.md).
 
 ---
 
@@ -13,6 +14,7 @@ Indice cartelle: [`README.md`](README.md).
 | Ticket remediation P0–P2 | [`complete/plan_docs_audit_ticket_status.md`](complete/plan_docs_audit_ticket_status.md) | **0 OPEN** |
 | Playbook audit docs | [`complete/plan_docs_audit_playbook.md`](complete/plan_docs_audit_playbook.md) | CLOSED |
 | Allineamento product docs | [`complete/plan_docs_monorepo_source.md`](complete/plan_docs_monorepo_source.md) | ESEGUITO + coerenza porte/health/requeue |
+| Final Release F1–F4 | [`active/plan_release_final_gate.md`](active/plan_release_final_gate.md) + report `remediation/*_F*.md` | Backup, seed 10k, chaos C1–C3, security |
 | SoT LLM multi-provider | [`active/sot_llm_multi_model_fallback.md`](active/sot_llm_multi_model_fallback.md) | **Vivo** (design/routing) |
 | Report ticket singoli | [`remediation/`](remediation/) | Storico — non cancellare |
 | Prompt eseguiti | [`prompts/done/`](prompts/done/) | Storico |
@@ -20,19 +22,14 @@ Indice cartelle: [`README.md`](README.md).
 
 ---
 
-## Da fare (unico backlog vivo)
+## Residui post-gate
 
-SoT: [`active/plan_release_final_gate.md`](active/plan_release_final_gate.md)  
-Prompt: [`prompts/active/audit_prompt_final_release_gate.md`](prompts/active/audit_prompt_final_release_gate.md)
+| Item | Stato | Note |
+|------|--------|------|
+| Fase 0 — PR `refactor/testing` → `develop` (senza merge auto) | **Aperto** | Branch pushed; aprire via [compare](https://github.com/JiraaG/Dashboard-finance/compare/develop...refactor/testing?expand=1) (`gh` opzionale) |
+| Fase 5 — digest pin + drop `--legacy-peer-deps` | **DEFERRED ACCETTATO** | Non blocca merge; vedi piano §7 |
 
-| Fase | Lavoro | Stato |
-|------|--------|-------|
-| 0 | PR `refactor/testing` → base (senza merge) | **Aperto** |
-| 1 | Backup / restore drill | **Aperto** |
-| 2 | Seed 10k + misura budget | **Aperto** |
-| 3 | Chaos kill/restart (dopo backup) | **Aperto** |
-| 4 | SAST / image scan / XSS spot | **Aperto** |
-| 5 | Digest pin + drop `--legacy-peer-deps` | **DEFERRED** (tenere deferred) |
+Prompt orchestratore (solo se serve chiudere Fase 0): [`prompts/active/audit_prompt_final_release_gate.md`](prompts/active/audit_prompt_final_release_gate.md) — **F1–F4 già PASS**, non rieseguire.
 
 **Fuori scope:** nuove feature; `radar-sidebar/**`; riaprire ticket CLOSED.
 
@@ -42,11 +39,11 @@ Prompt: [`prompts/active/audit_prompt_final_release_gate.md`](prompts/active/aud
 
 ```text
 plan-audit/
-  STATUS.md          ← questo file (quadro fatto / da fare)
-  active/            ← SOLO vivo: SoT LLM + Final Release Gate
+  STATUS.md          ← questo file (quadro fatto / residui)
+  active/            ← SoT LLM + piano Final Release (storico procedure)
   complete/          ← piani e checklist COMPLETATI
-  prompts/active/    ← prompt Final Release
+  prompts/active/    ← prompt post-gate (PR)
   prompts/done/      ← storico
-  remediation/       ← report DONE
+  remediation/       ← report DONE (incl. F1–F4)
   archive/           ← SUPERSEDED / scratch / ECC early
 ```

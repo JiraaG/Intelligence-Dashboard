@@ -162,8 +162,12 @@ Ogni modifica al codice deve essere:
 ## Comandi Chiave del Progetto
 
 ```bash
-# Avvio completo (prima esecuzione)
+# Avvio completo (prima esecuzione) — preferire up -d (rispetta depends_on healthy)
 docker compose up -d --build
+
+# Evitare: docker compose restart su tutto lo stack (non ri-applica depends_on → race DB starting up).
+# Restart ordinato se serve: radar-db → attendi healthy → poi gli altri; oppure up -d.
+# Singolo servizio OK: docker compose restart radar-worker
 
 # Avvio solo backend per sviluppo
 docker compose up radar-db radar-backend

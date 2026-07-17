@@ -25,7 +25,7 @@ Internet/LAN → [Porta 80] → radar-frontend (Nginx) ──radar-edge──→
 
 Phase 3 DONE: edge/data, `/health/live`+`/ready`, CSP, ops backup, soft hardening.
 Phase 4 DONE: frontend lifecycle/security (non tocca Compose).
-Phase 6 DONE / GATE VERDE: docs/CI/GeoJSON/runbook. **Deferred post–Phase 6 (prodotto):** image digest pin SHA e drop `--legacy-peer-deps` (quando matrix Angular/CDK/PrimeNG allineata).
+Phase 6 DONE / GATE VERDE: docs/CI/GeoJSON/runbook. **Final Release F1–F4 PASS (2026-07-17)** — backup/restore, seed 10k, chaos C1–C3, security scan; vedi `plan-audit/STATUS.md`. **Deferred prodotto (Fase 5 accettato):** image digest pin SHA e drop `--legacy-peer-deps` (quando matrix Angular/CDK/PrimeNG allineata).
 ---
 
 ## Regola 1: Cinque Servizi, Nomi Immutabili
@@ -136,6 +136,8 @@ radar-backend:
   environment:
     DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@radar-db:5432/${POSTGRES_DB}
 ```
+
+**Ops scripts (`ops/backup-postgres.sh`, `ops/restore-postgres.sh`):** non usare `source .env` grezzo (commenti/`()` rompono bash su Windows). Caricare solo `KEY=VALUE` via `ops/_load_dotenv.sh` (`radar_load_dotenv`). Eseguire da Git Bash/WSL, non PowerShell raw. Default credenziali dump: `radar_user` / `radar_db` se assenti.
 
 **VIETATO:**
 ```yaml

@@ -10,11 +10,10 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-5_services-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 
-**Stato piani (2026-07-15):** Phase **0–5 DONE**. Phase **6 DONE / GATE VERDE**.  
-**Final Release** ≠ Phase GATE: residui ancora aperti — [`plan_release_final_gate.md`](plan-audit/active/plan_release_final_gate.md).  
+**Stato piani (2026-07-17):** Phase **0–5 DONE**. Phase **6 DONE / GATE VERDE**.  
+**Final Release** ≠ Phase GATE: **F1–F4 PASS**; Fase 5 **DEFERRED ACCETTATO**; resta **PR** (Fase 0, no merge auto) — [`STATUS.md`](plan-audit/STATUS.md) · piano [`plan_release_final_gate.md`](plan-audit/active/plan_release_final_gate.md) · handoff [`audit_remediation_final_release_handoff.md`](plan-audit/remediation/audit_remediation_final_release_handoff.md).  
 **ECC expansion wiring DONE** (hooks/rules Cursor + skill dominio Radar).  
 Sorgente di verità avanzamento Phase 0–6: [`plan_impl_phase_0_6_execution.md`](plan-audit/complete/plan_impl_phase_0_6_execution.md).  
-Quadro fatto vs da fare (Final Release): [`plan-audit/STATUS.md`](plan-audit/STATUS.md).  
 Checklist allineamento docs (chiusa): [`plan_docs_monorepo_source.md`](plan-audit/complete/plan_docs_monorepo_source.md).  
 **Sidebar freeze:** non modificare `radar/frontend/src/app/components/radar-sidebar/`.
 
@@ -139,10 +138,11 @@ Build FE Docker: `npm ci --legacy-peer-deps` (peer matrix Angular/PrimeNG).
 
 | Documento | Ruolo |
 |-----------|--------|
-| [STATUS.md](plan-audit/STATUS.md) | **Quadro** fatto vs da fare |
-| [plan_release_final_gate.md](plan-audit/active/plan_release_final_gate.md) | Backlog Final Release (**≠** Phase 6 GATE) |
+| [STATUS.md](plan-audit/STATUS.md) | **Quadro** fatto vs residui post-gate |
+| [plan_release_final_gate.md](plan-audit/active/plan_release_final_gate.md) | Piano Final Release (**F1–F4 PASS**; PR + Fase 5 deferred — **≠** Phase 6 GATE) |
 | [sot_llm_multi_model_fallback.md](plan-audit/active/sot_llm_multi_model_fallback.md) | SoT LLM multi-provider + Profili A–E |
 | [complete/](plan-audit/complete/) | Phase 0–6, playbook, ticket status, checklist docs (**chiusi**) |
+| [remediation/](plan-audit/remediation/) | Report ticket + Final Release F1–F4 |
 
 ### Governance agenti (ECC)
 

@@ -1,21 +1,18 @@
 # Prompt — Final Release Gate (orchestratore multi-fase)
 
-> **Uso:** copia il blocco `text` sotto in un **nuovo** chat Agent (orchestratore).  
-> **Piano SoT:** `plan-audit/active/plan_release_final_gate.md` (leggi per intero prima di agire).  
-> **Default:** esegui **una fase per turno** (o più se l’utente lo chiede). **Non** merge PR. **Non** droppare deferred senza decisione esplicita.  
-> **Precondizioni:** P0–P2 CLOSED; smoke UI fatto; branch `refactor/testing` @ `7bb8ed8+` pushed.
+> **Stato 2026-07-17:** Fasi **1–4 PASS** (report in `plan-audit/remediation/audit_remediation_final_release_F*.md`). Fase 5 = **DEFERRED ACCETTATO**.  
+> **Uso residuo:** solo **Fase 0 PR** (senza merge) se ancora aperta — non rieseguire backup/seed/chaos/SAST.  
+> **Piano SoT:** `plan-audit/active/plan_release_final_gate.md` + [`STATUS.md`](../../STATUS.md).  
+> **Precondizioni:** P0–P2 CLOSED; smoke UI fatto; branch `refactor/testing` pushed.
 
 ```text
-/goal Esegui il Final Release Gate del Radar secondo
+/goal Chiudi il residuo Final Release Gate del Radar: Fase 0 PR
+`refactor/testing` → `develop` SENZA merge, secondo
 `plan-audit/active/plan_release_final_gate.md` nel workspace
 `c:\Users\lucag\Documents\Dashboard finance`.
-Tu sei l’ORCHESTRATORE: una fase alla volta (salvo richiesta “esegui Fasi X–Y”),
-report per fase, aggiorna SoT. NON fare merge di PR.
-NON toccare radar/frontend/src/app/components/radar-sidebar/**.
-NON eseguire Fase 5 (digest / drop legacy-peer-deps) salvo ordine esplicito:
-default = documentare DEFERRED ACCETTATO.
-NON commitare dump in backups/ né .env. Commit/push solo se l’utente lo chiede
-in questo messaggio o dopo PASS di fase.
+F1–F4 sono già PASS — NON rieseguire. Fase 5 resta DEFERRED ACCETTATO.
+NON fare merge di PR. NON toccare radar-sidebar/**.
+NON commitare dump in backups/ né .env.
 
 ========================================================================
 ## 0. Contesto

@@ -13,7 +13,7 @@ Cartella di audit, prompt orchestratore e SoT del modulo Radar.
 | Documento | Ruolo |
 |-----------|--------|
 | [sot_llm_multi_model_fallback.md](active/sot_llm_multi_model_fallback.md) | **SoT** LLM multi-provider + routing v2.2 |
-| [plan_release_final_gate.md](active/plan_release_final_gate.md) | **Backlog** Final Release (PR, backup, seed, chaos, SAST) |
+| [plan_release_final_gate.md](active/plan_release_final_gate.md) | Piano Final Release (**F1–F4 PASS**; resta PR + Fase 5 deferred) |
 
 ## `complete/` — chiusi
 

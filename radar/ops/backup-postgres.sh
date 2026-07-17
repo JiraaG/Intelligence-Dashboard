@@ -23,13 +23,12 @@ DEST="${BACKUP_ROOT}/${STAMP}"
 POSTGRES_USER="${POSTGRES_USER:-radar_user}"
 POSTGRES_DB="${POSTGRES_DB:-radar_db}"
 
-# Load .env if present (does not override already-exported vars)
-if [[ -f "${RADAR_ROOT}/.env" ]]; then
-  set -a
-  # shellcheck disable=SC1091
-  source "${RADAR_ROOT}/.env"
-  set +a
-fi
+# Load .env KEY=VALUE only (safe on Windows / comments with parentheses)
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/_load_dotenv.sh"
+radar_load_dotenv "${RADAR_ROOT}/.env"
+POSTGRES_USER="${POSTGRES_USER:-radar_user}"
+POSTGRES_DB="${POSTGRES_DB:-radar_db}"
 
 mkdir -p "${DEST}"
 

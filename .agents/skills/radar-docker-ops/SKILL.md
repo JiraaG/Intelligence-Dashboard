@@ -27,7 +27,11 @@ Modifiche a containerizzazione, reti, health, o build FE in Docker.
 ## Deferred (non inventare come fatto)
 
 - Drop `--legacy-peer-deps` solo con matrix allineata
-- Digest pin immagini = opzionale prodotto post–Phase 6
+- Digest pin immagini = opzionale prodotto (Final Release Fase 5 **DEFERRED ACCETTATO** 2026-07-17)
+
+## Ops .env
+
+`ops/backup-postgres.sh` / `restore-postgres.sh` usano `ops/_load_dotenv.sh` (KEY=VALUE), non `source .env` grezzo.
 
 ## Comandi utili
 
