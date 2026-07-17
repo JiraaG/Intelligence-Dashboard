@@ -34,9 +34,13 @@ function isStringArray(value: unknown): value is string[] {
 }
 
 /**
- * Runtime validation for API article DTOs before they reach map/template code.
- * FE arrays (`companies_involved`, `tags`, `infrastructural_entities`) come from
- * SQL `array_agg` — do not confuse with Pydantic CSV `str` on the Gemini schema.
+ * Guard runtime DTO articolo API prima di mappa/template.
+ *
+ * FE: ``companies_involved`` / ``tags`` / ``infrastructural_entities`` sono
+ * ``string[]`` (SQL ``array_agg``). Non confondere con Pydantic CSV ``str``
+ * sullo schema Gemini lato backend.
+ *
+ * @see radar-api-contract; docs/03.
  */
 export function isArticleDto(value: unknown): value is Article {
   if (!value || typeof value !== 'object') return false;
@@ -77,8 +81,9 @@ function parseArticleArray(items: unknown[]): Article[] {
 }
 
 /**
- * Accepts Phase 5 envelope `{ items, next_cursor, total }` (preferred) or a legacy bare array.
- * Invalid shapes throw; callers may catch and surface via StateService.error.
+ * Accetta envelope Phase 5 ``{ items, next_cursor, total }`` oppure array nudo legacy.
+ * Shape invalida → throw (caller → StateService.error). ``ArticleService`` usa
+ * di preferenza ``parseArticlesPageDto`` sull’envelope.
  */
 export function parseArticlesDto(payload: unknown): Article[] {
   if (Array.isArray(payload)) {
@@ -90,6 +95,10 @@ export function parseArticlesDto(payload: unknown): Article[] {
   throw new Error('Articles payload must be an array or { items, next_cursor, total } envelope');
 }
 
+/**
+ * Parser envelope paginato Phase 5 (SoT API).
+ * ``next_cursor``: number finito o null; ``total`` obbligatorio finito.
+ */
 export function parseArticlesPageDto(payload: unknown): ArticlesPage {
   if (!payload || typeof payload !== 'object') {
     throw new Error('Articles page payload must be an object');
@@ -112,6 +121,7 @@ export function parseArticlesPageDto(payload: unknown): ArticlesPage {
   };
 }
 
+/** Riga ``GET /api/map-summary``: country×category + count/read + lat/lon finite. */
 export function isMapSummaryRowDto(value: unknown): value is MapSummaryRow {
   if (!value || typeof value !== 'object') return false;
   const row = value as Record<string, unknown>;

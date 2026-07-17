@@ -6,6 +6,13 @@ import { MultiSelectModule } from 'primeng/multiselect';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { ArticleFilters, CountrySummary, Sentiment, PrimaryCategory } from '../../models/article.model';
 
+/**
+ * Toolbar filtri giorno: data, sentiment, categorie, lista paesi da day-summary.
+ * Non carica ``Article[]`` — solo rollup ``CountrySummary`` + conteggi.
+ * Emit ``filtersChange`` / ``countrySelected`` verso App/StateService.
+ *
+ * @see docs/03; radar-api-contract (day = map-summary).
+ */
 @Component({
   selector: 'app-radar-toolbar',
   standalone: true,
@@ -14,11 +21,12 @@ import { ArticleFilters, CountrySummary, Sentiment, PrimaryCategory } from '../.
   styleUrl: './radar-toolbar.component.scss'
 })
 export class RadarToolbarComponent {
-  /** Day summary rollup — country list without full Article[]. */
+  /** Rollup day-view (paesi) senza Article[] completo. */
   countries    = input<CountrySummary[]>([]);
   articleCount = input<number>(0);
   readCount    = input<number>(0);
   isLoading    = input<boolean>(false);
+  /** Banner errore unificato (map-summary o detailError nation-fetch). */
   apiError     = input<boolean>(false);
 
   filtersChange   = output<ArticleFilters>();
@@ -71,6 +79,7 @@ export class RadarToolbarComponent {
     { label: '🛡️ Sicurezza', value: 'Sicurezza' }
   ];
 
+  /** Nomi IT per ISO comuni; fallback Intl / codice grezzo sotto. */
   readonly COUNTRY_NAMES: Record<string, string> = {
     'IT': 'Italia',
     'DE': 'Germania',
@@ -99,6 +108,10 @@ export class RadarToolbarComponent {
     'XX': 'World Wide'
   };
 
+  /**
+   * Lista paesi ordinata per conteggio: mappa CODE→nome
+   * (tabella / Intl.DisplayNames / codice) + read_count.
+   */
   readonly countriesList = computed(() => {
     const list: { code: string; name: string; count: number; readCount: number }[] = [];
     for (const c of this.countries()) {
@@ -125,6 +138,7 @@ export class RadarToolbarComponent {
     return list.sort((a, b) => b.count - a.count);
   });
 
+  /** Bandiera emoji da ISO-2; ``XX`` → ``WW``; codepoint invalidi → bandiera bianca. */
   getFlagEmoji(countryCode: string): string {
     if (!countryCode || countryCode === 'XX') return 'WW';
     const codePoints = countryCode
@@ -138,6 +152,10 @@ export class RadarToolbarComponent {
     }
   }
 
+  /**
+   * Data locale → ``YYYY-MM-DD`` (compensa timezone offset).
+   * Sentiment/categorie vuoti → ``null`` (filtro assente lato StateService/API).
+   */
   onFiltersChange(): void {
     const date = this.selectedDate();
     const offset = date.getTimezoneOffset();

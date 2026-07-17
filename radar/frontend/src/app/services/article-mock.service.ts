@@ -10,8 +10,15 @@ import {
 } from '../models/article.model';
 import { MapSummaryRow } from '../models/map-summary.model';
 
+/** Data ISO di generazione fixture — usata come ``published_at``, non come filtro query. */
 const TODAY = new Date().toISOString().split('T')[0];
 
+/**
+ * Fixture offline per cluster/hatching/spiderfy senza backend.
+ * Attivo solo se ``MOCK_MODE=true`` (mai fallback silenzioso da ArticleService).
+ *
+ * @see skill spatial-data-mocking.
+ */
 export const MOCK_ARTICLES: Article[] = [
   // --- CLUSTER TEST: Due articoli in Germania (città diverse) ---
   {
@@ -144,8 +151,19 @@ export const MOCK_ARTICLES: Article[] = [
   },
 ];
 
+/**
+ * Mock offline: stessa forma API (map-summary + envelope articles) senza HTTP.
+ *
+ * Nota C-07: il parametro ``date`` è accettato ma **ignorato** (``void date``) —
+ * le fixture restano sempre ``MOCK_ARTICLES``/``TODAY``. Lo skill checklist che
+ * prevede «data passata → 0 notizie» non riflette questo codice.
+ */
 @Injectable({ providedIn: 'root' })
 export class ArticleMockService {
+  /**
+   * Aggrega country×category con lat/lon media progressiva e filtri sentiment.
+   * ``date`` ignorato (vedi nota classe / C-07).
+   */
   getMapSummary(date: string, sentiment?: Sentiment | Sentiment[] | null): Observable<MapSummaryRow[]> {
     void date;
     let arts = MOCK_ARTICLES;
@@ -183,6 +201,10 @@ export class ArticleMockService {
     }));
   }
 
+  /**
+   * Envelope keyset mock: sort id DESC, cursor = id strettamente minore, limit ≤100.
+   * Filtri country/category/sentiment/relevance; ``date`` non applicato.
+   */
   getArticlesPage(filters: ArticlesPageFilters): Observable<ArticlesPage> {
     const limit = Math.min(Math.max(filters.limit ?? 50, 1), 100);
     const allMatching = MOCK_ARTICLES.filter((a) => {
@@ -204,11 +226,13 @@ export class ArticleMockService {
     });
   }
 
+  /** Helper legacy: tutti i mock (``date`` ignorato). */
   getArticles(date: string): Observable<Article[]> {
     void date;
     return of(MOCK_ARTICLES);
   }
 
+  /** Rollup CountrySummary da fixture (``date`` ignorato). */
   getCountries(date: string): Observable<CountrySummary[]> {
     void date;
     const grouped = new Map<string, { cats: Set<string>; count: number; read: number }>();
