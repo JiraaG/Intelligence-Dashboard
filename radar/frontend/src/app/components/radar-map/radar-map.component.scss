@@ -37,6 +37,7 @@
   }
 }
 
+/* Dual toggle: classe su wrapper Leaflet e/o su .marker-icon interno (syncMarkerReadState). */
 :host ::ng-deep .marker-icon.marker-read,
 :host ::ng-deep .marker-read .marker-icon {
   opacity: 0.45;

@@ -1,6 +1,8 @@
 """
-Radar Informativo Globale — Backend Package Init
-Modulo principale del servizio di ingestione geopolitica.
+Package ``app`` del backend Radar (moduli condivisi FastAPI + worker).
+
+Entrypoint API: ``python -m app.main``. Entrypoint ingest: ``python -m app.worker``.
+Non è un package “ingest-only”.
 """
 
 __version__ = "0.1.0"

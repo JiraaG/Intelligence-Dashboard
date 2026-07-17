@@ -1,16 +1,18 @@
 ---
 title: Piano commenti codice principiante — Radar
-status: execute-p0-done
+status: execute-p0-p1-p2-done
 model: grok-4.5
 pipeline: terra-audit → grok-refine → grok-execute
 created: 2026-07-17
 refined: 2026-07-17
 executed_p0: 2026-07-17
+executed_p1: 2026-07-17
+executed_p2: 2026-07-17
 scope: backend-app-prod + frontend-active + ecc-hooks-adapters-sync + ops-sh
 exclude: tests, radar-sidebar, migrations-sql, node_modules, data, backups, vault
 comment_language: it
 behavior_change: false
-next: P1-01…P1-03 opt-in; P2-01 opt-in
+next: none (campagne commenti P0–P2 chiuse; altri P2 inventario restano opt-in fuori batch)
 ---
 
 # Piano commenti codice principiante — Radar
@@ -284,7 +286,7 @@ Ogni batch è comment-only e contiene al massimo cinque file. I P0 rispettano l'
 
 ### P2 — opt-in, nessun obbligo di edit
 
-1. **P2-01 — Basso valore prioritario (5 file, ~S×5):** `__init__.py` (root app), `core/logging.py`, `radar-map.component.html`, `radar-map.component.scss`, `radar-toolbar.component.scss`. Unico batch P2 eseguibile; solo se serve chiudere gap minimi.
+1. **P2-01 — Basso valore prioritario (5 file, ~S×5):** `__init__.py` (root app), `core/logging.py`, `radar-map.component.html`, `radar-map.component.scss`, `radar-toolbar.component.scss`. Unico batch P2 eseguibile; solo se serve chiudere gap minimi. ✅ (2026-07-17; `logging.py` skipped — già chiaro)
 2. Gli altri P2 (`app.html`, `app.scss`, toolbar HTML, `article.model.ts`, `map-summary.model.ts`) restano in inventario con `batch_id: —` — fuori sequenza obbligatoria.
 
 Le entry skip non ricevono batch salvo errore fattuale dimostrato; anche allora il cambio deve restare comment-only e rientrare nel file già classificato.
@@ -422,3 +424,4 @@ Il secondo comando deve restare vuoto. In caso di failure test/typecheck preesis
 | P1-01 | DONE 2026-07-17 | 5 file supporto; AST equal; pytest `not live` 151 passed; nessun C-xx nuovo |
 | P1-02 | DONE 2026-07-17 | typecheck OK; C-07 mock `date` ignorato documentato (skill «data passata→0» ≠ codice) |
 | P1-03 | DONE 2026-07-17 | requeue dry-run, sync SoT→mirror, backup crash-consistency; pytest 151; nessun C-xx nuovo |
+| P2-01 | DONE 2026-07-17 | minimi: `__init__` non ingest-only; map mount; dual `.marker-read`; toolbar `::ng-deep`. **Skip** `logging.py` |

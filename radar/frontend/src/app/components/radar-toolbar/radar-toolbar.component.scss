@@ -248,6 +248,7 @@
     overflow: hidden;
   }
 
+  /* Pierce view encapsulation: calendar/multiselect PrimeNG renderizzano fuori dal template. */
   ::ng-deep {
     .p-calendar,
     .p-multiselect {
