@@ -33,6 +33,9 @@ yarn-error.log*
 # ─── Docker ──────────────────────────────────────────────────────────────────
 data/postgres/
 
+# ─── Ops backup (pg_dump + vault.tar.gz; mai in Git) ─────────────────────────
+backups/
+
 # ─── IDE e sistema operativo ─────────────────────────────────────────────────
 .idea/
 .vscode/
