@@ -1,5 +1,5 @@
 """
-Builder SQL per lista articoli day-scoped, map-summary e countries.
+Builder SQL per lista articoli day-scoped / saved, map-summary e countries.
 
 Companies/tags via ``LEFT JOIN LATERAL`` — mai due LEFT JOIN sibling di
 ``article_companies`` + ``article_tags`` nello stesso FROM (rischio cartesiano).
@@ -124,16 +124,22 @@ def _append_optional_filters(
 
 
 def build_articles_count_query(
-    pub_date: date,
+    pub_date: Optional[date] = None,
     *,
     sentiment: Optional[Sequence[str]] = None,
     relevance_level: Optional[int] = None,
     country: Optional[str] = None,
     category: Optional[str] = None,
+    saved_only: bool = False,
 ) -> tuple[str, list[Any]]:
-    """``COUNT(*)`` articoli filtrati di un solo giorno (senza cursor)."""
-    params: list[Any] = [pub_date]
-    parts = ["SELECT COUNT(*) FROM articles a WHERE a.published_at = $1"]
+    """``COUNT(*)`` articoli filtrati (giorno e/o ``is_saved``; senza cursor)."""
+    params: list[Any] = []
+    parts = ["SELECT COUNT(*) FROM articles a WHERE TRUE"]
+    if saved_only:
+        parts.append("AND a.is_saved = TRUE")
+    if pub_date is not None:
+        params.append(pub_date)
+        parts.append(f"AND a.published_at = ${len(params)}")
     _append_optional_filters(
         parts,
         params,
@@ -147,7 +153,7 @@ def build_articles_count_query(
 
 
 def build_articles_page_query(
-    pub_date: date,
+    pub_date: Optional[date] = None,
     *,
     sentiment: Optional[Sequence[str]] = None,
     relevance_level: Optional[int] = None,
@@ -155,21 +161,23 @@ def build_articles_page_query(
     category: Optional[str] = None,
     cursor: Optional[int] = None,
     limit: int,
+    saved_only: bool = False,
 ) -> tuple[str, list[Any]]:
-    """Pagina keyset di un giorno calendario (``id DESC``, ``id < cursor`` esclusivo).
+    """Pagina keyset (``id DESC``, ``id < cursor`` esclusivo).
 
+    Day-scoped se ``pub_date`` valorizzata; vault salvati se ``saved_only``.
     Companies/tags via LATERAL — niente doppio LEFT JOIN junction nel FROM.
     Returns:
         ``(sql, params)`` pronti per ``conn.fetch``.
     """
-    params: list[Any] = [pub_date]
+    params: list[Any] = []
     parts = [
         """
         SELECT
             a.id, a.title, a.summary, a.published_at::text AS published_at, a.source_url,
             a.country_code, a.latitude, a.longitude, a.primary_category,
             a.sentiment, a.relevance_level, a.infrastructural_entities, a.feed_title,
-            a.is_read,
+            a.is_read, a.is_saved,
             COALESCE(companies.names, '{}') AS companies_involved,
             COALESCE(tags.names, '{}') AS tags
         FROM articles a
@@ -185,9 +193,14 @@ def build_articles_page_query(
             JOIN tags t ON t.id = atag.tag_id
             WHERE atag.article_id = a.id
         ) tags ON TRUE
-        WHERE a.published_at = $1
+        WHERE TRUE
         """
     ]
+    if saved_only:
+        parts.append("AND a.is_saved = TRUE")
+    if pub_date is not None:
+        params.append(pub_date)
+        parts.append(f"AND a.published_at = ${len(params)}")
     _append_optional_filters(
         parts,
         params,
@@ -267,4 +280,37 @@ def build_countries_summary_query(
     )
     parts.append("GROUP BY country_code")
     parts.append("ORDER BY country_code")
+    return " ".join(parts), params
+
+
+def build_saved_summary_query(
+    *,
+    sentiment: Optional[Sequence[str]] = None,
+    relevance_level: Optional[int] = None,
+) -> tuple[str, list[Any]]:
+    """Aggregato ``country_code × primary_category`` per articoli ``is_saved`` (no date)."""
+    params: list[Any] = []
+    finite = _FINITE_LAT_LON_FILTER
+    parts = [
+        f"""
+        SELECT
+            country_code,
+            primary_category,
+            COUNT(*)::int AS article_count,
+            COUNT(*) FILTER (WHERE is_read)::int AS read_count,
+            COALESCE(AVG(latitude) FILTER (WHERE {finite}), 0.0) AS latitude,
+            COALESCE(AVG(longitude) FILTER (WHERE {finite}), 0.0) AS longitude
+        FROM articles
+        WHERE is_saved = TRUE
+        """
+    ]
+    _append_optional_filters(
+        parts,
+        params,
+        sentiment=sentiment,
+        relevance_level=relevance_level,
+        column_prefix="",
+    )
+    parts.append("GROUP BY country_code, primary_category")
+    parts.append("ORDER BY country_code, primary_category")
     return " ".join(parts), params

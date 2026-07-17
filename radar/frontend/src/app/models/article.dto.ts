@@ -65,6 +65,7 @@ export function isArticleDto(value: unknown): value is Article {
   if (!isStringArray(row['infrastructural_entities'])) return false;
   if (typeof row['feed_title'] !== 'string') return false;
   if (row['is_read'] !== undefined && typeof row['is_read'] !== 'boolean') return false;
+  if (row['is_saved'] !== undefined && typeof row['is_saved'] !== 'boolean') return false;
 
   return true;
 }

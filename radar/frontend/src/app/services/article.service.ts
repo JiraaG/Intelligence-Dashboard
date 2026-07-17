@@ -17,17 +17,24 @@ import { MOCK_MODE } from './mock-mode.token';
 export interface ReadStatusResponse {
   status: string;
   is_read: boolean;
+  is_saved?: boolean;
+}
+
+export interface SavedStatusResponse {
+  status: string;
+  is_saved: boolean;
+  is_read?: boolean;
 }
 
 const DEFAULT_PAGE_LIMIT = 50;
 const MAX_PAGE_LIMIT = 100;
 
 /**
- * Confine HTTP articoli / map-summary.
+ * Confine HTTP articoli / map-summary / saved-summary.
  *
  * Switch mock **solo** via token ``MOCK_MODE`` (inject). Se false, errori HTTP
  * restano errori — **nessun** fallback silenzioso a ``ArticleMockService``.
- * Pagine: clamp 1…100; nation open concatena keyset fino a ``next_cursor`` null.
+ * Pagine: clamp 1…100; nation/saved open concatena keyset fino a ``next_cursor`` null.
  *
  * @see radar-api-contract; docs/03; frontend rule §2b; spatial-data-mocking.
  */
@@ -63,14 +70,44 @@ export class ArticleService {
   }
 
   /**
+   * Vault salvati: ``GET /api/saved-summary`` (no date).
+   * Sentiment multiplo: query ripetuta ``sentiment=`` (OR lato API).
+   */
+  getSavedSummary(filters: {
+    sentiment?: Sentiment | Sentiment[] | null;
+  } = {}): Observable<MapSummaryRow[]> {
+    if (this.mockMode) {
+      return this.mock.getSavedSummary(filters.sentiment ?? undefined);
+    }
+    let params = new HttpParams();
+    const sentiments = Array.isArray(filters.sentiment)
+      ? filters.sentiment
+      : filters.sentiment
+        ? [filters.sentiment]
+        : [];
+    for (const s of sentiments) {
+      params = params.append('sentiment', s);
+    }
+    return this.http.get<unknown>('/api/saved-summary', { params }).pipe(
+      map((payload) => parseMapSummaryDto(payload)),
+    );
+  }
+
+  /**
    * Una pagina envelope ``{ items, next_cursor, total }`` (limit clampato ≤100).
+   * Con ``saved=true`` omette ``date``.
    */
   getArticlesPage(filters: ArticlesPageFilters): Observable<ArticlesPage> {
     const limit = Math.min(Math.max(filters.limit ?? DEFAULT_PAGE_LIMIT, 1), MAX_PAGE_LIMIT);
     if (this.mockMode) {
       return this.mock.getArticlesPage({ ...filters, limit });
     }
-    let params = new HttpParams().set('date', filters.date).set('limit', String(limit));
+    let params = new HttpParams().set('limit', String(limit));
+    if (filters.saved) {
+      params = params.set('saved', 'true');
+    } else if (filters.date) {
+      params = params.set('date', filters.date);
+    }
     if (filters.country) params = params.set('country', filters.country);
     if (filters.category) params = params.set('category', filters.category);
     if (filters.sentiment) params = params.set('sentiment', filters.sentiment);
@@ -90,13 +127,37 @@ export class ArticleService {
   getAllArticlesForCountry(
     date: string,
     country: string,
-    extra: Omit<ArticlesPageFilters, 'date' | 'country' | 'cursor' | 'limit'> = {},
+    extra: Omit<ArticlesPageFilters, 'date' | 'country' | 'cursor' | 'limit' | 'saved'> = {},
   ): Observable<Article[]> {
     const limit = MAX_PAGE_LIMIT;
     return this.getArticlesPage({ date, country, limit, ...extra }).pipe(
       expand((page) =>
         page.next_cursor != null
           ? this.getArticlesPage({ date, country, limit, cursor: page.next_cursor, ...extra })
+          : EMPTY,
+      ),
+      reduce((acc, page) => acc.concat(page.items), [] as Article[]),
+    );
+  }
+
+  /**
+   * Concatena pagine salvate per country (no date), page size = MAX 100.
+   */
+  getAllSavedArticlesForCountry(
+    country: string,
+    extra: Omit<ArticlesPageFilters, 'date' | 'country' | 'cursor' | 'limit' | 'saved'> = {},
+  ): Observable<Article[]> {
+    const limit = MAX_PAGE_LIMIT;
+    return this.getArticlesPage({ saved: true, country, limit, ...extra }).pipe(
+      expand((page) =>
+        page.next_cursor != null
+          ? this.getArticlesPage({
+              saved: true,
+              country,
+              limit,
+              cursor: page.next_cursor,
+              ...extra,
+            })
           : EMPTY,
       ),
       reduce((acc, page) => acc.concat(page.items), [] as Article[]),
@@ -115,11 +176,30 @@ export class ArticleService {
   /** PATCH read-status; in mock risponde ``of(...)`` senza HTTP. */
   updateReadStatus(articleId: number, isRead: boolean): Observable<ReadStatusResponse> {
     if (this.mockMode) {
-      return of({ status: 'success', is_read: isRead });
+      return of({
+        status: 'success',
+        is_read: isRead,
+        ...(isRead ? {} : { is_saved: false }),
+      });
     }
     return this.http.patch<ReadStatusResponse>(
       `/api/articles/${articleId}/read_status`,
       { is_read: isRead },
+    );
+  }
+
+  /** PATCH saved-status; save ⇒ is_read=true. In mock risponde ``of(...)`` senza HTTP. */
+  updateSavedStatus(articleId: number, isSaved: boolean): Observable<SavedStatusResponse> {
+    if (this.mockMode) {
+      return of({
+        status: 'success',
+        is_saved: isSaved,
+        ...(isSaved ? { is_read: true } : {}),
+      });
+    }
+    return this.http.patch<SavedStatusResponse>(
+      `/api/articles/${articleId}/saved_status`,
+      { is_saved: isSaved },
     );
   }
 }

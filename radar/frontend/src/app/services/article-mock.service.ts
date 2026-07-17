@@ -38,6 +38,7 @@ export const MOCK_ARTICLES: Article[] = [
     infrastructural_entities: ['TSMC Dresden Fab', 'Silicon Saxony Campus'],
     feed_title: 'Silicon Saxony News',
     is_read: false,
+    is_saved: true,
   },
   {
     id: 2,
@@ -56,6 +57,7 @@ export const MOCK_ARTICLES: Article[] = [
     infrastructural_entities: ['Rete di trasmissione 380kV Baviera', 'Interconnessione DE-AT'],
     feed_title: 'Bavarian Grid Monitor',
     is_read: true,
+    is_saved: false,
   },
   // --- CLUSTER TEST: Due articoli vicini in Ucraina ---
   {
@@ -75,6 +77,7 @@ export const MOCK_ARTICLES: Article[] = [
     infrastructural_entities: ['Centrale Nucleare di Zaporizhzhia', 'Sito di stoccaggio combustibile'],
     feed_title: 'IAEA Bulletin',
     is_read: false,
+    is_saved: true,
   },
   {
     id: 4,
@@ -93,6 +96,7 @@ export const MOCK_ARTICLES: Article[] = [
     infrastructural_entities: ['Diga di Kakhovka', 'Serbatoio di Kakhovka'],
     feed_title: 'EU Reconstruction Index',
     is_read: false,
+    is_saved: false,
   },
   // --- SINGOLI MARKER: Test hatching multi-categoria ---
   {
@@ -112,6 +116,7 @@ export const MOCK_ARTICLES: Article[] = [
     infrastructural_entities: ['Impianto di Natanz', 'Impianto di Fordow'],
     feed_title: 'United Nations Security News',
     is_read: false,
+    is_saved: false,
   },
   {
     id: 6,
@@ -130,6 +135,7 @@ export const MOCK_ARTICLES: Article[] = [
     infrastructural_entities: ['Samsung Fab Hwaseong', 'Samsung R&D Campus Suwon'],
     feed_title: 'Korea Tech Herald',
     is_read: false,
+    is_saved: true,
   },
   {
     id: 7,
@@ -148,6 +154,7 @@ export const MOCK_ARTICLES: Article[] = [
     infrastructural_entities: ['Trans-Adriatic Pipeline (TAP)', 'Terminale di Melendugno', 'Campo di Shah Deniz II'],
     feed_title: 'Trans-Adriatic Pipeline Press',
     is_read: false,
+    is_saved: false,
   },
 ];
 
@@ -205,10 +212,12 @@ export class ArticleMockService {
   /**
    * Envelope keyset mock: sort id DESC, cursor = id strettamente minore, limit ≤100.
    * Filtri country/category/sentiment/relevance; ``date`` non applicato.
+   * Con ``saved=true`` filtra solo ``is_saved``.
    */
   getArticlesPage(filters: ArticlesPageFilters): Observable<ArticlesPage> {
     const limit = Math.min(Math.max(filters.limit ?? 50, 1), 100);
     const allMatching = MOCK_ARTICLES.filter((a) => {
+      if (filters.saved && !a.is_saved) return false;
       if (filters.country && a.country_code !== filters.country.toUpperCase()) return false;
       if (filters.category && a.primary_category !== filters.category) return false;
       if (filters.sentiment && a.sentiment !== filters.sentiment) return false;
@@ -225,6 +234,46 @@ export class ArticleMockService {
       next_cursor: hasMore && pageItems.length > 0 ? pageItems[pageItems.length - 1].id : null,
       total: allMatching.length,
     });
+  }
+
+  /**
+   * Aggregato salvati (no date): stessa forma di map-summary su ``is_saved``.
+   */
+  getSavedSummary(sentiment?: Sentiment | Sentiment[] | null): Observable<MapSummaryRow[]> {
+    let arts = MOCK_ARTICLES.filter((a) => !!a.is_saved);
+    if (Array.isArray(sentiment) && sentiment.length > 0) {
+      const allowed = new Set(sentiment);
+      arts = arts.filter((a) => allowed.has(a.sentiment));
+    } else if (typeof sentiment === 'string') {
+      arts = arts.filter((a) => a.sentiment === sentiment);
+    }
+
+    const grouped = new Map<string, MapSummaryRow>();
+    for (const a of arts) {
+      const key = `${a.country_code}|${a.primary_category}`;
+      const existing = grouped.get(key);
+      if (existing) {
+        existing.article_count += 1;
+        if (a.is_read) existing.read_count += 1;
+        existing.latitude =
+          (existing.latitude * (existing.article_count - 1) + a.latitude) / existing.article_count;
+        existing.longitude =
+          (existing.longitude * (existing.article_count - 1) + a.longitude) / existing.article_count;
+      } else {
+        grouped.set(key, {
+          country_code: a.country_code,
+          primary_category: a.primary_category,
+          article_count: 1,
+          read_count: a.is_read ? 1 : 0,
+          latitude: a.latitude,
+          longitude: a.longitude,
+        });
+      }
+    }
+    return of([...grouped.values()].sort((a, b) => {
+      const c = a.country_code.localeCompare(b.country_code);
+      return c !== 0 ? c : a.primary_category.localeCompare(b.primary_category);
+    }));
   }
 
   /** Helper legacy: tutti i mock (``date`` ignorato). */

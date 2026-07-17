@@ -132,9 +132,11 @@ Default produzione: `false`. **Vietato** `catchError` che attiva mock silenziosa
 
 Errore API → `StateService.error` / banner toolbar (`app.html` `[apiError]="!!state.error()"`); data richiesta preservata.
 
-**Nation-fetch (T-P1-04 DONE):** `detailError = signal<unknown>(null)`; `error = computed(() => mapSummaryResource.error() ?? detailError())`.
-`loadCountryArticles` valorizza `detailError` in catch. Sul fallimento, `App.onCountryClick` chiama `closeSidebar(false)` così la UI si chiude ma il banner resta.
-Close intenzionale utente (`closeSidebar()` / default `clearError: true`) azzera `detailError`. **Non** toccare `radar-sidebar/**`.
+**Nation-fetch (T-P1-04 DONE):** `detailError = signal<unknown>(null)`; `error = computed(() => mapSummaryResource.error() ?? savedSummaryResource.error() ?? detailError())`.
+`loadCountryArticles` / `loadSavedCountryArticles` valorizzano `detailError` in catch. Sul fallimento, `App` chiama `closeSidebar(false)` così la UI si chiude ma il banner resta.
+Close intenzionale utente (`closeSidebar()` / default `clearError: true`) azzera `detailError`. **Non** refactorare `radar-sidebar/**` (eccezione: toggle Salva).
+
+**Notizie Salvate:** `savedSummaryResource` (no date); toolbar `NOTIZIE SALVATE` + tooltip nazioni; `sidebarMode: 'nation' | 'saved'`; click nazione salvata = stesso path di LETTE/TROVATE (`fitBounds` + `flyTo` 6 + spiderfy); save ⇒ read; unread ⇒ unsave.
 
 ---
 
@@ -258,9 +260,11 @@ Il componente `p-sidebar` di PrimeNG può essere usato come wrapper UI.
 
 ---
 
-## Regola 7: Clustering per categoria + map-summary (Phase 5)
+## Regola 7: Clustering per categoria + map-summary (Phase 5+)
 
 **Day open (Phase 5):** la mappa si dipinge da `GET /api/map-summary` (righe `country_code × primary_category` + count/read + lat/lon finite). Niente `Article[]` globale del giorno. Hatching da categorie aggregate per paese (zoom &lt; 5). A zoom ≥ 5: **un pin nazione** (conteggio + anello conic categorie) — non pallini numerati per-categoria. Click pin → fetch nazione + sidebar (`preserveZoom: true`, niente dezoom). Click poligono/toolbar → nation open + `fitBounds` (`maxZoom: 4`).
+
+**Saved vault:** `GET /api/saved-summary` (no date) alimenta `NOTIZIE SALVATE` + tooltip nazioni; click → `loadSavedCountryArticles` + carosello multi-day con `sidebarMode='saved'`; **stesso path mappa di LETTE/TROVATE** (`fitBounds` + `flyTo` zoom 6 + spiderfy categoria + highlight). Card **Salva notizia** / **Rimuovi dai salvati**; save ⇒ read; unread ⇒ unsave.
 
 **Nation open:** `GET /api/articles?date&country` (envelope `{items,next_cursor,total}`, page ≤100; FE concatena tutte le pagine) → carosello = **tutte** le notizie della nazione (sort categoria + pill `findIndex` invariati in sidebar). Sulla mappa: marker articolo **solo** per il paese aperto + **hub disco compatto** (`radar-spider-root`, stesso stile del root spiderfy). Spiderfy: sola categoria del pallino / pill / articolo attivo carosello — **non** tutte; allo scroll stessa categoria solo highlight (`lastSpiderfyKey`). Fan: **tutte** le icone della categoria (niente hard cap 24 / park extras); size emoji + `spiderfyDistanceMultiplier` adattivi al conteggio; restore hub se spiderfy fallisce. Close/cambio paese: clear detail markers; tornano i pin summary.
 

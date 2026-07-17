@@ -100,6 +100,10 @@ curl.exe -s "http://localhost/api/articles?date=2026-07-15"
 # Map summary
 curl.exe -s "http://localhost/api/map-summary?date=2026-07-15"
 
+# Saved vault (cross-day, no date)
+curl.exe -s "http://localhost/api/saved-summary"
+curl.exe -s "http://localhost/api/articles?saved=true&limit=10"
+
 # DB
 docker compose exec radar-db psql -U radar_user -d radar_db -c "\dt"
 ```

@@ -38,6 +38,7 @@ def _article_row(article_id: int, **overrides: Any) -> dict[str, Any]:
         "infrastructural_entities": [],
         "feed_title": "Feed",
         "is_read": False,
+        "is_saved": False,
         "companies_involved": [],
         "tags": [],
     }
@@ -248,3 +249,115 @@ def test_articles_sql_uses_lateral_not_sibling_left_joins() -> None:
     assert "LEFT JOIN LATERAL" in sql
     assert "LEFT JOIN article_companies" not in sql
     assert "LEFT JOIN article_tags" not in sql
+    assert "a.is_saved" in sql
+
+
+@pytest.mark.unit
+def test_saved_articles_ignores_date_and_filters_is_saved() -> None:
+    mock_pool, mock_conn = _mock_pool()
+    mock_conn.fetchval = AsyncMock(return_value=1)
+    mock_conn.fetch = AsyncMock(return_value=[_article_row(7, is_saved=True)])
+    state.db_pool = mock_pool
+
+    client = TestClient(app)
+    response = client.get("/api/articles?saved=true&country=IT")
+
+    assert response.status_code == 200
+    page_sql = mock_conn.fetch.await_args.args[0]
+    assert "a.is_saved = TRUE" in page_sql
+    assert "published_at" not in page_sql.split("WHERE", 1)[1].split("ORDER BY")[0] or (
+        "published_at =" not in page_sql
+    )
+
+
+@pytest.mark.unit
+def test_articles_without_date_requires_saved() -> None:
+    mock_pool, _mock_conn = _mock_pool()
+    state.db_pool = mock_pool
+
+    client = TestClient(app)
+    response = client.get("/api/articles")
+    assert response.status_code == 400
+
+
+@pytest.mark.unit
+def test_saved_summary_no_date() -> None:
+    mock_pool, mock_conn = _mock_pool()
+    mock_conn.fetch = AsyncMock(
+        return_value=[
+            {
+                "country_code": "US",
+                "primary_category": "Ambiente",
+                "article_count": 2,
+                "read_count": 1,
+                "latitude": 40.0,
+                "longitude": -74.0,
+            }
+        ]
+    )
+    state.db_pool = mock_pool
+
+    client = TestClient(app)
+    response = client.get("/api/saved-summary")
+    assert response.status_code == 200
+    sql = mock_conn.fetch.await_args.args[0]
+    assert "is_saved = TRUE" in sql
+    assert "published_at =" not in sql
+
+
+@pytest.mark.unit
+def test_read_status_unread_unsaves() -> None:
+    mock_pool, mock_conn = _mock_pool()
+    mock_conn.execute = AsyncMock(return_value="UPDATE 1")
+    state.db_pool = mock_pool
+
+    client = TestClient(app)
+    response = client.patch(
+        "/api/articles/42/read_status",
+        json={"is_read": False},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["is_read"] is False
+    assert data["is_saved"] is False
+    sql = mock_conn.execute.await_args.args[0]
+    assert "is_saved = FALSE" in sql
+
+
+@pytest.mark.unit
+def test_saved_status_patch() -> None:
+    mock_pool, mock_conn = _mock_pool()
+    mock_conn.execute = AsyncMock(return_value="UPDATE 1")
+    state.db_pool = mock_pool
+
+    client = TestClient(app)
+    response = client.patch(
+        "/api/articles/42/saved_status",
+        json={"is_saved": True},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"status": "success", "is_saved": True, "is_read": True}
+    sql = mock_conn.execute.await_args.args[0]
+    assert "is_saved = TRUE" in sql
+    assert "is_read = TRUE" in sql
+
+
+@pytest.mark.unit
+def test_saved_status_unsave_keeps_read() -> None:
+    mock_pool, mock_conn = _mock_pool()
+    mock_conn.execute = AsyncMock(return_value="UPDATE 1")
+    mock_conn.fetchval = AsyncMock(return_value=True)
+    state.db_pool = mock_pool
+
+    client = TestClient(app)
+    response = client.patch(
+        "/api/articles/42/saved_status",
+        json={"is_saved": False},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["is_saved"] is False
+    assert data["is_read"] is True
+    sql = mock_conn.execute.await_args.args[0]
+    assert "is_saved = FALSE" in sql
+    assert "is_read = TRUE" not in sql

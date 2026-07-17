@@ -317,6 +317,7 @@ if (targetGroup) {
 - Spiderfy custom / graph; `spiderfyOnMaxZoom: false` (mai `true`)
 - `maxClusterRadius: 40` → match `radar-map.component.ts`
 - Day-view: pin nazione da map-summary; nation open: hub disco `radar-spider-root` + fan emoji (tutte le icone della categoria; size/distanza adattivi; restore hub se spiderfy fallisce)
+- Saved vault open (`App.onToolbarSavedCountrySelect`): stesso path zoom/spiderfy della toolbar LETTE/TROVATE (`refocusCountry` / `scheduleCategorySpiderfy` → `focusAndSpiderfyCategory`); non documentare saved come spiderfy-free
 - Hub root: non cancellare su `unspiderfied` se `restoreDetailHubOnUnspiderfy === false` (cambio categoria)
 - Zoom/wheel con spider aperto: disabilitare auto-unspiderfy MarkerCluster su click **e** zoom; tenere fan finché zoom ≥ 5; a zoom &lt; 5 (hatching) → `collapseAllGraphs(true)`; `lastSpiderfyCountry`/`lastSpiderfyCategory` + re-spiderfy deferito su `zoomend` ≥ 5
 - Icone marker XSS-safe: DOM + `textContent` (Phase 4), non HTML string

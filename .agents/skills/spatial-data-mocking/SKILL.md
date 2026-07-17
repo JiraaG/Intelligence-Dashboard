@@ -41,7 +41,9 @@ azzerando l'errore (`closeSidebar(false)` sul catch).
 
 Contratto API Phase 5 (allineato a `article.service.ts` / `article-mock.service.ts`):
 - Day view: `getMapSummary` → `GET /api/map-summary`
+- Saved vault: `getSavedSummary` → `GET /api/saved-summary` (no date; `is_saved`)
 - Nation open: `getArticlesPage` → `GET /api/articles` con envelope `{ items, next_cursor, total }` (page ≤ 100; FE concatena)
+- Saved open: `getArticlesPage({ saved: true, country })` — ignora date
 
 ```typescript
 // frontend/src/app/services/mock-mode.token.ts
@@ -293,7 +295,7 @@ export class ArticleService {
 ```
 
 Offline: in `app.config.ts` (o TestBed) fornire `{ provide: MOCK_MODE, useValue: true }`.
-Produzione: `{ provide: MOCK_MODE, useValue: false }` — errori API (map-summary **e** nation-fetch via `detailError`) restano in `StateService.error()`.
+Produzione: `{ provide: MOCK_MODE, useValue: false }` — errori API (map-summary, saved-summary **e** nation/saved-fetch via `detailError`) restano in `StateService.error()`.
 
 ---
 
@@ -342,6 +344,14 @@ con i dati mockati prima di connettere il backend reale.
 - [ ] In mock mode i dati usano `TODAY` — cambiando data in passato tipicamente 0 notizie (day view via `getMapSummary`)
 - [ ] Con data odierna: le 7 notizie mock compaiono (summary + nation pages)
 - [ ] Day view usa `getMapSummary`; nation open concatena pagine `{ items, next_cursor, total }`
+
+### ✅ Test 6: Notizie Salvate
+
+- [ ] Contatore toolbar **NOTIZIE SALVATE** non dipende dalla data del calendario
+- [ ] Tooltip **Nazioni Salvate** elenca paesi con badge count
+- [ ] Click nazione → carousel multi-day + **fitBounds / flyTo 6 + spiderfy** (parity LETTE/TROVATE)
+- [ ] Card: **Salva notizia** / **Rimuovi dai salvati**; save ⇒ letta; unread ⇒ unsave
+- [ ] Mock: `getSavedSummary` + `getArticlesPage({ saved: true })`
 
 ---
 

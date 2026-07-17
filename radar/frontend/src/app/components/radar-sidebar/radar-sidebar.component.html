@@ -45,6 +45,10 @@
           <i class="pi" [class.pi-check-circle]="!displayArticle()!.is_read" [class.pi-times-circle]="displayArticle()!.is_read"></i>
           {{ displayArticle()!.is_read ? 'Segna come non letta' : 'Segna come letta' }}
         </button>
+        <button class="read-btn save-btn" [class.is-saved]="displayArticle()!.is_saved" (click)="toggleSave(displayArticle()!)">
+          <i class="pi" [class.pi-bookmark]="!displayArticle()!.is_saved" [class.pi-bookmark-fill]="displayArticle()!.is_saved"></i>
+          {{ displayArticle()!.is_saved ? 'Rimuovi dai salvati' : 'Salva notizia' }}
+        </button>
       </div>
 
       <div class="badge-section" *ngIf="displayArticle()?.infrastructural_entities?.length">
@@ -144,6 +148,10 @@
             <button class="read-btn" [class.is-read]="a.is_read" (click)="toggleRead(a)">
               <i class="pi" [class.pi-check-circle]="!a.is_read" [class.pi-times-circle]="a.is_read"></i>
               {{ a.is_read ? 'Segna come non letta' : 'Segna come letta' }}
+            </button>
+            <button class="read-btn save-btn" [class.is-saved]="a.is_saved" (click)="toggleSave(a)">
+              <i class="pi" [class.pi-bookmark]="!a.is_saved" [class.pi-bookmark-fill]="a.is_saved"></i>
+              {{ a.is_saved ? 'Rimuovi dai salvati' : 'Salva notizia' }}
             </button>
           </div>
 

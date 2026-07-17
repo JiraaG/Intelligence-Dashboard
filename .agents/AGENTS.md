@@ -25,11 +25,13 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 
 > [!CRITICAL]
 > ### ⛔ Sidebar freeze (non negoziabile)
-> Non modificare, restyle, refactor o sostituire `radar/frontend/src/app/components/radar-sidebar/` (TS/HTML/SCSS/spec).
+> Non refactorare, restyle ampio o sostituire `radar/frontend/src/app/components/radar-sidebar/` (TS/HTML/SCSS/spec).
 > Conservare `p-carousel` e `updateCarouselHeight` con `document.getElementById('article-card-' + id)`.
 > Vietato introdurre `app-article-list`, infinite scroll o ResizeObserver “migliorativi” sul carosello.
-> Bug **letta/non letta** (`.marker-read`): fix solo in `state.service.ts` + `radar-map.component.ts`, senza toccare la sidebar.
+> Bug **letta/non letta** (`.marker-read`) e logica **save**: fix in `state.service.ts` + `radar-map.component.ts` (sidebar solo delega click).
+> **Eccezione mirata:** toggle **Salva / Rimuovi dai salvati** sulle card (binding `is_saved`) — vedi skill `radar-sidebar-freeze`.
 > **Phase 4 DONE:** `MOCK_MODE` esplicito (no fallback silenzioso), marker XSS-safe, DestroyRef, fingerprint geometry (no rebuild cluster su solo `is_read`).
+> **Notizie Salvate:** vault cross-day (`is_saved`, `/api/saved-summary`, `GET /api/articles?saved=true`); save ⇒ read; unread ⇒ unsave; click nazione = fitBounds + flyTo 6 + spiderfy (parity LETTE/TROVATE).
 
 > [!CRITICAL]
 > ### ⛔ Divieto Assoluto di Placeholder o "TODO"
@@ -120,9 +122,10 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 > 8. **Gestione Dinamica Altezza Carosello**: Il ridimensionamento dinamico dell'altezza delle schede nel carosello laterale DEVE essere calcolato estraendo l'ID univoco dell'articolo corrente (`document.getElementById('article-card-' + id)`) anziché affidarsi alla classe `.p-carousel-item-active` di PrimeNG, la quale introduce race-condition nel DOM al primo avvio.
 > 9. **Allineamento Flexbox e Troncamento Fonti**: Le sezioni di metadati contenenti stringhe potenzialmente lunghe (es. la fonte dell'articolo) e bottoni affiancati (es. `Leggi fonte →`) devono impiegare rigorosamente layout *Flexbox* (`flex: 1`, `min-width: 0` per il contenitore di testo e `flex-shrink: 0`, `white-space: nowrap` per il link).
 > 10. **Pulizia Prefisso Feed**: I titoli dei feed provenienti da Miniflux devono essere processati in Angular tramite Regex (es. `.replace(/^Feed:\s*/i, '')`) per rimuovere la dicitura automatica "Feed: " prima del rendering.
-> 11. **API Phase 5:** day view via `GET /api/map-summary`; nation open via `GET /api/articles` con envelope `{ items, next_cursor, total }` (page ≤ 100; FE concatena). Mock solo con `MOCK_MODE`.
+> 11. **API Phase 5+:** day view via `GET /api/map-summary`; saved vault via `GET /api/saved-summary` (no date); nation open via `GET /api/articles` con envelope `{ items, next_cursor, total }` (page ≤ 100; FE concatena); saved open via `?saved=true` (ignora date). Mock solo con `MOCK_MODE`.
 > 12. **Overlay full-bleed:** mappa sempre `100vw`; sidebar sopra — non split 70%/30% che restringe la mappa; `invalidateSize()` dopo open/close.
-> 13. **Errori API / nation-fetch (T-P1-04):** `StateService.error` = `mapSummaryResource.error() ?? detailError()`. Fallimento `loadCountryArticles` → `detailError` + `closeSidebar(false)` (banner toolbar resta). Close utente → clear errore. Vietato fallback silenzioso a mock.
+> 13. **Errori API / nation-fetch (T-P1-04):** `StateService.error` = `mapSummaryResource.error() ?? savedSummaryResource.error() ?? detailError()`. Fallimento `loadCountryArticles` / `loadSavedCountryArticles` → `detailError` + `closeSidebar(false)` (banner toolbar resta). Close utente → clear errore. Vietato fallback silenzioso a mock.
+> 14. **Notizie Salvate:** contatore toolbar date-agnostic; tooltip nazioni; carosello multi-day in `sidebarMode='saved'`; click nazione = stesso path di LETTE/TROVATE (`fitBounds` + `flyTo` 6 + spiderfy); save ⇒ read; unread ⇒ unsave.
 
 ---
 

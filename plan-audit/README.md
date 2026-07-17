@@ -6,7 +6,7 @@ Cartella di audit, prompt orchestratore e SoT del modulo Radar.
 **Quadro fatto vs da fare:** [`STATUS.md`](STATUS.md)  
 **Product docs:** root [`README.md`](../README.md) + [`docs/01–04`](../docs/).
 
-**Anti-drift:** autorità runtime = product docs + Compose (`80:8080`, migrazioni `001–009`) + SoT LLM. Claim storici nei piani in `complete/` possono essere datati.
+**Anti-drift:** autorità runtime = product docs + Compose (`80:8080`, migrazioni `001–010`) + SoT LLM. Claim storici nei piani in `complete/` possono essere datati.
 
 ## `active/` — vivi
 

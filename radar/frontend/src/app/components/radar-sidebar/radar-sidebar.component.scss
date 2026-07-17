@@ -366,7 +366,9 @@
 ------------------------------ */
 .read-toggle-container {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
+  gap: 8px;
 }
 
 .read-btn {
@@ -405,5 +407,11 @@
       border-color: var(--color-text-muted);
       color: var(--color-text-primary);
     }
+  }
+
+  &.is-saved {
+    color: var(--color-text-accent);
+    border-color: var(--color-text-accent);
+    background: rgba(0, 212, 255, 0.15);
   }
 }

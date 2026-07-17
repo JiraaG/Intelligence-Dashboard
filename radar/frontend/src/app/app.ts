@@ -36,6 +36,7 @@ export class App {
 
   articleCount = computed(() => this.state.articleCount());
   readCount    = computed(() => this.state.readCount());
+  savedCount   = computed(() => this.state.savedCount());
   /** Overlay full-bleed: true quando la sidebar è aperta (mappa resta 100vw). */
   isMapSplit   = computed(() => this.isSidebarOpen());
 
@@ -157,6 +158,43 @@ export class App {
 
   async onToolbarCountrySelect(countryCode: string): Promise<void> {
     await this.onCountryClick({ countryCode });
+  }
+
+  /**
+   * Vault salvati: stesso path UI di toolbar LETTE/TROVATE
+   * (fitBounds + spiderfy categoria), fetch via ``loadSavedCountryArticles``.
+   */
+  async onToolbarSavedCountrySelect(countryCode: string): Promise<void> {
+    if (!countryCode) return;
+
+    const gen = ++this.nationOpenGeneration;
+
+    try {
+      const arts = await this.state.loadSavedCountryArticles(countryCode);
+      if (gen !== this.nationOpenGeneration) return;
+
+      if (arts.length === 0) {
+        this.closeSidebar();
+        this.focusCountryCode.set(countryCode);
+        return;
+      }
+
+      const displayArticle =
+        [...arts].sort((a, b) => a.primary_category.localeCompare(b.primary_category))[0] ??
+        arts[0];
+
+      this.selectedArticle.set(displayArticle);
+      this.clusterArticles.set(arts);
+      this.isSidebarOpen.set(true);
+      if (this.focusCountryCode() === countryCode) {
+        this.mapComponent()?.refocusCountry(countryCode);
+      }
+      this.focusCountryCode.set(countryCode);
+      this.scheduleCategorySpiderfy(countryCode, displayArticle.primary_category);
+    } catch {
+      if (gen !== this.nationOpenGeneration) return;
+      this.closeSidebar(false);
+    }
   }
 
   /**

@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS articles (
     sentiment       VARCHAR(20) NOT NULL CHECK (sentiment IN ('Positivo', 'Neutrale', 'Negativo')),
     relevance_level INTEGER NOT NULL CHECK (relevance_level BETWEEN 1 AND 5),
     is_read         BOOLEAN NOT NULL DEFAULT FALSE,
+    is_saved        BOOLEAN NOT NULL DEFAULT FALSE,
     infrastructural_entities TEXT[] NOT NULL DEFAULT '{}',
     feed_title      TEXT NOT NULL DEFAULT 'RSS Feed',
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -80,8 +81,11 @@ COMMENT ON COLUMN articles.primary_category IS 'Categoria univoca per determinar
 COMMENT ON COLUMN articles.country_code IS 'ISO Alpha-2 (IT, US, CN...). XX = fallback errore Gemini.';
 COMMENT ON COLUMN articles.infrastructural_entities IS 'Elenco di asset o infrastrutture fisiche citate (es. dighe, porti, fabbriche).';
 COMMENT ON COLUMN articles.is_read IS 'Stato letto/non letto lato FE (marker-read).';
+COMMENT ON COLUMN articles.is_saved IS 'Vault salvati cross-day (Notizie Salvate). Save ⇒ is_read=true; unread ⇒ is_saved=false.';
 COMMENT ON COLUMN articles.feed_title IS 'Titolo feed Miniflux associato all entry.';
 ```
+
+> Migration `010_articles_is_saved.sql` aggiunge `is_saved` + indice parziale `(country_code) WHERE is_saved`.
 
 ### Tabella `schema_migrations` (Runner)
 

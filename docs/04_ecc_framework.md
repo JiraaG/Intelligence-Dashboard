@@ -79,8 +79,8 @@ Regola d’oro (upstream cross-harness): comportamento durevole in skill/rules/h
 
 **Dominio Radar** (SoT `.agents/skills/radar-*/SKILL.md`)
 
-4. **radar-sidebar-freeze** — zero touch `radar-sidebar/**`; `p-carousel` only  
-5. **radar-api-contract** — map-summary + envelope `{items,next_cursor,total}`; `MOCK_MODE`  
+4. **radar-sidebar-freeze** — freeze `radar-sidebar/**` + eccezione mirata toggle Salva; `p-carousel` only  
+5. **radar-api-contract** — map-summary + saved-summary + envelope `{items,next_cursor,total}` (+ `saved=true`); PATCH read/save coupling; `MOCK_MODE`  
 6. **radar-docker-ops** — edge/data, live/ready, verify-geojson, `./data/postgres`; ops backup → [`ops/README.md`](../radar/ops/README.md) §Windows  
 7. **radar-geojson-assets** — gitignore + `--fetch` in Docker build; `ASSET_LICENSE`  
 8. **radar-quota-ledger** — reserve/complete/fail; limiti per-lane `LLM_SIMPLE_*`/`LLM_COMPLEX_*`; soft-trim = `LLM_SIMPLE.rpd`; RPM/TPM attesa stessa lane; RPD esaurita → `QuotaDailyExceeded` + residual cross-lane; 429 Retry-After; free vs paid budget; provider `gemini`\|`deepseek`\|`openai`\|`glm`\|`grok`\|`claude` (**stub**)  
@@ -162,12 +162,13 @@ Prerequisito host per post-hook Python: `ruff` sul `PATH`.
 
 ## Vincoli da non contraddire
 
-- Sidebar freeze: `radar-sidebar/**` + `p-carousel`
+- Sidebar freeze: `radar-sidebar/**` + `p-carousel` (eccezione mirata: toggle Salva)
 - Ingest solo `worker.py`; API in `main.py`
 - Reti `radar-edge` / `radar-data`; health live vs ready
 - Cluster: radius **40**, `spiderfyOnMaxZoom: false`; nation hub disco + fan tutte le icone (no hard cap 24; size/distanza adattivi)
+- Notizie Salvate: `saved-summary` + `?saved=true`; click nazione = zoom/spiderfy parity LETTE/TROVATE; save⇒read, unread⇒unsave
 - Pydantic CSV `str`; FE `string[]` solo post-API
-- `MOCK_MODE` esplicito; no fallback silenzioso; nation-fetch `detailError` → banner (T-P1-04)
+- `MOCK_MODE` esplicito; no fallback silenzioso; nation/saved-fetch `detailError` → banner (T-P1-04)
 - Docker: no tag `latest`; FE `npm ci --legacy-peer-deps`
 
 Dettaglio operativo: [`.agents/AGENTS.md`](../.agents/AGENTS.md), [`radar/.ecc/CLAUDE.md`](../radar/.ecc/CLAUDE.md).

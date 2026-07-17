@@ -32,12 +32,13 @@ npm ci --legacy-peer-deps
 
 ## Vincoli
 
-- **Sidebar freeze:** non editare `src/app/components/radar-sidebar/**`
+- **Sidebar freeze:** non refactorare `src/app/components/radar-sidebar/**` — eccezione mirata: toggle **Salva notizia** / **Rimuovi dai salvati**
 - Leaflet solo via `window.L` (`angular.json` scripts); stub test in `src/app/testing/leaflet.stub.ts`
 - Mock solo con token `MOCK_MODE` (`useValue: true`) — mai fallback silenzioso su errore API
 - Cluster: `maxClusterRadius: 40`, `spiderfyOnMaxZoom: false`
 - Nation spiderfy: hub disco compatto (`radar-spider-root`); **tutte** le icone della categoria attiva (niente hard cap 24); size+distanza adattivi
 - Focus: pin summary = `preserveZoom`; poligono/toolbar = `fitBounds` (`maxZoom: 4`); `refocusCountry` se stesso codice
+- **Notizie Salvate:** contatore toolbar date-agnostic + tooltip nazioni; open = stesso zoom/spiderfy di LETTE/TROVATE; save⇒read, unread⇒unsave
 
 ## Docker
 

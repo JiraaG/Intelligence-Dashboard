@@ -81,6 +81,7 @@ Schema applicato da `core/migrations.py` + SQL ordinati in `radar/backend/migrat
 | `007_articles_query_indexes.sql` | indici Phase 5 |
 | `008_outbox_miniflux_marked_at.sql` | mark-read retry / `miniflux_marked_at` |
 | `009_llm_model_cooldown.sql` | cooldown durable (provider, model) |
+| `010_articles_is_saved.sql` | `articles.is_saved` + indice parziale (vault Notizie Salvate) |
 
 Commit: transazione DB + riga outbox → reconcile vault → mark-read Miniflux **solo** se outbox `completed`.
 
@@ -114,12 +115,14 @@ CORS: middleware solo se `CORS_ALLOW_ORIGINS` non vuoto; metodi `GET`, `PATCH`, 
 
 | Metodo | Endpoint | Parametri | Risposta |
 |--------|----------|-----------|----------|
-| GET | `/api/articles` | `date` (obbl.), `country`, `category`, `sentiment`, `relevance_level`, `cursor`, `limit` ≤ 100 | `{ items, next_cursor, total }` |
+| GET | `/api/articles` | `date` (obbl. salvo `saved=true`), `country`, `category`, `sentiment`, `relevance_level`, `cursor`, `limit` ≤ 100, `saved?` | `{ items, next_cursor, total }` — con `saved=true` ignora `date`, filtra `is_saved` |
 | GET | `/api/map-summary` | `date`, `sentiment?`, `relevance_level?` | Array `country_code × primary_category` + count/read + lat/lon finite |
+| GET | `/api/saved-summary` | `sentiment?`, `relevance_level?` | Stessa shape di map-summary; solo `is_saved=true`; **senza date** |
 | GET | `/api/countries` | `date`, filtri opzionali | Rollup paese (`categories`, `article_count`) |
-| PATCH | `/api/articles/{id}/read_status` | `{ "is_read": bool }` | `{ "status": "success", "is_read": bool }` |
+| PATCH | `/api/articles/{id}/read_status` | `{ "is_read": bool }` | `{ "status", "is_read", "is_saved"? }` — unread ⇒ `is_saved=false` |
+| PATCH | `/api/articles/{id}/saved_status` | `{ "is_saved": bool }` | `{ "status", "is_saved", "is_read"? }` — save ⇒ `is_read=true` |
 
-Companies/tags sugli articoli: join **LATERAL** (no Cartesian `array_agg` classico). UI giorno: preferire **map-summary**; lista piena solo in nation-open (FE pagina fino a `next_cursor` null).
+Companies/tags sugli articoli: join **LATERAL** (no Cartesian `array_agg` classico). UI giorno: preferire **map-summary**; lista piena in nation-open day **o** vault salvati (`saved=true`, FE pagina fino a `next_cursor` null).
 
 ---
 

@@ -19,6 +19,19 @@ Remote / internet exposure: put a TLS reverse proxy with auth and ACLs in front 
 
 ---
 
+## Smoke after deploy
+
+```bash
+curl -s http://localhost/health/live
+curl -s "http://localhost/api/map-summary?date=$(date -I)"
+curl -s http://localhost/api/saved-summary
+curl -s "http://localhost/api/articles?saved=true&limit=10"
+```
+
+UI: toolbar **NOTIZIE SALVATE** + tooltip nazioni; card **Salva notizia** / **Rimuovi dai salvati**; click nazione → carousel + zoom + spiderfy. See [`docs/runbook.md`](../docs/runbook.md).
+
+---
+
 ## Live vs ready
 
 | Probe | Path | Meaning | Compose uses it? |

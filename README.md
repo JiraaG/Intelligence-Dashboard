@@ -200,8 +200,8 @@ Esempio: `git checkout 56c2eff` (tip Phase 6 / GATE VERDE; tip successivo = ECC 
 | Cooldown modelli | `radar/backend/app/classification/cooldown.py` |
 | Requeue ops | `radar/backend/app/scripts/requeue_articles.py` |
 | API FastAPI (no ingest) | `radar/backend/app/main.py` |
-| Migrazioni / outbox | `radar/backend/migrations/` (001–009), `radar/backend/app/core/migrations.py`, `radar/backend/app/commit/outbox.py` |
-| Query articles / map-summary | `radar/backend/app/api/articles_query.py` |
+| Migrazioni / outbox | `radar/backend/migrations/` (001–010), `radar/backend/app/core/migrations.py`, `radar/backend/app/commit/outbox.py` |
+| Query articles / map-summary / saved | `radar/backend/app/api/articles_query.py` |
 | Compose + overlay | `radar/docker-compose.yml`, `radar/docker-compose.hardened.yml`, `radar/docker-compose.lan.yml` |
 | Ops backup/restore | `radar/ops/` |
 | Runbook | `radar/docs/runbook.md` |
@@ -223,10 +223,12 @@ Esempio: `git checkout 56c2eff` (tip Phase 6 / GATE VERDE; tip successivo = ECC 
 | GET | `/health/ready` | Pool + migrazioni + heartbeat worker (ops; può 503 al boot; in-container `:8000`) |
 | GET | `/health` (API `:8000`) | Alias di live sull’API |
 | GET | `/health` (host `:80`) | Healthcheck **Nginx FE** — risposta statica `ok`; **non** è l’API |
-| GET | `/api/articles` | Envelope `{items,next_cursor,total}` — `date` obbligatorio, `limit` ≤ 100 |
-| GET | `/api/map-summary` | Righe `country_code × primary_category` + count/lat/lon |
+| GET | `/api/articles` | Envelope `{items,next_cursor,total}` — `date` obbligatorio salvo `saved=true` (cross-day), `limit` ≤ 100 |
+| GET | `/api/map-summary` | Righe `country_code × primary_category` + count/lat/lon (day) |
+| GET | `/api/saved-summary` | Stessa shape; solo `is_saved`; **senza date** |
 | GET | `/api/countries` | Rollup paese (compat) |
-| PATCH | `/api/articles/{id}/read_status` | Body `{is_read}`; risposta `{status,is_read}` |
+| PATCH | `/api/articles/{id}/read_status` | Body `{is_read}`; unread ⇒ `is_saved=false` |
+| PATCH | `/api/articles/{id}/saved_status` | Body `{is_saved}`; save ⇒ `is_read=true` |
 
 Dettaglio: [docs/02_architecture_and_backend.md](docs/02_architecture_and_backend.md).
 
@@ -257,11 +259,11 @@ Dashboard finance/
     ├── ops/                           # backup/restore + README ops
     ├── docs/runbook.md
     ├── backend/
-    │   ├── migrations/                # 001–009
+    │   ├── migrations/                # 001–010
     │   └── app/
     │       ├── main.py                # API-only
     │       ├── worker.py              # ingest
-    │       ├── api/                   # articles_query (Phase 5)
+    │       ├── api/                   # articles_query (Phase 5+)
     │       ├── core/                  # incl. llm_lanes.py, heartbeat
     │       ├── extraction/ classification/ commit/
     │       ├── scripts/               # requeue_articles.py

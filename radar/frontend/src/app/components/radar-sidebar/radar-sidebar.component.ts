@@ -107,6 +107,11 @@ export class RadarSidebarComponent {
     this.stateService.toggleReadStatus(article.id, !article.is_read);
   }
 
+  toggleSave(article: Article): void {
+    if (!article) return;
+    this.stateService.toggleSavedStatus(article.id, !article.is_saved);
+  }
+
   @HostListener('window:resize')
   onResize() {
     if (this.isOpen() && this.mode() === 'cluster') {

@@ -1,12 +1,15 @@
 <!-- Toolbar centrata -->
 <app-radar-toolbar
   [countries]="state.countries()"
+  [savedCountries]="state.savedCountries()"
   [articleCount]="articleCount()"
   [readCount]="readCount()"
+  [savedCount]="savedCount()"
   [isLoading]="state.isLoading()"
   [apiError]="!!state.error()"
   (filtersChange)="onFiltersChange($event)"
-  (countrySelected)="onToolbarCountrySelect($event)">
+  (countrySelected)="onToolbarCountrySelect($event)"
+  (savedCountrySelected)="onToolbarSavedCountrySelect($event)">
 </app-radar-toolbar>
 
 <!-- Mappa Leaflet -->

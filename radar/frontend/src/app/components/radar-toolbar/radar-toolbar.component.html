@@ -75,6 +75,38 @@
     </div>
   </div>
 
+  <div class="article-count-container"
+       (mouseenter)="isSavedTooltipHovered.set(true)"
+       (mouseleave)="isSavedTooltipHovered.set(false)">
+    <button
+      type="button"
+      class="article-count"
+      (click)="toggleSavedTooltip($event)"
+      [attr.aria-expanded]="isSavedTooltipVisible()"
+      aria-haspopup="true">
+      NOTIZIE SALVATE: <strong>{{ savedCount() }}</strong>
+    </button>
+
+    <div class="countries-tooltip" *ngIf="isSavedTooltipVisible() && savedCountriesList().length > 0" role="listbox">
+      <div class="tooltip-header">
+        <span class="tooltip-title">Nazioni Salvate</span>
+        <button type="button" class="tooltip-close-btn" (click)="closeSavedTooltip($event)" aria-label="Chiudi">✕</button>
+      </div>
+      <div class="tooltip-list">
+        <button
+          type="button"
+          class="tooltip-row clickable"
+          *ngFor="let c of savedCountriesList()"
+          (click)="selectSavedCountry(c.code, $event)"
+          role="option">
+          <span class="country-flag">{{ getFlagEmoji(c.code) }}</span>
+          <span class="country-name">{{ c.name }}</span>
+          <span class="country-badge">{{ c.count }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   @if (apiError()) {
     <div class="api-error-banner" role="alert">
       Errore API — dati non disponibili

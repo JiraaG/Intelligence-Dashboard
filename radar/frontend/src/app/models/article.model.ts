@@ -30,6 +30,7 @@ export interface Article {
   infrastructural_entities: string[];         // Asset fisici identificati (es. "Zaporizhzhia Nuclear Plant")
   feed_title:               string;           // Fonte di acquisizione (es. "Yahoo Finance")
   is_read?:                 boolean;          // Stato letto/da leggere
+  is_saved?:                boolean;          // Vault salvati (cross-day)
 }
 
 /** Paginated envelope from GET /api/articles (Phase 5 breaking). */
@@ -56,11 +57,13 @@ export interface ArticleFilters {
 
 /** Query params for a single articles page (API contract). */
 export interface ArticlesPageFilters {
-  date: string;
+  date?: string;
   country?: string;
   category?: string;
   sentiment?: Sentiment;
   relevance_level?: number;
   cursor?: number;
   limit?: number;
+  /** When true, API ignores date and returns only saved articles. */
+  saved?: boolean;
 }

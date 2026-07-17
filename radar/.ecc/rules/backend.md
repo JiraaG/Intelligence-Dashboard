@@ -220,10 +220,13 @@ Phase 2: stessa immagine, due processi.
 - API: `WORKDIR=/app`, `PYTHONPATH=/app`, `uvicorn app.main:app`
 - Worker: `python -m app.worker`
 
-**API Phase 5 (query layer):**
+**API Phase 5+ (query layer):**
 - Day: `GET /api/map-summary` → righe aggregate `country_code × primary_category`
+- Saved vault: `GET /api/saved-summary` → stessa shape, `is_saved=true`, **senza date**
 - Nation: `GET /api/articles` → envelope `{ items, next_cursor, total }` (keyset, page ≤ 100)
-- Implementazione SQL: `backend/app/api/articles_query.py` (o modulo query dedicato) + migrazione `007_articles_query_indexes.sql`
+- Saved open: `GET /api/articles?saved=true&country=` → stesso envelope, ignora `date`
+- `PATCH .../read_status` (unread ⇒ `is_saved=false`); `PATCH .../saved_status` (save ⇒ `is_read=true`)
+- Implementazione SQL: `backend/app/api/articles_query.py` + migrazioni `007` + `010_articles_is_saved`
 
 **OBBLIGATORIO (Dockerfile / Compose):**
 ```bash

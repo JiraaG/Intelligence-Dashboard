@@ -23,14 +23,18 @@ import { ArticleFilters, CountrySummary, Sentiment, PrimaryCategory } from '../.
 export class RadarToolbarComponent {
   /** Rollup day-view (paesi) senza Article[] completo. */
   countries    = input<CountrySummary[]>([]);
+  /** Rollup vault salvati (cross-day). */
+  savedCountries = input<CountrySummary[]>([]);
   articleCount = input<number>(0);
   readCount    = input<number>(0);
+  savedCount   = input<number>(0);
   isLoading    = input<boolean>(false);
   /** Banner errore unificato (map-summary o detailError nation-fetch). */
   apiError     = input<boolean>(false);
 
   filtersChange   = output<ArticleFilters>();
   countrySelected = output<string>();
+  savedCountrySelected = output<string>();
 
   selectedDate       = signal<Date>(new Date());
   selectedSentiment  = signal<Sentiment[]>([]);
@@ -40,9 +44,18 @@ export class RadarToolbarComponent {
   isTooltipClicked = signal<boolean>(false);
   isTooltipVisible = computed(() => (this.isTooltipHovered() || this.isTooltipClicked()) && this.countriesList().length > 0);
 
+  isSavedTooltipHovered = signal<boolean>(false);
+  isSavedTooltipClicked = signal<boolean>(false);
+  isSavedTooltipVisible = computed(
+    () =>
+      (this.isSavedTooltipHovered() || this.isSavedTooltipClicked()) &&
+      this.savedCountriesList().length > 0,
+  );
+
   toggleTooltip(event: Event): void {
     event.stopPropagation();
     this.isTooltipClicked.update(v => !v);
+    this.isSavedTooltipClicked.set(false);
   }
 
   closeTooltip(event: Event): void {
@@ -51,11 +64,30 @@ export class RadarToolbarComponent {
     this.isTooltipHovered.set(false);
   }
 
+  toggleSavedTooltip(event: Event): void {
+    event.stopPropagation();
+    this.isSavedTooltipClicked.update(v => !v);
+    this.isTooltipClicked.set(false);
+  }
+
+  closeSavedTooltip(event: Event): void {
+    event.stopPropagation();
+    this.isSavedTooltipClicked.set(false);
+    this.isSavedTooltipHovered.set(false);
+  }
+
   selectCountry(countryCode: string, event: Event): void {
     event.stopPropagation();
     this.countrySelected.emit(countryCode);
     this.isTooltipClicked.set(false);
     this.isTooltipHovered.set(false);
+  }
+
+  selectSavedCountry(countryCode: string, event: Event): void {
+    event.stopPropagation();
+    this.savedCountrySelected.emit(countryCode);
+    this.isSavedTooltipClicked.set(false);
+    this.isSavedTooltipHovered.set(false);
   }
 
   readonly today = new Date();
@@ -112,9 +144,16 @@ export class RadarToolbarComponent {
    * Lista paesi ordinata per conteggio: mappa CODE→nome
    * (tabella / Intl.DisplayNames / codice) + read_count.
    */
-  readonly countriesList = computed(() => {
+  readonly countriesList = computed(() => this.buildCountryList(this.countries()));
+
+  /** Lista nazioni salvate (badge = solo count salvati). */
+  readonly savedCountriesList = computed(() => this.buildCountryList(this.savedCountries()));
+
+  private buildCountryList(
+    countries: CountrySummary[],
+  ): { code: string; name: string; count: number; readCount: number }[] {
     const list: { code: string; name: string; count: number; readCount: number }[] = [];
-    for (const c of this.countries()) {
+    for (const c of countries) {
       let name = this.COUNTRY_NAMES[c.country_code];
       if (!name) {
         if (c.country_code === 'XX') {
@@ -136,7 +175,7 @@ export class RadarToolbarComponent {
       });
     }
     return list.sort((a, b) => b.count - a.count);
-  });
+  }
 
   /** Bandiera emoji da ISO-2; ``XX`` → ``WW``; codepoint invalidi → bandiera bianca. */
   getFlagEmoji(countryCode: string): string {
