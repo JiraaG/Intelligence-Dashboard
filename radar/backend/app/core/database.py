@@ -1,3 +1,13 @@
+"""
+Bootstrap pool asyncpg e handoff alle migrazioni ordinate.
+
+``init_pool``: retry su race di avvio Postgres (compose restart parallelo ignora
+depends_on health). ``bootstrap_database``: delegano a ``run_migrations`` —
+niente CREATE TABLE ad-hoc.
+
+@see docs/01 startup; docs/02 persistence; backend rule asyncpg.
+"""
+
 import asyncio
 import logging
 
@@ -8,18 +18,19 @@ from app.core.migrations import run_migrations
 
 logger = logging.getLogger("radar.database")
 
-# Parallel `docker compose restart` ignores depends_on health ordering; Postgres can
-# still be in "starting up" when backend/worker call create_pool. Retry transient races.
+# Compose restart parallelo ignora l'ordine health di depends_on; Postgres può
+# essere ancora in "starting up" quando backend/worker chiamano create_pool.
 _POOL_STARTUP_ATTEMPTS = 10
 _POOL_STARTUP_BASE_DELAY_S = 0.5
 
 
 def _is_transient_db_startup_error(exc: BaseException) -> bool:
+    """True se l'errore è tipico di DB non ancora pronto (retry); altrimenti fail-fast."""
     if isinstance(exc, asyncpg.CannotConnectNowError):
         return True
     if isinstance(exc, (ConnectionRefusedError, ConnectionResetError, TimeoutError)):
         return True
-    # asyncpg sometimes wraps OS-level refusals during container boot.
+    # asyncpg a volte wrappa refusal OS durante il boot del container.
     if isinstance(exc, OSError) and getattr(exc, "errno", None) in {111, 61, 10061}:
         return True
     msg = str(exc).lower()
@@ -28,11 +39,10 @@ def _is_transient_db_startup_error(exc: BaseException) -> bool:
 
 async def init_pool(db_url: str | None = None) -> asyncpg.Pool:
     """
-    Inizializza e restituisce direttamente il pool di connessioni asyncpg.
-    Questo disaccoppiamento facilita l'integrazione nel Lifespan di FastAPI.
+    Crea e restituisce il pool asyncpg (Lifespan FastAPI / worker).
 
-    Retries briefly on transient Postgres startup races (compose restart of all
-    services in parallel). Non-transient errors fail immediately.
+    Retry brevi su race di startup Postgres; errori non transienti falliscono subito.
+    ``min_size=2`` / ``max_size=10``; ``command_timeout=60``.
     """
     url = db_url or DATABASE_URL
     logger.info("Inizializzazione del pool database PostgreSQL...")
@@ -77,8 +87,8 @@ async def init_pool(db_url: str | None = None) -> asyncpg.Pool:
 
 async def bootstrap_database(pool: asyncpg.Pool) -> None:
     """
-    Allinea lo schema PostgreSQL eseguendo le migrazioni ordinate con verifica checksum.
-    Sostituisce il precedente bootstrap ad-hoc CREATE TABLE IF NOT EXISTS.
+    Allinea lo schema eseguendo le migrazioni ordinate con verifica checksum.
+    Sostituisce il vecchio bootstrap ad-hoc ``CREATE TABLE IF NOT EXISTS``.
     """
     logger.info("Bootstrap database: avvio run_migrations...")
     await run_migrations(pool)

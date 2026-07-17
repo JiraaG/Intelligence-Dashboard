@@ -1,4 +1,14 @@
-"""Ordered SQL migrations with SHA-256 checksum verification."""
+"""
+Runner migrazioni SQL ordinate con verifica checksum SHA-256.
+
+SoT schema = file in ``backend/migrations/*.sql`` + tabella ``schema_migrations``.
+Mismatch checksum su versione già applicata → abort avvio (schema incompatibile).
+Legame legacy pre-restore: se esiste colonna ``name`` invece di ``version``,
+DROP + recreate tracking e re-baseline (SQL idempotente CREATE/ALTER IF NOT EXISTS).
+
+Non commentare il SQL delle migrazioni qui — solo il perché del runner.
+@see docs/02 persistence.
+"""
 
 from __future__ import annotations
 
@@ -20,15 +30,16 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 
 
 class MigrationError(RuntimeError):
-    """Raised when schema state is unknown or incompatible."""
+    """Stato schema sconosciuto o incompatibile — interrompe l'avvio."""
 
 
 def get_migrations_dir() -> Path:
-    """Resolve backend/migrations relative to this module (app/core/migrations.py)."""
+    """Risolve ``backend/migrations`` rispetto a questo modulo (``app/core/migrations.py``)."""
     return Path(__file__).resolve().parent.parent.parent / "migrations"
 
 
 def _sha256_file(path: Path) -> str:
+    """Checksum del file SQL a chunk (non caricare tutto in RAM)."""
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(65536), b""):
@@ -38,8 +49,8 @@ def _sha256_file(path: Path) -> str:
 
 def discover_migrations(migrations_dir: Path | None = None) -> list[tuple[str, Path, str]]:
     """
-    Return sorted migration triples: (version, path, checksum).
-    Version is the filename stem (e.g. 001_initial).
+    Triple ordinate: ``(version, path, checksum)``.
+    ``version`` = stem del filename (es. ``001_initial``).
     """
     root = migrations_dir or get_migrations_dir()
     if not root.is_dir():
@@ -92,9 +103,10 @@ async def _column_exists(conn: asyncpg.Connection, table_name: str, column_name:
 
 async def _ensure_tracking_table(conn: asyncpg.Connection) -> None:
     """
-    Ensure schema_migrations uses (version, checksum, applied_at).
-    Legacy pre-restore shape used (id, name, checksum, applied_at): drop and recreate
-    so Phase 1 SQL can re-apply idempotently (CREATE/ALTER IF NOT EXISTS).
+    Garantisce ``schema_migrations (version, checksum, applied_at)``.
+
+    Forma legacy pre-restore ``(id, name, …)``: DROP e recreate così le migrazioni
+    Phase 1 possono riapplicarsi in modo idempotente. Schema sconosciuto → errore.
     """
     if not await _table_exists(conn, "schema_migrations"):
         await conn.execute(SCHEMA_MIGRATIONS_DDL)
@@ -123,8 +135,11 @@ async def run_migrations(
     migrations_dir: Path | None = None,
 ) -> None:
     """
-    Apply pending SQL migrations in order.
-    Aborts startup if an already-applied migration has a checksum mismatch.
+    Applica le migrazioni SQL pending in ordine lessicografico del filename.
+
+    Se una versione è già in ``schema_migrations`` ma il checksum file ≠ DB →
+    ``MigrationError`` (non riscrivere silenziosamente lo schema).
+    Ogni apply = una transazione (SQL file + INSERT tracking).
     """
     migrations = discover_migrations(migrations_dir)
     logger.info(

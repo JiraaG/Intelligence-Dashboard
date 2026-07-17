@@ -1,4 +1,13 @@
-"""Worker heartbeat helpers for Phase 3 readiness (/health/ready)."""
+"""
+Heartbeat del worker leader per readiness Phase 3 (``GET /health/ready``).
+
+Solo il processo che detiene l'advisory lock di leadership deve fare UPSERT.
+``/health/live`` = processo su; ``/health/ready`` = pool + migrazione 004+ +
+heartbeat fresco. Conteggio outbox è riportato ma **non** fallisce ready da solo
+(reconcile atteso).
+
+@see docs/02 §health; runbook live vs ready.
+"""
 
 from __future__ import annotations
 
@@ -11,6 +20,7 @@ import asyncpg
 
 logger = logging.getLogger("radar.heartbeat")
 
+# Riga singleton: uno solo leader scrive (id fisso = 1).
 HEARTBEAT_ROW_ID = 1
 
 
@@ -21,7 +31,8 @@ async def upsert_worker_heartbeat(
     detail: str | None = None,
 ) -> None:
     """
-    UPSERT the singleton heartbeat row. Call only from the advisory-lock leader.
+    UPSERT della riga heartbeat singleton.
+    Chiamare solo dal leader (advisory lock) — altrimenti ready può mentire.
     """
     async with pool.acquire() as conn:
         await conn.execute(
@@ -42,7 +53,7 @@ async def upsert_worker_heartbeat(
 
 
 async def fetch_worker_heartbeat(conn: asyncpg.Connection) -> asyncpg.Record | None:
-    """Return the singleton heartbeat row, or None if the table/row is missing."""
+    """Ritorna la riga heartbeat singleton, o None se tabella/riga assente."""
     return await conn.fetchrow(
         """
         SELECT id, updated_at, status, leader_pid, detail
@@ -54,7 +65,7 @@ async def fetch_worker_heartbeat(conn: asyncpg.Connection) -> asyncpg.Record | N
 
 
 def heartbeat_age_seconds(updated_at: datetime, *, now: datetime | None = None) -> float:
-    """Age of heartbeat timestamp in seconds (UTC-aware safe)."""
+    """Età del timestamp heartbeat in secondi (UTC-aware; naive → UTC)."""
     clock = now or datetime.now(timezone.utc)
     if updated_at.tzinfo is None:
         updated_at = updated_at.replace(tzinfo=timezone.utc)
@@ -68,9 +79,13 @@ async def evaluate_readiness(
     required_migration_prefix: str = "004_",
 ) -> tuple[bool, dict[str, Any]]:
     """
-    Ready when: pool works, migration 004+ applied, heartbeat fresher than stale_seconds.
-    Outbox pending/writing counts are reported but do not fail readiness by themselves
-    (reconcile is expected); a missing/stale heartbeat does.
+    Ready quando: pool ok, migrazione ``004_``+ applicata, heartbeat più fresco
+    di ``stale_seconds``.
+
+    Contatori outbox pending/writing/failed sono nel JSON di dettaglio ma **non**
+    falliscono readiness da soli (reconcile è atteso); heartbeat missing/stale sì.
+
+    @see runbook: 503 ready al boot ~30–90s finché il worker scrive; non restartare API.
     """
     details: dict[str, Any] = {
         "pool": False,

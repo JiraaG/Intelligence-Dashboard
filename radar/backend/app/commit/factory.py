@@ -1,4 +1,8 @@
-# factory.py — Obsidian Markdown Document Factory
+# factory.py — fabbrica Markdown Obsidian (frontmatter YAML + corpo).
+#
+# Usata da outbox/lock dopo il commit DB: produce il contenuto vault stabile
+# (safe_dump, liste flow per Leaflet/Obsidian). Truncamento sicuro se campi lunghi.
+# @see commit/router.py, commit/outbox.py; AGENTS vault.
 
 from __future__ import annotations
 
@@ -16,6 +20,7 @@ class _FlowList(list):
 
 
 def _represent_flow_list(dumper: yaml.SafeDumper, data: _FlowList) -> yaml.nodes.SequenceNode:
+    """Representer SafeDumper: sequenza in linea, non block-style."""
     return dumper.represent_sequence("tag:yaml.org,2002:seq", data, flow_style=True)
 
 
@@ -23,6 +28,10 @@ yaml.SafeDumper.add_representer(_FlowList, _represent_flow_list)
 
 
 def _truncate_text(text: str, max_chars: int, label: str) -> str:
+    """
+    Taglia ``text`` a ``max_chars`` includendo un suffisso esplicito di troncamento.
+    Evita note vault giganti da summary/entità LLM verbose.
+    """
     if len(text) <= max_chars:
         return text
     suffix = f"\n\n[... troncato: {label} supera {max_chars} caratteri]"
@@ -31,7 +40,11 @@ def _truncate_text(text: str, max_chars: int, label: str) -> str:
 
 
 def _dump_frontmatter(frontmatter: dict) -> str:
-    """Serializza l'intero mapping frontmatter tramite yaml.safe_dump (niente f-string YAML)."""
+    """
+    Serializza l'intero mapping frontmatter con ``yaml.safe_dump``
+    (niente f-string YAML manuali — escaping/unicode sicuri).
+    Ordine chiavi fisso; location/tags/companies in flow via ``_FlowList``.
+    """
     serializable = {
         "title": frontmatter["title"],
         "location": _FlowList(frontmatter["location"]),
@@ -55,8 +68,11 @@ def _dump_frontmatter(frontmatter: dict) -> str:
 
 def generate_markdown_content(article: GeopoliticalArticleSchema) -> str:
     """
-    Rappresenta l'articolo geopolitico come Markdown con YAML frontmatter.
-    location è [lat, lon]; tags/companies sono liste derivate da parse_csv_list.
+    Articolo geopolitico → Markdown con YAML frontmatter Obsidian.
+
+    - ``location`` = [lat, lon]; tags/companies da ``parse_csv_list`` (schema Pydantic CSV str).
+    - Corpo: riassunto + elenco entità infrastrutturali (o placeholder se vuoto).
+    - Truncation a livelli summary / entities / body intero.
     """
     tags_list = parse_csv_list(article.tags)
     companies_list = parse_csv_list(article.companies_involved)

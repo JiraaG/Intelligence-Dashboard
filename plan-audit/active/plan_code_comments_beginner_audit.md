@@ -278,7 +278,7 @@ Ogni batch è comment-only e contiene al massimo cinque file. I P0 rispettano l'
 
 ### P1 — solo dopo i P0 pertinenti
 
-1. **P1-01 — Supporto backend (5 file, ~M+S+M+M+M):** `classification/cooldown.py`, `commit/factory.py`, `core/database.py`, `core/heartbeat.py`, `core/migrations.py`.
+1. **P1-01 — Supporto backend (5 file, ~M+S+M+M+M):** `classification/cooldown.py`, `commit/factory.py`, `core/database.py`, `core/heartbeat.py`, `core/migrations.py`. ✅ (2026-07-17)
 2. **P1-02 — Confine dati frontend (5 file, ~S+M+M+M+M):** `app.config.ts`, toolbar TS, `article.dto.ts`, `article.service.ts`, `article-mock.service.ts`.
 3. **P1-03 — Ops e sync (3 file, ~M+M+M):** `scripts/requeue_articles.py`, `radar/.ecc/scripts/sync_skills.py`, `ops/backup-postgres.sh`.
 
@@ -414,3 +414,9 @@ Il secondo comando deve restare vuoto. In caso di failure test/typecheck preesis
 
 **Freeze:** ogni batch ha confermato `git diff --stat -- radar/frontend/src/app/components/radar-sidebar/` vuoto.  
 **Working tree:** i file prodotto restano modificati (comment-only) finché l’utente non chiede commit.
+
+## 12. Log esecuzione P1 (parziale)
+
+| Batch | Esito | Note |
+|-------|--------|------|
+| P1-01 | DONE 2026-07-17 | 5 file supporto; AST equal; pytest `not live` 151 passed; nessun C-xx nuovo |

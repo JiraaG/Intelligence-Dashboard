@@ -1,4 +1,13 @@
-"""Durable LLM model cooldown (24h hard-fail) backed by llm_model_cooldown."""
+"""
+Cooldown durable modelli LLM (hard-fail tipicamente 24h).
+
+Persistenza: tabella ``llm_model_cooldown`` (migrazione 009).
+Senza pool (unit test): mappa in-memory equivalente.
+Chiamato dal classification client su HARD_COOLDOWN / residual — questo modulo
+è solo storage (set / query / clear expired), non decide la policy di errore.
+
+@see SoT LLM §4.7; radar-quota-ledger.
+"""
 
 from __future__ import annotations
 
@@ -13,10 +22,11 @@ logger = logging.getLogger("radar.classification.cooldown")
 
 class ModelCooldownStore:
     """
-    Skip models until until_ts.
+    Salta modelli finché ``until_ts`` è nel futuro (UTC).
 
-    With pool: SQL table llm_model_cooldown.
-    Without pool (unit tests): in-memory map.
+    Con ``pool``: SQL ``llm_model_cooldown`` (chiave provider+model).
+    Senza pool (test): dict in memoria — stesso contratto async.
+    ``clock`` iniettabile per test di expiry.
     """
 
     def __init__(
@@ -32,18 +42,24 @@ class ModelCooldownStore:
         self._memory: dict[tuple[str, str], tuple[datetime, str | None]] = {}
 
     def _now(self) -> datetime:
+        """Ora wall-clock in UTC aware (naive → assume UTC)."""
         now = self._clock()
         if now.tzinfo is None:
             return now.replace(tzinfo=timezone.utc)
         return now.astimezone(timezone.utc)
 
     async def is_cooling_down(self, provider: str, model: str) -> bool:
+        """True se esiste un ``until_ts`` strettamente successivo a ora."""
         until = await self.get_until(provider, model)
         if until is None:
             return False
         return until > self._now()
 
     async def get_until(self, provider: str, model: str) -> datetime | None:
+        """
+        Scadenza cooldown per (provider, model), o None se assente.
+        Timestamp DB naive → tz UTC per confronti sicuri.
+        """
         if self.pool is None:
             entry = self._memory.get((provider, model))
             return entry[0] if entry else None
@@ -72,6 +88,10 @@ class ModelCooldownStore:
         reason: str | None = None,
         hours: int | None = None,
     ) -> datetime:
+        """
+        UPSERT cooldown: ``until = now + hours`` (default 24h SoT).
+        Ritorna ``until_ts`` effettivo. Log WARNING (SQL o memory).
+        """
         hrs = hours if hours is not None else self._default_hours
         until = self._now() + timedelta(hours=hrs)
         if self.pool is None:
@@ -109,6 +129,10 @@ class ModelCooldownStore:
         return until
 
     async def clear_expired(self) -> int:
+        """
+        Elimina entry con ``until_ts <= now``.
+        Ritorna il numero di righe rimosse (best-effort su status string asyncpg).
+        """
         now = self._now()
         if self.pool is None:
             before = len(self._memory)
@@ -119,7 +143,7 @@ class ModelCooldownStore:
             "DELETE FROM llm_model_cooldown WHERE until_ts <= $1",
             now,
         )
-        # asyncpg returns status like "DELETE 3"
+        # asyncpg restituisce status tipo "DELETE 3"
         try:
             return int(str(result).split()[-1])
         except (ValueError, IndexError):
