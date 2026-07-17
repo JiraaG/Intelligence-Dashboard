@@ -11,12 +11,14 @@ SoT:
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 
 from fastapi import HTTPException
 
 DEFAULT_ARTICLES_LIMIT = 50
 MAX_ARTICLES_LIMIT = 100
+
+ALLOWED_SENTIMENTS = frozenset({"Positivo", "Neutrale", "Negativo"})
 
 # Coord finite: esclude NULL e NaN (``x = x`` falso per NaN) e fuori range geografico.
 _FINITE_LAT_LON_FILTER = (
@@ -40,6 +42,49 @@ def parse_published_date(raw: str) -> date:
         ) from exc
 
 
+def normalize_sentiments(
+    raw: Optional[str | Sequence[str]],
+) -> Optional[list[str]]:
+    """Normalizza query ``sentiment`` (singolo, ripetuto o CSV) a lista dedup SoT.
+
+    Returns:
+        ``None`` se assente/vuoto; altrimenti lista ordinata di valori ammessi.
+    Raises:
+        HTTPException 400 se compare un valore fuori da ``ALLOWED_SENTIMENTS``.
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        tokens = [raw]
+    else:
+        tokens = list(raw)
+
+    expanded: list[str] = []
+    for token in tokens:
+        expanded.extend(part.strip() for part in token.split(",") if part.strip())
+
+    if not expanded:
+        return None
+
+    invalid = sorted({value for value in expanded if value not in ALLOWED_SENTIMENTS})
+    if invalid:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Sentiment non valido. Usa Positivo, Neutrale o Negativo "
+                f"(ricevuto: {', '.join(invalid)})."
+            ),
+        )
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for value in expanded:
+        if value not in seen:
+            seen.add(value)
+            deduped.append(value)
+    return deduped
+
+
 def clamp_articles_limit(limit: int) -> int:
     """Clamp page size a ``[1, MAX_ARTICLES_LIMIT]`` (contratto FE ≤ 100)."""
     if limit < 1:
@@ -51,7 +96,7 @@ def _append_optional_filters(
     query_parts: list[str],
     params: list[Any],
     *,
-    sentiment: Optional[str],
+    sentiment: Optional[Sequence[str]],
     relevance_level: Optional[int],
     country: Optional[str] = None,
     category: Optional[str] = None,
@@ -65,8 +110,14 @@ def _append_optional_filters(
         params.append(category)
         query_parts.append(f"AND {column_prefix}primary_category = ${len(params)}")
     if sentiment:
-        params.append(sentiment)
-        query_parts.append(f"AND {column_prefix}sentiment = ${len(params)}")
+        if len(sentiment) == 1:
+            params.append(sentiment[0])
+            query_parts.append(f"AND {column_prefix}sentiment = ${len(params)}")
+        else:
+            params.append(list(sentiment))
+            query_parts.append(
+                f"AND {column_prefix}sentiment = ANY(${len(params)}::text[])"
+            )
     if relevance_level is not None:
         params.append(relevance_level)
         query_parts.append(f"AND {column_prefix}relevance_level = ${len(params)}")
@@ -75,7 +126,7 @@ def _append_optional_filters(
 def build_articles_count_query(
     pub_date: date,
     *,
-    sentiment: Optional[str] = None,
+    sentiment: Optional[Sequence[str]] = None,
     relevance_level: Optional[int] = None,
     country: Optional[str] = None,
     category: Optional[str] = None,
@@ -98,7 +149,7 @@ def build_articles_count_query(
 def build_articles_page_query(
     pub_date: date,
     *,
-    sentiment: Optional[str] = None,
+    sentiment: Optional[Sequence[str]] = None,
     relevance_level: Optional[int] = None,
     country: Optional[str] = None,
     category: Optional[str] = None,
@@ -158,7 +209,7 @@ def build_articles_page_query(
 def build_map_summary_query(
     pub_date: date,
     *,
-    sentiment: Optional[str] = None,
+    sentiment: Optional[Sequence[str]] = None,
     relevance_level: Optional[int] = None,
 ) -> tuple[str, list[Any]]:
     """Aggregato ``country_code × primary_category`` con media lat/lon solo finite."""
@@ -192,7 +243,7 @@ def build_map_summary_query(
 def build_countries_summary_query(
     pub_date: date,
     *,
-    sentiment: Optional[str] = None,
+    sentiment: Optional[Sequence[str]] = None,
     relevance_level: Optional[int] = None,
 ) -> tuple[str, list[Any]]:
     """Aggregato compat per ``country_code`` (nessun join junction)."""

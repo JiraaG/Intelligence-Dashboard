@@ -30,11 +30,12 @@ export class StateService {
   readonly detailArticles = signal<Article[]>([]);
   readonly detailLoading = signal(false);
 
-  /** Day-view: `GET /api/map-summary` in base a data (+ sentiment singolo se selezionato). */
+  /** Day-view: `GET /api/map-summary` in base a data (+ sentiment selezionati, OR). */
   readonly mapSummaryResource = rxResource({
     params: () => {
       const f = this.filters();
-      const sentiment = f.sentiment && f.sentiment.length === 1 ? f.sentiment[0] : undefined;
+      const sentiment =
+        f.sentiment && f.sentiment.length > 0 ? f.sentiment : undefined;
       return { date: f.date, sentiment };
     },
     stream: (p) =>

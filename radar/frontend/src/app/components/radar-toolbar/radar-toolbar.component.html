@@ -21,6 +21,8 @@
     [options]="sentimentOptions"
     [(ngModel)]="selectedSentiment"
     (onChange)="onFiltersChange()"
+    optionLabel="label"
+    optionValue="value"
     placeholder="Sentiment"
     [maxSelectedLabels]="1"
     selectedItemsLabel="{0} selezionati">
@@ -31,6 +33,8 @@
     [options]="categoryOptions"
     [(ngModel)]="selectedCategories"
     (onChange)="onFiltersChange()"
+    optionLabel="label"
+    optionValue="value"
     placeholder="Tipologia"
     [maxSelectedLabels]="1"
     selectedItemsLabel="{0} selezionate">

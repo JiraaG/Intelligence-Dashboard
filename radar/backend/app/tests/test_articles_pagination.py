@@ -180,6 +180,48 @@ def test_map_summary_groups_by_country_and_category() -> None:
 
 
 @pytest.mark.unit
+def test_map_summary_multi_sentiment_uses_any() -> None:
+    mock_pool, mock_conn = _mock_pool()
+    mock_conn.fetch = AsyncMock(return_value=[])
+    state.db_pool = mock_pool
+
+    client = TestClient(app)
+    response = client.get(
+        "/api/map-summary?date=2026-07-15&sentiment=Positivo&sentiment=Negativo"
+    )
+
+    assert response.status_code == 200
+    sql = mock_conn.fetch.await_args.args[0]
+    params = list(mock_conn.fetch.await_args.args[1:])
+    assert "sentiment = ANY($2::text[])" in sql
+    assert params[1] == ["Positivo", "Negativo"]
+
+
+@pytest.mark.unit
+def test_map_summary_rejects_invalid_sentiment() -> None:
+    mock_pool, mock_conn = _mock_pool()
+    state.db_pool = mock_pool
+
+    client = TestClient(app)
+    response = client.get("/api/map-summary?date=2026-07-15&sentiment=Happy")
+
+    assert response.status_code == 400
+    mock_conn.fetch.assert_not_called()
+
+
+@pytest.mark.unit
+def test_normalize_sentiments_csv_and_dedupe() -> None:
+    from app.api.articles_query import normalize_sentiments
+
+    assert normalize_sentiments(["Positivo,Negativo", "Positivo"]) == [
+        "Positivo",
+        "Negativo",
+    ]
+    assert normalize_sentiments(None) is None
+    assert normalize_sentiments([]) is None
+
+
+@pytest.mark.unit
 def test_articles_sql_uses_lateral_not_sibling_left_joins() -> None:
     mock_pool, mock_conn = _mock_pool()
     mock_conn.fetchval = AsyncMock(return_value=0)

@@ -167,8 +167,9 @@ export class ArticleMockService {
   getMapSummary(date: string, sentiment?: Sentiment | Sentiment[] | null): Observable<MapSummaryRow[]> {
     void date;
     let arts = MOCK_ARTICLES;
-    if (Array.isArray(sentiment) && sentiment.length === 1) {
-      arts = arts.filter((a) => a.sentiment === sentiment[0]);
+    if (Array.isArray(sentiment) && sentiment.length > 0) {
+      const allowed = new Set(sentiment);
+      arts = arts.filter((a) => allowed.has(a.sentiment));
     } else if (typeof sentiment === 'string') {
       arts = arts.filter((a) => a.sentiment === sentiment);
     }

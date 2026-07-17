@@ -39,7 +39,7 @@ export class ArticleService {
 
   /**
    * Day view: ``GET /api/map-summary`` (o mock aggregato).
-   * Sentiment multiplo: API accetta un solo valore — se array length≠1, omesso.
+   * Sentiment multiplo: query ripetuta ``sentiment=`` (OR lato API).
    */
   getMapSummary(filters: {
     date: string;
@@ -49,11 +49,13 @@ export class ArticleService {
       return this.mock.getMapSummary(filters.date, filters.sentiment ?? undefined);
     }
     let params = new HttpParams().set('date', filters.date);
-    const singleSentiment = Array.isArray(filters.sentiment)
-      ? (filters.sentiment.length === 1 ? filters.sentiment[0] : undefined)
-      : filters.sentiment ?? undefined;
-    if (singleSentiment) {
-      params = params.set('sentiment', singleSentiment);
+    const sentiments = Array.isArray(filters.sentiment)
+      ? filters.sentiment
+      : filters.sentiment
+        ? [filters.sentiment]
+        : [];
+    for (const s of sentiments) {
+      params = params.append('sentiment', s);
     }
     return this.http.get<unknown>('/api/map-summary', { params }).pipe(
       map((payload) => parseMapSummaryDto(payload)),

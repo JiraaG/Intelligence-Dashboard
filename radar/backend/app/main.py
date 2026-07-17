@@ -26,6 +26,7 @@ from app.api.articles_query import (
     build_countries_summary_query,
     build_map_summary_query,
     clamp_articles_limit,
+    normalize_sentiments,
     parse_published_date,
 )
 from app.core.config import CORS_ALLOW_ORIGINS, DATABASE_URL, WORKER_HEARTBEAT_STALE_SECONDS
@@ -141,7 +142,7 @@ async def get_articles(
     date: str,
     country: Optional[str] = Query(None, min_length=2, max_length=2),
     category: Optional[str] = Query(None),
-    sentiment: Optional[str] = Query(None),
+    sentiment: Optional[list[str]] = Query(None),
     relevance_level: Optional[int] = Query(None, ge=1, le=5),
     cursor: Optional[int] = Query(None, ge=1),
     limit: int = Query(DEFAULT_ARTICLES_LIMIT, ge=1),
@@ -150,6 +151,7 @@ async def get_articles(
 
     Keyset ``id DESC``, cursore esclusivo (``id < cursor``). ``limit`` capped a 100.
     Fetch ``limit+1`` per sapere se esiste una pagina successiva senza round-trip extra.
+    ``sentiment`` ripetibile (OR): ``?sentiment=Positivo&sentiment=Negativo``.
     SoT: skill radar-api-contract Phase 5.
     """
     empty = {"items": [], "next_cursor": None, "total": 0}
@@ -157,20 +159,21 @@ async def get_articles(
         return empty
 
     pub_date = parse_published_date(date)
+    sentiments = normalize_sentiments(sentiment)
     page_limit = clamp_articles_limit(limit)
     # Una riga in più: se arriva, c'è next_cursor.
     fetch_limit = page_limit + 1
 
     count_sql, count_params = build_articles_count_query(
         pub_date,
-        sentiment=sentiment,
+        sentiment=sentiments,
         relevance_level=relevance_level,
         country=country,
         category=category,
     )
     page_sql, page_params = build_articles_page_query(
         pub_date,
-        sentiment=sentiment,
+        sentiment=sentiments,
         relevance_level=relevance_level,
         country=country,
         category=category,
@@ -192,17 +195,21 @@ async def get_articles(
 @app.get("/api/map-summary")
 async def get_map_summary(
     date: str,
-    sentiment: Optional[str] = Query(None),
+    sentiment: Optional[list[str]] = Query(None),
     relevance_level: Optional[int] = Query(None, ge=1, le=5),
 ):
-    """Aggregato ``country_code × primary_category`` per hatching day-view sulla mappa."""
+    """Aggregato ``country_code × primary_category`` per hatching day-view sulla mappa.
+
+    ``sentiment`` ripetibile (OR), allineato a ``/api/articles``.
+    """
     if not state.db_pool:
         return []
 
     pub_date = parse_published_date(date)
+    sentiments = normalize_sentiments(sentiment)
     sql, params = build_map_summary_query(
         pub_date,
-        sentiment=sentiment,
+        sentiment=sentiments,
         relevance_level=relevance_level,
     )
 
@@ -215,7 +222,7 @@ async def get_map_summary(
 @app.get("/api/countries")
 async def get_countries_summary(
     date: str,
-    sentiment: Optional[str] = Query(None),
+    sentiment: Optional[list[str]] = Query(None),
     relevance_level: Optional[int] = Query(None, ge=1, le=5),
 ):
     """Rollup compat per paese (senza join junction → nessun rischio cartesiano)."""
@@ -223,9 +230,10 @@ async def get_countries_summary(
         return []
 
     pub_date = parse_published_date(date)
+    sentiments = normalize_sentiments(sentiment)
     sql, params = build_countries_summary_query(
         pub_date,
-        sentiment=sentiment,
+        sentiment=sentiments,
         relevance_level=relevance_level,
     )
 
