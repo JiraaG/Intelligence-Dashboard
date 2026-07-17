@@ -35,11 +35,11 @@ Stato: Phase 6 GATE VERDE; §3 ticket P2 DONE; verifica precedente =
 PASS_WITH_GAPS. Obiettivo turno = **PASS** rigoroso + handoff.
 
 ### SoT
-1. `plan-audit/active/plan_docs_audit_ticket_status.md`
-2. `plan-audit/active/plan_docs_audit_playbook.md` (FASE 2 + F.8)
+1. `plan-audit/complete/plan_docs_audit_ticket_status.md`
+2. `plan-audit/complete/plan_docs_audit_playbook.md` (FASE 2 + F.8)
 3. `plan-audit/remediation/audit_remediation_T-P2_batch.md`
-4. `plan-audit/active/plan_impl_phase_0_6_execution.md` §C
-5. `plan-audit/active/plan_impl_phase_0_6.md` → Final Release Gate
+4. `plan-audit/complete/plan_impl_phase_0_6_execution.md` §C
+5. `plan-audit/complete/plan_impl_phase_0_6.md` → Final Release Gate
 6. `.agents/AGENTS.md` + `radar/.ecc/rules/{backend,frontend}.md`
 
 ### Gap (DoD)

@@ -2,7 +2,8 @@
 
 > **Stato premesse (2026-07-16):** remediation codice P0–P2 **CLOSED**; Phase 6 GATE VERDE; smoke UI manuale **fatto**; commit/push su `refactor/testing` @ `7bb8ed8`.  
 > **Scopo di questo documento:** piano definitivo per i residui Final Release + deferred, con procedure, file, pro/contro e scelta raccomandata.  
-> **SoT correlati:** `plan_impl_phase_0_6.md` §Final Release Gate · `audit_remediation_final_release_handoff.md` · `radar/ops/README.md` · `radar/docs/runbook.md` · `radar/.ecc/rules/docker.md`
+> **SoT correlati:** [`../complete/plan_impl_phase_0_6.md`](../complete/plan_impl_phase_0_6.md) §Final Release Gate · [`../remediation/audit_remediation_final_release_handoff.md`](../remediation/audit_remediation_final_release_handoff.md) · `radar/ops/README.md` · `radar/docs/runbook.md` · `radar/.ecc/rules/docker.md`  
+> **Quadro fatto/da fare:** [`../STATUS.md`](../STATUS.md)
 
 ---
 
@@ -10,7 +11,7 @@
 
 | Area | Evidenza |
 |------|----------|
-| Ticket SoT P0/P1/P2 | 0 OPEN — `plan_docs_audit_ticket_status.md` §3 |
+| Ticket SoT P0/P1/P2 | 0 OPEN — [`../complete/plan_docs_audit_ticket_status.md`](../complete/plan_docs_audit_ticket_status.md) §3 |
 | Unit/integration offline | pytest `not live` ~117; FE typecheck + test:ci 30 |
 | Docs/ECC vs deploy | Phase 6 + remediation docs CLOSED |
 | Smoke UI letta + spiderfy | Eseguito dall’utente post-rebuild |
@@ -91,7 +92,7 @@ gh pr create --base develop --head refactor/testing --title "…" --body "…"
 ## 3. Fase 1 — Backup / restore drill
 
 ### Obiettivo
-Dimostrare che backup e restore funzionano end-to-end (criterio Final Release ancora `[ ]` in `plan_impl_phase_0_6.md`).
+Dimostrare che backup e restore funzionano end-to-end (criterio Final Release ancora `[ ]` in [`../complete/plan_impl_phase_0_6.md`](../complete/plan_impl_phase_0_6.md)).
 
 ### File e codice
 | Path | Ruolo |

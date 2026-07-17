@@ -1,58 +1,45 @@
 # plan-audit — indice
 
-Cartella di audit, prompt orchestratore e SoT operativi del modulo Radar.  
+Cartella di audit, prompt orchestratore e SoT del modulo Radar.  
 **Non** è codice di produzione.
 
-**Product docs (manuali operatori):** root [`README.md`](../README.md) + [`docs/01–04`](../docs/).  
-**Checklist allineamento docs:** [`plan_docs_monorepo_source.md`](active/plan_docs_monorepo_source.md).
+**Quadro fatto vs da fare:** [`STATUS.md`](STATUS.md)  
+**Product docs:** root [`README.md`](../README.md) + [`docs/01–04`](../docs/).
 
-**Anti-drift:** claim storici nei phase plans (es. porte `80:80`, migrazioni `001–007`) possono essere datati. Autorità runtime = product docs + Compose (`80:8080`, migrazioni `001–009`) + SoT LLM. Niente file operativi in root oltre questo README; scratch solo in `archive/scratch/`.
+**Anti-drift:** autorità runtime = product docs + Compose (`80:8080`, migrazioni `001–009`) + SoT LLM. Claim storici nei piani in `complete/` possono essere datati.
 
-## SoT e piani in `active/` — vivi vs chiusi
-
-### Vivi (usare)
+## `active/` — solo vivi
 
 | Documento | Ruolo |
 |-----------|--------|
-| [sot_llm_multi_model_fallback.md](active/sot_llm_multi_model_fallback.md) | **SoT** LLM multi-provider + routing (lane env + complexity v2.2) |
-| [plan_release_final_gate.md](active/plan_release_final_gate.md) | Gate residuali Final Release (**≠** Phase 6 GATE) |
-| [plan_docs_monorepo_source.md](active/plan_docs_monorepo_source.md) | Checklist allineamento README/docs/ops/ECC |
+| [sot_llm_multi_model_fallback.md](active/sot_llm_multi_model_fallback.md) | **SoT** LLM multi-provider + routing v2.2 |
+| [plan_release_final_gate.md](active/plan_release_final_gate.md) | **Backlog** Final Release (PR, backup, seed, chaos, SAST) |
 
-### Chiusi (riferimento — non backlog)
+## `complete/` — chiusi
 
-| Documento | Ruolo |
-|-----------|--------|
-| [plan_impl_phase_0_6.md](active/plan_impl_phase_0_6.md) | Piano Phase 0–6 (**DONE / GATE VERDE**) + restore SHA |
-| [plan_impl_phase_0_6_execution.md](active/plan_impl_phase_0_6_execution.md) | Scoreboard esecuzione Phase 0–6 (**chiuso**) |
-| [plan_docs_audit_playbook.md](active/plan_docs_audit_playbook.md) | Playbook audit/remediation (**CLOSED**) |
-| [plan_docs_audit_ticket_status.md](active/plan_docs_audit_ticket_status.md) | Trail ticket docs/codice (**CLOSED**, 0 OPEN) |
+Vedi [`complete/README.md`](complete/README.md): Phase 0–6, playbook, ticket status, checklist docs.
 
-> Phase plans restano in `active/` finché Final Release non è chiuso (ancora citati da README/docs). Poi: candidati a `archive/plans/`.
-
-## Layout cartelle
+## Layout
 
 ```text
 plan-audit/
-  README.md                 ← Questo file (indice)
-  active/                   SoT vive + piani chiusi di riferimento
-  prompts/active/           Prompt orchestratore attivi
-  prompts/done/             Prompt già eseguiti (storico)
-  remediation/              Report chiusura ticket (DONE — non cancellare)
-  archive/plans/            Piani operativi storici / PRD
-  archive/ecc/              Handoff ECC storici
-  archive/llm-stubs/        Stub LLM SUPERSEDED
-  archive/scratch/          Checklist audit grezze
+  STATUS.md                 ← fatto vs da fare (leggere per primo)
+  README.md                 ← questo indice
+  active/                   Solo SoT LLM + Final Release Gate
+  complete/                 Piani/checklist COMPLETATI
+  prompts/active/           Prompt Final Release
+  prompts/done/             Prompt eseguiti (storico)
+  remediation/              Report ticket DONE (non cancellare)
+  archive/plans|ecc|llm-stubs|scratch/
 ```
 
-## Prompt attivi (`prompts/active/`)
+## Prompt attivi
 
-* [audit_prompt_final_release_gate.md](prompts/active/audit_prompt_final_release_gate.md) — Gate finali di release.
+* [audit_prompt_final_release_gate.md](prompts/active/audit_prompt_final_release_gate.md)
 
-## Note e storico
+## Note
 
-* **Limits Plan (DONE):** [plan_llm_limits_periodicity_docs_ecc.md](archive/plans/plan_llm_limits_periodicity_docs_ecc.md).
-* **Remediation & Done Prompts:** [remediation/](remediation/) + [prompts/done/](prompts/done/) — SoT storico del lavoro; **non eliminare**.
-* **Stub LLM:** [archive/llm-stubs/](archive/llm-stubs/) — non usare come riferimento.
-* **Complexity v2.2:** SIMPLE = `LLM_SIMPLE`; BORDERLINE+COMPLEX = `LLM_COMPLEX`; L sola → SIMPLE.
-* **Limiti:** per-lane `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (`0` = unmanaged); soft-trim = `LLM_SIMPLE.rpd`; free = RPM/RPD, paid = `BUDGET_USD_DAY`.
-* **Provider:** `gemini` \| `deepseek` \| `openai` \| `glm` \| `grok` \| `claude` (stub). Dialect: deepseek=`thinking`; openai/glm/grok=`stock`. SoT §5 Profili A–E.
+* **Limits Plan (DONE):** [archive/plans/plan_llm_limits_periodicity_docs_ecc.md](archive/plans/plan_llm_limits_periodicity_docs_ecc.md)
+* **Stub LLM:** [archive/llm-stubs/](archive/llm-stubs/) — non usare
+* **Provider:** `gemini`\|`deepseek`\|`openai`\|`glm`\|`grok`\|`claude`(stub). Dialect: deepseek=`thinking`; openai/glm/grok=`stock`
+* **Limiti:** per-lane; `0`=unmanaged; soft-trim=`LLM_SIMPLE.rpd`; free=RPM/RPD; paid=BUDGET

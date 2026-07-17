@@ -34,7 +34,7 @@ File unico: `radar/frontend/src/app/components/radar-map/radar-map.component.ts`
 - `radar/.ecc/agents/angular-map-expert.md`
 - `radar/.ecc/CLAUDE.md`
 - `.agents/AGENTS.md` §5.3
-- `plan-audit/active/plan_impl_phase_0_6.md` / `plan_impl_phase_0_6_execution.md`
+- `plan-audit/complete/plan_impl_phase_0_6.md` / `plan_impl_phase_0_6_execution.md`
 - `plan-audit/archive/scratch/scratch_frontend_rules.md` (FE-CL-08, FE-ZM-08) + `scratch_frontend_audit.md`
 
 ## Restore

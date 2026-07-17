@@ -31,12 +31,12 @@ Prima fai un audit di drift (sola lettura), poi applica fix docs minimi. Non imp
 ## Alberi da controllare (allowlist)
 
 ### Audit / plan
-- `plan-audit/active/plan_docs_audit_playbook.md`
-- `plan-audit/active/plan_docs_audit_ticket_status.md`
+- `plan-audit/complete/plan_docs_audit_playbook.md`
+- `plan-audit/complete/plan_docs_audit_ticket_status.md`
 - `plan-audit/audit_remediation_*.md`
 - `plan-audit/audit_prompt_*.md`
-- `plan-audit/active/plan_impl_phase_0_6.md`
-- `plan-audit/active/plan_impl_phase_0_6_execution.md`
+- `plan-audit/complete/plan_impl_phase_0_6.md`
+- `plan-audit/complete/plan_impl_phase_0_6_execution.md`
 - `plan-audit/scratch/*` (solo nota “storico” se drift; non riscrivere audit grezzi salvo citazioni false operative)
 
 ### ECC / agents / skills

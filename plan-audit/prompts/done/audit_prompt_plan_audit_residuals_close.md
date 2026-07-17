@@ -19,7 +19,7 @@ Non rifare git mv di massa. Non toccare codice runtime, .env, sidebar, vault.
 CONTESTO (AS-IS atteso)
 - SoT LLM: plan-audit/active/sot_llm_multi_model_fallback.md
 - Limits DONE: plan-audit/archive/plans/plan_llm_limits_periodicity_docs_ecc.md
-- Impl: plan-audit/active/plan_impl_phase_0_6.md (+ _execution)
+- Impl: plan-audit/complete/plan_impl_phase_0_6.md (+ _execution)
 - Release gate: plan-audit/active/plan_release_final_gate.md
 - Docs audit: plan_docs_audit_playbook.md / plan_docs_audit_ticket_status.md
 - Scratch: plan-audit/archive/scratch/scratch_*.md
@@ -45,7 +45,7 @@ A) ecc_deep_dive_analysis_v2.md (repo root)
 
 B) Sweep anti-regressione (grep) — FAIL se path VIVI inesistenti in link markdown:
    Cerca e correggi (se sono href/path operativi, non citazioni storiche in prompt done):
-   - ](plan-audit/active/plan_impl_phase_0_6.md) o ](../plan-audit/active/plan_impl_phase_0_6.md) senza plan-audit/
+   - ](plan-audit/complete/plan_impl_phase_0_6.md) o ](../plan-audit/complete/plan_impl_phase_0_6.md) senza plan-audit/
    - ](plan-audit/archive/ecc/handoff_ecc_expansion.md) / ](plan-audit/archive/ecc/handoff_ecc_architecture_audit.md) in root
    - plan-audit/active/sot_llm_multi_model_fallback.md
    - plan-audit/archive/plans/plan_llm_limits_periodicity_docs_ecc.md
@@ -59,7 +59,7 @@ C) Eccezioni OK (non “fixare” a meno che non siano href rotti):
 
 D) Opzionale low-priority:
    - Bare basename in archive/ecc/handoff_*.md tipo `plan_impl_phase_0_6_execution.md`
-     senza path: preferire `../../active/plan_impl_phase_0_6_execution.md` se è un link.
+     senza path: preferire `../../complete/plan_impl_phase_0_6_execution.md` se è un link.
    - Root README tree già aggiornato: conferma coerenza.
 
 ALLOWLIST EDIT

@@ -18,7 +18,7 @@
    vanno aggiornati i path (altrimenti trail storico punta a file inesistenti).
 3. **Link rotti fuori plan-audit:** `.agents/AGENTS.md` e `docs/02|04` puntano a  
    `../plan_impl_phase_0_6.md` (repo root — **file assente**). Fix obbligatorio →  
-   `../plan-audit/active/plan_impl_phase_0_6.md` (e execution twin).  
+   `../plan-audit/complete/plan_impl_phase_0_6.md` (e execution twin).  
    `docs/04` punta a `../handoff_ecc_expansion.md` (assente in root) →  
    `../plan-audit/archive/ecc/handoff_ecc_expansion.md`.
 4. **Conteggio:** 46 `.md` sotto `plan-audit/` (incl. README + cleanup prompt) — OK.
@@ -74,10 +74,10 @@ MATRICE VERIFICATA (46 file — path relativi a plan-audit/)
 | active/sot_llm_multi_model_fallback.md | MOVE+RENAME | active/sot_llm_multi_model_fallback.md | med |
 | active/LLM_Limits_Periodicity_Docs_ECC_Plan.md | MOVE+RENAME | archive/plans/plan_llm_limits_periodicity_docs_ecc.md | low |
 | active/plan_release_final_gate.md | RENAME | active/plan_release_final_gate.md | low |
-| active/plan_impl_phase_0_6.md | RENAME | active/plan_impl_phase_0_6.md | low |
-| active/plan_impl_phase_0_6_execution.md | RENAME | active/plan_impl_phase_0_6_execution.md | low |
-| active/plan_docs_audit_playbook.md | RENAME | active/plan_docs_audit_playbook.md | low |
-| active/plan_docs_audit_ticket_status.md | RENAME | active/plan_docs_audit_ticket_status.md | low |
+| complete/plan_impl_phase_0_6.md | RENAME | complete/plan_impl_phase_0_6.md | low |
+| complete/plan_impl_phase_0_6_execution.md | RENAME | complete/plan_impl_phase_0_6_execution.md | low |
+| complete/plan_docs_audit_playbook.md | RENAME | complete/plan_docs_audit_playbook.md | low |
+| complete/plan_docs_audit_ticket_status.md | RENAME | complete/plan_docs_audit_ticket_status.md | low |
 | prompts/active/audit_prompt_final_release_gate.md | KEEP + fix link interni | stesso | low |
 | prompts/active/audit_prompt_llm_limits_docs_ecc.md | MOVE | prompts/done/audit_prompt_llm_limits_docs_ecc.md | low |
 | prompts/active/audit_prompt_llm_limits_phase_close.md | MOVE | prompts/done/audit_prompt_llm_limits_phase_close.md | low |
@@ -108,13 +108,13 @@ LLM_Limits_Periodicity_Docs_ECC_Plan.md
 plan_release_final_gate.md
   → plan-audit/active/plan_release_final_gate.md
 plan_impl_phase_0_6_execution.md
-  → plan-audit/active/plan_impl_phase_0_6_execution.md
+  → plan-audit/complete/plan_impl_phase_0_6_execution.md
 plan_impl_phase_0_6.md
-  → plan-audit/active/plan_impl_phase_0_6.md
+  → plan-audit/complete/plan_impl_phase_0_6.md
 plan_docs_audit_ticket_status.md
-  → plan-audit/active/plan_docs_audit_ticket_status.md
+  → plan-audit/complete/plan_docs_audit_ticket_status.md
 plan_docs_audit_playbook.md
-  → plan-audit/active/plan_docs_audit_playbook.md
+  → plan-audit/complete/plan_docs_audit_playbook.md
 handoff_ecc_architecture_audit.md
   → plan-audit/archive/ecc/handoff_ecc_architecture_audit.md
 handoff_ecc_expansion.md
@@ -142,13 +142,13 @@ Dopo rename skill .agents → RI-SYNC mirror .ecc (stesso contenuto path SoT).
 
 FIX LINK ROTTI SPECIFICI
 .agents/AGENTS.md:
-  ../plan_impl_phase_0_6.md → ../plan-audit/active/plan_impl_phase_0_6.md
-  ../plan_impl_phase_0_6_execution.md → ../plan-audit/active/plan_impl_phase_0_6_execution.md
+  ../plan_impl_phase_0_6.md → ../plan-audit/complete/plan_impl_phase_0_6.md
+  ../plan_impl_phase_0_6_execution.md → ../plan-audit/complete/plan_impl_phase_0_6_execution.md
 docs/02_architecture_and_backend.md:
-  ../plan_impl_phase_0_6.md → ../plan-audit/active/plan_impl_phase_0_6.md
+  ../plan_impl_phase_0_6.md → ../plan-audit/complete/plan_impl_phase_0_6.md
 docs/04_ecc_framework.md:
-  ../plan_impl_phase_0_6.md → ../plan-audit/active/plan_impl_phase_0_6.md
-  ../plan_impl_phase_0_6_execution.md → ../plan-audit/active/plan_impl_phase_0_6_execution.md
+  ../plan_impl_phase_0_6.md → ../plan-audit/complete/plan_impl_phase_0_6.md
+  ../plan_impl_phase_0_6_execution.md → ../plan-audit/complete/plan_impl_phase_0_6_execution.md
   ../handoff_ecc_expansion.md → ../plan-audit/archive/ecc/handoff_ecc_expansion.md
   (se citato Architecture handoff: → handoff_ecc_architecture_audit.md)
 radar/.ecc/CLAUDE.md: aggiornare menzioni Implementation_Plan* ai path plan-audit/active/

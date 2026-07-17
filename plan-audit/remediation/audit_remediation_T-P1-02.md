@@ -1,8 +1,8 @@
 # Audit Report — Ticket T-P1-02: Race TOCTOU multi-consumer / advisory lock per-URL
 
 > **Stato ticket:** **DONE** (verificato nel workspace principale 2026-07-15)  
-> **SoT stato:** `plan-audit/active/plan_docs_audit_ticket_status.md` §3 / §13  
-> **Playbook:** `plan-audit/active/plan_docs_audit_playbook.md` §3.4 / §4.3 / Script H
+> **SoT stato:** `plan-audit/complete/plan_docs_audit_ticket_status.md` §3 / §13  
+> **Playbook:** `plan-audit/complete/plan_docs_audit_playbook.md` §3.4 / §4.3 / Script H
 
 ---
 

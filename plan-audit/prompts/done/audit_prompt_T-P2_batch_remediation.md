@@ -29,12 +29,12 @@ NON regressare map UX spider-dezoom (`ed3d88f`) oltre i touch P2 elencati.
   docs pin `f439508` — vedi `plan-audit/remediation/audit_remediation_spider_dezoom.md`.
 
 ### SoT obbligatori (ordine autorità)
-1. `plan-audit/active/plan_docs_audit_ticket_status.md` §3 (stati OPEN/DONE)
-2. `plan-audit/active/plan_docs_audit_playbook.md` §4.8 (fix P2) + FASE 5 §5.0 + **Script M**
+1. `plan-audit/complete/plan_docs_audit_ticket_status.md` §3 (stati OPEN/DONE)
+2. `plan-audit/complete/plan_docs_audit_playbook.md` §4.8 (fix P2) + FASE 5 §5.0 + **Script M**
 3. Scratch findings: `plan-audit/archive/scratch/scratch_backend_audit.md` (BE-AUD-007…010),
    `plan-audit/archive/scratch/scratch_frontend_audit.md` (FE-AUD-002…005)
 4. Guardrail: `.agents/AGENTS.md` + `radar/.ecc/rules/{backend,frontend}.md`
-5. Scoreboard: `plan-audit/active/plan_impl_phase_0_6_execution.md` §C (riga P2)
+5. Scoreboard: `plan-audit/complete/plan_impl_phase_0_6_execution.md` §C (riga P2)
 6. Checklist: `plan-audit/archive/scratch/scratch_backend_rules.md`, `scratch_frontend_rules.md`
 
 ### Skills / ECC da leggere (per area)
@@ -93,8 +93,8 @@ Workspace: c:\Users\lucag\Documents\Dashboard finance
 Branch: refactor/testing @ f439508+
 Implementa SOLO T-P2-01, T-P2-02, T-P2-03, T-P2-04.
 
-SoT: plan-audit/active/plan_docs_audit_ticket_status.md §3
-Playbook: plan-audit/active/plan_docs_audit_playbook.md §4.8 + Script M
+SoT: plan-audit/complete/plan_docs_audit_ticket_status.md §3
+Playbook: plan-audit/complete/plan_docs_audit_playbook.md §4.8 + Script M
 Scratch: plan-audit/archive/scratch/scratch_backend_audit.md BE-AUD-007…010 (segui i diff)
 Rules: radar/.ecc/rules/backend.md
 Skill: .agents/skills/llm-json-extraction/SKILL.md (T-P2-03 schema)
@@ -130,8 +130,8 @@ Workspace: c:\Users\lucag\Documents\Dashboard finance
 Branch: refactor/testing @ f439508+
 Implementa SOLO T-P2-05, T-P2-06, T-P2-07, T-P2-08.
 
-SoT: plan-audit/active/plan_docs_audit_ticket_status.md §3
-Playbook: plan-audit/active/plan_docs_audit_playbook.md §4.8
+SoT: plan-audit/complete/plan_docs_audit_ticket_status.md §3
+Playbook: plan-audit/complete/plan_docs_audit_playbook.md §4.8
 Scratch: plan-audit/archive/scratch/scratch_frontend_audit.md FE-AUD-002…005 (segui i diff)
 Rules: radar/.ecc/rules/frontend.md
 Skills: .agents/skills/radar-sidebar-freeze/SKILL.md (ZERO touch sidebar);

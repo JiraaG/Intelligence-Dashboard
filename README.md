@@ -13,8 +13,9 @@
 **Stato piani (2026-07-15):** Phase **0–5 DONE**. Phase **6 DONE / GATE VERDE**.  
 **Final Release** ≠ Phase GATE: residui ancora aperti — [`plan_release_final_gate.md`](plan-audit/active/plan_release_final_gate.md).  
 **ECC expansion wiring DONE** (hooks/rules Cursor + skill dominio Radar).  
-Sorgente di verità avanzamento: [`plan_impl_phase_0_6_execution.md`](plan-audit/active/plan_impl_phase_0_6_execution.md).  
-Checklist allineamento docs: [`plan_docs_monorepo_source.md`](plan-audit/active/plan_docs_monorepo_source.md).  
+Sorgente di verità avanzamento Phase 0–6: [`plan_impl_phase_0_6_execution.md`](plan-audit/complete/plan_impl_phase_0_6_execution.md).  
+Quadro fatto vs da fare (Final Release): [`plan-audit/STATUS.md`](plan-audit/STATUS.md).  
+Checklist allineamento docs (chiusa): [`plan_docs_monorepo_source.md`](plan-audit/complete/plan_docs_monorepo_source.md).  
 **Sidebar freeze:** non modificare `radar/frontend/src/app/components/radar-sidebar/`.
 
 ---
@@ -134,15 +135,14 @@ Build FE Docker: `npm ci --legacy-peer-deps` (peer matrix Angular/PrimeNG).
 | [RSS.txt](RSS.txt) | Feed RSS suggeriti |
 | [LICENSE](LICENSE) | Licenza del repository |
 
-### Piani attivi (enterprise consolidation)
+### Piani (plan-audit)
 
 | Documento | Ruolo |
 |-----------|--------|
-| [plan_docs_monorepo_source.md](plan-audit/active/plan_docs_monorepo_source.md) | Checklist allineamento docs (questa passata) |
+| [STATUS.md](plan-audit/STATUS.md) | **Quadro** fatto vs da fare |
+| [plan_release_final_gate.md](plan-audit/active/plan_release_final_gate.md) | Backlog Final Release (**≠** Phase 6 GATE) |
 | [sot_llm_multi_model_fallback.md](plan-audit/active/sot_llm_multi_model_fallback.md) | SoT LLM multi-provider + Profili A–E |
-| [plan_impl_phase_0_6.md](plan-audit/active/plan_impl_phase_0_6.md) | Piano Phase 0–6 (**chiuso** / GATE VERDE) + restore SHA |
-| [plan_impl_phase_0_6_execution.md](plan-audit/active/plan_impl_phase_0_6_execution.md) | Scoreboard Phase 0–6 (**chiuso**) |
-| [plan_release_final_gate.md](plan-audit/active/plan_release_final_gate.md) | Residui Final Release (**≠** Phase 6 GATE) |
+| [complete/](plan-audit/complete/) | Phase 0–6, playbook, ticket status, checklist docs (**chiusi**) |
 
 ### Governance agenti (ECC)
 
@@ -185,7 +185,7 @@ Restore SHA sotto (Phase 0–6). Il branch di lavoro corrente può differire —
 | Phase 5 | `1dfdf60` | map-summary + articles cursor; nation markers; spiderfy categoria |
 | Phase 6 | `56c2eff` | GATE VERDE: docs, GeoJSON fetch+verify, CI, runbook, hooks |
 
-Esempio: `git checkout 56c2eff` (tip Phase 6 / GATE VERDE; tip successivo = ECC remediation). Dettaglio gate: [plan_impl_phase_0_6_execution.md](plan-audit/active/plan_impl_phase_0_6_execution.md).
+Esempio: `git checkout 56c2eff` (tip Phase 6 / GATE VERDE; tip successivo = ECC remediation). Dettaglio gate: [plan_impl_phase_0_6_execution.md](plan-audit/complete/plan_impl_phase_0_6_execution.md).
 
 ---
 
@@ -236,11 +236,12 @@ Dettaglio: [docs/02_architecture_and_backend.md](docs/02_architecture_and_backen
 ```text
 Dashboard finance/
 ├── docs/                              # Manuali operatori 01–04
-├── plan-audit/                        # SoT / prompt / remediation (vedi plan-audit/README.md)
-│   ├── active/plan_docs_monorepo_source.md
-│   ├── active/sot_llm_multi_model_fallback.md
-│   ├── active/plan_impl_phase_0_6*.md
-│   └── archive/ecc/handoff_ecc_*.md
+├── plan-audit/                        # vedi plan-audit/STATUS.md (fatto vs da fare)
+│   ├── STATUS.md
+│   ├── active/                        # SoT LLM + Final Release Gate
+│   ├── complete/                      # Phase 0–6, playbook, ticket, docs checklist
+│   ├── remediation/ + prompts/
+│   └── archive/
 ├── ecc_deep_dive_analysis_v2.md       # Manuale ECC (descrizione; skill map può essere stale → SoT LLM)
 ├── RSS.txt
 ├── LICENSE

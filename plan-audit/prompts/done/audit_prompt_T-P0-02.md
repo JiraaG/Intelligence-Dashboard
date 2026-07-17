@@ -17,8 +17,8 @@ il fix, NON deprecare file, NON commitare, NON pushare.
 - Repo: `c:\Users\lucag\Documents\Dashboard finance` · app `radar/`
 - Branch tipico: `refactor/testing` (tracking `origin/refactor/testing`)
 - Gate progetto: Phase 6 / Gate Verde
-- SoT ticket: `plan-audit/active/plan_docs_audit_ticket_status.md` §3 / §4 / §5
-- Playbook: `plan-audit/active/plan_docs_audit_playbook.md` §3.2 / §4.5 / Script I / App. F §F.2
+- SoT ticket: `plan-audit/complete/plan_docs_audit_ticket_status.md` §3 / §4 / §5
+- Playbook: `plan-audit/complete/plan_docs_audit_playbook.md` §3.2 / §4.5 / Script I / App. F §F.2
 - Skills utili: `.agents/skills/llm-json-extraction`, `.agents/skills/radar-quota-ledger`
 - Constraint: `main.py` API-only; asyncpg; non toccare `radar-sidebar/**`
 
