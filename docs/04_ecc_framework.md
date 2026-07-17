@@ -2,9 +2,21 @@
 
 Harness per vincolare l’agente alle regole di produzione. Overlay Radar a **tre superfici**: policy/SoT in `.agents/` + `radar/.ecc/`, enforcement Cursor in `.cursor/`.
 
+**Manuale operativo SoT** per agenti e operatori. Deep-dive descrittivo: [`ecc_deep_dive_analysis_v2.md`](../ecc_deep_dive_analysis_v2.md) (può restare dietro sull’inventario — preferire questo file + skill map).
+
+**Fonti upstream:** GitHub [affaan-m/ECC](https://github.com/affaan-m/ECC) + [cross-harness.md](https://raw.githubusercontent.com/affaan-m/ECC/main/docs/architecture/cross-harness.md) + Mintlify. **CodeWiki** ([codewiki.google/…/ecc](https://codewiki.google/github.com/affaan-m/ecc)) è spesso shell vuota — **non** usarla come SoT.
+
+**Prompt base sempre-on:** **NO**. [`.agents/AGENTS.md`](../.agents/AGENTS.md) è già Magna Carta iniettata ogni turno. Nessun slash `/radar-preamble`. Aggiungere in chat *“usa skill X”* solo se il path non è in skill map o il workflow ops non è path-triggered.
+
 ---
 
-## Tre superfici
+## Tre superfici (enforce vs guida)
+
+| Superficie | Guida (soft) | Enforce (hard) |
+|------------|--------------|----------------|
+| `.agents/` | `AGENTS.md` + skill playbook | — (Cursor carica AGENTS; skill on trigger) |
+| `radar/.ecc/` | `CLAUDE.md`, agents, mirror skill, `settings.json` | Logica hook in `hooks/*.py`; rules SoT |
+| `.cursor/` | `commands/` shortcut | `hooks.json` + adapters; `rules/*.mdc` globs |
 
 ### Globale — `.agents/`
 
@@ -19,10 +31,11 @@ Harness per vincolare l’agente alle regole di produzione. Overlay Radar a **tr
 |------|--------|
 | `CLAUDE.md` | Entry-point sessione + skill map + nota spawn profili |
 | `settings.json` | Tool/domain whitelist; `hooks.notes` (non registra Cursor) |
-| `rules/` | Path-scoped SoT: `backend.md`, `frontend.md`, `docker.md` |
+| `rules/` | Path-scoped SoT: `backend.md`, `frontend.md`, `docker.md`, `testing.md` |
 | `agents/` | Profili prompt: `pipeline-engineer`, `angular-map-expert`, `geo-data-architect` |
 | `hooks/` | Logica security/lint: `pre-tool-use.py`, `post-tool-use.py` |
 | `skills/` | Mirror flat delle skill (sync da `.agents`) |
+| `scripts/sync_skills.py` | `--check` / `--write` SoT → mirror |
 
 ### Adapter Cursor — `.cursor/`
 
@@ -30,15 +43,29 @@ Harness per vincolare l’agente alle regole di produzione. Overlay Radar a **tr
 |------|--------|
 | `hooks.json` | Eventi `preToolUse` / `postToolUse` / `afterFileEdit` |
 | `hooks/*-adapter.py` | Adapter sottili → delegano a `radar/.ecc/hooks/*.py` |
-| `rules/radar-*.mdc` | Globs nativi → puntano al SoT in `.ecc/rules` (no testo duplicato) |
+| `rules/radar-*.mdc` | Globs nativi → puntano al SoT in `.ecc/rules` (no testo lungo duplicato) |
 | `commands/` | Shortcut: `radar-verify`, `radar-smoke`, `radar-lint` |
 
 Piani Phase 0–6 (**DONE / GATE VERDE**, riferimento — non backlog): [`plan_impl_phase_0_6.md`](../plan-audit/complete/plan_impl_phase_0_6.md) + [`plan_impl_phase_0_6_execution.md`](../plan-audit/complete/plan_impl_phase_0_6_execution.md) (voce **ECC expansion wiring — DONE**).  
 Final Release (**F1–F4 PASS** 2026-07-17; Fase 5 deferred; resta PR): [`STATUS.md`](../plan-audit/STATUS.md) · [`plan_release_final_gate.md`](../plan-audit/active/plan_release_final_gate.md) · handoff [`audit_remediation_final_release_handoff.md`](../plan-audit/remediation/audit_remediation_final_release_handoff.md).  
 Checklist docs: [`plan_docs_monorepo_source.md`](../plan-audit/complete/plan_docs_monorepo_source.md).  
-Manuale ECC: [`ecc_deep_dive_analysis_v2.md`](../ecc_deep_dive_analysis_v2.md) — descrittivo; per LLM multi-model / skill map aggiornata preferire SoT LLM + `.agents/skills/` (deep-dive può essere stale).  
 Handoff expansion (eseguito): [`handoff_ecc_expansion.md`](../plan-audit/archive/ecc/handoff_ecc_expansion.md).  
 Non usare come piano vivo: `Fase2_Implementation_Plan.md`, `plan*.md` in archive, `ecc_deep_dive_analysis.md` (V1 assente).
+
+---
+
+## Strumento → quando usare
+
+| Strumento | Quando | Non usare per |
+|-----------|--------|---------------|
+| **AGENTS.md** | Vincoli immutabili globali (sidebar freeze, worker vs API, cluster 40, MOCK_MODE) | Tutorial lunghi / how-to |
+| **Skill** | Workflow ripetuto ≥2–3×, anti-pattern costosi, `when_to_use` chiaro | One-shot, copia di AGENTS, Angular/Python generici già in `angular-developer` |
+| **Rule** (`.ecc/rules` + `.mdc`) | “Non violare” path-scoped | Playbook passo-passo |
+| **Hook** | Enforcement HARD (secret, path vietati, lint fail-closed, allowlist dominio) | “Ricorda di leggere skill X”; memory/SessionStart upstream |
+| **Agent** (`radar/.ecc/agents/*`) | Task specialista scope ristretto | Auto-dispatch di massa |
+| **Command** | Shortcut 1–5 comandi | Sostituire una skill lunga |
+
+Regola d’oro (upstream cross-harness): comportamento durevole in skill/rules/hooks; adapter sottili. Se per cambiare un workflow editi tre copie harness, la SoT è nel posto sbagliato.
 
 ---
 
@@ -54,9 +81,68 @@ Non usare come piano vivo: `Fase2_Implementation_Plan.md`, `plan*.md` in archive
 
 4. **radar-sidebar-freeze** — zero touch `radar-sidebar/**`; `p-carousel` only  
 5. **radar-api-contract** — map-summary + envelope `{items,next_cursor,total}`; `MOCK_MODE`  
-6. **radar-docker-ops** — edge/data, live/ready, verify-geojson, `./data/postgres`  
+6. **radar-docker-ops** — edge/data, live/ready, verify-geojson, `./data/postgres`; ops backup → [`ops/README.md`](../radar/ops/README.md) §Windows  
 7. **radar-geojson-assets** — gitignore + `--fetch` in Docker build; `ASSET_LICENSE`  
-8. **radar-quota-ledger** — reserve/complete/fail; limiti per-lane `LLM_SIMPLE_*`/`LLM_COMPLEX_*`; soft-trim = `LLM_SIMPLE.rpd`; RPM/TPM attesa stessa lane; RPD esaurita → `QuotaDailyExceeded` + residual cross-lane; 429 Retry-After; free vs paid budget; provider `gemini`\|`deepseek`\|`openai`\|`glm`\|`grok`\|`claude` (**stub**)
+8. **radar-quota-ledger** — reserve/complete/fail; limiti per-lane `LLM_SIMPLE_*`/`LLM_COMPLEX_*`; soft-trim = `LLM_SIMPLE.rpd`; RPM/TPM attesa stessa lane; RPD esaurita → `QuotaDailyExceeded` + residual cross-lane; 429 Retry-After; free vs paid budget; provider `gemini`\|`deepseek`\|`openai`\|`glm`\|`grok`\|`claude` (**stub**)  
+9. **radar-requeue-ops** — re-ingest Miniflux: dry-run → exec → `restart radar-worker`
+
+Skill map path → skill: [`radar/.ecc/CLAUDE.md`](../radar/.ecc/CLAUDE.md).
+
+---
+
+## Checklist nuova skill
+
+```text
+1. Gate: workflow ≥2–3× OR anti-pattern costoso OR conoscenza non ovvia dal codice
+2. Creare .agents/skills/<name>/SKILL.md
+   - frontmatter: name, description, when_to_use, version
+   - Quando usare / Vincoli / Anti-pattern / SoT path reali
+3. Aggiornare skill map in radar/.ecc/CLAUDE.md
+4. python radar/.ecc/scripts/sync_skills.py --write
+5. Non contraddire AGENTS.md / rules
+6. Non creare skill per: one-shot, tutorial generici, copia di AGENTS
+```
+
+---
+
+## Checklist nuovo / esteso hook
+
+```text
+1. Solo enforcement HARD (secret, path vietati, linter fail-closed, allowlist)
+2. Estendere logica in radar/.ecc/hooks/pre|post-tool-use.py (SoT)
+3. Tenere settings.json domains/secrets in sync con i pattern hook
+4. Adapter .cursor/hooks/*-adapter.py: toccare solo se cambia contratto JSON Cursor
+5. Smoke: echo JSON | python .cursor/hooks/pre-tool-use-adapter.py → permission allow/deny
+6. NON usare hook per “ricordare di leggere una skill”
+7. NON paste raw hooks.json upstream / memory-persistence
+```
+
+---
+
+## Sync mirror
+
+SoT playbook = `.agents/skills/<name>/SKILL.md`.  
+Mirror flat = `radar/.ecc/skills/<name>.md` (non è nel catalogo Cursor).
+
+```bash
+# Da root monorepo
+python radar/.ecc/scripts/sync_skills.py --check   # exit 0 se allineati
+python radar/.ecc/scripts/sync_skills.py --write   # copia SoT → mirror
+```
+
+Dopo ogni edit a una skill SoT: `--write` (o fallisce il `--check` in CI/locale).
+
+---
+
+## Anti-pattern
+
+- Clonare il catalogo ECC upstream (~67 agents / ~200+ skills) nel monorepo  
+- Duplicare testo lungo nelle `.mdc` (devono restare pointer + globs)  
+- Hook-as-reminder (“leggi skill X”)  
+- Skill one-shot o copia di `AGENTS.md`  
+- Paste raw `hooks.json` / installer ECC massivo  
+- Usare CodeWiki vuota come SoT  
+- Editare tre copie dello stesso playbook (`.agents` + `.ecc` + `.mdc`) invece dello SoT + sync  
 
 ---
 

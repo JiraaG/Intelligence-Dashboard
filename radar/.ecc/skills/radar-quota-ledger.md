@@ -24,8 +24,10 @@ Worker soft-trim usa solo `LLM_SIMPLE.rpd` (se > 0) — indipendente dal provide
 
 | Tipo | Vincolo | Semantica |
 |------|---------|-----------|
-| Free (es. Gemini Studio) | RPM + RPD | `*_RPM` / `*_RPD` > 0 |
+| Free (es. Gemini Studio) | RPM + RPD (+ TPM se >0) | `*_RPM` / `*_TPM` / `*_RPD` > 0 |
 | Paid (es. DeepSeek) | Credito / soft-cap | `*_RPM`/`*_RPD` = 0 + `*_BUDGET_USD_DAY` |
+
+RPM/TPM pieni → attesa sulla **stessa** lane (no cross). **RPD esaurita** → `QuotaDailyExceeded` → cooldown + residual cross-lane.
 
 Residual cross-lane fattura `ref.quota_lane` (SIMPLE↔COMPLEX se identity diversa).
 

@@ -6,7 +6,7 @@ description: >
   relazioni molti-a-molti tramite junction tables. Crea e mantiene gli indici SQL sulle coordinate
   geografiche e sulla data di pubblicazione per garantire query istantanee al frontend. Non tocca
   mai il codice Python di pipeline né il frontend Angular.
-tools: ["Read", "Write", "Bash", "Grep"]
+tools: ["Read", "Write", "Shell", "Grep"]
 model: sonnet
 scope:
   directories:
@@ -37,7 +37,8 @@ PostgreSQL via **asyncpg puro** (niente ORM/SQLAlchemy).
 `core/database.py` chiama `run_migrations` — **non** reinventare DDL via `CREATE TABLE` ad-hoc nel bootstrap.
 Migrazioni attuali: `001_initial.sql`, `002_pipeline_outbox_and_quotas.sql` (`article_outbox`),
 `003_quota_ledger.sql`, `004_worker_heartbeat.sql`, `005_quota_ledger_align.sql`,
-`006_quota_ledger_legacy_nulls.sql`, `007_articles_query_indexes.sql` (indici query Phase 5).
+`006_quota_ledger_legacy_nulls.sql`, `007_articles_query_indexes.sql` (indici query Phase 5),
+`008_outbox_miniflux_marked_at.sql`, `009_llm_model_cooldown.sql`.
 Phase 2 DONE (worker, `llm_request_ledger`). Phase 3 DONE (heartbeat, edge/data, `/health/live`+`/ready`).
 Phase 4 DONE (FE lifecycle/security — non tocca schema SQL).
 Phase 5 DONE (map-summary + articles keyset — indici in `007`).

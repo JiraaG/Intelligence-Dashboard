@@ -9,7 +9,7 @@ description: >
   scrittura idempotente su PostgreSQL. DEVE ESSERE USATO
   per qualsiasi modifica a `backend/app/worker.py`, `main.py` (API) e ai moduli di
   pipeline (extraction/, classification/, commit/, core/). Non tocca mai il frontend né i file Docker.
-tools: ["Read", "Write", "Bash", "Grep", "Glob"]
+tools: ["Read", "Write", "Shell", "Grep", "Glob"]
 model: sonnet
 scope:
   directories:

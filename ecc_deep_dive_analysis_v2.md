@@ -164,52 +164,49 @@ Dashboard finance/
 ├── .agents/                              ← NAMESPACE GLOBALE (Cursor-vivo)
 │   ├── AGENTS.md                         ← Magna Carta (project rule)
 │   └── skills/
-│       ├── angular-developer/
-│       │   ├── SKILL.md
-│       │   └── references/               ← 34 file SoT
-│       ├── llm-json-extraction/SKILL.md  ← SoT Gemini/outbox
-│       └── spatial-data-mocking/SKILL.md ← SoT mock FE Phase 4–5
+│       ├── angular-developer/            ← + references/
+│       ├── llm-json-extraction/
+│       ├── spatial-data-mocking/
+│       ├── radar-sidebar-freeze/
+│       ├── radar-api-contract/
+│       ├── radar-docker-ops/
+│       ├── radar-geojson-assets/
+│       ├── radar-quota-ledger/
+│       └── radar-requeue-ops/            ← ops re-ingest (se presente)
 │
 ├── radar/.ecc/                           ← NAMESPACE LOCALE (policy + mirror)
-│   ├── CLAUDE.md                         ← entry sessione + Phase 0–6
+│   ├── CLAUDE.md                         ← entry sessione + skill map
 │   ├── settings.json                     ← allowlist, domains, pathScope, profiles
-│   ├── rules/
-│   │   ├── backend.md
-│   │   ├── frontend.md
-│   │   └── docker.md
-│   ├── agents/
-│   │   ├── pipeline-engineer.md
-│   │   ├── angular-map-expert.md
-│   │   └── geo-data-architect.md
-│   ├── skills/                           ← mirror flat (non catalogo Cursor)
-│   │   ├── llm-json-extraction.md
-│   │   ├── spatial-data-mocking.md
-│   │   └── angular-developer.md          ← links → .agents/.../references/
-│   └── hooks/
-│       ├── pre-tool-use.py
-│       └── post-tool-use.py
+│   ├── rules/                            ← backend, frontend, docker (+ testing se presente)
+│   ├── agents/                           ← 3 profili Task
+│   ├── skills/                           ← mirror flat (sync da .agents)
+│   ├── scripts/sync_skills.py            ← --check / --write
+│   └── hooks/                            ← pre/post-tool-use.py
 │
-├── .cursor/                              ← hooks.json + rules/*.mdc (P0 wiring) + debug logs
-├── docs/04_ecc_framework.md
-├── plan-audit/archive/ecc/handoff_ecc_architecture_audit.md     ← audit + remediation (chiusa)
+├── .cursor/
+│   ├── hooks.json + hooks/*-adapter.py   ← WIRED → .ecc/hooks
+│   ├── rules/radar-*.mdc                 ← globs → .ecc/rules
+│   └── commands/                         ← radar-verify, radar-smoke, radar-lint
+├── docs/04_ecc_framework.md              ← manuale operativo SoT
+├── plan-audit/archive/ecc/               ← handoff expansion (DONE)
 ├── ecc_deep_dive_analysis.md             ← V1 archivio
-└── ecc_deep_dive_analysis_v2.md          ← QUESTO FILE
+└── ecc_deep_dive_analysis_v2.md          ← QUESTO FILE (descrittivo)
 ```
 
 ### 2.2 Mapping upstream → Radar
 
 | Ruolo ECC upstream | Radar | Note |
 |--------------------|-------|------|
-| `AGENTS.md` cross-harness | `.agents/AGENTS.md` | Freeze, Docker, cluster, health, hook manuali |
-| `skills/*/SKILL.md` | `.agents/skills/*/SKILL.md` | **SoT playbook** per Cursor |
-| Mirror progetto | `radar/.ecc/skills/*.md` | Flat; sync manuale post-remediation |
+| `AGENTS.md` cross-harness | `.agents/AGENTS.md` | Freeze, Docker, cluster, health, hook auto + fallback |
+| `skills/*/SKILL.md` | `.agents/skills/*/SKILL.md` | **SoT playbook** per Cursor (8+ dominio) |
+| Mirror progetto | `radar/.ecc/skills/*.md` | Flat; sync via `radar/.ecc/scripts/sync_skills.py` |
 | `CLAUDE.md` | `radar/.ecc/CLAUDE.md` | Skill map + comandi + Phase status |
-| `rules/common`+lang | `radar/.ecc/rules/{backend,frontend,docker}.md` | Domain-scoped, non lang-pack completo |
-| `agents/*.md` | 3 profili Radar | Non i 67 generici |
+| `rules/common`+lang | `radar/.ecc/rules/{backend,frontend,docker}.md` (+ testing) | Domain-scoped, non lang-pack completo |
+| `agents/*.md` | 3 profili Radar | Non i 67 generici; Task esplicito |
 | `hooks/hooks.json` + Node | `radar/.ecc/hooks/*.py` + `.cursor/hooks.json` adapters | Logica in `.ecc`; **registrazione Cursor WIRED** |
 | Settings / allowlist | `radar/.ecc/settings.json` | Policy dichiarativa, non Cursor nativa |
 | `mcp-configs/` | (IDE MCP utente) | Non in `.ecc` |
-| `commands/` | Assente | Opzionale; Radar usa skill + AGENTS |
+| `commands/` | `.cursor/commands/radar-{verify,smoke,lint}.md` | Shortcut minimi; non sostituiscono skill |
 
 ### 2.3 Inventario dettagliato componenti Radar
 
@@ -225,10 +222,16 @@ Dashboard finance/
 | Skill | Quando | SoT codice |
 |-------|--------|------------|
 | `angular-developer` | FE Angular 21 generico + references | Pattern Angular; non Radar-specific |
-| `llm-json-extraction` | Modifiche Gemini / `worker.py` / classification / commit | Pydantic strict, CSV `str`, advisory lock → complete |
+| `llm-json-extraction` | `worker.py` / classification / commit (Gemini + OpenAI-compat) | Pydantic strict, CSV `str`, complexity v2.2 |
 | `spatial-data-mocking` | UI offline / MOCK_MODE | 10 categorie, overlay, map-summary + articles page |
+| `radar-sidebar-freeze` | UI laterale / carousel / read-unread | **BLOCCA** `radar-sidebar/**` |
+| `radar-api-contract` | `main.py`, articles query, FE services | map-summary + envelope cursor |
+| `radar-docker-ops` | Compose, Dockerfile, health, ops | edge/data, live vs ready, verify-geojson |
+| `radar-geojson-assets` | `assets/data`, FE Dockerfile GeoJSON | ASSET_LICENSE, `--fetch`, gitignore |
+| `radar-quota-ledger` | `quota.py`, ledger SQL | reserve/complete/fail; lane SIMPLE/COMPLEX |
+| `radar-requeue-ops` | Re-ingest Miniflux incident | dry-run → exec → restart worker |
 
-**Stato Cursor:** catalogo `available_skills` → l’agente deve **Read** `SKILL.md` al match.
+**Stato Cursor:** catalogo `available_skills` = directory sotto `.agents/skills/` → l’agente deve **Read** `SKILL.md` al match. I mirror `radar/.ecc/skills/*.md` **non** sono nel catalogo.
 
 #### C. `radar/.ecc/CLAUDE.md`
 
@@ -242,8 +245,9 @@ Entry-point: tree repo, Regola 80/20, comandi (verify-geojson, runbook, CI), ski
 | `backend.md` | `backend/**` | Worker loop, no sleep in finally, quote ledger, API Phase 5 map-summary |
 | `frontend.md` | `frontend/**` | Freeze sidebar, Leaflet `window.L`, cluster, MOCK_MODE, map-summary |
 | `docker.md` | Compose/Dockerfile | edge/data, `./data/postgres`, uvicorn `app.main:app`, verify-geojson, nginx 1.27 |
+| `testing.md` | tests / `*.spec.ts` | `not live`, MOCK_MODE TestBed, no tocco sidebar |
 
-`settings.json` → `contextScope` **documenta** il path-scoping; Cursor **non** lo esegue automaticamente.
+`settings.json` → `contextScope` **documenta** il path-scoping; Cursor **esegue** i globs via `.cursor/rules/radar-*.mdc` (pointer al SoT).
 
 #### E. Agent profiles
 
@@ -291,11 +295,11 @@ Rules native: `.cursor/rules/radar-*.mdc` globs → SoT `radar/.ecc/rules/*`.
 | `radar/.ecc/settings.json` | **Policy-only** | Nessun enforcement runtime Cursor |
 | `radar/.ecc/hooks/*.py` | **Auto via Cursor** | `.cursor/hooks.json` + adapters; fallback manuale OK |
 | MCP ECC progetto | **No** | Nessun `mcp.json` Radar in repo |
-| Commands ECC | **No** | Cartella assente |
+| Commands Radar | **Sì** | `.cursor/commands/radar-{verify,smoke,lint}.md` |
 
 ### Implicazione operativa
 
-L’ECC Radar **guida** lo sviluppo (soprattutto via `AGENTS.md` + skill) ma **non forza** ancora i gate security/lint a ogni tool call. La remediation ha reso i *contenuti* veri; il *wiring harness* è il gap principale verso un ECC “pieno” in Cursor.
+L’ECC Radar **guida** (AGENTS.md + skill) e **enforce** security/lint a ogni tool call rilevante via `.cursor/hooks.json` → adapters → `radar/.ecc/hooks/*.py`. Rules path-scoped arrivano via `.cursor/rules/radar-*.mdc` (pointer al SoT). Il gap wiring P0 è **DONE**; espansione restante = selettiva (sync mirror, skill ops, rule testing) — vedi [`docs/04_ecc_framework.md`](docs/04_ecc_framework.md).
 
 ---
 
@@ -328,76 +332,59 @@ V1 = archivio storico.
 
 | Capacità ECC | Upstream | Radar oggi | Espandibile? |
 |--------------|----------|------------|--------------|
-| Skills dominio | Centinaia | 3 (+ references Angular) | **Sì — alta priorità selettiva** |
-| Rules path/lang | common+lang | 3 domain rules | **Sì** (Cursor rules globs o disciplina Read) |
-| Hooks auto | hooks.json + installer | **P0 DONE** — `.cursor/hooks.json` + adapters → `.ecc/hooks/*.py` | Estendere matcher/eventi solo se serve |
-| Agents dispatch | nativo Claude / orchestrazione | 3 markdown | **Sì** (Task prompts / modes) |
-| Commands slash | `/plan` `/tdd` … | Assenti | **Sì** (pochi, Radar-specific) |
-| MCP | catalogo | Solo IDE utente | **Opzionale selettivo** |
+| Skills dominio | Centinaia | **8+** (core + radar-*) | Solo se gap ripetuto reale |
+| Rules path/lang | common+lang | 3 domain (+ testing) + `.cursor/rules` globs | Estendere selettivo |
+| Hooks auto | hooks.json + installer | **P0 DONE** — `.cursor/hooks.json` + adapters → `.ecc/hooks/*.py` | Solo matcher HARD nuovi |
+| Agents dispatch | nativo Claude / orchestrazione | 3 markdown; Task esplicito | Non auto-dispatch di massa |
+| Commands slash | `/plan` `/tdd` … | **3** Radar (`verify`/`smoke`/`lint`) | Solo shortcut, non catalogo |
+| MCP | catalogo | Solo IDE utente | Opzionale selettivo |
 | Memory / instincts / compact | maturo | Solo Regola 80/20 testuale | **Bassa priorità** (non reinventare) |
-| Sync skill multi-copia | manifest/installer | Manuale `.agents`↔`.ecc` | **Sì** (script CI) |
-| Path-scope enforcement | harness | Declarative JSON | **Sì** via `.cursor/rules` |
+| Sync skill multi-copia | manifest/installer | `radar/.ecc/scripts/sync_skills.py` | Tenere `--check` verde |
+| Path-scope enforcement | harness | `.cursor/rules/*.mdc` + settings dichiarativo | Allineare globs se serve |
 
-### 5.2 Possibilità di espansione — roadmap allineata a ECC
+### 5.2 Espansione — stato AS-IS (non backlog wiring)
 
 Espandere **finché utile**, non fino a clonare ECC.
 
-#### P0 — Enforcement (massimo ROI)
+#### P0 — Enforcement — **DONE** (storico)
 
-1. **Collegare gli hook a Cursor**  
-   - Creare `.cursor/hooks.json` (project hooks) che invochi:
-     - `preToolUse` → `python radar/.ecc/hooks/pre-tool-use.py`
-     - `postToolUse` / `afterFileEdit` → `post-tool-use.py`  
-   - Riusare gli script esistenti (già dual tool names, fail-closed prettier/ruff).  
-   - Non copiare raw `hooks.json` upstream; adattare al contratto Cursor (JSON stdin/stdout).  
-   - Riferimento: skill Cursor create-hook; upstream [hooks README](https://raw.githubusercontent.com/affaan-m/ECC/main/hooks/README.md).
+- `.cursor/hooks.json` → `preToolUse` / `postToolUse` / `afterFileEdit` → adapters → `radar/.ecc/hooks/*.py`
+- `.cursor/rules/radar-*.mdc` globs → SoT `radar/.ecc/rules/*`
+- **Non** ricreare wiring; **non** paste raw `hooks.json` upstream
 
-2. **Rules native Cursor con globs**  
-   - Opzione A: `.cursor/rules/*.mdc` con `globs: radar/backend/**`, `radar/frontend/**`, `**/Dockerfile` che includono/puntano a `radar/.ecc/rules/*`.  
-   - Opzione B: protocollo obbligatorio in `AGENTS.md` “Read rule prima di edit” (già quasi vero, ma soft).
+#### P1 — Skills dominio — **DONE** (selettivo)
 
-#### P1 — Skills di dominio Radar (skills-first)
+Skill Radar presenti sotto `.agents/skills/radar-*/` (freeze, api-contract, docker-ops, geojson, quota-ledger, + requeue-ops).  
+Nuove skill **solo** con gate: workflow ≥2–3×, anti-pattern costosi, `when_to_use` chiaro.  
+Formato: SoT `.agents/skills/<name>/SKILL.md` → `python radar/.ecc/scripts/sync_skills.py --write` → riga in skill map `CLAUDE.md`.
 
-Nuove skill **solo** se chiudono un gap di prodotto ripetuto. Candidati concreti:
+#### P1 — Sync SoT — **tooling**
 
-| Skill proposta | Trigger | Contenuto |
-|----------------|---------|-----------|
-| `radar-docker-ops` | Compose, health, runbook | edge/data, live vs ready, verify-geojson, `ops/` backup |
-| `radar-api-contract` | `main.py`, `articles_query`, FE services | map-summary, envelope `{items,next_cursor,total}`, DTO parse |
-| `radar-quota-ledger` | `classification/quota.py`, ledger SQL | reserve/complete/fail, RPD half-open, 429 |
-| `radar-geojson-assets` | assets/data, Dockerfile FE | pin ASSET_LICENSE, `--fetch`, gitignore policy |
-| `radar-sidebar-freeze` | qualsiasi tocco UI laterale | **BLOCCA** edit `radar-sidebar/**`; p-carousel only |
+```text
+python radar/.ecc/scripts/sync_skills.py --check   # exit 0 se allineati
+python radar/.ecc/scripts/sync_skills.py --write   # copia SoT → mirror flat
+```
 
-Formato: directory sotto `.agents/skills/<name>/SKILL.md` (come ECC), poi mirror flat in `radar/.ecc/skills/` + riga in skill map `CLAUDE.md`.
+#### P2 — Agents / commands — **minimo DONE**
 
-#### P1 — Sync SoT
-
-- Script `scripts/sync-ecc-skills.mjs` (o CI step): copia `.agents/skills/*/SKILL.md` → `radar/.ecc/skills/<name>.md`  
-- Checklist `rg` del handoff §9 in CI (categorie illegali, eslint in map-expert, domains)
-
-#### P2 — Agents / commands
-
-- Convertire i 3 profili in **prompt Task** documentati (quando spawnare `angular-map-expert` vs edit diretto).  
-- Commands minimi (Markdown o Cursor commands), non 94 slash:
-  - `/radar-verify` → typecheck + test:ci + pytest not live + verify-geojson  
-  - `/radar-smoke` → punta a `radar/docs/runbook.md`  
-  - `/radar-lint` → ruff + prettier  
+- Profili Task documentati in `CLAUDE.md` (angular-map-expert / pipeline-engineer / geo-data-architect)
+- Commands: `.cursor/commands/radar-verify.md`, `radar-smoke.md`, `radar-lint.md`
 
 Preferire skill se il workflow è lungo; command solo come shortcut.
 
-#### P2 — Rules aggiuntive (estendere, non duplicare)
+#### P2 — Rules aggiuntive
 
-| Rule | Scope | Perché |
+| Rule | Scope | Stato |
 |------|-------|--------|
-| `security.md` (sottile) | `**/*` o shared | Riassumere secret/path già negli hook; non duplicare backend |
-| `testing.md` | `**/tests/**`, `**/*.spec.ts` | Marker pytest, MOCK_MODE in TestBed, no live senza gate |
-| `migrations.md` | `backend/migrations/**` | Solo append numerato; checksum; no DDL ad-hoc |
+| `testing.md` | tests / `*.spec.ts` | Aggiungere selettivo (path-scoped + `.mdc`) |
+| `security.md` | shared | Opzionale — secret già negli hook |
+| `migrations.md` | `backend/migrations/**` | Opzionale — già in geo-data-architect / backend rule |
 
 #### P3 — MCP / domini opzionali
 
-- Abilitare MCP solo se usati (es. Context7 per Angular docs) — &lt;10 attivi.  
+- Abilitare MCP solo se usati (es. Context7) — &lt;10 attivi.  
 - Valutare `*.basemaps.cartocdn.com` in allowlist se tool agente fetchano tile.  
-- Non portare AgentShield / ecc2 control plane finché non serve ops multi-progetto.
+- Non portare AgentShield / ecc2 / memory-persistence.
 
 #### Fuori scope (non espandere così)
 
@@ -417,7 +404,7 @@ Preferire skill se il workflow è lungo; command solo come shortcut.
    - frontmatter: name, description, when_to_use, version
    - sezione "Quando Usare", SoT codice (path file reali), anti-pattern
 2. Aggiornare skill map in radar/.ecc/CLAUDE.md
-3. Mirror: radar/.ecc/skills/<name>.md (o script sync)
+3. Mirror: `python radar/.ecc/scripts/sync_skills.py --write` (o copia flat `radar/.ecc/skills/<name>.md`)
 4. Se serve in Cursor subito: verificare che appaia in available_skills
 5. Non contraddire AGENTS.md / rules
 ```
@@ -528,10 +515,10 @@ Sidebar freeze: **sempre** zero touch `radar/frontend/src/app/components/radar-s
 
 1. **ECC upstream** è un OS multi-harness; Radar ne usa correttamente la *filosofia* come overlay sottile.  
 2. **Contenuti ECC Radar** sono allineati al codice post–remediation (`526c856`).  
-3. **Uso reale in Cursor** = Magna Carta + skill + **hooks/rules wiring** (P0 DONE).  
-4. **Espansione restante:** skill dominio Radar selettive, sync SoT, commands/agent dispatch minimi.  
-5. **Non espandere** clonando ECC intero né riaprendo vincoli prodotto.  
-6. Questo **V2** è il manuale descrittivo corrente; aggiornarlo quando cambiano wiring o inventario skill/rules/hooks.
+3. **Uso reale in Cursor** = Magna Carta + skill + **hooks/rules wiring** (P0 DONE) + commands minimi.  
+4. **Espansione restante:** sync SoT, skill ops selettive, rule testing — non clonare catalogo.  
+5. **Manuale operativo SoT** = [`docs/04_ecc_framework.md`](docs/04_ecc_framework.md); questo V2 resta descrittivo.  
+6. Aggiornare V2 quando cambiano inventario skill/rules/hooks o stato wiring.
 
 ---
 

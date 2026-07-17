@@ -1,0 +1,12 @@
+---
+description: Radar testing path-scoped rules (SoT in radar/.ecc/rules/testing.md)
+globs: radar/backend/**/tests/**,radar/backend/**/test_*.py,radar/frontend/**/*.spec.ts
+alwaysApply: false
+---
+
+# Testing rules (pointer)
+
+**Source of truth:** `radar/.ecc/rules/testing.md`
+
+Before editing Radar tests, read that file and follow it.
+Do not invent alternate test conventions here — this rule only scopes the SoT into Cursor.

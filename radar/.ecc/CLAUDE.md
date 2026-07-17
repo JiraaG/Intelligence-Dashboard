@@ -248,7 +248,9 @@ Miniflux API (`WORKER_POLL_INTERVAL_SECONDS`, default 900)
 | UI laterale / carousel / read-unread | `radar-sidebar-freeze` (+ freeze AGENTS) |
 | `assets/data`, verify-geojson, FE Dockerfile GeoJSON | `radar-geojson-assets` |
 | `docker-compose.yml`, `Dockerfile`   | Regola: `rules/docker.md` + `radar-docker-ops` |
+| Requeue / re-ingest Miniflux         | `radar-requeue-ops`          |
 | Nuove feature UI o test offline      | `spatial-data-mocking`       |
+| Test backend/FE (`tests/`, `*.spec.ts`) | Regola: `rules/testing.md` |
 
 ### Commands / profili (P2 minimo)
 

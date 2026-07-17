@@ -29,9 +29,10 @@ Modifiche a containerizzazione, reti, health, o build FE in Docker.
 - Drop `--legacy-peer-deps` solo con matrix allineata
 - Digest pin immagini = opzionale prodotto (Final Release Fase 5 **DEFERRED ACCETTATO** 2026-07-17)
 
-## Ops .env
+## Ops .env / backup Windows
 
-`ops/backup-postgres.sh` / `restore-postgres.sh` usano `ops/_load_dotenv.sh` (KEY=VALUE), non `source .env` grezzo.
+`ops/backup-postgres.sh` / `restore-postgres.sh` usano `ops/_load_dotenv.sh` (KEY=VALUE), non `source .env` grezzo.  
+Backup/restore su host Windows: seguire `radar/ops/README.md` §Windows (Git Bash/WSL, non PowerShell raw; `MSYS_NO_PATHCONV=1`). Non committare `radar/backups/` né dump sotto `data/postgres`.
 
 ## Comandi utili
 

@@ -8,7 +8,7 @@ description: >
   dissolvenza CSS in zoom-in e del layout split-screen overlay full-bleed (mappa 100vw;
   sidebar sopra). Usa esclusivamente Angular 21
   con Standalone Components e Signals. Non tocca mai il backend Python né i file Docker.
-tools: ["Read", "Write", "Bash", "Grep", "Glob"]
+tools: ["Read", "Write", "Shell", "Grep", "Glob"]
 model: sonnet
 scope:
   directories:
