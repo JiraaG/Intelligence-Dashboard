@@ -1,21 +1,23 @@
-"""Per-lane LLM configuration (SIMPLE / COMPLEX), provider-agnostic.
+"""Configurazione LLM per-lane (SIMPLE / COMPLEX), provider-agnostic.
 
-Preferred env (source of truth for limits):
-  LLM_SIMPLE_RPM | LLM_SIMPLE_TPM | LLM_SIMPLE_RPD   (0 = unmanaged)
-  LLM_COMPLEX_RPM | LLM_COMPLEX_TPM | LLM_COMPLEX_RPD (0 = unmanaged)
+Env preferito (fonte dei limiti):
+  ``LLM_SIMPLE_RPM|TPM|RPD`` e ``LLM_COMPLEX_*`` — ``0`` = dimensione unmanaged.
+Anche: ``PROVIDER``, ``MODEL``, ``API_KEY``, ``BASE_URL``, ``BUDGET_USD_DAY``,
+``USD_PER_1M_TOKENS``, ``TIMEOUT``, ``REASONING_EFFORT``, ``FALLBACKS`` per lane.
 
-Also: PROVIDER, MODEL, API_KEY, BASE_URL, BUDGET_USD_DAY, USD_PER_1M_TOKENS,
-TIMEOUT, REASONING_EFFORT, FALLBACKS for each lane.
-
-``PROVIDER`` selects the adapter:
+``PROVIDER`` seleziona l'adapter:
   gemini | deepseek | openai | glm | grok | claude (claude = stub).
-OpenAI-compat HTTP adapters: deepseek | openai | glm | grok.
-Dialect: deepseek → DeepSeek ``thinking`` payload; openai/glm/grok → stock
-chat/completions (no DeepSeek-only fields).
+Adapter HTTP OpenAI-compat: deepseek | openai | glm | grok.
+Dialect: deepseek → payload ``thinking``; openai/glm/grok → chat/completions stock.
 
-Legacy vendor keys (GEMINI_*, DEEPSEEK_*, LLM_RPM/TPM/RPD) fill gaps only when
-the corresponding LLM_SIMPLE_* / LLM_COMPLEX_* key is unset — they are NOT a
-shared global quota across both lanes.
+Legacy vendor (``GEMINI_*``, ``DEEPSEEK_*``, ``LLM_RPM``/TPM/RPD) riempiono i gap
+solo come default di ``load_lane`` — non sono un tetto globale condiviso.
+Attenzione unset vs blank: per ``*_FALLBACKS`` chiave presente anche vuota ≠ assente
+(sopprime il legacy); per RPM/TPM/RPD blank ≡ assente (usa default/legacy). Vedi C-03/C-04.
+
+SoT:
+    plan-audit/active/sot_llm_multi_model_fallback.md §5–6; skill radar-quota-ledger;
+    .agents/AGENTS.md §3.
 """
 
 from __future__ import annotations
@@ -42,24 +44,33 @@ _PROVIDER_DEFAULT_BASE_URL: Mapping[str, str] = {
 
 
 def api_dialect_for_provider(provider: str) -> str:
-    """HTTP payload dialect for OpenAI-compatible adapters."""
+    """Dialect HTTP per adapter OpenAI-compat.
+
+    Returns:
+        ``deepseek`` (campo thinking) oppure ``openai`` (stock) per ogni altro provider.
+    SoT:
+        skill llm-json-extraction; SoT LLM §5.
+    """
     if provider == "deepseek":
         return API_DIALECT_DEEPSEEK
     return API_DIALECT_OPENAI
 
 
 class LlmConfigError(ValueError):
-    """Invalid LLM lane / provider configuration."""
+    """Configurazione lane/provider LLM non valida."""
 
 
 @dataclass(frozen=True, slots=True)
 class LlmLaneConfig:
-    """One classification lane (simple or complex).
+    """Una lane di classificazione (simple o complex).
 
-    Rate limits are **per lane** (not shared across SIMPLE/COMPLEX):
-    - rpm: requests per minute; ``0`` = unmanaged (no spacing / no RPM wait)
-    - tpm: tokens per minute; ``0`` = unmanaged
-    - rpd: requests per local day; ``0`` = unmanaged (no day cap / no soft-trim)
+    I rate limit sono **per lane** (non condivisi tra SIMPLE e COMPLEX):
+    - rpm: richieste al minuto; ``0`` = unmanaged (niente spacing / attesa RPM)
+    - tpm: token al minuto; ``0`` = unmanaged
+    - rpd: richieste nel giorno locale; ``0`` = unmanaged (niente cap giornaliero / soft-trim)
+
+    SoT:
+        skill radar-quota-ledger; SoT LLM §6.
     """
 
     lane: str
@@ -78,18 +89,22 @@ class LlmLaneConfig:
 
     @property
     def available(self) -> bool:
+        """True se la lane ha una API key non vuota (pronta per chiamate provider)."""
         return bool(self.api_key)
 
     @property
     def is_openai_compat(self) -> bool:
+        """True se il provider usa l'adapter HTTP OpenAI-compat (httpx)."""
         return self.provider in OPENAI_COMPAT_PROVIDERS
 
     @property
     def api_dialect(self) -> str:
+        """Dialect payload derivato dal provider (thinking vs stock)."""
         return api_dialect_for_provider(self.provider)
 
     @property
     def models(self) -> tuple[str, ...]:
+        """Catena primary + fallback senza duplicati, nell'ordine dichiarato."""
         out: list[str] = [self.model]
         for fb in self.fallbacks:
             if fb and fb not in out:
@@ -98,6 +113,14 @@ class LlmLaneConfig:
 
 
 def normalize_provider(raw: str | None, *, default: str) -> str:
+    """Normalizza il nome provider; valore sconosciuto → ``default`` sicuro.
+
+    Args:
+        raw: Valore env grezzo (può essere ``None``).
+        default: Provider di fallback (es. ``gemini`` / ``deepseek``).
+    Returns:
+        Token in ``LLM_PROVIDERS``, lowercase.
+    """
     value = (raw or default).strip().lower()
     if value not in LLM_PROVIDERS:
         return default
@@ -105,12 +128,22 @@ def normalize_provider(raw: str | None, *, default: str) -> str:
 
 
 def _env_raw(name: str) -> str | None:
+    """Lettura grezza: ``None`` solo se la chiave è assente da ``os.environ``.
+
+    Distingue unset (chiave mancante) da blank (chiave presente, anche stringa vuota).
+    Usata per ``*_FALLBACKS`` e legacy: blank ≠ unset (C-04).
+    """
     if name not in os.environ:
         return None
     return os.environ.get(name)
 
 
 def _env_str_or(name: str, fallback: str) -> str:
+    """Stringa env: solo chiave assente → ``fallback``; blank resta stringa strip-pata.
+
+    Diverso da ``config._env_str`` (là blank ≡ default). Qui il blank può ancora
+    essere reinterpretato dal chiamante (es. ``or model_default`` su MODEL).
+    """
     raw = _env_raw(name)
     if raw is None:
         return fallback
@@ -118,6 +151,7 @@ def _env_str_or(name: str, fallback: str) -> str:
 
 
 def _csv_models(raw: str | None) -> tuple[str, ...]:
+    """CSV di id modello → tupla deduplicata; ``None``/blank → tupla vuota."""
     if not raw or not raw.strip():
         return ()
     out: list[str] = []
@@ -139,6 +173,11 @@ def _parse_int(
     max_value: int,
     allow_zero: bool = False,
 ) -> int:
+    """Parse intero lane: chiave assente **o** blank → ``default`` (fill-gap legacy).
+
+    Nota C-04: a differenza di ``*_FALLBACKS``, qui blank ≡ unset.
+    ``0`` con ``allow_zero`` significa dimensione unmanaged, non errore di range.
+    """
     raw = _env_raw(name)
     if raw is None or raw.strip() == "":
         return default
@@ -163,6 +202,7 @@ def _parse_float(
     min_value: float,
     max_value: float,
 ) -> float:
+    """Parse float lane: assente o blank → ``default`` (stessa semantica di ``_parse_int``)."""
     raw = _env_raw(name)
     if raw is None or raw.strip() == "":
         return default
@@ -178,6 +218,11 @@ def _parse_float(
 
 
 def _legacy_api_key(provider: str) -> str:
+    """Chiave vendor legacy per ``provider`` se ``LLM_{LANE}_API_KEY`` è vuota.
+
+    Non è Gemini-only: mappa provider → env storica (GOOGLE/GEMINI, DEEPSEEK,
+    OPENAI, GLM/ZHIPU, GROK/XAI, ANTHROPIC/CLAUDE).
+    """
     if provider == "gemini":
         return (
             (_env_raw("GOOGLE_API_KEY") or "").strip()
@@ -206,6 +251,10 @@ def _legacy_api_key(provider: str) -> str:
 
 
 def _legacy_model(provider: str, *, lane: str) -> str:
+    """Default modello vendor quando ``LLM_{LANE}_MODEL`` è unset/blank dopo strip.
+
+    ``lane`` è riservato per estensioni future; oggi i default dipendono dal provider.
+    """
     if provider == "gemini":
         raw = (_env_raw("GEMINI_MODEL") or "gemma-4-31b").strip() or "gemma-4-31b"
         return "gemma-4-31b-it" if raw in ("gemma-4-31b", "gemma-4-31b-it") else raw
@@ -231,7 +280,28 @@ def load_lane(
     default_provider: str,
     default_model: str | None = None,
 ) -> LlmLaneConfig:
-    """Load one lane from ``LLM_{LANE}_*`` with legacy vendor fallbacks."""
+    """Carica una lane da ``LLM_{LANE}_*`` con default legacy vendor.
+
+    Ordine tipico per campo:
+    1. env lane esplicita (``LLM_SIMPLE_RPM``, …);
+    2. se assente (o blank su int/float), default da legacy (``LLM_RPM``,
+       ``GEMINI_MODEL_FALLBACKS``, ``DEEPSEEK_*``, …) o costante codice.
+
+    Precedenza ``*_FALLBACKS`` (C-03): se la chiave lane è **presente** — anche
+    stringa vuota — vince e non si usa ``GEMINI_MODEL_FALLBACKS``. Solo chiave
+    **assente** abilita il fill-gap legacy (SIMPLE) o la tupla vuota (COMPLEX).
+
+    Args:
+        lane: ``simple`` o ``complex``.
+        default_provider: Provider se ``*_PROVIDER`` assente/invalido.
+        default_model: Override del default modello; altrimenti ``_legacy_model``.
+    Returns:
+        ``LlmLaneConfig`` immutabile con limiti per-lane (``0`` = unmanaged).
+    Raises:
+        LlmConfigError: lane sconosciuta o valore fuori range.
+    SoT:
+        SoT LLM §5–6; skill radar-quota-ledger; runbook §LLM (C-03/C-04).
+    """
     if lane not in {LANE_SIMPLE, LANE_COMPLEX}:
         raise LlmConfigError(f"unknown lane {lane!r}")
 
@@ -255,6 +325,7 @@ def load_lane(
         ).rstrip("/")
     base_url = _env_str_or(f"{prefix}_BASE_URL", base_default).rstrip("/")
 
+    # Default numerici: legacy fill-gap (SIMPLE←LLM_RPM/…; COMPLEX←DEEPSEEK_*).
     if lane == LANE_SIMPLE:
         rpm_default = _parse_int(
             "LLM_RPM", default=10, min_value=0, max_value=10_000, allow_zero=True
@@ -345,6 +416,7 @@ def load_lane(
     else:
         effort = "high"
 
+    # C-03: chiave lane presente (anche "") → CSV lane; solo unset → legacy/default.
     fallbacks_raw = _env_raw(f"{prefix}_FALLBACKS")
     fallbacks = (
         _csv_models(fallbacks_raw) if fallbacks_raw is not None else fallbacks_default
@@ -368,6 +440,13 @@ def load_lane(
 
 
 def load_lanes() -> tuple[LlmLaneConfig, LlmLaneConfig]:
+    """Costruisce le due lane di boot: SIMPLE (default gemini) e COMPLEX (default deepseek).
+
+    Returns:
+        Coppia ``(LLM_SIMPLE, LLM_COMPLEX)`` usata da ``core.config`` all'import.
+    SoT:
+        docs/01_getting_started.md (profili A–E); SoT LLM §5.
+    """
     simple = load_lane(LANE_SIMPLE, default_provider="gemini")
     complex_lane = load_lane(LANE_COMPLEX, default_provider="deepseek")
     return simple, complex_lane

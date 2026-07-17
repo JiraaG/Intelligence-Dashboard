@@ -1,5 +1,6 @@
 # Plan prompt — ECC Radar: manuale operativo + expansion selettiva
 
+> **Stato: ACTIVE (non eseguito)** — resta in `prompts/active/` finché non si produce un piano deliverable.  
 > **Uso:** apri una chat in **Plan mode**, incolla il blocco sotto (da `## PROMPT` in poi).  
 > **SoT già presenti:** `docs/04_ecc_framework.md`, `ecc_deep_dive_analysis_v2.md`, `.agents/AGENTS.md`, `radar/.ecc/CLAUDE.md`, handoff `plan-audit/archive/ecc/handoff_ecc_expansion.md`.  
 > **Upstream:** https://github.com/affaan-m/ECC (= `everything-claude-code` / `affaan-m/ecc`).  

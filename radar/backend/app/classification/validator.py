@@ -1,4 +1,11 @@
-# validator.py — Pydantic Schema Validation & Fallback
+"""Validazione Pydantic strict + normalizzazione quirks provider + fallback.
+
+Schema: CSV restano ``str`` (FE fa ``string[]`` solo post-API). Nessun campo
+``reasoning``. Fence markdown e override Miniflux di URL/data prima del validate.
+
+SoT:
+    skill llm-json-extraction; radar-api-contract (CSV str → array FE).
+"""
 
 from __future__ import annotations
 
@@ -27,14 +34,14 @@ SENTIMENT_VALUES = ("Positivo", "Neutrale", "Negativo")
 
 ISO_DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 SOURCE_URL_PATTERN = re.compile(r"^https?://", re.IGNORECASE)
-# Soft remap: game / entertainment reviews often mislabeled as Geopolitica/Infrastrutture.
+# Soft remap: recensioni game/entertainment spesso etichettate Geopolitica/Infrastrutture.
 _GAME_REVIEW_HINT = re.compile(
     r"(videogioc\w*|video\s*game|videogame|game\s*review|"
     r"recensione.{0,40}(gioco|game)|ps5|xbox|nintendo|steam\b|"
     r"\bpc,\s*ps5\b|\bunreal\b|\bunity\b)",
     re.IGNORECASE | re.DOTALL,
 )
-# Soft remap: philosophy / explicit non-news fluff must not stay in Geopolitica.
+# Soft remap: filosofia / fluff non-news non devono restare in Geopolitica.
 _OFFTOPIC_GEOPOLITICA_HINT = re.compile(
     r"non\s+(presenta|contiene)\s+informazioni\s+geopolitic|"
     r"nessun[ao]?\s+informazione\s+geopolitic|"
@@ -45,7 +52,7 @@ _OFFTOPIC_GEOPOLITICA_HINT = re.compile(
     re.IGNORECASE,
 )
 
-# ISO 3166-1 alpha-2 (~249) + sentinel XX for undetermined geography.
+# ISO 3166-1 alpha-2 (~249) + sentinel XX per geografia indeterminata.
 ISO_ALPHA2_CODES: frozenset[str] = frozenset(
     {
         "AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR", "AS", "AT", "AU", "AW", "AX", "AZ",
@@ -84,9 +91,10 @@ ISO_ALPHA2_CODES: frozenset[str] = frozenset(
 
 
 class GeopoliticalArticleSchema(BaseModel):
-    """
-    Schema di validazione Pydantic ed estrazione strutturata dei dati.
-    Strict mode: categorie, sentiment e date invalidi sono REJECTED (no coerce silenzioso).
+    """Contratto output strutturato LLM: strict, extra forbid, CSV come ``str``.
+
+    Categorie/sentiment/date invalidi → REJECT (niente coerce silenzioso).
+    SoT: skill llm-json-extraction (schema immutabile; no ``List[str]`` qui).
     """
 
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -153,6 +161,7 @@ class GeopoliticalArticleSchema(BaseModel):
     @field_validator("published_at")
     @classmethod
     def validate_published_at(cls, value: str) -> str:
+        """Accetta solo ``YYYY-MM-DD`` calendario-valido."""
         if not isinstance(value, str) or not ISO_DATE_PATTERN.match(value):
             raise ValueError("published_at deve essere in formato ISO YYYY-MM-DD")
         try:
@@ -164,6 +173,7 @@ class GeopoliticalArticleSchema(BaseModel):
     @field_validator("source_url")
     @classmethod
     def validate_source_url(cls, value: str) -> str:
+        """URL http(s) ≤ 2048; nessun coerce di schemi diversi."""
         if not isinstance(value, str) or not SOURCE_URL_PATTERN.match(value):
             raise ValueError("source_url deve iniziare con http:// o https://")
         if len(value) > 2048:
@@ -173,6 +183,7 @@ class GeopoliticalArticleSchema(BaseModel):
     @field_validator("country_code")
     @classmethod
     def validate_country_code(cls, value: str) -> str:
+        """ISO Alpha-2 in allowlist, oppure sentinel ``XX``."""
         if not isinstance(value, str):
             raise ValueError("country_code deve essere una stringa")
         if value == "XX":
@@ -187,6 +198,7 @@ class GeopoliticalArticleSchema(BaseModel):
     @field_validator("latitude")
     @classmethod
     def validate_latitude(cls, value: float) -> float:
+        """Float finito in [-90, 90]; strict rifiuta int non-float."""
         if not isinstance(value, float):
             raise ValueError("latitude deve essere un float")
         if not math.isfinite(value):
@@ -198,6 +210,7 @@ class GeopoliticalArticleSchema(BaseModel):
     @field_validator("longitude")
     @classmethod
     def validate_longitude(cls, value: float) -> float:
+        """Float finito in [-180, 180]."""
         if not isinstance(value, float):
             raise ValueError("longitude deve essere un float")
         if not math.isfinite(value):
@@ -208,6 +221,7 @@ class GeopoliticalArticleSchema(BaseModel):
 
     @model_validator(mode="after")
     def first_tag_matches_primary(self) -> Self:
+        """Invariante schema: primo CSV tag == ``primary_category`` (non Nessuno)."""
         first = (self.tags.split(",")[0].strip() if self.tags else "")
         if first.lower() in {"nessuno", "nessuna", "none", ""}:
             raise ValueError("tags deve iniziare con primary_category")
@@ -219,10 +233,16 @@ class GeopoliticalArticleSchema(BaseModel):
 
 
 def normalize_llm_json_dict(data: dict[str, Any]) -> dict[str, Any]:
-    """
-    Provider-side shape fixes before strict Pydantic validate.
-    Does not change GeopoliticalArticleSchema; flattens common DeepSeek quirks
-    (nested coordinates, category alias, int lat/lon, float relevance).
+    """Ripara shape comuni dei provider **prima** del validate strict.
+
+    Non cambia ``GeopoliticalArticleSchema``: appiattisce coordinate annidate,
+    alias categoria, int→float lat/lon, float→int relevance, clamp lunghezze,
+    soft-remap game/filosofia → Tecnologia, allinea primo tag a primary.
+
+    Args:
+        data: Dict JSON già decodificato dal modello.
+    Returns:
+        Copia normalizzata pronta per ``model_validate``.
     """
     out = dict(data)
 
@@ -276,14 +296,14 @@ def normalize_llm_json_dict(data: dict[str, Any]) -> dict[str, Any]:
     if isinstance(out.get("country_code"), str):
         out["country_code"] = out["country_code"].strip().upper()
 
-    # Soft-normalize published_at: accept ISO datetime → YYYY-MM-DD.
+    # Soft-normalize published_at: datetime ISO → YYYY-MM-DD.
     pa = out.get("published_at")
     if isinstance(pa, str):
         pa_stripped = pa.strip()
         if len(pa_stripped) >= 10 and ISO_DATE_PATTERN.match(pa_stripped[:10]):
             out["published_at"] = pa_stripped[:10]
 
-    # Soft-clamp string lengths to schema limits (Gemma/DeepSeek verbosity).
+    # Soft-clamp lunghezze stringa ai limiti schema (verbosità Gemma/DeepSeek).
     for key, limit in (
         ("title", 120),
         ("summary", 2000),
@@ -296,8 +316,7 @@ def normalize_llm_json_dict(data: dict[str, Any]) -> dict[str, Any]:
         if isinstance(val, str) and len(val) > limit:
             out[key] = val[:limit]
 
-    # Soft remap: game/software reviews must not land in Geopolitica/Sicurezza/Infrastrutture.
-    # Same for philosophy / explicit "no geopolitical content" fluff.
+    # Soft remap: game/software e filosofia off-topic non restano in Geopolitica/…
     pc = out.get("primary_category")
     if isinstance(pc, str) and pc in ("Geopolitica", "Sicurezza", "Infrastrutture"):
         hint_blob = " ".join(
@@ -309,7 +328,7 @@ def normalize_llm_json_dict(data: dict[str, Any]) -> dict[str, Any]:
         ):
             out["primary_category"] = "Tecnologia"
 
-    # Enforce schema rule: first CSV tag must equal primary_category.
+    # Regola schema: primo tag CSV = primary_category.
     pc = out.get("primary_category")
     tags = out.get("tags")
     if isinstance(pc, str) and pc in PRIMARY_CATEGORIES:
@@ -330,14 +349,16 @@ def parse_llm_article_json(
     source_url: str | None = None,
     published_at: str | None = None,
 ) -> GeopoliticalArticleSchema:
-    """
-    Parse model JSON → normalize quirks → strict GeopoliticalArticleSchema.
+    """Parse JSON modello → normalize quirks → validate strict.
 
-    Optional source_url / published_at override Miniflux ground truth before
-    validate (fixes Gemma truncating dates / inventing URLs).
+    Opzionali ``source_url`` / ``published_at`` sovrascrivono con ground truth
+    Miniflux prima del validate (Gemma tronca date / inventa URL).
 
-    Raises pydantic.ValidationError (not bare JSONDecodeError) so the client
-    correction / escalate path runs instead of blind retries.
+    Raises:
+        pydantic.ValidationError (anche su JSON vuoto/illeggibile) — il client
+        usa correction/escalate invece di retry ciechi su ``JSONDecodeError``.
+    SoT:
+        llm-json-extraction; overwrite Miniflux su URL/data.
     """
     from pydantic import ValidationError as PydanticValidationError
 
@@ -356,7 +377,7 @@ def parse_llm_article_json(
 
     cleaned = str(text).strip()
     if cleaned.startswith("```"):
-        # Strip optional ```json fences Gemma sometimes emits.
+        # Strip fence opzionale ```json che Gemma emette a volte.
         lines = cleaned.splitlines()
         if lines and lines[0].startswith("```"):
             lines = lines[1:]
@@ -369,7 +390,7 @@ def parse_llm_article_json(
         try:
             raw = json.loads(cleaned)
         except json.JSONDecodeError:
-            # Extra data / trailing junk: take the first JSON value.
+            # Extra data / trailing junk: prendi il primo valore JSON.
             raw, _end = json.JSONDecoder().raw_decode(cleaned)
     except json.JSONDecodeError as exc:
         raise PydanticValidationError.from_exception_data(
@@ -397,7 +418,7 @@ def parse_llm_article_json(
 
 
 def parse_csv_list(val: str) -> list[str]:
-    """Trasforma una stringa separata da virgole in una lista, gestendo i valori vuoti/Nessuno."""
+    """CSV schema → lista Python; ``Nessuno``/vuoto → lista vuota (uso commit/API)."""
     if not val:
         return []
     if val.strip().lower() in ["nessuno", "nessuna", "nessun", "none", "n/a", ""]:
@@ -406,6 +427,7 @@ def parse_csv_list(val: str) -> list[str]:
 
 
 def _normalize_fallback_date(published_at: str) -> str:
+    """Data sicura per articolo fallback; invalida → ``2000-01-01``."""
     if not published_at or not ISO_DATE_PATTERN.match(published_at):
         return "2000-01-01"
     try:
@@ -416,9 +438,10 @@ def _normalize_fallback_date(published_at: str) -> str:
 
 
 def get_fallback_article(title: str, source_url: str, published_at: str) -> GeopoliticalArticleSchema:
-    """
-    Costruisce un GeopoliticalArticleSchema con dati di fallback sicuri e neutri.
-    Evita crash della pipeline in caso di errori API irrecuperabili.
+    """Articolo neutro di emergenza quando l'API LLM è irrecuperabile.
+
+    Evita crash della pipeline: XX / 0,0 / Infrastrutture / relevance 1.
+    Side-effects: nessuno verso rete/DB — solo costruzione in-memory.
     """
     clean_date = _normalize_fallback_date(published_at)
     safe_url = source_url if SOURCE_URL_PATTERN.match(source_url or "") else "https://example.com/unknown"

@@ -1,14 +1,17 @@
-"""Heuristic article complexity → routing lane (SIMPLE / BORDERLINE / COMPLEX).
+"""Heuristic complessità articolo → lane di routing (SIMPLE / BORDERLINE / COMPLEX).
 
-Complexity = schema-extraction risk (ambiguous geo, multi-entity, non-Latin script),
-not body length alone and not generic "IQ".
+Complessità = rischio di estrazione schema (geo ambigua, multi-entità, script
+non latino), **non** sola lunghezza del body e **non** un generico “QI”.
 
-Families: G geo, E entities, L length, X script/language, N negative (anti-paid).
+Famiglie: G geo, E entità, L lunghezza, X script/lingua, N negativa (anti-paid).
 Lane (v2.2):
-  - only L, or no strong families → SIMPLE
-  - exactly 1 of {G, E, X} → BORDERLINE
-  - ≥2 of {G, E, L, X} (L counts only in combination) → COMPLEX
-Score is for logging only.
+  - solo L, oppure nessuna famiglia forte → SIMPLE
+  - esattamente 1 di {G, E, X} → BORDERLINE
+  - ≥2 di {G, E, L, X} (L conta solo in combinazione) → COMPLEX
+Lo score numerico è solo per logging.
+
+SoT:
+    plan-audit/active/sot_llm_multi_model_fallback.md §4; .agents/AGENTS.md §3.
 """
 
 from __future__ import annotations
@@ -19,16 +22,18 @@ from enum import Enum
 
 
 class Lane(str, Enum):
+    """Fascia di routing heuristic (non confondere con quota_lane simple/complex)."""
+
     SIMPLE = "SIMPLE"
     BORDERLINE = "BORDERLINE"
     COMPLEX = "COMPLEX"
 
 
-# Min body length for geo_marker alone to count as G (avoids short HN pitch FPs).
+# Min body length perché un solo geo_marker conti come G (evita FP su pitch HN corti).
 _GEO_MARKER_MIN_BODY = 1500
 
 
-# Top countries for Radar lexicon (EN + IT common forms).
+# Lexicon paesi Radar (forme EN + IT comuni) per famiglia G.
 _COUNTRY_NAMES: frozenset[str] = frozenset(
     {
         "united states",
@@ -226,7 +231,7 @@ _ISO_ALLOWLIST: frozenset[str] = frozenset(
         "AZ",
         "GE",
         "AM",
-        "EU",  # mapped as geo org hint
+        "EU",  # hint org geo, non paese ISO classico
     }
 )
 
@@ -249,6 +254,8 @@ _ISO_TOKEN = re.compile(r"\b([A-Z]{2})\b")
 
 @dataclass(frozen=True)
 class ComplexityResult:
+    """Esito heuristic: lane di routing, famiglie attive, score e segnali di log."""
+
     lane: Lane
     families: frozenset[str]
     score: int
@@ -256,11 +263,17 @@ class ComplexityResult:
 
 
 def _count_countries(text: str, text_lower: str) -> tuple[int, list[str]]:
+    """Conta paesi distinti (nomi lexicon ∪ ISO allowlist) e segnali di log.
+
+    ISO solo sul casing originale: evita falsi ``il``/``un`` → IL/UN dopo upper().
+    Returns:
+        ``(n, signals)`` dove ``n = max(nomi, iso)``.
+    """
     found: list[str] = []
     for name in _COUNTRY_NAMES:
         if name in text_lower:
             found.append(name)
-    # ISO only on original casing — avoid "il"/"un" → IL/UN after upper().
+    # ISO solo sul casing originale — evitare "il"/"un" → IL/UN dopo upper().
     iso_hits = [
         m.group(1)
         for m in _ISO_TOKEN.finditer(text)
@@ -278,10 +291,12 @@ def _count_countries(text: str, text_lower: str) -> tuple[int, list[str]]:
 
 
 def _count_orgs(text: str) -> int:
+    """Conta match di suffissi societari (Inc/Ltd/…) per famiglia E."""
     return len(_ORG_SUFFIX.findall(text))
 
 
 def _non_latin_ratio(sample: str) -> float:
+    """Frazione di lettere oltre Latin Extended-A (soglia famiglia X)."""
     if not sample:
         return 0.0
     non_latin = sum(1 for c in sample if ord(c) > 0x024F and c.isalpha())
@@ -292,11 +307,18 @@ def _non_latin_ratio(sample: str) -> float:
 
 
 def score_complexity(title: str, content: str) -> ComplexityResult:
-    """
-    Compute routing lane from title + sanitized body.
+    """Calcola la lane di routing da titolo + body già sanitizzato.
 
-    Families: G geo, E entities, L length, X script/language, N negative (anti-paid).
-    Lane v2.2: L-alone → SIMPLE; 1 of {G,E,X} → BORDERLINE; ≥2 (L only in combo) → COMPLEX.
+    Quorum v2.2 (non score-driven): L sola → SIMPLE; 1 di {G,E,X} → BORDERLINE;
+    ≥2 famiglie positive (L solo in combo) → COMPLEX; clip N → SIMPLE.
+
+    Args:
+        title: Titolo entry.
+        content: Testo piano post-``strip_html_tags`` (non HTML grezzo).
+    Returns:
+        ``ComplexityResult`` con lane, famiglie, score clampato 0–100, signals.
+    SoT:
+        SoT LLM §4.4 algoritmo v2.2.
     """
     title = title or ""
     content = content or ""
@@ -319,7 +341,7 @@ def score_complexity(title: str, content: str) -> ComplexityResult:
     n_countries, geo_signals = _count_countries(blob, blob_lower)
     signals.extend(geo_signals)
     geo_marker = bool(_GEO_MARKERS.search(blob))
-    # ≥2 distinct countries → G even on short bodies; geo_marker alone needs length.
+    # ≥2 paesi distinti → G anche su body corti; geo_marker da solo richiede lunghezza.
     if n_countries >= 2:
         families.add("G")
         score += 25
@@ -353,7 +375,7 @@ def score_complexity(title: str, content: str) -> ComplexityResult:
         signals.append("negative_clip")
         lane = Lane.SIMPLE
     elif positive == {"L"}:
-        # Length alone is not schema-extraction risk.
+        # Lunghezza da sola ≠ rischio estrazione schema (v2.2).
         signals.append("l_alone_simple")
         lane = Lane.SIMPLE
     elif len(positive) >= 2:

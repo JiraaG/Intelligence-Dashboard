@@ -1,4 +1,13 @@
-"""Multi-provider classification with durable quota, cascade, and lanes."""
+"""Router classificazione multi-provider: quota durable, cascade lane, escalate.
+
+Per ogni tentativo: ``QuotaLedger.reserve`` → adapter (Gemini SDK o OpenAI-compat
+httpx) → ``complete``/``fail``/``release``. Lane heuristic (SIMPLE/BORDERLINE/
+COMPLEX) ≠ ``quota_lane`` (simple|complex → ``purpose=classify:*``).
+BORDERLINE v2.2 usa la catena COMPLEX. Shadow/off → solo catena SIMPLE.
+
+SoT:
+    skill radar-quota-ledger; llm-json-extraction; SoT LLM §4–6; AGENTS.md §3.
+"""
 
 from __future__ import annotations
 
@@ -57,11 +66,12 @@ _DEFAULT_TEMPERATURE = 0.3
 
 
 def _is_gemma_model(model: str) -> bool:
+    """True se il nome modello contiene ``gemma`` (temp/token dedicati)."""
     return "gemma" in (model or "").lower()
 
 
 def _extract_gemini_text(response: Any) -> str | None:
-    """Best-effort text from a generate_content response (never trust .text alone)."""
+    """Estrae testo da ``generate_content``; non fidarsi solo di ``.text``."""
     direct = getattr(response, "text", None)
     if isinstance(direct, str) and direct.strip():
         return direct
@@ -85,7 +95,7 @@ def _extract_gemini_text(response: Any) -> str | None:
 
 
 def _exc_msg(exc: BaseException, limit: int = 200) -> str:
-    """Human-readable exception text; never empty (some SDK errors have blank str())."""
+    """Messaggio eccezione leggibile; mai vuoto (alcuni SDK hanno ``str()`` blank)."""
     text = str(exc).strip() or repr(exc)
     cause = getattr(exc, "__cause__", None)
     if cause is not None:
@@ -107,7 +117,7 @@ _GEMINI_UNSUPPORTED_SCHEMA_KEYS = frozenset(
 
 
 def sanitize_gemini_response_schema(schema: dict[str, Any]) -> dict[str, Any]:
-    """Return a deep-copied JSON Schema safe for Gemini structured outputs."""
+    """Deep-copy JSON Schema senza ``additionalProperties`` (Gemini-safe)."""
 
     def _walk(node: Any) -> Any:
         if isinstance(node, dict):
@@ -127,22 +137,30 @@ def sanitize_gemini_response_schema(schema: dict[str, Any]) -> dict[str, Any]:
 
 
 def build_gemini_response_schema() -> dict[str, Any]:
-    """JSON Schema for GenerateContentConfig.response_schema (Gemini-safe)."""
+    """JSON Schema per ``GenerateContentConfig.response_schema`` (Gemini-safe)."""
     return sanitize_gemini_response_schema(GeopoliticalArticleSchema.model_json_schema())
 
 
 class ErrorClass(str, Enum):
+    """Tassonomia errori provider → azione nel loop tentativi."""
+
     RETRYABLE = "retryable"
     FATAL = "fatal"
     VALIDATION = "validation"
-    HARD_COOLDOWN = "hard_cooldown"  # switch model + 24h cooldown
+    HARD_COOLDOWN = "hard_cooldown"  # switch modello + cooldown 24h
 
 
 def classify_provider_error(exc: BaseException) -> ErrorClass:
-    """
-    Retry ONLY transport / 429 / 5xx / timeout.
-    HARD_COOLDOWN: daily quota, credits, persistent 5xx already exhausted, model 404.
-    FATAL: auth — no cascade value.
+    """Classifica un'eccezione per retry / cooldown / stop cascade.
+
+    - RETRYABLE: transport, 429 RPM breve, timeout; Gemini 5xx (retry N volte).
+    - HARD_COOLDOWN: RPD day, 402/crediti, 404 modello; **DeepSeek 5xx al primo
+      colpo** (diverso da SoT ``5xx×N`` e da Gemini che esaurisce i retry prima).
+    - FATAL: auth / ConfigError — niente cascade utile (outcome ``fatal_auth``).
+    - VALIDATION: correction loop, non cooldown.
+
+    SoT:
+        SoT LLM §4.7; divergenza DeepSeek-5xx documentata nel piano P0-04.
     """
     if isinstance(exc, ValidationError):
         return ErrorClass.VALIDATION
@@ -159,6 +177,7 @@ def classify_provider_error(exc: BaseException) -> ErrorClass:
             return ErrorClass.HARD_COOLDOWN
         if code == 429:
             return ErrorClass.RETRYABLE
+        # Asimmetria vs Gemini: primo 5xx OpenAI-compat → cooldown immediato.
         if code is not None and code >= 500:
             return ErrorClass.HARD_COOLDOWN
         if code == 408:
@@ -178,7 +197,7 @@ def classify_provider_error(exc: BaseException) -> ErrorClass:
         if code == 404:
             return ErrorClass.HARD_COOLDOWN
         if code == 429:
-            # RPD / free_tier day → cooldown 24h. RPM breve → RETRYABLE.
+            # RPD / free_tier day → cooldown 24h. RPM breve → RETRYABLE + Retry-After.
             if any(
                 token in message
                 for token in (
@@ -192,6 +211,7 @@ def classify_provider_error(exc: BaseException) -> ErrorClass:
             ):
                 return ErrorClass.HARD_COOLDOWN
             return ErrorClass.RETRYABLE
+        # Gemini 5xx: RETRYABLE qui; cooldown solo dopo esaurimento tentativi (5xx×N).
         if code == 408 or (isinstance(code, int) and code >= 500):
             return ErrorClass.RETRYABLE
         if isinstance(code, int) and 400 <= code < 500:
@@ -224,7 +244,10 @@ def classify_provider_error(exc: BaseException) -> ErrorClass:
 
 
 def extract_retry_after_seconds(exc: BaseException) -> float | None:
-    """Parse authoritative Retry-After from APIError / DeepSeekError."""
+    """Estrae Retry-After autoritativo (DeepSeek, header HTTP, details Gemini).
+
+    Valori clampati a ``_RETRY_AFTER_MAX_SECONDS`` (300). ``None`` se assente.
+    """
     if isinstance(exc, DeepSeekError) and exc.retry_after is not None:
         return max(0.0, min(_RETRY_AFTER_MAX_SECONDS, float(exc.retry_after)))
 
@@ -249,6 +272,7 @@ def extract_retry_after_seconds(exc: BaseException) -> float | None:
 
 
 def _parse_retry_after_value(raw: Any) -> float | None:
+    """Parse secondi numerici oppure HTTP-date; clamp 0–300."""
     if raw is None:
         return None
     text = str(raw).strip()
@@ -273,6 +297,7 @@ def _parse_retry_after_value(raw: Any) -> float | None:
 
 
 def _retry_delay_from_details(details: Any) -> float | None:
+    """``retryDelay`` da payload ``details`` Gemini (es. ``\"12s\"``)."""
     if details is None:
         return None
     if isinstance(details, dict):
@@ -292,6 +317,7 @@ def _retry_delay_from_details(details: Any) -> float | None:
 
 
 def _usage_token_count(response: Any) -> int | None:
+    """``total_token_count`` da usage Gemini, se presente."""
     meta = getattr(response, "usage_metadata", None)
     if meta is None:
         return None
@@ -306,23 +332,27 @@ def _usage_token_count(response: Any) -> int | None:
 
 @dataclass(frozen=True, slots=True)
 class _ModelRef:
+    """Riferimento tentativo: adapter + modello + **quota_lane** (non Lane heuristic)."""
+
     provider: str
     model: str
-    quota_lane: str  # simple | complex — which lane limits apply
-    # Distinguishes same model with different thinking (e.g. flash none vs high).
+    quota_lane: str  # simple | complex — quali limiti RPM/TPM/RPD/budget
+    # Distingue stesso modello con thinking diverso (es. flash none vs high).
     reasoning_effort: str = "high"
 
     @property
     def identity(self) -> tuple[str, str, str]:
+        """Chiave dedupe cascade: provider + model + effort."""
         return (self.provider, self.model, self.reasoning_effort)
 
-class ClassificationClient:
-    """
-    Classification with QuotaLedger reserve-before-every-attempt.
 
-    - LLM_ROUTING_MODE=off / shadow: only SIMPLE lane chain.
-    - complexity: SIMPLE → LLM_SIMPLE; BORDERLINE+COMPLEX → LLM_COMPLEX; escalate on validation.
-    Provider type (gemini|deepseek|openai|claude) selects the adapter.
+class ClassificationClient:
+    """Classificazione con ``reserve`` prima di ogni tentativo provider.
+
+    - ``LLM_ROUTING_MODE=off`` / shadow: solo catena SIMPLE (shadow logga la lane).
+    - ``complexity``: SIMPLE → ``LLM_SIMPLE``; BORDERLINE+COMPLEX → ``LLM_COMPLEX``;
+      escalate su ValidationError esaurita.
+    Il tipo provider (gemini|deepseek|openai|glm|grok|claude) seleziona l'adapter.
     """
 
     def __init__(
@@ -386,6 +416,7 @@ class ClassificationClient:
         self._complex_model = self._complex.model
 
         self._complex_unavailable = False
+        # Fail-loud F4: COMPLEX senza key/claude stub → degrado a SIMPLE (STRICT = raise).
         if self._complex.provider == _PROVIDER_CLAUDE:
             msg = "LLM_COMPLEX_PROVIDER=claude non ancora supportato — COMPLEX userà SIMPLE"
             if self._routing_mode == "complexity" and LLM_ROUTING_STRICT:
@@ -437,9 +468,11 @@ class ClassificationClient:
         )
 
     def _lane_cfg(self, quota_lane: str) -> LlmLaneConfig:
+        """Config lane quota (``simple``|``complex``), non Lane heuristic."""
         return self._simple if quota_lane == LANE_SIMPLE else self._complex
 
     def _compat_client(self, quota_lane: str) -> DeepSeekClient:
+        """Client OpenAI-compat cacheato per quota_lane (effort/dialect dalla config)."""
         if self.deepseek is not None and self._lane_cfg(quota_lane).provider == _PROVIDER_DEEPSEEK:
             return self.deepseek
         cached = self._compat_clients.get(quota_lane)
@@ -463,7 +496,7 @@ class ClassificationClient:
         contents: Any,
         model: str | None = None,
     ) -> Any:
-        """Call Gemini via async SDK under application deadline (+ optional concurrency sem)."""
+        """Chiama Gemini async sotto deadline applicativa (+ sem concurrency opzionale)."""
         use_model = model or self.model
         gemma = _is_gemma_model(use_model)
         temperature = _GEMMA_TEMPERATURE if gemma else _DEFAULT_TEMPERATURE
@@ -493,6 +526,7 @@ class ClassificationClient:
         return await _call()
 
     def _provider_refs(self, cfg: LlmLaneConfig) -> list[_ModelRef]:
+        """Espande ``cfg.models`` in ``_ModelRef``; claude → lista vuota (stub)."""
         if cfg.provider == _PROVIDER_CLAUDE:
             return []
         if cfg.provider in OPENAI_COMPAT_PROVIDERS:
@@ -500,18 +534,17 @@ class ClassificationClient:
                 _ModelRef(cfg.provider, m, cfg.lane, cfg.reasoning_effort)
                 for m in cfg.models
             ]
-        # gemini (and unknown → treat as gemini-shaped cascade)
+        # gemini (e sconosciuti → cascade a forma Gemini)
         return [
             _ModelRef(_PROVIDER_GEMINI, m, cfg.lane, cfg.reasoning_effort)
             for m in cfg.models
         ]
 
     def _simple_chain(self) -> list[_ModelRef]:
-        """
-        Catena lane SIMPLE.
+        """Catena lane SIMPLE: primary ``LLM_SIMPLE.models`` + residual COMPLEX.
 
-        - Primary: solo modelli di LLM_SIMPLE (niente CSV Gemini fallback).
-        - Residual: lane COMPLEX se diversa (provider/model/effort) — cooldown/esaurimento.
+        Residual solo se mode=complexity, COMPLEX disponibile e identity diversa.
+        Catena = ``cfg.models`` della lane (C-03: non rilegge ``GEMINI_MODEL_FALLBACKS``).
         """
         primary = self._provider_refs(self._simple)
         simple_id = (
@@ -529,7 +562,7 @@ class ClassificationClient:
             and not self._complex_unavailable
             and simple_id != complex_id
         ):
-            # Cross-lane residual only — no same-provider Gemini CSV fallbacks.
+            # Residual cross-lane only — no same-provider Gemini CSV fallbacks.
             residual = self._provider_refs(self._complex)
             out: list[_ModelRef] = []
             seen: set[tuple[str, str, str]] = set()
@@ -542,12 +575,7 @@ class ClassificationClient:
         return primary
 
     def _complex_chain(self) -> list[_ModelRef]:
-        """
-        Catena lane COMPLEX.
-
-        - Primary: LLM_COMPLEX.
-        - Residual: solo LLM_SIMPLE (viceversa su quota/cooldown COMPLEX).
-        """
+        """Catena lane COMPLEX: primary ``LLM_COMPLEX`` + residual SIMPLE (dedupe)."""
         primary = self._provider_refs(self._complex)
         residual = self._provider_refs(self._simple)
         out: list[_ModelRef] = []
@@ -560,14 +588,16 @@ class ClassificationClient:
         return out
 
     def _chain_for(self, lane: Lane, *, force_simple: bool) -> list[_ModelRef]:
+        """Sceglie catena: force_simple/off → SIMPLE; BORDERLINE|COMPLEX → COMPLEX (v2.2)."""
         if force_simple or self._routing_mode != "complexity":
             return self._simple_chain()
-        # BORDERLINE = schema risk (geo/entity/script) → thinking-capable lane.
+        # BORDERLINE = rischio schema (geo/entity/script) → lane thinking-capable.
         if lane in (Lane.COMPLEX, Lane.BORDERLINE) and not self._complex_unavailable:
             return self._complex_chain()
         return self._simple_chain()
 
     async def _eligible(self, refs: list[_ModelRef]) -> list[_ModelRef]:
+        """Filtra cooldown attivo, claude stub, key mancante, client Gemini assente."""
         out: list[_ModelRef] = []
         for ref in refs:
             if await self.cooldown.is_cooling_down(ref.provider, ref.model):
@@ -590,7 +620,11 @@ class ClassificationClient:
         url: str,
         date: str,
     ) -> GeopoliticalArticleSchema:
-        """Extract structured geopolitics; cascade / escalate per routing mode."""
+        """Estrae geopolitica strutturata; cascade/escalate secondo routing mode.
+
+        Trunca ``content`` a 4000 (invariante tutte le lane). ``force_simple`` se
+        mode≠complexity, shadow, o COMPLEX unavailable su BORDERLINE/COMPLEX.
+        """
         truncated = content[:4000]
         complexity = score_complexity(title, content)
         lane = complexity.lane
@@ -662,6 +696,7 @@ class ClassificationClient:
             if outcome == "fatal_auth":
                 return get_fallback_article(title, url, date)
 
+            # Escalate una volta verso primary COMPLEX se identity diversa e disponibile.
             can_escalate = (
                 outcome == "escalate"
                 and self._escalate
@@ -714,9 +749,14 @@ class ClassificationClient:
         lane: Lane,
         max_attempts: int | None = None,
     ) -> tuple[GeopoliticalArticleSchema | None, str]:
-        """
-        Returns (article|None, outcome) where outcome is:
-        ok | exhausted | escalate | fatal_auth | hard_cooldown
+        """Loop tentativi su un ``_ModelRef``: reserve → call → validate → retry/cooldown.
+
+        Returns:
+            ``(article|None, outcome)`` con outcome in
+            ``ok | exhausted | escalate | fatal_auth | hard_cooldown``.
+        Side-effects:
+            Ledger reserve/complete/fail/release; eventuale ``set_cooldown``;
+            sleep Retry-After o backoff.
         """
         attempts = max_attempts if max_attempts is not None else _MAX_ATTEMPTS
         user_message = build_user_prompt(
@@ -737,6 +777,7 @@ class ClassificationClient:
 
         for attempt in range(attempts):
             try:
+                # Invariante SoT: reserve **prima** di ogni tentativo (anche retry).
                 reservation_id = await self.quota.reserve(
                     estimated_tokens=self._estimated_tokens,
                     model=ref.model,
@@ -750,7 +791,7 @@ class ClassificationClient:
                     ref.model,
                     budget_err,
                 )
-                # Soft-cap USD: skip provider for this article — no 24h model cooldown.
+                # Soft-cap USD: skip provider per questo articolo — no cooldown 24h.
                 return None, "exhausted"
             except QuotaDailyExceeded as rpd_err:
                 logger.warning(
@@ -759,8 +800,8 @@ class ClassificationClient:
                     ref.model,
                     rpd_err,
                 )
-                # Mark cooldown so subsequent articles skip this model until reset;
-                # chain residual (other lane) remains available.
+                # Cooldown così i prossimi articoli saltano questo modello;
+                # il residual (altra lane) resta nella chain.
                 await self.cooldown.set_cooldown(
                     ref.provider,
                     ref.model,
@@ -800,7 +841,7 @@ class ClassificationClient:
                     )
                     actual = tokens if tokens is not None else self._estimated_tokens
                     await self.quota.complete(reservation_id, actual)
-                    reservation_id = -1
+                    reservation_id = -1  # già chiusa: evita double fail
                     extracted = parse_llm_article_json(
                         response_text,
                         source_url=url,
@@ -818,7 +859,7 @@ class ClassificationClient:
                     reservation_id,
                     actual_tokens if actual_tokens is not None else self._estimated_tokens,
                 )
-                reservation_id = -1
+                reservation_id = -1  # già chiusa: evita double fail
                 response_text = _extract_gemini_text(response)
                 extracted = parse_llm_article_json(
                     response_text,
@@ -834,6 +875,7 @@ class ClassificationClient:
                 return extracted, "ok"
 
             except asyncio.CancelledError:
+                # Pre-call → release; mid-call → fail (tentativo consumato).
                 if reservation_id >= 0:
                     try:
                         if provider_started:
@@ -862,7 +904,7 @@ class ClassificationClient:
                 if reservation_id >= 0:
                     await self.quota.fail(reservation_id)
 
-                # Capture Gemini raw text if validate failed after a successful generate.
+                # Cattura testo grezzo Gemini se validate fallisce dopo generate.
                 if (
                     ref.provider == _PROVIDER_GEMINI
                     and response_text is None
@@ -870,7 +912,7 @@ class ClassificationClient:
                 ):
                     response_text = _extract_gemini_text(response)
 
-                # BORDERLINE: escalate after first failed correction (any SIMPLE provider)
+                # BORDERLINE: escalate dopo la prima correction fallita (validation_fails≥2).
                 if (
                     lane == Lane.BORDERLINE
                     and self._escalate
@@ -942,7 +984,7 @@ class ClassificationClient:
                     or (isinstance(e, DeepSeekError) and e.status_code == 429)
                 )
                 if is_429:
-                    # Floor avoids Retry-After=0 thundering herd against Studio RPM.
+                    # Floor evita Retry-After=0 thundering herd contro Studio RPM.
                     delay = 5.0 if retry_after is None else max(float(retry_after), 5.0)
                     delay = min(delay, _RETRY_AFTER_MAX_SECONDS)
                     logger.warning(
@@ -965,7 +1007,7 @@ class ClassificationClient:
                     )
                     await asyncio.sleep(backoff)
                 else:
-                    # Exhausted retries on this model — cooldown on repeated 5xx
+                    # Esauriti i retry su questo modello — cooldown su 5xx Gemini ripetuti.
                     if isinstance(e, genai_errors.APIError) and getattr(e, "code", None) is not None:
                         code = getattr(e, "code", None)
                         if isinstance(code, int) and code >= 500:
@@ -983,7 +1025,7 @@ class ClassificationClient:
                         _exc_msg(e),
                     )
 
-        # Validation exhausted on SIMPLE lane primary → escalate once to COMPLEX
+        # Validation esaurita sulla primary SIMPLE → escalate una volta a COMPLEX.
         if (
             lane == Lane.SIMPLE
             and self._escalate

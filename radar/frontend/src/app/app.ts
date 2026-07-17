@@ -9,6 +9,14 @@ import {
 import { RadarToolbarComponent } from './components/radar-toolbar/radar-toolbar.component';
 import { RadarSidebarComponent } from './components/radar-sidebar/radar-sidebar.component';
 
+/**
+ * Shell UI: mappa + toolbar + sidebar (freeze: importata, mai modificata qui).
+ *
+ * Coordina nation-open (generation token), ``invalidateSize`` prima di spiderfy,
+ * close che può preservare ``detailError``, auto-read sul cambio card carosello.
+ *
+ * @see SoT: frontend.md §2b/§7; skill radar-sidebar-freeze.
+ */
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -28,11 +36,12 @@ export class App {
 
   articleCount = computed(() => this.state.articleCount());
   readCount    = computed(() => this.state.readCount());
+  /** Overlay full-bleed: true quando la sidebar è aperta (mappa resta 100vw). */
   isMapSplit   = computed(() => this.isSidebarOpen());
 
-  /** Ignore stale nation-fetch results when the user clicks another pallino quickly. */
+  /** Ignora risultati nation-fetch obsoleti se l'utente cambia pallino in fretta. */
   private nationOpenGeneration = 0;
-  /** Skip collapse/spiderfy when carousel only changes article within the same category. */
+  /** Evita re-spiderfy a ogni slide carosello nella stessa categoria. */
   private lastSpiderfyKey: string | null = null;
 
   @HostListener('window:resize')
@@ -40,8 +49,8 @@ export class App {
     this.mapComponent()?.invalidateSize();
   }
 
+  /** Dopo transizione CSS / layout: Leaflet deve ricalcolare size (overlay full-bleed). */
   private scheduleInvalidateSize(): void {
-    // After CSS transition / layout — overlay full-bleed still needs Leaflet resize.
     requestAnimationFrame(() => {
       this.mapComponent()?.invalidateSize();
       setTimeout(() => this.mapComponent()?.invalidateSize(), 360);
@@ -72,6 +81,12 @@ export class App {
     this.scheduleInvalidateSize();
   }
 
+  /**
+   * Apre nazione: fetch paged → carosello (categoria pallino o full nation) → spiderfy.
+   * Fallimento → ``closeSidebar(false)`` (banner ``detailError`` resta).
+   *
+   * @param req Codice paese oppure ``CountryOpenRequest`` (preserveZoom / category).
+   */
   async onCountryClick(req: CountryOpenRequest | string): Promise<void> {
     const open: CountryOpenRequest =
       typeof req === 'string' ? { countryCode: req } : req;
@@ -94,7 +109,7 @@ export class App {
         ? arts.filter((a) => a.primary_category === category)
         : arts;
       const focusList = sidebarArts.length > 0 ? sidebarArts : arts;
-      // Match sidebar carousel order (sort by category) so spiderfy tracks the visible card.
+      // Allinea ordine carosello (sort categoria) così spiderfy segue la card visibile.
       const displayArticle =
         (category
           ? arts.find((a) => a.primary_category === category)
@@ -105,19 +120,19 @@ export class App {
         focusList[0];
 
       this.selectedArticle.set(displayArticle);
-      // Category pallino → carousel on that category only; polygon/toolbar → full nation.
+      // Pallino categoria → carosello solo quella; poligono/toolbar → nazione intera.
       this.clusterArticles.set(focusList);
       this.isSidebarOpen.set(true);
-      // Summary/pallino path: keep camera. Polygon/toolbar: fitBounds to the nation.
+      // Summary/pallino: tieni camera. Poligono/toolbar: fitBounds sulla nazione.
       if (open.preserveZoom) {
         this.mapComponent()?.armSkipCountryFit();
       } else if (this.focusCountryCode() === open.countryCode) {
-        // Same code again: signal would not re-fire — force fitBounds.
+        // Stesso codice di nuovo: il signal non ri-emette — forza fitBounds.
         this.mapComponent()?.refocusCountry(open.countryCode);
       }
       this.focusCountryCode.set(open.countryCode);
 
-      // Spiderfy only the category of the article on screen (not every category).
+      // Spiderfy solo la categoria dell'articolo a schermo (non tutte).
       this.scheduleCategorySpiderfy(open.countryCode, displayArticle.primary_category);
     } catch {
       if (gen !== this.nationOpenGeneration) return;
@@ -126,8 +141,8 @@ export class App {
   }
 
   /**
-   * After detail markers replace summary balls: resize map, then spiderfy.
-   * Order matters — invalidateSize must not run after spiderfy.
+   * Dopo i marker detail: resize mappa, poi spiderfy.
+   * Ordine obbligatorio — ``invalidateSize`` non deve arrivare dopo spiderfy.
    */
   private scheduleCategorySpiderfy(countryCode: string, category: PrimaryCategory): void {
     this.lastSpiderfyKey = `${countryCode}|${category}`;
@@ -144,6 +159,10 @@ export class App {
     await this.onCountryClick({ countryCode });
   }
 
+  /**
+   * Chiude sidebar e azzera detail. ``clearError=false`` lascia il banner nation-fetch
+   * (T-P1-04); default true per close intenzionale utente.
+   */
   closeSidebar(clearError = true): void {
     this.nationOpenGeneration++;
     this.lastSpiderfyKey = null;
@@ -156,6 +175,7 @@ export class App {
     this.scheduleInvalidateSize();
   }
 
+  /** Pill categoria in sidebar → spiderfy quella categoria (senza rifetch). */
   onSidebarCategoryClick(category: string): void {
     const code = this.focusCountryCode();
     const country = code || this.clusterArticles()[0]?.country_code;
@@ -164,13 +184,17 @@ export class App {
     this.mapComponent()?.focusAndSpiderfyCategory(country, category);
   }
 
+  /**
+   * Card attiva carosello: highlight marker + auto-read se non letta.
+   * Spiderfy solo al cambio categoria visibile (``lastSpiderfyKey``).
+   */
   onActiveArticleChanged(article: Article | null): void {
     this.mapComponent()?.highlightMarkerForArticle(article);
-    // Carousel (or single-card) focus: auto-mark as read; manual toggle in sidebar still works.
+    // Focus carosello / card: auto-mark letta; toggle manuale in sidebar resta.
     if (article && !article.is_read) {
       this.state.toggleReadStatus(article.id, true);
     }
-    // Spiderfy only when the visible category changes — not on every carousel slide.
+    // Spiderfy solo se cambia la categoria visibile — non a ogni slide.
     if (!article?.country_code || !article.primary_category) return;
     const countryCode = this.focusCountryCode() ?? article.country_code;
     const spiderKey = `${countryCode}|${article.primary_category}`;

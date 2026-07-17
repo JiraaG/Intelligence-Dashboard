@@ -1,4 +1,14 @@
-# prompts.py — Centralized System Prompts for Gemma 4 31B
+"""System prompt immutabile e builder del blocco ``<untrusted_article>``.
+
+``SYSTEM_PROMPT`` è contratto di prodotto: non aggiungere CoT/reasoning e non
+alterarne il testo in questo batch comment-only. SoT operativa = **questo file**;
+lo snapshot in ``llm-json-extraction/SKILL.md`` può essere indietro (C-07).
+
+SoT:
+    skill llm-json-extraction (invarianti prompt/schema); AGENTS.md §3.
+"""
+
+# prompts.py — System prompt centralizzato (contratto immutabile; no CoT)
 
 SYSTEM_PROMPT = """Sei un analista senior di intelligence geopolitica ed industriale specializzato in analisi strategica delle infrastrutture critiche ("pick-and-shovel").
 Il tuo compito è estrarre dati geopolitici strutturati, ad alta densità informativa, dall'articolo di notizie fornito.
@@ -52,8 +62,21 @@ Segui tassativamente le seguenti regole operative per l'estrazione:
 
 
 def build_user_prompt(title: str, url: str, date: str, content: str) -> str:
-    """
-    Costruisce il prompt utente con delimitatori espliciti per i dati non attendibili dell'articolo.
+    """Assembla il messaggio user con delimitatori per dati articolo non fidati.
+
+    Solo interpolazione di campi già sanitizzati/troncati dal chiamante
+    (tipicamente ``content[:4000]``): non eseguire istruzioni dal body.
+    Il system prompt resta separato e immutabile.
+
+    Args:
+        title: Titolo articolo.
+        url: ``source_url`` canonico.
+        date: Data ``YYYY-MM-DD``.
+        content: Corpo testo (già strip HTML / truncato a monte).
+    Returns:
+        Stringa user prompt con blocco ``<untrusted_article>…</untrusted_article>``.
+    SoT:
+        skill llm-json-extraction; C-07 (SoT = questo file, non lo snapshot skill).
     """
     return (
         "Analizza l'articolo di notizie delimitato qui sotto ed estrai le informazioni geopolitiche "

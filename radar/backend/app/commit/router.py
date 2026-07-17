@@ -1,4 +1,12 @@
-# router.py — Obsidian Vault path routing
+"""Routing path Markdown nel Vault Obsidian (categoria / paese / filename).
+
+Allowlist categorie = ``PRIMARY_CATEGORIES``; country ``^[A-Z]{2}$|^XX$``.
+Filename: ``{published_at}_{slug}_{sha256(url)[:16]}.md`` con tetto basename.
+Containment: ``Path.resolve().relative_to(vault_root)`` — path traversal → ValueError.
+
+SoT:
+    .agents/AGENTS.md §6 (vault); docs/02 persistence.
+"""
 
 from __future__ import annotations
 
@@ -19,9 +27,13 @@ URL_HASH_HEX_CHARS = 16
 
 
 def initialize_vault_directories(vault_path: str | None = None) -> None:
-    """
-    Scansiona la directory del Vault di Obsidian e crea le 10 sottocartelle
-    delle macro-categorie geopolitiche se non sono già presenti.
+    """Crea la root vault e le 10 sottocartelle categoria se mancanti.
+
+    Default root: ``OBSIDIAN_VAULT_PATH`` (``/app/vault`` in container).
+    Raises:
+        OSError: permessi / mount vault non scrivibile.
+    SoT:
+        AGENTS.md §2 fallback vault ``/app/vault``.
     """
     root = Path(vault_path or OBSIDIAN_VAULT_PATH)
 
@@ -43,9 +55,9 @@ def initialize_vault_directories(vault_path: str | None = None) -> None:
 
 
 def slugify_title(title: str) -> str:
-    """
-    Sanitizza il titolo per filesystem Windows/macOS/Linux.
-    Sostituisce i caratteri vietati con un trattino.
+    """Sanitizza il titolo per filesystem Windows/macOS/Linux.
+
+    Caratteri vietati → ``-``; spazi collassati; lowercase. Vuoto → ``senza-titolo``.
     """
     if not title:
         return "senza-titolo"
@@ -58,12 +70,14 @@ def slugify_title(title: str) -> str:
 
 
 def _validate_category(category: str) -> str:
+    """Categoria in allowlist ``PRIMARY_CATEGORIES``; altrimenti ValueError."""
     if category not in ALLOWED_CATEGORIES:
         raise ValueError(f"Categoria non valida: {category!r}")
     return category
 
 
 def _validate_country_code(country_code: str) -> str:
+    """ISO Alpha-2 maiuscolo o sentinel ``XX``."""
     normalized = country_code.strip().upper()
     if not COUNTRY_CODE_PATTERN.match(normalized):
         raise ValueError(f"country_code non valido: {country_code!r}")
@@ -71,10 +85,12 @@ def _validate_country_code(country_code: str) -> str:
 
 
 def _url_hash(source_url: str) -> str:
+    """Prefisso SHA-256 dell'URL: rende unico il basename a parità di titolo/data."""
     return hashlib.sha256(source_url.encode("utf-8")).hexdigest()[:URL_HASH_HEX_CHARS]
 
 
 def _build_filename(published_at: str, slugified: str, source_url: str) -> str:
+    """Costruisce basename entro ``MAX_BASENAME_CHARS``, truncando lo slug se serve."""
     url_hash = _url_hash(source_url)
     suffix = f"_{url_hash}.md"
     prefix = f"{published_at}_"
@@ -94,10 +110,20 @@ def _build_filename(published_at: str, slugified: str, source_url: str) -> str:
 
 
 def get_article_file_path(article: GeopoliticalArticleSchema, vault_path: str | None = None) -> str:
-    """
-    Calcola il percorso semantico di salvataggio del file Markdown nel Vault.
-    Struttura: {vault}/{primary_category}/{country_code}/{published_at}_{slug}_{sha256[:16]}.md
-    Solleva ValueError se il percorso resolved esce dal vault root.
+    """Calcola il path assoluto Markdown nel Vault con containment sul root.
+
+    Struttura:
+    ``{vault}/{primary_category}/{country_code}/{published_at}_{slug}_{sha256[:16]}.md``
+
+    Args:
+        article: Schema con categoria/paese/titolo/URL/data già validati.
+        vault_path: Override root; default ``OBSIDIAN_VAULT_PATH``.
+    Returns:
+        Path assoluto resolved (stringa) ancora sotto il vault root.
+    Raises:
+        ValueError: categoria/paese invalidi, oppure path fuori dal vault (traversal).
+    SoT:
+        AGENTS.md §6; docs/02.
     """
     vault_root = Path(vault_path or OBSIDIAN_VAULT_PATH).resolve()
     category_folder = _validate_category(article.primary_category)

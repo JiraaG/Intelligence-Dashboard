@@ -1,22 +1,26 @@
 #!/usr/bin/env bash
-# restore-postgres.sh — restore drill for pg_dump custom format + optional vault.
+# restore-postgres.sh — drill di restore da pg_dump custom + vault opzionale.
 #
-# DANGER: replaces the live database. Use only on disposable stacks or after
-# an explicit backup of the current state.
+# PERICOLO: sostituisce il database live. Solo su stack usa-e-getta o dopo
+# backup esplicito dello stato corrente.
 #
-# Usage (Git Bash / WSL; from radar/):
+# Uso (Git Bash / WSL; da radar/):
 #   ./ops/restore-postgres.sh ./backups/20260715T120000Z
 #   ./ops/restore-postgres.sh ./backups/20260715T120000Z --with-vault
 #
-# Steps:
-#   1. Verify SHA-256 (if SHA256SUMS present)
-#   2. Stop worker (and optionally backend) to avoid writes
-#   3. pg_restore --clean --if-exists into POSTGRES_DB
-#   4. Optional: replace ./vault from vault.tar.gz
-#   5. Start services; worker reconciles pending outbox
+# Passi:
+#   1. Verifica SHA-256 se esiste SHA256SUMS (altrimenti WARN e continua)
+#   2. Conferma interattiva Enter (Ctrl-C abort)
+#   3. Stop worker+backend per congelare scritture
+#   4. pg_restore --clean --if-exists in POSTGRES_DB
+#      (exit nonzero di pg_restore: WARN e continua — NOTICE tipici con --clean)
+#   5. Opzionale: sposta vault corrente in vault.pre-restore.<UTC>, poi tar -xzf
+#   6. Start backend+worker; il worker riconcilia outbox pending al ciclo successivo
+#
+# @see ops/README.md; docs/runbook.md (restore).
 set -euo pipefail
 
-# Git Bash on Windows rewrites args like /tmp/foo → %TEMP%/foo before docker sees them.
+# Git Bash su Windows riscrive path tipo /tmp/foo → %TEMP%/foo prima di docker.
 export MSYS_NO_PATHCONV=1
 export MSYS2_ARG_CONV_EXCL='*'
 
@@ -29,7 +33,7 @@ POSTGRES_USER="${POSTGRES_USER:-radar_user}"
 POSTGRES_DB="${POSTGRES_DB:-radar_db}"
 WITH_VAULT=0
 
-# Load .env KEY=VALUE only (safe on Windows / comments with parentheses)
+# Carica solo KEY=VALUE da .env (sicuro su Windows / commenti con parentesi)
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/_load_dotenv.sh"
 radar_load_dotenv "${RADAR_ROOT}/.env"
@@ -61,7 +65,7 @@ DUMP="$(ls -1 "${BACKUP_DIR}"/radar_*.dump 2>/dev/null | head -n1 || true)"
 echo "==> Restore from ${BACKUP_DIR}"
 echo "    dump: ${DUMP}"
 
-# ── Verify checksums ─────────────────────────────────────────────────────────
+# ── Verifica checksum (opzionale) ────────────────────────────────────────────
 if [[ -f "${BACKUP_DIR}/SHA256SUMS" ]]; then
   echo "==> Verifying SHA256SUMS"
   (
@@ -83,11 +87,11 @@ echo "WARNING: This will DROP/replace objects in database '${POSTGRES_DB}'."
 echo "Press Enter to continue, or Ctrl-C to abort."
 read -r _
 
-# ── Quiesce writers ──────────────────────────────────────────────────────────
+# ── Quiesce writer ───────────────────────────────────────────────────────────
 echo "==> Stopping radar-worker (and radar-backend) to freeze writes..."
 $COMPOSE stop radar-worker radar-backend || true
 
-# Host path for `docker compose cp` under Git Bash (cygpath → Windows path)
+# Path host per `docker compose cp` sotto Git Bash (cygpath → path Windows)
 host_path() {
   local p="$1"
   if command -v cygpath >/dev/null 2>&1; then
@@ -97,24 +101,24 @@ host_path() {
   fi
 }
 
-# ── Copy dump into db container and restore ──────────────────────────────────
+# ── Copia dump nel container db e restore ────────────────────────────────────
 echo "==> pg_restore --clean --if-exists"
 $COMPOSE cp "$(host_path "${DUMP}")" "radar-db:/tmp/radar_restore.dump"
 $COMPOSE exec -T radar-db \
   pg_restore -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" \
   --clean --if-exists --no-owner --no-acl \
   /tmp/radar_restore.dump || {
-    # pg_restore returns non-zero on some benign NOTICE/errors with --clean
+    # pg_restore può uscire nonzero su NOTICE/error benigni con --clean
     echo "WARN: pg_restore exited non-zero — inspect logs; continuing" >&2
   }
 $COMPOSE exec -T radar-db rm -f /tmp/radar_restore.dump
 
-# ── Optional vault ───────────────────────────────────────────────────────────
+# ── Vault opzionale (safety copy prima di sostituire) ────────────────────────
 if [[ "${WITH_VAULT}" -eq 1 ]]; then
   VAULT_TAR="${BACKUP_DIR}/vault.tar.gz"
   if [[ -f "${VAULT_TAR}" ]]; then
     echo "==> Restoring vault from ${VAULT_TAR}"
-    # Keep a safety copy of current vault
+    # Copia di sicurezza del vault corrente
     if [[ -d "${RADAR_ROOT}/vault" ]]; then
       SAFETY="${RADAR_ROOT}/vault.pre-restore.$(date -u +%Y%m%dT%H%M%SZ)"
       mv "${RADAR_ROOT}/vault" "${SAFETY}"

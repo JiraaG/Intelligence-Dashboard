@@ -1,4 +1,13 @@
-"""Validation and normalization of Miniflux entry payloads."""
+"""Validazione e normalizzazione dei payload entry Miniflux.
+
+Confine input: dict grezzo API → ``ValidatedMinifluxEntry`` immutabile, oppure
+``EntryValidationError`` (il chiamante isola per-entry senza abortire il batch).
+URL canonico prima di dedup/persistenza; content con fallback su summary e cap byte.
+
+SoT:
+    .agents/AGENTS.md §3 dedup pre-LLM; docs/01_getting_started.md §6 ingest;
+    radar/.ecc/rules/backend.md (sanitize / bound).
+"""
 
 from __future__ import annotations
 
@@ -15,6 +24,13 @@ _HTTP_SCHEME = re.compile(r"^https?$", re.IGNORECASE)
 
 @dataclass(frozen=True)
 class ValidatedMinifluxEntry:
+    """Entry Miniflux già validata; campi stabili per dedup, parse e commit.
+
+    ``source_url`` è canonico (scheme/host lower, no fragment, slash trailing tolto).
+    ``published_at`` è solo la parte data ``YYYY-MM-DD``.
+    ``content`` può essere HTML grezzo (sanitize successiva in ``parser``).
+    """
+
     id: int
     source_url: str
     title: str
@@ -24,13 +40,24 @@ class ValidatedMinifluxEntry:
 
 
 class EntryValidationError(ValueError):
-    """Raised when a Miniflux entry is malformed and must be skipped."""
+    """Entry Miniflux malformata: va saltata, non deve far fallire le sorelle."""
 
 
 def normalize_source_url(url: str) -> str:
-    """
-    Normalize a source URL once before deduplication and persistence.
-    Lowercases scheme/host, strips whitespace and trailing slash (except root).
+    """Normalizza l'URL una sola volta prima di deduplicazione e persistenza.
+
+    Lowercase di scheme/host, trim whitespace, rimozione slash finale (tranne root),
+    scarto del fragment per identità stabile su ``articles.source_url``.
+
+    Args:
+        url: URL grezzo dal campo Miniflux ``url``.
+    Returns:
+        URL canonico http/https, lunghezza ≤ 2048.
+    Raises:
+        EntryValidationError: tipo errato, vuoto, schema non http(s), host assente,
+            o lunghezza eccessiva.
+    SoT:
+        AGENTS.md §3 (dedup su URL); skill llm-json-extraction (overwrite source_url).
     """
     if not isinstance(url, str):
         raise EntryValidationError("source_url deve essere una stringa")
@@ -55,7 +82,7 @@ def normalize_source_url(url: str) -> str:
             parts.netloc.lower(),
             path,
             parts.query,
-            "",  # fragment discarded for stable identity
+            "",  # fragment scartato: non fa parte dell'identità stabile
         )
     )
     if len(normalized) > 2048:
@@ -64,6 +91,11 @@ def normalize_source_url(url: str) -> str:
 
 
 def _parse_published_date(raw: object) -> str:
+    """Estrae ``YYYY-MM-DD`` da timestamp ISO Miniflux (con o senza ``T``).
+
+    Raises:
+        EntryValidationError: assente, non stringa, o data non ISO valida.
+    """
     if raw is None:
         raise EntryValidationError("published_at mancante")
     if not isinstance(raw, str):
@@ -90,6 +122,7 @@ def _parse_published_date(raw: object) -> str:
 
 
 def _validate_entry_id(raw: object) -> int:
+    """Id Miniflux intero positivo; rifiuta ``bool`` (sottotipo di ``int`` in Python)."""
     if isinstance(raw, bool) or not isinstance(raw, int):
         raise EntryValidationError(f"id entry non valido: {raw!r}")
     if raw <= 0:
@@ -98,6 +131,7 @@ def _validate_entry_id(raw: object) -> int:
 
 
 def _validate_title(raw: object) -> str:
+    """Titolo non vuoto dopo strip; tetto 2000 caratteri (protezione payload)."""
     if not isinstance(raw, str):
         raise EntryValidationError("title deve essere una stringa")
     title = raw.strip()
@@ -109,6 +143,7 @@ def _validate_title(raw: object) -> str:
 
 
 def _validate_feed_title(raw_feed: object) -> str:
+    """Titolo feed da oggetto ``feed``; default ``RSS Feed`` se assente/vuoto."""
     if raw_feed is None:
         return "RSS Feed"
     if not isinstance(raw_feed, dict):
@@ -125,6 +160,11 @@ def _validate_feed_title(raw_feed: object) -> str:
 
 
 def _validate_content(raw_entry: dict) -> str:
+    """Corpo entry: ``content``, altrimenti ``summary``, altrimenti stringa vuota.
+
+    Confronta la lunghezza in byte UTF-8 con ``MAX_ENTRY_CONTENT_BYTES`` prima
+    del parse HTML (secondo check anche in ``parser.strip_html_tags``).
+    """
     content = raw_entry.get("content")
     if content is None or content == "":
         content = raw_entry.get("summary")
@@ -143,9 +183,17 @@ def _validate_content(raw_entry: dict) -> str:
 
 
 def validate_miniflux_entry(raw: object) -> ValidatedMinifluxEntry:
-    """
-    Validate a raw Miniflux entry dict.
-    Raises EntryValidationError on malformed payloads — callers must isolate per entry.
+    """Valida un dict entry Miniflux grezzo in struttura immutabile.
+
+    Args:
+        raw: Oggetto JSON entry dalla lista ``entries``.
+    Returns:
+        ``ValidatedMinifluxEntry`` pronto per dedup/sanitize/LLM.
+    Raises:
+        EntryValidationError: payload malformato — il chiamante deve isolare
+            l'entry e continuare con le sorelle.
+    SoT:
+        docs/01 §6; llm-json-extraction (confine input non fidato).
     """
     if not isinstance(raw, dict):
         raise EntryValidationError("entry non è un oggetto JSON")
@@ -168,7 +216,12 @@ def validate_miniflux_entry(raw: object) -> ValidatedMinifluxEntry:
 
 
 def parse_iso_date_or_today(value: str) -> date:
-    """Parse YYYY-MM-DD; used by DB commit for published_at binding."""
+    """Parse ``YYYY-MM-DD`` per binding DB; se invalida, oggi (fail-soft al commit).
+
+    Usata da ``commit/db_commit`` su ``published_at`` già normalizzato in teoria;
+    il fallback a ``date.today()`` evita di far fallire l'intera transazione per
+    una data residuale non ISO.
+    """
     try:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except ValueError:

@@ -1,8 +1,16 @@
 """
-Radar Informativo Globale — ingest worker (Compose service ``radar-worker``).
+Radar Informativo Globale — demone ingest (Compose ``radar-worker``).
 
-Owns: Miniflux polling, bounded entry queue, PARSE/DB/GEMINI semaphores,
-session-level PostgreSQL advisory lock, and bounded graceful shutdown.
+Possiede: polling Miniflux, coda entry bounded, semafori PARSE/DB/Gemini-SDK,
+advisory lock di leadership (session-level), soft-trim ``LLM_SIMPLE.rpd``,
+heartbeat leader e shutdown ordinato. Non è l'API (``main.py`` resta API-only).
+
+Due famiglie di advisory lock PostgreSQL (non confonderle):
+  - leadership: 1-arg ``WORKER_ADVISORY_LOCK_KEY`` su ``lock_conn`` dedicata;
+  - per-URL: 2-arg ``(ns, sha256)`` sulla connessione pool durante l'entry.
+
+SoT:
+    .agents/AGENTS.md §3; docs/01–02; skill radar-quota-ledger (soft-trim).
 """
 
 from __future__ import annotations
@@ -61,7 +69,7 @@ logger = logging.getLogger("radar.worker")
 
 
 class WorkerState:
-    """Shared mutable state for one worker process lifetime."""
+    """Stato mutabile di un processo worker: pool, client, semafori, leadership."""
 
     def __init__(self) -> None:
         self.db_pool: Optional[asyncpg.Pool] = None
@@ -70,8 +78,10 @@ class WorkerState:
         self.classification_client: Optional[ClassificationClient] = None
         self.parse_sem: Optional[asyncio.Semaphore] = None
         self.db_sem: Optional[asyncio.Semaphore] = None
+        # Cap concurrency Gemini SDK (enforced in ClassificationClient, non qui).
         self.gemini_sem: Optional[asyncio.Semaphore] = None
         self.consumer_tasks: list[asyncio.Task] = []
+        # Connessione dedicata che detiene il lock di leadership (non dal pool).
         self.lock_conn: Optional[asyncpg.Connection] = None
         self.lock_held: bool = False
         self.heartbeat_task: Optional[asyncio.Task] = None
@@ -83,7 +93,7 @@ def build_worker_semaphores(
     db_concurrency: int = WORKER_DB_CONCURRENCY,
     gemini_concurrency: int = WORKER_GEMINI_CONCURRENCY,
 ) -> tuple[asyncio.Semaphore, asyncio.Semaphore, asyncio.Semaphore]:
-    """Create PARSE / DB / GEMINI semaphores (exported for tests)."""
+    """Crea semafori PARSE / DB / Gemini-SDK (esportato per i test)."""
     return (
         asyncio.Semaphore(parse_concurrency),
         asyncio.Semaphore(db_concurrency),
@@ -92,7 +102,10 @@ def build_worker_semaphores(
 
 
 def get_url_lock_keys(url: str) -> tuple[int, int]:
-    """Generate a stable 2-argument advisory lock key (namespace, url_hash) for pg_advisory_lock."""
+    """Chiave advisory 2-arg stabile ``(namespace, url_hash int32)`` per serializzare lo stesso URL.
+
+    Namespace magico distinto da ``WORKER_ADVISORY_LOCK_KEY`` (leadership 1-arg).
+    """
     ns = 777_666_555
     h = hashlib.sha256(url.encode("utf-8")).digest()
     url_hash = struct.unpack("!i", h[:4])[0]
@@ -100,12 +113,12 @@ def get_url_lock_keys(url: str) -> tuple[int, int]:
 
 
 async def try_acquire_advisory_lock(conn: asyncpg.Connection, key: int) -> bool:
-    """Non-blocking session-level advisory lock attempt."""
+    """Tentativo non bloccante di leadership (``pg_try_advisory_lock`` 1-arg)."""
     return bool(await conn.fetchval("SELECT pg_try_advisory_lock($1)", key))
 
 
 async def release_advisory_lock(conn: asyncpg.Connection, key: int) -> bool:
-    """Release session-level advisory lock; returns False if we did not hold it."""
+    """Rilascia leadership; ``False`` se questa sessione non la deteneva."""
     return bool(await conn.fetchval("SELECT pg_advisory_unlock($1)", key))
 
 
@@ -115,10 +128,11 @@ async def acquire_advisory_lock_with_retry(
     *,
     backoff_seconds: float = float(WORKER_ADVISORY_LOCK_BACKOFF_SECONDS),
 ) -> None:
-    """
-    Block until leadership is acquired. Non-leaders stay alive and retry
-    (Compose restart flap avoidance). CancelledError: release is caller's job
-    only if lock was held; this helper never holds a lock across cancel mid-sleep.
+    """Attende la leadership senza uscire dal processo.
+
+    I non-leader restano vivi e ritentano (evita flapping Compose su exit).
+    ``CancelledError`` mid-sleep: il chiamante chiude ``lock_conn`` se il lock
+    non era ancora acquisito — questo helper non tiene il lock durante lo sleep.
     """
     while True:
         try:
@@ -145,9 +159,9 @@ async def shutdown_worker_resources(
     shutdown_timeout: float = float(WORKER_SHUTDOWN_TIMEOUT),
     lock_key: int = WORKER_ADVISORY_LOCK_KEY,
 ) -> None:
-    """
-    Ordered shutdown: cancel heartbeat + consumers → await (bounded) → close httpx →
-    release advisory → close pool. No sleep.
+    """Shutdown ordinato: HB → consumer (bounded) → httpx → unlock leadership → pool.
+
+    Nessuno sleep qui (lo sleep di poll sta fuori da qualsiasi ``finally`` di shutdown).
     """
     if state.heartbeat_task is not None:
         state.heartbeat_task.cancel()
@@ -200,9 +214,10 @@ async def shutdown_worker_resources(
 
 
 async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry) -> bool:
-    """
-    Dedup → sanitize → classify → commit+outbox → vault → mark-read.
-    Uses PARSE / DB / GEMINI semaphores. Returns True on success/skip, False on error.
+    """Pipeline per-entry: lock URL → dedup → sanitize → classify → commit+outbox → vault.
+
+    Usa semafori PARSE/DB; Gemini-SDK capped nel client. ``True`` = ok/skip,
+    ``False`` = errore livello-3 (il ciclo continua). ``CancelledError`` ri-lanciato.
     """
     assert state.db_pool is not None
     assert state.miniflux_client is not None
@@ -224,14 +239,15 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
         async with state.db_sem:
             async with state.db_pool.acquire() as conn:
                 try:
+                    # Lock per-URL bloccante (2-arg): serializza TOCTOU dedup/commit sullo stesso URL.
                     await conn.execute("SELECT pg_advisory_lock($1, $2)", lock_ns, lock_key)
                     lock_acquired = True
 
                     is_dup = await is_article_duplicate(conn, source_url)
 
                     if is_dup:
-                        # T-P0-01: mark-read only if vault durable (outbox completed)
-                        # or legacy NULL outbox with vault file present — never blind mark-read.
+                        # T-P0-01: mark-read solo se vault durable (outbox completed)
+                        # o legacy senza outbox ma file vault presente — mai mark-read cieco.
                         row = await conn.fetchrow(
                             """
                             SELECT
@@ -271,7 +287,7 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                                 title[:50],
                             )
                         else:
-                            # outbox_status is None (legacy / no outbox row)
+                            # outbox_status is None: legacy / nessuna riga outbox → check file vault.
                             from pathlib import Path
 
                             from app.classification.validator import GeopoliticalArticleSchema
@@ -299,6 +315,7 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                                 relevance_level=3,
                             )
                             try:
+                                # Schema minimo solo per ricostruire lo stesso path di router.
                                 vault_path = get_article_file_path(
                                     temp_schema, vault_path=OBSIDIAN_VAULT_PATH
                                 )
@@ -330,8 +347,8 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                     async with state.parse_sem:
                         clean_content = strip_html_tags(entry.content)
 
-                    # Gemini concurrency is enforced inside ClassificationClient._generate_content
-                    # so DeepSeek COMPLEX work is not blocked behind Gemini 429 sleeps.
+                    # Cap Gemini-SDK dentro ClassificationClient._generate_content:
+                    # così il lavoro OpenAI-compat (COMPLEX) non resta dietro i sleep 429 Gemini.
                     extracted_article = await state.classification_client.classify_article(
                         title=title,
                         content=clean_content,
@@ -339,6 +356,7 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                         date=published_date,
                     )
 
+                    # Ground truth Miniflux: URL/data non fidati all'LLM.
                     extracted_article = extracted_article.model_copy(
                         update={
                             "source_url": source_url,
@@ -418,7 +436,7 @@ async def _entry_consumer(
     results: dict[str, int],
     results_lock: asyncio.Lock,
 ) -> None:
-    """Pull entries from the bounded queue until cancelled."""
+    """Consumer coda bounded: elabora entry fino a cancel; sempre ``task_done``."""
     while True:
         entry: ValidatedMinifluxEntry = await queue.get()
         try:
@@ -435,10 +453,10 @@ async def _entry_consumer(
 
 
 async def _ledger_simple_rpd_used(pool: asyncpg.Pool) -> int:
-    """Count active SIMPLE-lane ledger rows in the RADAR_TIME_ZONE half-open day.
+    """Conta righe ledger attive della lane SIMPLE nel giorno half-open ``RADAR_TIME_ZONE``.
 
-    Prefer purpose ``classify:simple``; legacy rows without that purpose fall back to
-    non-DeepSeek model heuristic (pre-generalization ledger).
+    Preferisce ``purpose=classify:simple``; fallback legacy su model non-DeepSeek
+    (ledger pre-generalizzazione). Non usa ``COUNT(*)`` su ``articles``.
     """
     day_start, day_end = compute_day_window(datetime.now(timezone.utc), RADAR_TIME_ZONE)
     async with pool.acquire() as conn:
@@ -465,10 +483,11 @@ async def _ledger_simple_rpd_used(pool: asyncpg.Pool) -> int:
 
 
 async def run_pipeline_cycle(state: WorkerState) -> None:
-    """
-    One ingest cycle: reconcile → SIMPLE RPD soft-trim via ledger → fetch →
-    bounded queue + N consumers (never TaskGroup-all-entries).
-    Hard RPM/TPM/RPD enforcement remains in QuotaLedger.reserve per lane.
+    """Un ciclo ingest: reconcile → soft-trim SIMPLE.rpd → fetch → coda + N consumer.
+
+    Mai ``TaskGroup`` su tutte le entry. Hard RPM/TPM/RPD restano in
+    ``QuotaLedger.reserve`` per-lane. Soft-trim: ``simple_rpd==0`` = off;
+    pieno senza residual COMPLEX → iberna ciclo; con residual → bypass failover.
     """
     assert state.db_pool is not None
     assert state.miniflux_client is not None
@@ -563,9 +582,10 @@ async def run_heartbeat_loop(
     status: str = "running",
     detail: str | None = None,
 ) -> None:
-    """
-    Periodically UPSERT worker_heartbeat while this process holds leadership.
-    CancelledError is re-raised; other errors are logged and the loop continues.
+    """UPSERT periodico ``worker_heartbeat`` finché questo processo è leader.
+
+    ``CancelledError`` ri-lanciato; altri errori solo log — il loop continua
+    (readiness API dipende dalla freshness di questo heartbeat).
     """
     assert state.db_pool is not None
     logger.info(
@@ -584,7 +604,10 @@ async def run_heartbeat_loop(
 
 
 async def run_pipeline_loop(state: WorkerState) -> None:
-    """Daemon loop. Poll interval is awaited outside any finally (shutdown-safe)."""
+    """Loop demone: ciclo + sleep di poll **fuori** da qualsiasi ``finally`` di shutdown.
+
+    Livelli errore: demone sopravvive agli errori di ciclo; ``CancelledError`` sale.
+    """
     logger.info(
         "Demone pipeline avviato (poll=%ss, queue_depth=%s, entry_concurrency=%s).",
         WORKER_POLL_INTERVAL_SECONDS,
@@ -619,7 +642,11 @@ async def run_pipeline_loop(state: WorkerState) -> None:
 
 
 async def run_worker() -> None:
-    """Bootstrap resources, acquire leadership, run loop; always re-raise CancelledError."""
+    """Bootstrap → leadership → heartbeat → pipeline (o degraded sleep); sempre shutdown.
+
+    Gate ingest: ``bool(LLM_API_KEY)`` (alias boot da lane/legacy in ``config``).
+    Senza chiave: leadership+heartbeat restano, nessuna classificazione (status degraded).
+    """
     setup_logging()
     logger.info(
         "Avvio radar-worker. MAX_MINIFLUX_RESPONSE_BYTES=%s.",
@@ -661,6 +688,7 @@ async def run_worker() -> None:
                 gemini_sem=gemini_sem,
             )
         else:
+            # Log storico Gemini-centrico: il gate reale è LLM_API_KEY (lane o legacy).
             logger.error(
                 "GEMINI_API_KEY/GOOGLE_API_KEY mancante: ingest LLM sospeso. "
                 "API e frontend restano disponibili; il worker mantiene leadership + heartbeat."
@@ -693,7 +721,7 @@ async def run_worker() -> None:
         if ingest_enabled:
             await run_pipeline_loop(state)
         else:
-            # Stay alive for heartbeat / leadership without calling Gemini.
+            # Resta vivo per heartbeat/leadership senza chiamare provider LLM.
             while True:
                 await asyncio.sleep(float(WORKER_POLL_INTERVAL_SECONDS))
 
@@ -706,7 +734,10 @@ async def run_worker() -> None:
 
 
 def _install_signal_handlers(loop: asyncio.AbstractEventLoop, main_task: asyncio.Task) -> None:
-    """Cancel the main task on SIGTERM/SIGINT (Docker stop / Ctrl+C)."""
+    """Cancella il task principale su SIGTERM/SIGINT (Docker stop / Ctrl+C).
+
+    Su Windows ``add_signal_handler`` può non essere supportato → fallback ``signal.signal``.
+    """
 
     def _request_shutdown() -> None:
         logger.info("Segnale di shutdown ricevuto; cancellazione task principale.")
@@ -731,7 +762,7 @@ async def _async_main() -> None:
 
 
 def main() -> None:
-    """CLI entry: ``python -m app.worker``."""
+    """Entry CLI: ``python -m app.worker``. Cancel → exit 0 (stop Docker pulito)."""
     try:
         asyncio.run(_async_main())
     except asyncio.CancelledError:

@@ -1,4 +1,12 @@
-"""Atomic relational DB commit with outbox enqueue."""
+"""Commit relazionale atomico + enqueue outbox nella stessa transazione.
+
+Ordine durable (docs/02): INSERT articles/junction + riga ``article_outbox``
+→ reconcile vault (altrove) → mark-read Miniflux solo se outbox ``completed``.
+URL normalizzato una sola volta prima di dedup / ``ON CONFLICT``.
+
+SoT:
+    docs/02_architecture_and_backend.md (persistence); runbook outbox.
+"""
 
 from __future__ import annotations
 
@@ -23,9 +31,30 @@ async def commit_article_to_db(
     outbox_payload: str,
     miniflux_entry_id: int | None = None,
 ) -> int:
-    """
-    Inserimento atomico articolo + relazioni + riga outbox in una sola transazione.
-    L'URL viene normalizzato una sola volta prima del dedup/ON CONFLICT.
+    """Inserisce articolo + relazioni + outbox in **una** transazione.
+
+    CSV schema → liste Python via ``parse_csv_list``; companies/tags diventano
+    junction ``ON CONFLICT DO NOTHING``. Se ``source_url`` già presente
+    (``ON CONFLICT DO NOTHING``), recupera l'id esistente e aggiorna comunque
+    l'outbox (pending, salvo già ``completed`` — vedi ``enqueue_outbox_row``).
+
+    Args:
+        conn: Connessione asyncpg (transazione aperta qui).
+        article: Schema Pydantic già validato.
+        feed_title: Titolo feed Miniflux.
+        outbox_target_path: Path vault assoluto (da ``get_article_file_path``).
+        outbox_payload: Markdown da proiettare sul vault.
+        miniflux_entry_id: Id entry per mark-read differito; può essere ``None``.
+    Returns:
+        ``articles.id`` (nuovo o già esistente).
+    Raises:
+        RuntimeError: impossibile risolvere id dopo conflict URL.
+        EntryValidationError: URL non normalizzabile.
+    Side-effects:
+        Scrive tabelle relazionali + ``article_outbox``; **non** tocca il vault
+        né Miniflux (compito di ``reconcile_outbox``).
+    SoT:
+        docs/02 persistence; runbook (mark-read solo post-completed).
     """
     logger.info("Salvataggio relazionale nel DB per l'articolo: '%s'", article.title[:50])
 
@@ -68,6 +97,7 @@ async def commit_article_to_db(
         )
 
         if article_id is None:
+            # Conflict URL: riga già presente — recupera id per junction/outbox.
             logger.debug(
                 "Articolo già registrato via URL. Recupero ID esistente per: %s",
                 normalized_url,

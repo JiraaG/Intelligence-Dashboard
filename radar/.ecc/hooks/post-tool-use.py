@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """
-Hook PostToolUse — Radar Informativo Globale
+Hook PostToolUse — Radar Informativo Globale (logica SoT).
 
-Phase 6:
-- Resolve project root from this hook path / cwd
-- Fail-closed if the project linter binary is missing (ruff / prettier)
-- Accept ECC + Cursor write tool names
-- Soft warnings (TODO placeholders) do not fail; lint errors do
+Dopo un tool di scrittura: soft-warn su placeholder vietati; lint hard-fail
+(ruff / prettier). Linter assente → ``LinterMissing`` → exit 1 (fail-closed).
+
+Contratto diretto: exit nonzero = fallimento. L'adapter Cursor
+(``.cursor/hooks/post-tool-use-adapter.py``) può trasformare quel fallimento in
+``additional_context`` con exit 0 (C-01: docs «fail-closed» vs adapter advisory).
+
+@see docs/04_ecc_framework.md (hooks); Phase 6 write-tool allowlist.
 """
 
 from __future__ import annotations
@@ -18,6 +21,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Nomi ECC + Cursor: estesi da settings.json tools.allowlist se presenti.
 DEFAULT_WRITE_TOOLS = frozenset(
     {
         "write_to_file",
@@ -33,10 +37,14 @@ DEFAULT_WRITE_TOOLS = frozenset(
 
 
 class LinterMissing(RuntimeError):
-    pass
+    """Binario lint non sul PATH — Phase 6 richiede fail-closed, non skip silenzioso."""
 
 
 def resolve_radar_root() -> Path:
+    """
+    Root ``radar/``: da ``radar/.ecc/hooks`` → parents, oppure walk da cwd
+    (anche se lanciato dalla repo-root con ``radar/.ecc`` annidato).
+    """
     here = Path(__file__).resolve().parent  # radar/.ecc/hooks
     radar = here.parent.parent
     if (radar / ".ecc").is_dir() and (radar / "frontend").is_dir():
@@ -51,6 +59,7 @@ def resolve_radar_root() -> Path:
 
 
 def load_write_tool_names(settings_path: Path) -> frozenset[str]:
+    """Unione DEFAULT_WRITE_TOOLS + allowlist settings con write/replace/edit/patch."""
     names = set(DEFAULT_WRITE_TOOLS)
     if settings_path.is_file():
         try:
@@ -65,6 +74,7 @@ def load_write_tool_names(settings_path: Path) -> frozenset[str]:
 
 
 def extract_file_path(tool_input: dict) -> str:
+    """Prima chiave path non vuota tra forme ECC/Cursor/notebook."""
     for key in ("TargetFile", "AbsolutePath", "path", "file_path", "target_notebook"):
         val = tool_input.get(key)
         if isinstance(val, str) and val:
@@ -73,6 +83,10 @@ def extract_file_path(tool_input: dict) -> str:
 
 
 def check_todo_comments(file_path: str) -> list[str]:
+    """
+    Soft warning: placeholder vietati dal progetto.
+    Non fallisce da solo — solo ``hard_lint_failed`` / ``LinterMissing`` fanno exit 1.
+    """
     violations: list[str] = []
     forbidden_patterns = [
         r"#\s*TODO",
@@ -95,6 +109,7 @@ def check_todo_comments(file_path: str) -> list[str]:
 
 
 def run_python_linting(file_path: str, cwd: Path) -> bool:
+    """``ruff check``; False = problemi lint; ``LinterMissing`` se ruff assente."""
     try:
         result = subprocess.run(
             ["ruff", "check", "--quiet", file_path],
@@ -118,7 +133,10 @@ def run_python_linting(file_path: str, cwd: Path) -> bool:
 
 
 def run_frontend_linting(file_path: str, frontend_root: Path) -> bool:
-    """Project FE linter is Prettier (package.json lint), not ESLint."""
+    """
+    Linter FE di progetto = Prettier (``package.json`` lint), non ESLint.
+    Path reso relativo a ``frontend/`` per ``npx prettier --check``.
+    """
     try:
         rel = str(Path(file_path).resolve().relative_to(frontend_root.resolve()))
     except ValueError:
@@ -153,12 +171,17 @@ def run_frontend_linting(file_path: str, frontend_root: Path) -> bool:
 
 
 def log_tool_completion(tool_name: str, file_path: str = "") -> None:
+    """Log su stderr (non stdout — stdout può essere consumato dall'adapter)."""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     target = f" → {file_path}" if file_path else ""
     print(f"[{timestamp}] [PostToolUse OK] {tool_name}{target}", file=sys.stderr)
 
 
 def main() -> None:
+    """
+    Se write-tool + path: soft placeholder + lint per estensione.
+    Exit 1: linter missing o lint fallito. Soft warning → stderr, exit 0.
+    """
     radar_root = resolve_radar_root()
     settings_path = radar_root / ".ecc" / "settings.json"
     write_tools = load_write_tool_names(settings_path)

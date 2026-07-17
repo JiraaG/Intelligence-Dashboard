@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 """
-Hook PreToolUse — Radar Informativo Globale
-Eseguito PRIMA di qualsiasi invocazione di tool da parte dell'agente.
+Hook PreToolUse — Radar Informativo Globale.
 
-Pattern ECC: Security scanning e validazione input prima dell'azione.
-Rileva: path traversal, secret leak, accesso a file system vietati, comandi pericolosi.
-Phase 6: domain match == o endswith('.'+allowed) — no suffix spoof.
+Eseguito PRIMA di qualsiasi invocazione di tool da parte dell'agente.
+SoT della policy: questo file (non gli adapter Cursor).
+
+Scansiona l'input tool e, in caso di violazione, termina con exit 1 (deny).
+Non oscura output modello né risponde con testo redacted: blocca l'invocazione
+(C-02: settings.json parla di «redaction»; qui è deny sull'input).
+
+Rileva: path vietati, secret pattern, comandi pericolosi, host fuori allowlist.
+Phase 6: dominio ammesso solo se ``==`` all'apex o subdomain proprio
+(``endswith('.'+allowed)``) — niente spoof per suffisso.
+@see docs/04_ecc_framework.md (hooks); settings.json domains/secrets.
 """
 
 from __future__ import annotations
@@ -26,6 +33,7 @@ FORBIDDEN_PATHS = [
     r"AppData\\Roaming",
 ]
 
+# Allineare a settings.json secrets.notes — match = blocco invocazione, non redact.
 SECRET_PATTERNS = [
     r"AIza[0-9A-Za-z_-]{35}",
     r"sk-[A-Za-z0-9]{32,}",
@@ -46,6 +54,7 @@ DANGEROUS_COMMANDS = [
     r"curl\s+.*\|\s*(bash|sh|python)",
 ]
 
+# Sync con settings.json domains — match exact o subdomain (vedi domain_allowed).
 ALLOWED_DOMAINS = [
     "github.com",
     "raw.githubusercontent.com",
@@ -62,6 +71,7 @@ ALLOWED_DOMAINS = [
 
 
 def check_forbidden_paths(tool_input: str) -> list[str]:
+    """Segnala path sensibili (``.env``, ``.ssh``, system dirs) nell'input tool."""
     violations = []
     for pattern in FORBIDDEN_PATHS:
         if re.search(pattern, tool_input, re.IGNORECASE):
@@ -70,6 +80,13 @@ def check_forbidden_paths(tool_input: str) -> list[str]:
 
 
 def check_secret_patterns(tool_input: str) -> list[str]:
+    """
+    Rileva secret-like nell'input tool.
+
+    Il messaggio di violazione può dire «oscurato», ma l'effetto runtime è
+    ``sys.exit(1)`` in ``main`` (blocco invocazione). Non redige stdout/stderr
+    del modello né maschera risposte successive (C-02).
+    """
     violations = []
     for pattern in SECRET_PATTERNS:
         if re.search(pattern, tool_input):
@@ -78,6 +95,7 @@ def check_secret_patterns(tool_input: str) -> list[str]:
 
 
 def check_dangerous_commands(tool_input: str) -> list[str]:
+    """Segnala comandi distruttivi tipici (rm -rf /, DROP/TRUNCATE, pipe-to-shell)."""
     violations = []
     for pattern in DANGEROUS_COMMANDS:
         if re.search(pattern, tool_input, re.IGNORECASE):
@@ -86,6 +104,7 @@ def check_dangerous_commands(tool_input: str) -> list[str]:
 
 
 def _normalize_host(host: str) -> str:
+    """Lowercase, togli porta / zone-id / trailing dot; IPv6 tra ``[]`` → host interno."""
     host = host.strip().lower()
     if host.startswith("[") and "]" in host:
         host = host[1 : host.index("]")]
@@ -99,7 +118,10 @@ def _normalize_host(host: str) -> str:
 
 
 def domain_allowed(domain: str, allowed_domains: list[str]) -> bool:
-    """Accept only exact match or a proper subdomain of an allowlisted apex."""
+    """
+    True solo se host == apex allowlist o è subdomain proprio
+    (``evil.com.allowed.com`` non passa; ``api.allowed.com`` sì).
+    """
     domain = _normalize_host(domain)
     if not domain or domain.startswith("."):
         return False
@@ -113,6 +135,7 @@ def domain_allowed(domain: str, allowed_domains: list[str]) -> bool:
 
 
 def check_network_domains(tool_input: str) -> list[str]:
+    """Estrae host da URL http(s) nell'input e confronta con ALLOWED_DOMAINS."""
     violations = []
     urls = re.findall(r"https?://([^/\s\"']+)", tool_input)
     for url_domain in urls:
@@ -123,6 +146,11 @@ def check_network_domains(tool_input: str) -> list[str]:
 
 
 def main() -> None:
+    """
+    Legge JSON stdin (``tool_name`` / ``tool_input``); fallback argv se JSON rotto.
+    Exit 1 se path/secret/comando (sempre) o dominio (solo tool di rete/shell).
+    Exit 0 = allow.
+    """
     try:
         tool_data = json.loads(sys.stdin.read()) if not sys.stdin.isatty() else {}
         tool_name = tool_data.get("tool_name", "unknown")
@@ -136,6 +164,7 @@ def main() -> None:
     all_violations.extend(check_secret_patterns(tool_input_str))
     all_violations.extend(check_dangerous_commands(tool_input_str))
 
+    # Check dominio solo su tool che tipicamente fetchano/eseguono comandi con URL.
     if tool_name in ("run_command", "execute_bash", "Shell", "read_url_content", "WebFetch"):
         all_violations.extend(check_network_domains(tool_input_str))
 

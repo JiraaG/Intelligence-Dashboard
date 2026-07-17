@@ -1,4 +1,14 @@
-"""Miniflux HTTP client with shared httpx, size limits, and retryable backoff."""
+"""Client HTTP Miniflux: httpx condiviso, ceiling byte, retry/backoff.
+
+Confine rete verso Miniflux: stream con tetto ``MAX_MINIFLUX_RESPONSE_BYTES``,
+retry su 429/5xx e errori di rete, validazione entry isolata per-item.
+``mark_as_read`` / ``refresh_all_feeds`` sono side-effect usati dal worker/outbox
+dopo commit durable — non dall'API.
+
+SoT:
+    docs/01_getting_started.md §6; skill llm-json-extraction (fetch → mark-read);
+    AGENTS.md (ingest solo worker).
+"""
 
 from __future__ import annotations
 
@@ -30,14 +40,16 @@ logger = logging.getLogger("radar.extraction.client")
 
 
 class MinifluxResponseTooLarge(RuntimeError):
-    """Raised when a Miniflux response exceeds MAX_MINIFLUX_RESPONSE_BYTES."""
+    """Corpo (o Content-Length) oltre ``MAX_MINIFLUX_RESPONSE_BYTES``: no retry utile."""
 
 
 def _is_retryable_http_status(status_code: int) -> bool:
+    """429 e 5xx sono transienti lato Miniflux; 4xx diversi no."""
     return status_code == 429 or status_code >= 500
 
 
 def _is_retryable_exception(exc: BaseException) -> bool:
+    """Timeout/rete/protocollo o HTTPStatusError con status retryable."""
     if isinstance(exc, (httpx.TimeoutException, httpx.NetworkError, httpx.RemoteProtocolError)):
         return True
     if isinstance(exc, httpx.HTTPStatusError):
@@ -46,6 +58,7 @@ def _is_retryable_exception(exc: BaseException) -> bool:
 
 
 def _retry_after_seconds(response: httpx.Response | None, attempt: int) -> float:
+    """Backoff esponenziale capped; onora ``Retry-After`` numerico se presente."""
     base = float(MINIFLUX_RETRY_BASE_SECONDS)
     capped = min(float(MINIFLUX_RETRY_MAX_SECONDS), base * (2**attempt))
     if response is None:
@@ -60,9 +73,10 @@ def _retry_after_seconds(response: httpx.Response | None, attempt: int) -> float
 
 
 class MinifluxClient:
-    """
-    Client asincrono per l'API REST Miniflux.
-    Riusa un httpx.AsyncClient di proprietà del lifespan FastAPI.
+    """Client asincrono REST Miniflux su ``httpx.AsyncClient`` del lifespan.
+
+    Non crea un pool proprio: ownership del client HTTP resta al chiamante
+    (worker/API bootstrap). Credenziali vuote → solo warning a init.
     """
 
     def __init__(
@@ -86,6 +100,12 @@ class MinifluxClient:
         }
 
     async def _read_limited_body(self, response: httpx.Response) -> bytes:
+        """Legge lo stream a chunk; abort se supera il ceiling configurato.
+
+        Controlla anche ``Content-Length`` quando presente (fail-fast).
+        Raises:
+            MinifluxResponseTooLarge: tetto superato — non ritentare.
+        """
         content_length = response.headers.get("Content-Length")
         if content_length is not None:
             try:
@@ -118,6 +138,20 @@ class MinifluxClient:
         json_body: dict[str, Any] | None = None,
         expect_json: bool = True,
     ) -> Any:
+        """Esegue una richiesta streamata con retry bounded su errori transienti.
+
+        Args:
+            method: Verbo HTTP.
+            path: Path relativo sotto ``api_url`` (es. ``/v1/entries``).
+            params: Query string.
+            json_body: Body JSON opzionale.
+            expect_json: Se False restituisce bytes grezzi (mark-read / refresh).
+        Returns:
+            Dict/list JSON decodificato, ``{}`` se body vuoto, o bytes.
+        Raises:
+            MinifluxResponseTooLarge: subito, senza retry.
+            httpx.HTTPError / RuntimeError: dopo esaurimento tentativi.
+        """
         url = f"{self.api_url}{path}"
         last_error: BaseException | None = None
 
@@ -200,9 +234,18 @@ class MinifluxClient:
         raise RuntimeError(f"Richiesta Miniflux fallita senza errore esplicito: {method} {path}")
 
     async def fetch_unread_entries(self, limit: int = 50) -> list[ValidatedMinifluxEntry]:
-        """
-        Recupera articoli non letti e valida ogni entry isolatamente.
-        Entry malformate vengono scartate senza annullare le sorelle.
+        """Recupera unread recenti e valida ogni entry in isolamento.
+
+        Filtro: status unread, ordine ``published_at`` desc, finestra ~48h
+        (``published_after``). Entry malformate → warning e skip; le sorelle restano.
+        Fallimento HTTP dell'intero fetch → lista vuota (ciclo worker fail-soft).
+
+        Args:
+            limit: Max entry richieste (allineare a ``MINIFLUX_LIMIT`` / ceiling 5MB).
+        Returns:
+            Lista di ``ValidatedMinifluxEntry``; può essere vuota.
+        SoT:
+            docs/01 §6 (unread ~48h, MINIFLUX_LIMIT tipico 50).
         """
         params = {
             "status": "unread",
@@ -243,6 +286,14 @@ class MinifluxClient:
         return validated
 
     async def mark_as_read(self, entry_ids: list[int]) -> None:
+        """Segna entry come lette su Miniflux (side-effect post-outbox durable).
+
+        ``httpx.HTTPError`` → solo warning (il worker/outbox gestisce retry a
+        livello superiore); altre eccezioni sono ri-lanciate.
+        Lista vuota = no-op.
+        SoT:
+            llm-json-extraction (mark-read solo se vault/outbox completed).
+        """
         if not entry_ids:
             logger.debug("Nessun articolo da segnare come letto su Miniflux.")
             return
@@ -260,6 +311,11 @@ class MinifluxClient:
             raise
 
     async def refresh_all_feeds(self) -> None:
+        """Trigger refresh forzato di tutti i feed RSS su Miniflux.
+
+        ``HTTPError`` → warning; altre eccezioni → solo log error (non ri-lanciate).
+        Tipicamente chiamato dal ciclo worker prima del fetch unread.
+        """
         logger.info("Richiesta di refresh forzato di tutti i feed RSS su Miniflux...")
         try:
             await self._request("PUT", "/v1/feeds/refresh", expect_json=False)

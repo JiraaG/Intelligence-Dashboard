@@ -1,11 +1,25 @@
 ﻿#!/usr/bin/env python3
+"""
+Adapter sottile Cursor preToolUse → ``radar/.ecc/hooks/pre-tool-use.py``.
+
+Normalizza payload Cursor (``tool``/``arguments`` → ``tool_name``/``tool_input``),
+delega la policy al hook Radar e propaga deny (permission deny + messaggio).
+Non duplica pattern secret/path/dominio: SoT resta nel hook ECC.
+
+@see docs/04_ecc_framework.md (adapter sottili).
+"""
 import json, subprocess, sys
 from pathlib import Path
 
 def project_root():
+    """Repo-root (``.cursor/hooks`` → parents[2])."""
     return Path(__file__).resolve().parents[2]
 
 def main():
+    """
+    Exit del processo adapter è sempre 0 verso Cursor; il blocco è nel JSON
+    ``permission: deny``. Exit nonzero del pre-hook Radar → deny.
+    """
     raw = sys.stdin.read() if not sys.stdin.isatty() else "{}"
     try:
         payload = json.loads(raw) if raw.strip() else {}

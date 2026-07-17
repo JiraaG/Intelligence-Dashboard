@@ -1,8 +1,11 @@
-"""OpenAI-compatible chat client via httpx (DeepSeek / OpenAI / GLM / Grok).
+"""Client chat OpenAI-compat via httpx (DeepSeek / OpenAI / GLM / Grok).
 
-No ``openai`` package. Payload dialect:
-  - ``deepseek``: DeepSeek ``thinking`` + ``reasoning_effort``
-  - ``openai``: stock chat/completions (no DeepSeek-only fields)
+Niente package ``openai``. Dialect payload:
+  - ``deepseek``: campi ``thinking`` + ``reasoning_effort``
+  - ``openai``: chat/completions stock (nessun campo DeepSeek-only)
+
+SoT:
+    skill llm-json-extraction; SoT LLM §5; AGENTS.md (httpx, no openai pkg).
 """
 
 from __future__ import annotations
@@ -26,7 +29,10 @@ logger = logging.getLogger("radar.classification.deepseek")
 
 
 class DeepSeekError(Exception):
-    """Provider error with optional HTTP status and Retry-After seconds."""
+    """Errore provider con status HTTP e ``Retry-After`` opzionali.
+
+    Usato dal router in ``classification/client.py`` per tassonomia retry/cooldown.
+    """
 
     def __init__(
         self,
@@ -43,6 +49,7 @@ class DeepSeekError(Exception):
 
 
 def _parse_retry_after(headers: httpx.Headers) -> float | None:
+    """Parse ``Retry-After`` numerico; clamp 0–300s. Non-numerico → ``None``."""
     raw = headers.get("Retry-After") or headers.get("retry-after")
     if raw is None:
         return None
@@ -53,6 +60,7 @@ def _parse_retry_after(headers: httpx.Headers) -> float | None:
 
 
 def normalize_api_dialect(raw: str | None) -> str:
+    """Normalizza dialect a ``deepseek``|``openai``; default ``deepseek`` se ignoto."""
     value = (raw or API_DIALECT_DEEPSEEK).strip().lower()
     if value in {API_DIALECT_DEEPSEEK, API_DIALECT_OPENAI}:
         return value
@@ -67,7 +75,15 @@ def build_chat_completions_payload(
     effort: str,
     api_dialect: str,
 ) -> dict[str, Any]:
-    """Build POST /chat/completions JSON for the given dialect."""
+    """Costruisce il JSON POST ``/chat/completions`` per il dialect richiesto.
+
+    ``effort=none`` → ``max_tokens`` 2048; altrimenti 8192.
+    Dialect deepseek: ``thinking`` disabled oppure enabled+``reasoning_effort``
+    (low mappato a high). Dialect openai: nessun campo thinking (effort ignora).
+
+    SoT:
+        SoT LLM §5 dialect; llm-json-extraction.
+    """
     dialect = normalize_api_dialect(api_dialect)
     payload: dict[str, Any] = {
         "model": model,
@@ -79,7 +95,7 @@ def build_chat_completions_payload(
         "max_tokens": 2048 if effort == "none" else 8192,
     }
     if dialect == API_DIALECT_DEEPSEEK:
-        # Thinking off = cheaper / less capable path (bulk SIMPLE).
+        # Thinking off = path più economico / meno capace (bulk SIMPLE).
         # Thinking on: temperature/top_p non ammessi; effort high|max only (low→high).
         if effort == "none":
             payload["thinking"] = {"type": "disabled"}
@@ -88,8 +104,8 @@ def build_chat_completions_payload(
             payload["thinking"] = {"type": "enabled"}
             payload["reasoning_effort"] = ds_effort
     elif effort != "none":
-        # Stock OpenAI-compat: no DeepSeek ``thinking``. Effort only sizes max_tokens
-        # above; vendors that reject unknown fields stay safe.
+        # Stock OpenAI-compat: niente ``thinking`` DeepSeek. Effort solo dimensiona
+        # max_tokens sopra; vendor che rifiutano campi sconosciuti restano sicuri.
         logger.debug(
             "openai dialect ignores thinking/reasoning_effort (effort=%s model=%s)",
             effort,
@@ -99,7 +115,7 @@ def build_chat_completions_payload(
 
 
 class DeepSeekClient:
-    """Async chat completions → JSON string (Pydantic validated by caller)."""
+    """Chat completions async → stringa JSON (Pydantic a carico del chiamante)."""
 
     def __init__(
         self,
@@ -115,7 +131,7 @@ class DeepSeekClient:
         self.base_url = (base_url or DEEPSEEK_BASE_URL).rstrip("/")
         self.model = model or DEEPSEEK_MODEL
         effort_raw = (effort or DEEPSEEK_REASONING_EFFORT or "high").lower()
-        # none/off/disabled = non-thinking (cheaper). low/medium kept for config compat.
+        # none/off/disabled = non-thinking (più economico). low/medium restano per compat config.
         if effort_raw in {"none", "off", "disabled"}:
             self.effort = "none"
         elif effort_raw in {"low", "medium", "high", "max"}:
@@ -127,6 +143,7 @@ class DeepSeekClient:
 
     @property
     def available(self) -> bool:
+        """True se è configurata una API key non vuota."""
         return bool(self.api_key)
 
     def build_payload(
@@ -136,7 +153,7 @@ class DeepSeekClient:
         system: str,
         user: str,
     ) -> dict[str, Any]:
-        """Public builder for unit tests and callers that need the request body."""
+        """Builder pubblico per test e chiamanti che servono il body della request."""
         return build_chat_completions_payload(
             model=model,
             system=system,
@@ -155,11 +172,22 @@ class DeepSeekClient:
         correction: str | None = None,
         model: str | None = None,
     ) -> tuple[str, int | None]:
-        """
-        Return (json_text, usage_total_tokens_or_None).
+        """Chiama il provider e restituisce ``(json_text, usage_total_tokens|None)``.
 
-        ``model`` overrides the client default (lane env LLM_*_MODEL).
-        Raises DeepSeekError on HTTP/provider failures.
+        Trunca ``content`` a 4000 (invariante tutte le lane). Appende vincoli
+        json_object / chiavi flat e eventuale blocco CORREZIONE. Mappa HTTP →
+        ``DeepSeekError`` (429+Retry-After, 402 crediti, 401/403, 404 modello, 5xx).
+
+        Args:
+            title, content, url, date: Campi articolo per ``build_user_prompt``.
+            correction: Testo di correzione schema (retry ValidationError).
+            model: Override del default client (env ``LLM_*_MODEL`` della lane).
+        Returns:
+            Testo JSON grezzo + token usage se presente.
+        Raises:
+            DeepSeekError: key mancante, timeout, transport, status HTTP mappati.
+        SoT:
+            llm-json-extraction (``content[:4000]``, SYSTEM_PROMPT immutabile).
         """
         if not self.api_key:
             raise DeepSeekError("OpenAI-compat API key mancante", status_code=401)
@@ -260,10 +288,10 @@ class DeepSeekClient:
         data = resp.json()
         try:
             message = data["choices"][0]["message"]
-            # Prefer content; ignore reasoning_content (not in Radar schema).
+            # Preferisci content; ignora reasoning_content (fuori schema Radar).
             text = message.get("content") or ""
             if isinstance(text, list):
-                # Some APIs return content parts
+                # Alcune API restituiscono content a parti
                 text = "".join(
                     part.get("text", "") if isinstance(part, dict) else str(part) for part in text
                 )

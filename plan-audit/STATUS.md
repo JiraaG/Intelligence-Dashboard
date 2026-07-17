@@ -16,6 +16,8 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 | Allineamento product docs | [`complete/plan_docs_monorepo_source.md`](complete/plan_docs_monorepo_source.md) | ESEGUITO + coerenza porte/health/requeue |
 | Final Release F1–F4 | [`active/plan_release_final_gate.md`](active/plan_release_final_gate.md) + report `remediation/*_F*.md` | Backup, seed 10k, chaos C1–C3, security |
 | SoT LLM multi-provider | [`active/sot_llm_multi_model_fallback.md`](active/sot_llm_multi_model_fallback.md) | **Vivo** — §0 limiti/failover RPM·TPM vs RPD (2026-07-17) |
+| Commenti codice P0 | [`active/plan_code_comments_beginner_audit.md`](active/plan_code_comments_beginner_audit.md) | **P0-01…P0-09 DONE**; P1/P2 opt-in |
+| Prompt audit commenti | [`prompts/done/audit_prompt_code_comments_beginner_terra.md`](prompts/done/audit_prompt_code_comments_beginner_terra.md) | Pipeline Terra→Grok chiusa |
 | Report ticket singoli | [`remediation/`](remediation/) | Storico — non cancellare |
 | Prompt eseguiti | [`prompts/done/`](prompts/done/) | Storico |
 | Piani ECC / Limits / stub | [`archive/`](archive/) | SUPERSEDED / PRD |
@@ -28,10 +30,11 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 |------|--------|------|
 | Fase 0 — PR `refactor/testing` → `develop` (senza merge auto) | **Aperto** | Branch pushed; aprire via [compare](https://github.com/JiraaG/Dashboard-finance/compare/develop...refactor/testing?expand=1) (`gh` opzionale) |
 | Fase 5 — digest pin + drop `--legacy-peer-deps` | **DEFERRED ACCETTATO** | Non blocca merge; vedi piano §7 |
+| Commenti codice P1/P2 | **Opt-in** | Solo su richiesta; batch in piano §5 (`P1-01`…`P1-03`, `P2-01`) |
 
 Prompt orchestratore (solo se serve chiudere Fase 0): [`prompts/active/audit_prompt_final_release_gate.md`](prompts/active/audit_prompt_final_release_gate.md) — **F1–F4 già PASS**, non rieseguire.
 
-**Fuori scope:** nuove feature; `radar-sidebar/**`; riaprire ticket CLOSED.
+**Fuori scope:** nuove feature; `radar-sidebar/**`; riaprire ticket CLOSED; rieseguire P0 commenti senza richiesta.
 
 ---
 
@@ -40,10 +43,10 @@ Prompt orchestratore (solo se serve chiudere Fase 0): [`prompts/active/audit_pro
 ```text
 plan-audit/
   STATUS.md          ← questo file (quadro fatto / residui)
-  active/            ← SoT LLM + piano Final Release (storico procedure)
+  active/            ← SoT LLM + Final Release + piano commenti (P1/P2 residui)
   complete/          ← piani e checklist COMPLETATI
-  prompts/active/    ← prompt post-gate (PR)
-  prompts/done/      ← storico
+  prompts/active/    ← prompt post-gate (PR) + ECC expansion (non eseguito)
+  prompts/done/      ← storico (incl. audit commenti Terra)
   remediation/       ← report DONE (incl. F1–F4)
   archive/           ← SUPERSEDED / scratch / ECC early
 ```

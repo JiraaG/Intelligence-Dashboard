@@ -5,11 +5,19 @@ import { ArticleService } from './article.service';
 import { Article, ArticleFilters, CountrySummary, PrimaryCategory } from '../models/article.model';
 import { MapSummaryRow } from '../models/map-summary.model';
 
+/**
+ * Stato Signals condiviso: map-summary day-view + detail nazione + read-status.
+ *
+ * Non tocca `radar-sidebar/**`: le mutazioni `is_read` preservano le reference
+ * oggetto detenute dal carosello; l'array viene sostituito per rinfrescare i computed.
+ *
+ * @see SoT: radar/.ecc/rules/frontend.md §2b (detailError); skill radar-sidebar-freeze.
+ */
 @Injectable({ providedIn: 'root' })
 export class StateService {
   private readonly articleService = inject(ArticleService);
 
-  /** Per-article mutation counter — only the latest toggle may apply response/rollback. */
+  /** Contatore per-articolo: solo l'ultima toggle può applicare risposta/rollback. */
   private readonly readMutationVersion = new Map<number, number>();
 
   readonly filters = signal<ArticleFilters>({
@@ -18,10 +26,11 @@ export class StateService {
     categories: [],
   });
 
-  /** Nation-scoped articles for sidebar + map markers (empty on day view). */
+  /** Articoli nazione per sidebar + marker detail (vuoto in day-view). */
   readonly detailArticles = signal<Article[]>([]);
   readonly detailLoading = signal(false);
 
+  /** Day-view: `GET /api/map-summary` in base a data (+ sentiment singolo se selezionato). */
   readonly mapSummaryResource = rxResource({
     params: () => {
       const f = this.filters();
@@ -35,7 +44,7 @@ export class StateService {
       }),
   });
 
-  /** Summary rows with client-side category filter applied. */
+  /** Righe summary con filtro categoria client-side (toolbar). */
   readonly filteredSummary = computed((): MapSummaryRow[] => {
     const raw = this.mapSummaryResource.value() ?? [];
     const cats = this.filters().categories;
@@ -43,6 +52,7 @@ export class StateService {
     return raw.filter((row) => cats.includes(row.primary_category));
   });
 
+  /** Rollup paesi da ``filteredSummary`` (categorie, count, read). */
   readonly countries = computed((): CountrySummary[] => {
     const grouped = new Map<string, { cats: Set<PrimaryCategory>; count: number; read: number }>();
 
@@ -79,16 +89,25 @@ export class StateService {
   );
 
   /**
-   * Alias for nation detail list (sidebar / tests). Empty until a country is opened.
-   * Day view no longer loads a full Article[] dump.
+   * Alias della lista detail (sidebar / test). Vuoto finché non si apre una nazione.
+   * Day-view non carica più un dump ``Article[]`` globale.
    */
   readonly articles = computed(() => this.detailArticles());
 
   readonly isLoading = computed(() => this.mapSummaryResource.isLoading() || this.detailLoading());
+
+  /**
+   * Errore nation-fetch (T-P1-04). Su fallimento ``App.closeSidebar(false)`` lo lascia
+   * visibile nel banner; close utente lo azzera.
+   */
   readonly detailError = signal<unknown>(null);
 
+  /** Errore UI: summary oppure detail (banner toolbar). */
   readonly error = computed(() => this.mapSummaryResource.error() ?? this.detailError());
 
+  /**
+   * Svuota detail nazione. ``clearError: false`` preserva ``detailError`` (fail nation-fetch).
+   */
   clearDetailArticles(options?: { clearError?: boolean }): void {
     const clearError = options?.clearError ?? true;
     if (clearError) {
@@ -99,8 +118,12 @@ export class StateService {
   }
 
   /**
-   * Load every article for date+country (paginate until next_cursor is null),
-   * then apply client-side sentiment/category filters from toolbar.
+   * Carica tutti gli articoli date+country (pagine keyset fino a ``next_cursor`` null),
+   * poi applica filtri sentiment/categoria client-side dalla toolbar.
+   *
+   * @param countryCode Codice ISO Alpha-2 della nazione aperta.
+   * @returns Lista filtrata; in catch setta ``detailError`` e rilancia.
+   * @see SoT: frontend.md §2b T-P1-04; radar-api-contract.
    */
   async loadCountryArticles(countryCode: string): Promise<Article[]> {
     const f = this.filters();
@@ -123,6 +146,7 @@ export class StateService {
     }
   }
 
+  /** Filtri toolbar applicati in memoria sulla lista nazione già scaricata. */
   private matchesClientFilters(art: Article, f: ArticleFilters): boolean {
     if (f.sentiment && f.sentiment.length > 0 && !f.sentiment.includes(art.sentiment)) {
       return false;
@@ -134,9 +158,13 @@ export class StateService {
   }
 
   /**
-   * Hybrid update for sidebar freeze compatibility:
-   * mutate `is_read` on the existing object (sidebar holds the same refs) and
-   * return a new array so toolbar computed signals refresh.
+   * Update ibrido compatibile con sidebar freeze: muta ``is_read`` sull'oggetto
+   * esistente (stesse ref del carosello) e sostituisce l'array per i signal derivati.
+   * Versione per-id: risposte/rollback di toggle obsolete vengono ignorate.
+   *
+   * @param articleId Articolo da sincronizzare con la PATCH API.
+   * @param isRead Stato ottimistico richiesto dall'utente (o auto-read da App).
+   * @see SoT: radar-sidebar-freeze; frontend.md §2b.
    */
   toggleReadStatus(articleId: number, isRead: boolean): void {
     const version = (this.readMutationVersion.get(articleId) ?? 0) + 1;
@@ -192,6 +220,10 @@ export class StateService {
     });
   }
 
+  /**
+   * Aggiorna ``read_count`` sulla riga map-summary corrispondente (delta ±1, clamp).
+   * Non rebuilda i marker: solo contatori toolbar/pin.
+   */
   private patchSummaryReadCount(
     countryCode: string,
     category: PrimaryCategory,

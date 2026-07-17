@@ -8,12 +8,13 @@ Cartella di audit, prompt orchestratore e SoT del modulo Radar.
 
 **Anti-drift:** autorità runtime = product docs + Compose (`80:8080`, migrazioni `001–009`) + SoT LLM. Claim storici nei piani in `complete/` possono essere datati.
 
-## `active/` — solo vivi
+## `active/` — vivi
 
 | Documento | Ruolo |
 |-----------|--------|
 | [sot_llm_multi_model_fallback.md](active/sot_llm_multi_model_fallback.md) | **SoT** LLM multi-provider + routing v2.2 |
 | [plan_release_final_gate.md](active/plan_release_final_gate.md) | Piano Final Release (**F1–F4 PASS**; resta PR + Fase 5 deferred) |
+| [plan_code_comments_beginner_audit.md](active/plan_code_comments_beginner_audit.md) | Piano commenti IT (**P0 DONE**; P1/P2 opt-in) |
 
 ## `complete/` — chiusi
 
@@ -25,9 +26,9 @@ Vedi [`complete/README.md`](complete/README.md): Phase 0–6, playbook, ticket s
 plan-audit/
   STATUS.md                 ← fatto vs da fare (leggere per primo)
   README.md                 ← questo indice
-  active/                   Solo SoT LLM + Final Release Gate
+  active/                   SoT LLM + Final Release + piano commenti
   complete/                 Piani/checklist COMPLETATI
-  prompts/active/           Prompt Final Release
+  prompts/active/           Prompt ancora utili (PR gate; ECC expansion)
   prompts/done/             Prompt eseguiti (storico)
   remediation/              Report ticket DONE (non cancellare)
   archive/plans|ecc|llm-stubs|scratch/
@@ -35,7 +36,12 @@ plan-audit/
 
 ## Prompt attivi
 
-* [audit_prompt_final_release_gate.md](prompts/active/audit_prompt_final_release_gate.md)
+* [audit_prompt_final_release_gate.md](prompts/active/audit_prompt_final_release_gate.md) — F1–F4 PASS; utile solo per residuo PR
+* [plan_prompt_ecc_manual_and_expansion.md](prompts/active/plan_prompt_ecc_manual_and_expansion.md) — non ancora eseguito
+
+## Prompt done (recente)
+
+* [audit_prompt_code_comments_beginner_terra.md](prompts/done/audit_prompt_code_comments_beginner_terra.md) — audit Terra → piano commenti (P0 eseguiti)
 
 ## Note
 

@@ -1,8 +1,12 @@
 """
-Radar Informativo Globale — Backend FastAPI App (API only).
+Radar Informativo Globale — Backend FastAPI (solo API).
 
 Ingestione RSS/LLM: servizio Compose ``radar-worker`` (`python -m app.worker`).
 Questo processo espone solo health + REST; pool e migrazioni nel lifespan.
+Niente Miniflux / classificazione / outbox qui.
+
+SoT:
+    docs/02 §API/worker; skill radar-api-contract; docs/02 §health live vs ready.
 """
 
 from __future__ import annotations
@@ -33,7 +37,7 @@ logger = logging.getLogger("radar.main")
 
 
 class AppState:
-    """Stato globale API: solo pool database."""
+    """Stato globale API: solo pool database (nessun client ingest)."""
 
     def __init__(self) -> None:
         self.db_pool: Optional[Any] = None
@@ -44,7 +48,7 @@ state = AppState()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """init pool → migrations; reverse on shutdown. No pipeline / Miniflux / Gemini."""
+    """Avvio: pool → migrazioni; shutdown: chiudi pool. Nessuna pipeline LLM/Miniflux."""
     setup_logging()
     logger.info("Avvio del server FastAPI (API only). Inizializzazione pool...")
 
@@ -77,6 +81,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# CORS solo se allowlist non vuota; mai "*". Vuoto = same-origin via Nginx.
 if CORS_ALLOW_ORIGINS:
     app.add_middleware(
         CORSMiddleware,
@@ -92,21 +97,22 @@ else:
 
 @app.get("/health/live")
 async def health_live() -> dict[str, str]:
-    """Liveness: processo API su. Usato da Compose HEALTHCHECK (non dipende dal worker)."""
+    """Liveness: processo API su. Compose HEALTHCHECK (non dipende dal worker)."""
     return {"status": "ok", "service": "radar-backend"}
 
 
 @app.get("/health")
 async def health_check() -> dict[str, str]:
-    """Alias di /health/live per compatibilità."""
+    """Alias di ``/health/live`` per compatibilità."""
     return await health_live()
 
 
 @app.get("/health/ready")
 async def health_ready(response: Response) -> dict[str, Any]:
-    """
-    Readiness: pool, migrazione heartbeat, freshness leader.
-    503 non deve far restartare l'API (Compose usa /health/live).
+    """Readiness: pool + migrazione heartbeat + freshness leader.
+
+    503 = non ready (ops); **non** deve far restartare l'API — Compose usa live.
+    SoT: docs/02 §health; AGENTS §4.4.
     """
     if state.db_pool is None:
         response.status_code = 503
@@ -140,10 +146,11 @@ async def get_articles(
     cursor: Optional[int] = Query(None, ge=1),
     limit: int = Query(DEFAULT_ARTICLES_LIMIT, ge=1),
 ):
-    """
-    Day-scoped article page (BREAKING: object envelope, not a bare array).
+    """Pagina articoli day-scoped: envelope ``{items, next_cursor, total}`` (non array nudo).
 
-    Keyset: ``id DESC``, exclusive cursor (``id < cursor``). ``limit`` capped at 100.
+    Keyset ``id DESC``, cursore esclusivo (``id < cursor``). ``limit`` capped a 100.
+    Fetch ``limit+1`` per sapere se esiste una pagina successiva senza round-trip extra.
+    SoT: skill radar-api-contract Phase 5.
     """
     empty = {"items": [], "next_cursor": None, "total": 0}
     if not state.db_pool:
@@ -151,7 +158,7 @@ async def get_articles(
 
     pub_date = parse_published_date(date)
     page_limit = clamp_articles_limit(limit)
-    # Fetch one extra row to detect a following page without a second round-trip.
+    # Una riga in più: se arriva, c'è next_cursor.
     fetch_limit = page_limit + 1
 
     count_sql, count_params = build_articles_count_query(
@@ -188,7 +195,7 @@ async def get_map_summary(
     sentiment: Optional[str] = Query(None),
     relevance_level: Optional[int] = Query(None, ge=1, le=5),
 ):
-    """Aggregate rows by country_code × primary_category for day map hatching."""
+    """Aggregato ``country_code × primary_category`` per hatching day-view sulla mappa."""
     if not state.db_pool:
         return []
 
@@ -211,7 +218,7 @@ async def get_countries_summary(
     sentiment: Optional[str] = Query(None),
     relevance_level: Optional[int] = Query(None, ge=1, le=5),
 ):
-    """Compat country rollup (no junction joins / Cartesian risk)."""
+    """Rollup compat per paese (senza join junction → nessun rischio cartesiano)."""
     if not state.db_pool:
         return []
 
@@ -229,11 +236,14 @@ async def get_countries_summary(
 
 
 class ReadStatusUpdate(BaseModel):
+    """Body PATCH read-status: solo il flag ``is_read``."""
+
     is_read: bool
 
 
 @app.patch("/api/articles/{article_id}/read_status")
 async def update_article_read_status(article_id: int, status: ReadStatusUpdate):
+    """Aggiorna ``articles.is_read``; 404 se id assente. Usato dal FE (state ottimistico)."""
     if not state.db_pool:
         raise HTTPException(status_code=500, detail="Database non disponibile")
 

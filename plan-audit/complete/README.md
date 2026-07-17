@@ -10,4 +10,4 @@ Documenti **completati**. Non sono backlog. Per il quadro fatto vs da fare vedi 
 | [plan_docs_audit_ticket_status.md](plan_docs_audit_ticket_status.md) | Trail ticket (0 OPEN) | CLOSED |
 | [plan_docs_monorepo_source.md](plan_docs_monorepo_source.md) | Checklist allineamento docs monorepo | ESEGUITO |
 
-**Ancora vivi** (non qui): [`../active/sot_llm_multi_model_fallback.md`](../active/sot_llm_multi_model_fallback.md), [`../active/plan_release_final_gate.md`](../active/plan_release_final_gate.md).
+**Ancora vivi** (non qui): [`../active/sot_llm_multi_model_fallback.md`](../active/sot_llm_multi_model_fallback.md), [`../active/plan_release_final_gate.md`](../active/plan_release_final_gate.md), [`../active/plan_code_comments_beginner_audit.md`](../active/plan_code_comments_beginner_audit.md) (P0 done; P1/P2 residui).

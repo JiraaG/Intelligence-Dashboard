@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 """
-Thin Cursor → Radar adapter for postToolUse / afterFileEdit.
+Adapter sottile Cursor postToolUse / afterFileEdit → hook Radar post-tool-use.
 
-Reshapes Cursor payloads into the Radar post-tool-use contract, then returns
-Cursor-compatible JSON (additional_context on lint/soft issues).
-Logic remains in radar/.ecc/hooks/post-tool-use.py.
+Rimappa il payload Cursor nel contratto Radar, esegue
+``radar/.ecc/hooks/post-tool-use.py``, poi risponde con JSON Cursor.
+
+C-01 — comportamento reale Cursor: anche se il hook Radar esce nonzero
+(lint fail / linter missing), questo adapter stampa ``additional_context``
+e fa **sempre** ``sys.exit(0)``. Il post-hook diretto resta fail-closed;
+via Cursor il fallimento è advisory (non blocca il turno).
+
+Logica lint = SoT nel hook ECC; qui solo reshape + surface messaggio.
+@see docs/04_ecc_framework.md.
 """
 
 from __future__ import annotations
@@ -30,16 +37,18 @@ WRITE_TOOLS = frozenset(
 
 
 def project_root() -> Path:
+    """Repo-root (``.cursor/hooks`` → parents[2])."""
     return Path(__file__).resolve().parents[2]
 
 
 def radar_post_hook() -> Path:
+    """Path SoT del post-hook (non duplicare ruff/prettier qui)."""
     return project_root() / "radar" / ".ecc" / "hooks" / "post-tool-use.py"
 
 
 def to_radar_payload(cursor: dict) -> dict:
-    """Map Cursor pre/post/afterFileEdit shapes → Radar {tool_name, tool_input}."""
-    # afterFileEdit: { file_path, edits }
+    """Mappa forme Cursor pre/post/afterFileEdit → Radar ``{tool_name, tool_input}``."""
+    # afterFileEdit: { file_path, edits } — tratta come Write per far scattare il lint.
     file_path = cursor.get("file_path")
     if isinstance(file_path, str) and file_path and "tool_input" not in cursor:
         return {
@@ -55,6 +64,10 @@ def to_radar_payload(cursor: dict) -> dict:
 
 
 def main() -> None:
+    """
+    Skip lint se tool non-write e senza path. Timeout/hook missing/lint fail:
+    sempre exit 0 + ``additional_context`` (advisory; C-01).
+    """
     raw = sys.stdin.read() if not sys.stdin.isatty() else "{}"
     try:
         cursor = json.loads(raw) if raw.strip() else {}
@@ -75,7 +88,7 @@ def main() -> None:
         )
         sys.exit(0)
 
-    # Skip expensive lint when not a write-like tool and no file path
+    # Evita lint costoso su tool non di scrittura e senza path file.
     tool_name = str(radar_payload.get("tool_name") or "")
     tool_input = radar_payload.get("tool_input") or {}
     has_path = any(
@@ -103,7 +116,7 @@ def main() -> None:
         print(json.dumps(out))
         sys.exit(0)
 
-    # Lint hard-fail or linter missing: surface to agent; exit 0 (post cannot block)
+    # Lint hard-fail o linter missing: surface all'agente; exit 0 (post Cursor non blocca).
     msg = stderr or (proc.stdout or "").strip() or f"post-tool-use exit {proc.returncode}"
     print(
         json.dumps(

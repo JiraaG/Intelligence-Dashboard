@@ -17,16 +17,16 @@ import type * as Leaflet from 'leaflet';
 import { Article, CountrySummary, PrimaryCategory } from '../../models/article.model';
 import { MapSummaryRow } from '../../models/map-summary.model';
 
-/** Payload when opening a nation from polygon or summary marker/cluster. */
+/** Payload quando si apre una nazione da poligono o pin summary. */
 export interface CountryOpenRequest {
   countryCode: string;
-  /** When set (category pallino / nation detail), sidebar focuses this category and spiderfies. */
+  /** Se settato (pallino categoria / detail), sidebar e spiderfy su quella categoria. */
   category?: PrimaryCategory;
-  /** Keep current camera (no fitBounds dezoom). */
+  /** Mantieni la camera corrente (no fitBounds / dezoom). */
   preserveZoom?: boolean;
 }
 
-/** Minimal MarkerCluster group shape from the global UMD plugin (window.L). */
+/** Forma minima del MarkerCluster UMD su ``window.L`` (non ESM). */
 interface MarkerClusterGroupLike {
   addLayer(layer: Leaflet.Layer): this;
   removeLayer(layer: Leaflet.Layer): this;
@@ -36,7 +36,7 @@ interface MarkerClusterGroupLike {
   getVisibleParent(marker: Leaflet.Marker): Leaflet.Marker | null;
   on(type: string, fn: Leaflet.LeafletEventHandlerFn): this;
   addTo(map: Leaflet.Map): this;
-  /** Forces MarkerCluster to redraw icons after clearLayers/addLayer races. */
+  /** Forza ridisegno icone dopo race clearLayers/addLayer. */
   refreshClusters?: (layers?: Leaflet.Layer | Leaflet.Layer[]) => this;
   _spiderfied?: { unspiderfy?: () => void } | null;
   options?: { spiderfyDistanceMultiplier?: number };
@@ -46,7 +46,7 @@ interface MarkerClusterLike extends Leaflet.Marker {
   getAllChildMarkers(): Leaflet.Marker[];
 }
 
-/** Leaflet global from angular.json scripts[] + markercluster plugin. */
+/** Leaflet globale da ``angular.json`` scripts[] + plugin markercluster UMD. */
 type LeafletGlobal = typeof import('leaflet') & {
   markerClusterGroup: (options?: Record<string, unknown>) => MarkerClusterGroupLike;
 };
@@ -55,7 +55,7 @@ interface ArticleMarkerMeta {
   articleData?: Article;
   realLatLng?: Leaflet.LatLng;
   isDummy?: boolean;
-  /** Aggregate marker from map-summary (day view, before nation open). */
+  /** Marker aggregato da map-summary (day-view, prima del nation open). */
   isSummary?: boolean;
   summaryCount?: number;
   summaryCountry?: string;
@@ -67,6 +67,12 @@ type ArticleMarker = Leaflet.Marker &
     _icon?: HTMLElement | null;
   };
 
+/**
+ * Legge ``window.L`` iniettato dagli script globali (ESBuild + MarkerCluster UMD).
+ * Vietato ``import * as L from 'leaflet'`` / side-effect markercluster nel componente.
+ *
+ * @see SoT: AGENTS.md §5; frontend.md §10.
+ */
 function getLeaflet(): LeafletGlobal | null {
   const L = (window as unknown as { L?: LeafletGlobal }).L;
   if (!L || typeof L.map !== 'function' || typeof L.markerClusterGroup !== 'function') {
@@ -75,6 +81,15 @@ function getLeaflet(): LeafletGlobal | null {
   return L;
 }
 
+/**
+ * Mappa Leaflet Radar: hatching GeoJSON (zoom &lt; 5), pin day-view da map-summary,
+ * cluster per-categoria in nation detail con spiderfy custom (hub + fan emoji).
+ *
+ * Runtime sempre via ``window.L``. Read/unread: fingerprint geometria + sync DOM
+ * (no ``clearLayers`` su solo ``is_read``).
+ *
+ * @see SoT: AGENTS.md §5; frontend.md §7/§10; docs/03.
+ */
 @Component({
   selector: 'app-radar-map',
   standalone: true,
@@ -88,16 +103,17 @@ export class RadarMapComponent implements AfterViewInit {
 
   articles = input.required<Article[]>();
   countries = input.required<CountrySummary[]>();
-  /** Day aggregates — used for numbered cluster balls before a nation is opened. */
+  /** Aggregati day-view: un pin nazione (anello conic categorie), non pallini per-categoria. */
   mapSummary = input<MapSummaryRow[]>([]);
   focusCountryCode = input<string | null>(null);
 
   markerClicked = output<Article>();
   clusterClicked = output<Article[]>();
-  /** Nation open — optional category + preserveZoom for summary pallini. */
+  /** Apertura nazione — category / preserveZoom opzionali (pallini summary). */
   countryClicked = output<CountryOpenRequest>();
 
   currentZoomLevel = signal<number>(3);
+  /** True se zoom &lt; 5 (macro: hatching, pin summary nascosti). */
   isZoomedOut = computed(() => this.currentZoomLevel() < 5);
   isParsingGeoJson = signal<boolean>(true);
   mapUnavailable = signal<boolean>(false);
@@ -141,17 +157,20 @@ export class RadarMapComponent implements AfterViewInit {
     { label: 'Sicurezza', icon: '🛡️', cssVar: '--color-sicurezza' },
   ];
 
-  /** Day-view / nation-hub pin pixel box (tip at bottom). */
+  /** Box pixel pin day-view (punta in basso). Hub nazione usa disco compatto separato. */
   private readonly COUNTRY_PIN_SIZE = { w: 64, h: 76 } as const;
 
   private map: Leaflet.Map | null = null;
   private L: LeafletGlobal | null = null;
   private categoryClusterGroups = new Map<string, MarkerClusterGroupLike>();
-  /** Day-view: one pin per country (not category cluster balls). */
+  /** Day-view: un pin per paese (non pallini cluster per-categoria). */
   private summaryMarkerGroup: Leaflet.LayerGroup | null = null;
-  /** Nation open: single hub pin while spiderfy is collapsed. */
+  /** Nation open: hub singolo mentre lo spiderfy è chiuso. */
   private detailHubGroup: Leaflet.LayerGroup | null = null;
-  /** When false, unspiderfy must not re-show the hub (avoids pin-grow on 2nd spiderfy). */
+  /**
+   * Se false, ``unspiderfied`` non ripristina l'hub (cambio categoria: evita che
+   * l'unspiderfy async del fan precedente cancelli il nuovo root).
+   */
   private restoreDetailHubOnUnspiderfy = true;
   private isNavigating = false;
   private navigatingTargetZoom = 0;
@@ -166,18 +185,19 @@ export class RadarMapComponent implements AfterViewInit {
   private highlightedMarker: ArticleMarker | null = null;
   private pendingHighlightArticle: Article | null = null;
   private spiderfyGeneration = 0;
-  /** Last successful spiderfy target — re-open after MarkerCluster zoom-unspiderfy. */
+  /** Ultimo spiderfy riuscito — riapri dopo zoom (MC auto-unspiderfy disabilitato). */
   private lastSpiderfyCountry: string | null = null;
   private lastSpiderfyCategory: string | null = null;
-  /** When true, next focusCountryCode effect skips fitBounds (summary pallino path). */
+  /** Se true, il prossimo focusCountryCode salta fitBounds (path pallino summary). */
   private skipNextCountryFit = false;
   /**
-   * Geometry inputs changed while flyTo/fitBounds held `isNavigating`.
-   * Without a flush, MarkerCluster can keep layers in memory but draw zero icons.
+   * Input geometria cambiati durante flyTo/fitBounds (`isNavigating`).
+   * Senza flush, MarkerCluster può tenere layer in memoria ma zero icone nel pane.
    */
   private pendingGeometryRefresh = false;
 
   constructor() {
+    // Day/nation geometry: rebuild solo se fingerprint cambia; altrimenti sync is_read.
     effect(() => {
       const arts = this.articles();
       const ctrs = this.countries();
@@ -209,22 +229,26 @@ export class RadarMapComponent implements AfterViewInit {
     }
   }
 
-  /** Arm once: next country focus keeps camera (used after summary pallino click). */
+  /** Arma una volta: il prossimo focus paese tiene la camera (dopo click pin summary). */
   public armSkipCountryFit(): void {
     this.skipNextCountryFit = true;
   }
 
-  /** Force fitBounds even when focusCountryCode is unchanged (re-select same nation). */
+  /** Forza fitBounds anche se ``focusCountryCode`` è invariato (ri-selezione stessa nazione). */
   public refocusCountry(code: string): void {
     this.skipNextCountryFit = false;
     this.focusOnCountry(code);
   }
 
-  /** Call after sidebar open/close or window resize (overlay full-bleed layout). */
+  /**
+   * Dopo open/close sidebar o resize (layout overlay full-bleed).
+   * ``pan: false``; ``setView`` solo se la camera è driftata (setView mid-spiderfy
+   * svuota il pane MarkerCluster).
+   */
   public invalidateSize(): void {
     if (!this.map) return;
-    // Preserve camera without unconditional setView — setView mid-spiderfy blanks
-    // MarkerCluster icons (layers remain in group, DOM pane goes empty).
+    // Conserva camera senza setView incondizionato — setView a metà spiderfy
+    // svuota le icone MarkerCluster (layer restano nel group, pane DOM vuoto).
     const center = this.map.getCenter();
     const zoom = this.map.getZoom();
     this.map.invalidateSize({ animate: false, pan: false });
@@ -239,6 +263,7 @@ export class RadarMapComponent implements AfterViewInit {
     }
   }
 
+  /** Timeout tracciato e cancellabile in teardown (no leak post-destroy). */
   private scheduleTimeout(fn: () => void, ms: number): void {
     const id = setTimeout(() => {
       this.pendingTimeouts.delete(id);
@@ -252,6 +277,10 @@ export class RadarMapComponent implements AfterViewInit {
     this.pendingTimeouts.clear();
   }
 
+  /**
+   * Fingerprint geometria (id/cat/paese/coord o summary) — **senza** ``is_read``.
+   * Stesso fingerprint → solo sync DOM read; diverso → rebuild layer.
+   */
   private geometryFingerprint(articles: Article[], summary: MapSummaryRow[]): string {
     if (articles.length > 0) {
       return (
@@ -276,6 +305,10 @@ export class RadarMapComponent implements AfterViewInit {
     );
   }
 
+  /**
+   * Applica input geometria: se fingerprint uguale, ``syncMarkerReadState`` (no clearLayers).
+   * @see SoT: frontend.md §7 read/unread; AGENTS Phase 4 fingerprint.
+   */
   private applyGeometryInputs(
     articles: Article[],
     countries: CountrySummary[],
@@ -289,7 +322,7 @@ export class RadarMapComponent implements AfterViewInit {
     this.updateMapData(articles, countries, summary);
   }
 
-  /** End flyTo/fitBounds lock and apply any geometry updates deferred during navigation. */
+  /** Fine lock flyTo/fitBounds e applica geometria deferita durante la navigazione. */
   private finishNavigating(): void {
     this.isNavigating = false;
     if (!this.pendingGeometryRefresh || this.destroyed || !this.map || this.isParsingGeoJson()) {
@@ -299,7 +332,7 @@ export class RadarMapComponent implements AfterViewInit {
     this.applyGeometryInputs(this.articles(), this.countries(), this.mapSummary());
   }
 
-  /** MarkerCluster can keep layers but draw nothing after clearLayers/setView races. */
+  /** MarkerCluster può tenere layer ma non disegnare dopo race clearLayers/setView. */
   private refreshClusterVisibility(): void {
     this.categoryClusterGroups.forEach((cg) => {
       if (typeof cg.refreshClusters === 'function') {
@@ -314,6 +347,7 @@ export class RadarMapComponent implements AfterViewInit {
     return 1;
   }
 
+  /** Icona emoji articolo (classe ``marker-read`` se già letto). */
   private createSafeMarkerIcon(L: LeafletGlobal, article: Article, sizePx = 28): Leaflet.DivIcon {
     const box = Math.max(16, Math.round(sizePx));
     const fontPx = Math.max(12, Math.round(box * 0.55));
@@ -340,6 +374,10 @@ export class RadarMapComponent implements AfterViewInit {
     });
   }
 
+  /**
+   * Aggiorna classe ``.marker-read`` sul DOM senza ``clearLayers`` / rebuild cluster.
+   * Toggle duale: wrapper Leaflet + ``.marker-icon`` interno (stili SCSS).
+   */
   private syncMarkerReadState(articles: Article[]): void {
     const byId = new Map(articles.map((a) => [a.id, a]));
     this.categoryClusterGroups.forEach((cg) => {
@@ -361,6 +399,10 @@ export class RadarMapComponent implements AfterViewInit {
     });
   }
 
+  /**
+   * Inizializza mappa, tile, 10 cluster (raggio 40, no auto-spiderfy), zoomend hatching.
+   * Se ``window.L`` assente → ``mapUnavailable``.
+   */
   private initMap(): void {
     const L = getLeaflet();
     if (!L) {
@@ -412,6 +454,7 @@ export class RadarMapComponent implements AfterViewInit {
     const categories = Object.keys(this.CATEGORY_CSS_VARS);
     for (const cat of categories) {
       const cg = L.markerClusterGroup({
+        // SoT: raggio 40, spiderfyOnMaxZoom false — non riallineare a legacy 200/true.
         maxClusterRadius: 40,
         showCoverageOnHover: false,
         spiderfyOnMaxZoom: false,
@@ -419,15 +462,14 @@ export class RadarMapComponent implements AfterViewInit {
         // Baseline; overridden per open via spiderfyDistanceForCount().
         spiderfyDistanceMultiplier: 3.0,
         iconCreateFunction: (_cluster: MarkerClusterLike) => {
-          // No category pallini — day view uses summary pins; nation open uses
-          // hub pin + spiderfy emoji graph for the active carousel category.
+          // Nessun pallino categoria — day = pin summary; detail = hub + emoji spiderfy.
           return L.divIcon({ className: 'hidden', iconSize: [0, 0] });
         },
       });
 
       cg.on('unspiderfied', () => {
-        // Stale async unspiderfy (category switch) must NOT wipe the new spider root.
-        // When restoreDetailHubOnUnspiderfy is false, spiderfyAndCreateRoot owns the root.
+        // Unspiderfy async (cambio categoria) non deve cancellare il nuovo root.
+        // Con restoreDetailHubOnUnspiderfy=false, spiderfyAndCreateRoot possiede il root.
         if (!this.restoreDetailHubOnUnspiderfy) {
           return;
         }
@@ -466,7 +508,8 @@ export class RadarMapComponent implements AfterViewInit {
           .map((m) => m.articleData)
           .filter((a): a is Article => !!a && a.primary_category === cat);
 
-        // Day-view summary clusters: open nation on this category, keep zoom, then spiderfy.
+        // Path legacy: cluster senza articoli reali (oggi i pin day stanno in summaryMarkerGroup).
+        // Se mai riattivato con isSummary nei cluster, apre nazione preserveZoom.
         if (arts.length === 0) {
           const country = this.dominantSummaryCountry(childMarkers);
           if (country) {
@@ -484,6 +527,7 @@ export class RadarMapComponent implements AfterViewInit {
         if (arts.length > 0) this.clusterClicked.emit(arts);
 
         const currentZoom = this.map.getZoom();
+        // Nota: qui soglia in-place = 6; focusAndSpiderfyCategory usa ≥5 (drift interno).
         const targetZoom = 6;
         const gen = ++this.spiderfyGeneration;
 
@@ -517,9 +561,8 @@ export class RadarMapComponent implements AfterViewInit {
 
       this.categoryClusterGroups.set(cat, cg);
       this.map.addLayer(cg as unknown as Leaflet.Layer);
-      // MarkerCluster binds map click → unspiderfy in _spiderfierOnAdd; that collapses
-      // spider icons on nation hinterland clicks. Disable it — we unspiderfy explicitly
-      // via collapseAllGraphs / hub root / zoom handlers instead.
+      // MC binda map click → unspiderfy in _spiderfierOnAdd; chiuderebbe il fan
+      // su click hinterland. Lo disabilitiamo — unspiderfy esplicito altrove.
       this.disableMarkerClusterMapClickUnspiderfy(cg);
     }
     this.geoJsonLayerGroup.addTo(this.map);
@@ -531,10 +574,10 @@ export class RadarMapComponent implements AfterViewInit {
       this.refreshHatchingStyles();
       this.syncSummaryMarkerVisibility();
 
-      // Nation detail open: keep spider until hatching (zoom < 5); then close sidebar too.
-      // MC zoom-unspiderfy is disabled; re-spiderfy after zoom to refresh leg positions.
+      // Nation open: tieni spider fino a hatching (zoom < 5); sotto chiudi anche sidebar.
+      // MC zoom-unspiderfy disabilitato; ri-spiderfy dopo zoom per riposizionare le gambe.
       const nationOpen = this.articles().length > 0 || !!this.focusCountryCode();
-      // Require lastSpiderfy so fitBounds(maxZoom:4) open race cannot close the sidebar.
+      // Serve lastSpiderfy: evita che fitBounds(maxZoom:4) chiuda la sidebar in race.
       if (!this.isNavigating && nationOpen && zoom < 5 && !!this.lastSpiderfyCategory) {
         this.collapseAllGraphs(true);
       } else if (
@@ -546,7 +589,7 @@ export class RadarMapComponent implements AfterViewInit {
       ) {
         const country = this.lastSpiderfyCountry;
         const category = this.lastSpiderfyCategory;
-        // Defer so MarkerCluster finishes its own zoom bookkeeping first.
+        // Defer: lascia finire il bookkeeping zoom di MarkerCluster.
         this.scheduleTimeout(() => {
           if (this.destroyed || !this.map) return;
           if (this.map.getZoom() < 5) return;
@@ -566,7 +609,7 @@ export class RadarMapComponent implements AfterViewInit {
     this.activeRootMarkers = [];
   }
 
-  /** Keep spiderfy footprint readable: fewer icons → more room; many → tighter. */
+  /** Distanza spiderfy: pochi icone → più spazio; molti → più stretti. */
   private spiderfyDistanceForCount(n: number): number {
     if (n <= 4) return 3.8;
     if (n <= 8) return 3.2;
@@ -577,7 +620,7 @@ export class RadarMapComponent implements AfterViewInit {
     return 1.4;
   }
 
-  /** Pixel box for spiderfy emoji icons — shrinks as the fan grows. */
+  /** Box pixel emoji spiderfy — si riduce al crescere del fan. */
   private spiderfyIconSizeForCount(n: number): number {
     if (n <= 4) return 36;
     if (n <= 8) return 30;
@@ -588,7 +631,7 @@ export class RadarMapComponent implements AfterViewInit {
     return 14;
   }
 
-  /** Restore nation hub after a failed spiderfy (never leave a blank map). */
+  /** Ripristina hub nazione dopo spiderfy fallito (mai mappa vuota). */
   private restoreNationHubPin(): void {
     this.restoreDetailHubOnUnspiderfy = true;
     this.clearRootMarkers();
@@ -598,8 +641,8 @@ export class RadarMapComponent implements AfterViewInit {
   }
 
   /**
-   * Expand all real article markers in the group via MarkerCluster spiderfy.
-   * Returns false if spiderfy could not start — caller must restore the hub pin.
+   * Espande i marker articolo reali del gruppo via MarkerCluster.spiderfy.
+   * False se non parte — il caller deve ripristinare l'hub.
    */
   private spiderfyAndCreateRoot(
     cg: MarkerClusterGroupLike,
@@ -613,7 +656,7 @@ export class RadarMapComponent implements AfterViewInit {
     const realMarkers = childMarkers.filter((m) => !m.isDummy && !m.isSummary && !!m.articleData);
     if (realMarkers.length === 0) return false;
 
-    // Prefer a marker that still has a cluster parent (first may be orphaned after races).
+    // Preferisci marker ancora con parent cluster (il primo può essere orfano dopo race).
     let newParent: (Leaflet.Marker & { spiderfy?: () => void }) | null | undefined;
     for (const m of realMarkers) {
       const parent = cg.getVisibleParent(m) as
@@ -654,13 +697,13 @@ export class RadarMapComponent implements AfterViewInit {
       }
     }
 
-    // Only clear hub once spiderfy parent is confirmed — avoids blank map on failure.
+    // Pulisci hub solo a spiderfy confermato — evita mappa bianca sul fallimento.
     this.clearRootMarkers();
     this.clearDetailHubPin();
     this.restoreDetailHubOnUnspiderfy = false;
 
     const categoryArts = realMarkers.map((m) => m.articleData).filter((a): a is Article => !!a);
-    // Compact disc (not the tall hub pin) so spider legs stay clear.
+    // Disco compatto (non pin alto) così le gambe nord restano visibili.
     const rootIcon = this.createSpiderfyRootIcon(this.L, categoryArts);
 
     const rootMarker = this.L.marker(newParent.getLatLng(), {
@@ -679,7 +722,7 @@ export class RadarMapComponent implements AfterViewInit {
 
     this.activeRootMarkers.push(rootMarker);
     newParent.spiderfy();
-    // spiderfy may leave/rebind map-click unspiderfy; keep nation hinterland clicks stable.
+    // spiderfy può ri-bindare unspiderfy su click mappa; tienilo spento.
     this.disableMarkerClusterMapClickUnspiderfy(cg);
 
     const firstArt = categoryArts[0];
@@ -697,11 +740,8 @@ export class RadarMapComponent implements AfterViewInit {
   }
 
   /**
-   * leaflet.markercluster registers map `click` → `_unspiderfyWrapper` and
-   * zoomstart/zoomanim/zoomend → auto-unspiderfy. Click unspiderfy closes the
-   * fan on nation hinterland clicks; zoom unspiderfy collapses the fan on any
-   * wheel tick. Remove both — we unspiderfy explicitly via collapseAllGraphs /
-   * hub root / zoom&lt;5 hatch close instead.
+   * MarkerCluster registra map click → unspiderfy e zoom* → auto-unspiderfy.
+   * Li rimuoviamo: unspiderfy esplicito via collapseAllGraphs / hub / zoom&lt;5.
    */
   private disableMarkerClusterMapClickUnspiderfy(cg: MarkerClusterGroupLike): void {
     if (!this.map) return;
@@ -725,6 +765,7 @@ export class RadarMapComponent implements AfterViewInit {
     }
   }
 
+  /** Carica GeoJSON paesi (chunked via rAF) — ISO_A2 / FR+NO override ``-99``. */
   private loadGeoJson(): void {
     this.geoJsonSub?.unsubscribe();
     this.geoJsonSub = this.http
@@ -739,6 +780,10 @@ export class RadarMapComponent implements AfterViewInit {
       });
   }
 
+  /**
+   * Parse incrementale (batch 15/frame) per non bloccare UI.
+   * NaturalEarth ``-99`` su France/Norway → FR/NO per allineare hatching e click.
+   */
   private parseGeoJsonIncremental(geoData: GeoJSON.FeatureCollection): void {
     const L = this.L;
     if (!L || !this.geoJsonLayerGroup || this.destroyed) {
@@ -765,6 +810,7 @@ export class RadarMapComponent implements AfterViewInit {
         const feature = features[i];
         let code =
           feature.properties?.['ISO3166-1-Alpha-2'] ?? feature.properties?.['ISO_A2'] ?? 'XX';
+        // NaturalEarth: France/Norway spesso ``-99`` — remap esplicito.
         if (code === '-99' || !code || code === 'XX') {
           const name = feature.properties?.['name'];
           if (name === 'France') code = 'FR';
@@ -786,11 +832,11 @@ export class RadarMapComponent implements AfterViewInit {
             L.DomEvent.stopPropagation(e.originalEvent);
             (e.originalEvent as Event & { _radarHandled?: boolean })._radarHandled = true;
           }
-          // Nation already open on this polygon: do not re-emit (avoids fitBounds + re-spiderfy).
+          // Nazione già aperta su questo poligono: no re-emit (evita fitBounds + re-spiderfy).
           if (this.focusCountryCode() === code && this.articles().length > 0) {
             return;
           }
-          // Emit code only — nation Article[] is fetched by App/StateService (Phase 5).
+          // Solo code — Article[] nazione arrivano da App/StateService (Phase 5).
           this.countryClicked.emit({ countryCode: code });
         });
 
@@ -817,6 +863,10 @@ export class RadarMapComponent implements AfterViewInit {
     this.geoJsonRafId = requestAnimationFrame(processBatch);
   }
 
+  /**
+   * Hatching SVG solo con zoom &lt; 5 e countries() con categorie;
+   * altrimenti fill trasparente. Classe ``zoom-out-mode`` sul container.
+   */
   private refreshHatchingStyles(): void {
     if (!this.map) return;
     const ctrs = this.countries();
@@ -868,7 +918,7 @@ export class RadarMapComponent implements AfterViewInit {
     }
   }
 
-  /** Single SVG-pattern owner for country hatching (categories 1–10). */
+  /** Un pattern SVG per combo categorie (1–10) — hatching zoom-out. */
   private getOrCreateComboPattern(categories: string[], defs: SVGDefsElement): string {
     if (!categories || categories.length === 0) return '';
 
@@ -955,11 +1005,15 @@ export class RadarMapComponent implements AfterViewInit {
     return id;
   }
 
+  /**
+   * FitBounds su nazione (US/RU bounds hard-coded; altri da GeoJSON).
+   * Con ``skipNextCountryFit`` (path pin summary) non muove la camera.
+   */
   private focusOnCountry(code: string): void {
     const L = this.L;
     if (!this.map || !L || this.isNavigating || this.destroyed) return;
 
-    // Summary pallino path: keep current zoom/center (do not fitBounds/dezoom).
+    // Path pin summary: tieni zoom/centro (no fitBounds/dezoom).
     if (this.skipNextCountryFit) {
       this.skipNextCountryFit = false;
       return;
@@ -967,6 +1021,7 @@ export class RadarMapComponent implements AfterViewInit {
 
     let bounds: Leaflet.LatLngBounds | null = null;
 
+    // US/RU: bounds continenti ridotti (Alaska/isole/Kamchatka fuori frame).
     if (code === 'US') {
       bounds = L.latLngBounds(L.latLng(24.396308, -125.0), L.latLng(49.384358, -66.93457));
     } else if (code === 'RU') {
@@ -1036,6 +1091,7 @@ export class RadarMapComponent implements AfterViewInit {
     return best;
   }
 
+  /** Pin day-view: anello conic categorie + totale; punta sul centroide. */
   private createCountrySummaryPinIcon(
     L: LeafletGlobal,
     total: number,
@@ -1078,14 +1134,13 @@ export class RadarMapComponent implements AfterViewInit {
       html: root,
       className: 'radar-country-pin-wrap',
       iconSize: [w, h],
-      // Tip sits on the country centroid — no lateral CSS offset.
+      // Punta sul centroide — nessun offset laterale CSS.
       iconAnchor: [Math.round(w / 2), h],
     });
   }
 
   /**
-   * Compact centered disc used as spiderfy root — tall hub pin would cover
-   * northern spider legs (icons appear under the pin).
+   * Disco centrato come root spiderfy — pin alto coprirebbe le gambe nord.
    */
   private createSpiderfyRootIcon(L: LeafletGlobal, articles: Article[]): Leaflet.DivIcon {
     const categories = new Map<string, number>();
@@ -1136,6 +1191,10 @@ export class RadarMapComponent implements AfterViewInit {
     this.detailHubGroup?.clearLayers();
   }
 
+  /**
+   * Hub nazione (day→detail chiuso): disco compatto al centroide articoli.
+   * Visibile solo se non c'è spiderfy attivo.
+   */
   private upsertDetailHubPin(L: LeafletGlobal, articles: Article[]): void {
     if (!this.detailHubGroup || !this.map) return;
     this.detailHubGroup.clearLayers();
@@ -1153,7 +1212,7 @@ export class RadarMapComponent implements AfterViewInit {
     }
     if (n === 0) return;
 
-    // Same compact disc as spiderfy root — avoids tall-pin → small-root flash on open.
+    // Stesso disco compatto del root spiderfy — evita flash pin alto → disco piccolo.
     const icon = this.createSpiderfyRootIcon(L, articles);
     const marker = L.marker([latSum / n, lngSum / n], {
       icon,
@@ -1176,7 +1235,7 @@ export class RadarMapComponent implements AfterViewInit {
     this.detailHubGroup.addLayer(marker);
   }
 
-  /** Show day-view country pins only at zoom ≥ 5 and when no nation is open. */
+  /** Pin day-view solo a zoom ≥ 5 e senza nazione aperta. */
   private syncSummaryMarkerVisibility(): void {
     if (!this.map || !this.summaryMarkerGroup) return;
     const show = this.map.getZoom() >= 5 && this.articles().length === 0;
@@ -1188,6 +1247,10 @@ export class RadarMapComponent implements AfterViewInit {
     }
   }
 
+  /**
+   * Rebuild layer: unspiderfy → clear → day (summary) o detail (cluster + hub).
+   * Chiama sempre prima di clearLayers per evitare icone fantasma MarkerCluster.
+   */
   private updateMapData(
     articles: Article[],
     countries: CountrySummary[],
@@ -1196,8 +1259,7 @@ export class RadarMapComponent implements AfterViewInit {
     const L = this.L;
     if (!L || !this.map) return;
 
-    // Tear down spiderfy before clearLayers — otherwise MarkerCluster can leave
-    // icons missing from the pane while layers remain in the group.
+    // Unspiderfy prima di clearLayers — altrimenti MC lascia layer senza icone nel pane.
     this.spiderfyGeneration++;
     this.clearRootMarkers();
     this.categoryClusterGroups.forEach((cg) => {
@@ -1231,9 +1293,8 @@ export class RadarMapComponent implements AfterViewInit {
   }
 
   /**
-   * Day view: one map pin per country at the weighted centroid.
-   * Category mix is shown as a conic colour ring — avoids overlapping
-   * per-category balls that drift into neighbouring countries via iconAnchor.
+   * Day view: un pin per paese al centroide pesato.
+   * Mix categorie = anello conic — evita pallini per-categoria che driftano via iconAnchor.
    */
   private renderSummaryMarkers(L: LeafletGlobal, summary: MapSummaryRow[]): void {
     if (!this.summaryMarkerGroup) return;
@@ -1302,6 +1363,10 @@ export class RadarMapComponent implements AfterViewInit {
     });
   }
 
+  /**
+   * Nation detail: marker reali per categoria + dummy invisibile per forzare
+   * un parent cluster anche con un solo articolo (MC richiede ≥2 child).
+   */
   private renderDetailMarkers(L: LeafletGlobal, articles: Article[]): void {
     const countryCenters = new Map<string, { latSum: number; lngSum: number; count: number }>();
 
@@ -1374,6 +1439,10 @@ export class RadarMapComponent implements AfterViewInit {
     });
   }
 
+  /**
+   * Chiude tutti gli spiderfy. ``emitClose`` → sidebar (clusterClicked []);
+   * ``restoreHub`` → ripristina hub nazione (false durante switch categoria).
+   */
   collapseAllGraphs(emitClose: boolean = false, restoreHub: boolean = true): void {
     if (!this.map) return;
 
@@ -1403,6 +1472,10 @@ export class RadarMapComponent implements AfterViewInit {
     }
   }
 
+  /**
+   * Apre spiderfy per una categoria nella nazione (carousel / hub click).
+   * In-place se zoom ≥ 5; altrimenti flyTo 6. Nota: clusterclick usa soglia 6.
+   */
   public focusAndSpiderfyCategory(countryCode: string, category: string, attempt = 0): void {
     if (!this.map || this.destroyed) return;
     const cg = this.categoryClusterGroups.get(category);
@@ -1414,7 +1487,7 @@ export class RadarMapComponent implements AfterViewInit {
     );
 
     if (countryMarkers.length === 0) {
-      // Detail markers may still be applying after nation fetch / invalidateSize.
+      // Marker detail possono ancora arrivare dopo fetch nazione / invalidateSize.
       if (attempt < 10) {
         this.scheduleTimeout(
           () => this.focusAndSpiderfyCategory(countryCode, category, attempt + 1),
@@ -1448,7 +1521,7 @@ export class RadarMapComponent implements AfterViewInit {
         : firstMarker.getLatLng();
     const gen = ++this.spiderfyGeneration;
 
-    // Detail zoom already (markers visible): spiderfy in place — never fitBounds/dezoom.
+    // Zoom detail già ok: spiderfy in place — mai fitBounds/dezoom.
     if (currentZoom >= 5) {
       if (!this.spiderfyAndCreateRoot(cg, countryMarkers, gen)) {
         this.restoreNationHubPin();
@@ -1484,8 +1557,8 @@ export class RadarMapComponent implements AfterViewInit {
   }
 
   /**
-   * Nation open / carousel: expand emoji icons for one category in that country.
-   * Prefer focusAndSpiderfyCategory — multi-category expand is not used (active article only).
+   * Nation open legacy: prima categoria disponibile → focusAndSpiderfyCategory.
+   * Preferisci sempre la variante per-categoria (articolo attivo carousel).
    */
   public focusAndSpiderfyCountry(countryCode: string, attempt = 0): void {
     if (!this.map || this.destroyed) return;
@@ -1506,6 +1579,7 @@ export class RadarMapComponent implements AfterViewInit {
     }
   }
 
+  /** Evidenzia marker articolo attivo (carousel) con retry se icona non ancora nel DOM. */
   public highlightMarkerForArticle(article: Article | null): void {
     if (this.highlightedMarker) {
       const iconDiv = this.highlightedMarker._icon;
@@ -1554,6 +1628,7 @@ export class RadarMapComponent implements AfterViewInit {
     }
   }
 
+  /** DestroyRef: annulla timeout/rAF, unsubscribe GeoJSON, ``map.remove()``. */
   private teardown(): void {
     this.destroyed = true;
     this.spiderfyGeneration++;

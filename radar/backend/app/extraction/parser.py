@@ -1,3 +1,13 @@
+"""Sanitize HTML entry → testo piano per il prompt LLM.
+
+Purga tag multimediali/tracking e il loro contenuto interno; cap byte
+**prima** del parse; poi unescape e normalizzazione whitespace.
+Niente BeautifulSoup: solo ``html.parser`` stdlib.
+
+SoT:
+    .agents/AGENTS.md §2 (purgazione media); radar/.ecc/rules/backend.md HTML Sanitize.
+"""
+
 import re
 from html.parser import HTMLParser
 from html import unescape
@@ -6,26 +16,34 @@ from app.core.config import MAX_ENTRY_CONTENT_BYTES
 
 
 class EntryContentTooLarge(ValueError):
-    """Raised when raw entry HTML exceeds MAX_ENTRY_CONTENT_BYTES before parsing."""
+    """HTML grezzo oltre ``MAX_ENTRY_CONTENT_BYTES``: non si avvia il parse."""
 
 
 class HTMLStripper(HTMLParser):
+    """Parser che emette solo testo fuori dai tag spazzatura/multimediali.
+
+    Mantiene ``ignored_stack``: finché lo stack non è vuoto, ``handle_data``
+    scarta il testo (script/style/iframe/svg/noscript/meta/video/audio/embed/
+    object/img/picture/source). Gli attributi non sono mai riprodotti.
     """
-    Parser HTML personalizzato che rimuove i tag ed esclude completamente 
-    i contenuti interni dei tag spazzatura, di tracciamento e multimediali.
-    """
+
     def __init__(self) -> None:
         super().__init__()
         self.reset()
         self.fed: list[str] = []
-        # Tag di cui vogliamo ignorare sia il tag che tutto il contenuto testuale interno
+        # Tag di cui ignorare sia il markup sia tutto il testo interno.
         self.content_ignored_tags = {
-            "script", "style", "iframe", "svg", "noscript", "meta", 
+            "script", "style", "iframe", "svg", "noscript", "meta",
             "video", "audio", "embed", "object", "img", "picture", "source"
         }
         self.ignored_stack: list[str] = []
 
     def _has_matching_close_tag(self, tag_lower: str) -> bool:
+        """True se nel resto del documento c'è un ``</tag>`` prima di un nuovo open.
+
+        Serve per void-ish tags (``img``, ``source``, ``meta``, ``embed``): se non
+        c'è close matching non si pusha sullo stack (tipicamente self-closing).
+        """
         try:
             raw = self.rawdata
             line, offset = self.getpos()
@@ -38,7 +56,7 @@ class HTMLStripper(HTMLParser):
             close_idx = remaining.find(close_tag)
             if close_idx == -1:
                 return False
-            
+
             start_tag_end = remaining.find(">")
             if start_tag_end != -1:
                 next_start_search = remaining[start_tag_end:]
@@ -58,6 +76,7 @@ class HTMLStripper(HTMLParser):
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         tag_lower = tag.lower()
         if tag_lower in self.content_ignored_tags:
+            # Void-ish: push solo se esiste un close esplicito nel markup.
             if tag_lower in {"img", "source", "meta", "embed"}:
                 if self._has_matching_close_tag(tag_lower):
                     self.ignored_stack.append(tag_lower)
@@ -70,18 +89,29 @@ class HTMLStripper(HTMLParser):
             self.ignored_stack.remove(tag_lower)
 
     def handle_data(self, data: str) -> None:
-        # Aggiunge i dati testuali solo se non siamo all'interno di tag da ignorare
+        # Testo solo fuori dai tag ignorati (riduce token LLM / rimuove media).
         if not self.ignored_stack:
             self.fed.append(data)
 
     def get_data(self) -> str:
+        """Concatena i frammenti di testo accumulati."""
         return "".join(self.fed)
 
+
 def strip_html_tags(html_content: str) -> str:
-    """
-    Rimuove tutti i tag HTML, decodifica le entità HTML e normalizza gli spazi bianchi.
-    Esclude completamente i contenuti interni di script, style, e tag multimediali.
-    Enforce MAX_ENTRY_CONTENT_BYTES prima del parsing HTML.
+    """Rimuove tutto l'HTML, unescape entità e normalizza gli spazi.
+
+    Cap byte **prima** di ``HTMLParser.feed`` per non parsare payload enormi.
+    Collassa whitespace orizzontale e limita i newline consecutivi a due.
+
+    Args:
+        html_content: HTML grezzo da ``ValidatedMinifluxEntry.content``.
+    Returns:
+        Testo piano strip-pato; stringa vuota se input vuoto.
+    Raises:
+        EntryContentTooLarge: oltre ``MAX_ENTRY_CONTENT_BYTES``.
+    SoT:
+        AGENTS.md §2 purgazione media; llm-json-extraction (content[:4000] a valle).
     """
     if not html_content:
         return ""
@@ -97,17 +127,16 @@ def strip_html_tags(html_content: str) -> str:
     stripper.feed(html_content)
     text = stripper.get_data()
 
-    # Decodifica le entità HTML residue (es. &amp;, &quot;, &#39;)
+    # Entità residue (&amp;, &quot;, …) → caratteri Unicode.
     text = unescape(text)
 
-    # Normalizza gli spazi bianchi orizzontali (tabulazioni e spazi multipli in spazio singolo)
+    # Tab/spazi multipli → spazio singolo (non tocca i newline).
     text = re.sub(r"[ \t]+", " ", text)
 
-    # Divide in righe, pulisce spazi iniziali/finali per ciascuna riga e ricompone
     lines = [line.strip() for line in text.splitlines()]
     text = "\n".join(lines)
 
-    # Collassa tre o più ritorni a capo consecutivi in massimo due (preservando la struttura in paragrafi)
+    # Max due newline: preserva paragrafi senza gonfiare il prompt.
     text = re.sub(r"\n{3,}", "\n\n", text)
 
     return text.strip()

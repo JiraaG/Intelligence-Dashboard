@@ -1,13 +1,23 @@
-"""Durable RPM/TPM/RPD quota ledger backed by llm_request_ledger (asyncpg).
+"""Ledger quote durable RPM/TPM/RPD su ``llm_request_ledger`` (asyncpg).
 
-Limits are **per classification lane** (simple / complex), from LlmLaneConfig:
-- LLM_SIMPLE_RPM / TPM / RPD
-- LLM_COMPLEX_RPM / TPM / RPD
+Limiti **per lane** di classificazione (simple / complex), da ``LlmLaneConfig``:
+- ``LLM_SIMPLE_RPM`` / TPM / RPD
+- ``LLM_COMPLEX_RPM`` / TPM / RPD
 
-Semantics: ``0`` on a dimension = unmanaged (no wait / no day hibernation for that
-dimension on that lane). Budget USD soft-cap when ``budget_usd_day > 0``.
-Reservations are tagged ``purpose=classify:{lane}`` so SIMPLE and COMPLEX never
-share the same RPM/TPM/RPD counters.
+Semantica: ``0`` su una dimensione = unmanaged (niente wait / niente hibernation
+giornaliera per quella dimensione su quella lane). Soft-cap USD se
+``budget_usd_day > 0``. Le reservation sono taggate ``purpose=classify:{lane}``
+così SIMPLE e COMPLEX non condividono gli stessi contatori.
+
+Invarianti:
+- RPM/TPM pieni → attesa sulla **stessa** lane (loop sleep).
+- RPD esaurita → ``QuotaDailyExceeded`` (no sleep fino a mezzanotte): il chiamante
+  fa residual cross-lane.
+- Spacing in-process con ``time.monotonic()`` per-lane.
+- Giorno half-open ``[day_start, next_day)`` su ``RADAR_TIME_ZONE``.
+
+SoT:
+    skill radar-quota-ledger; .agents/AGENTS.md §3; SoT LLM §6.
 """
 
 from __future__ import annotations
@@ -34,6 +44,7 @@ from app.core.llm_lanes import LANE_COMPLEX, LANE_SIMPLE, LlmLaneConfig
 logger = logging.getLogger("radar.classification.quota")
 
 QUOTA_ADVISORY_LOCK_KEY = 883_421_017
+# Status che occupano capacità nella finestra RPM/TPM/RPD (released escluso).
 _ACTIVE_STATUSES = ("reserved", "completed", "failed")
 
 SleepFn = Callable[[float], Awaitable[None]]
@@ -42,18 +53,27 @@ UtcNowFn = Callable[[], datetime]
 
 
 class QuotaBudgetExceeded(Exception):
-    """Lane daily USD soft-cap reached — caller should skip this provider."""
+    """Soft-cap USD giornaliero della lane raggiunto — skip provider, no cooldown 24h."""
 
 
 class QuotaDailyExceeded(Exception):
-    """Lane RPD (requests/day) exhausted — caller should failover to residual lane."""
+    """RPD (richieste/giorno) della lane esaurito — failover residual sull'altra lane."""
 
 
 def compute_day_window(
     now_utc: datetime,
     tz: ZoneInfo | timezone,
 ) -> tuple[datetime, datetime]:
-    """Half-open local-day window [day_start, next_day) expressed in UTC."""
+    """Finestra giorno locale half-open ``[day_start, next_day)`` espressa in UTC.
+
+    Args:
+        now_utc: Istante corrente (naive trattato come UTC).
+        tz: Timezone operativa (``RADAR_TIME_ZONE``).
+    Returns:
+        Coppia ``(day_start_utc, day_end_utc)`` per filtri ``created_at``.
+    SoT:
+        skill radar-quota-ledger (RPD half-open).
+    """
     if now_utc.tzinfo is None:
         now_utc = now_utc.replace(tzinfo=timezone.utc)
     else:
@@ -69,15 +89,18 @@ def compute_day_window(
 
 
 def _normalize_lane(lane: str | None) -> str:
+    """Normalizza a ``simple``|``complex``; default ``simple`` se assente/ignoto."""
     value = (lane or LANE_SIMPLE).strip().lower()
     return value if value in {LANE_SIMPLE, LANE_COMPLEX} else LANE_SIMPLE
 
 
 def purpose_for_lane(lane: str) -> str:
+    """Purpose ledger che isola i contatori: ``classify:simple`` | ``classify:complex``."""
     return f"classify:{_normalize_lane(lane)}"
 
 
 def estimate_usd(tokens: int, usd_per_1m: float) -> float:
+    """Stima costo USD da token e prezzo per 1M; 0 se input non positivi."""
     if tokens <= 0 or usd_per_1m <= 0:
         return 0.0
     return (float(tokens) / 1_000_000.0) * float(usd_per_1m)
@@ -85,12 +108,16 @@ def estimate_usd(tokens: int, usd_per_1m: float) -> float:
 
 @dataclass(frozen=True, slots=True)
 class _ReserveOutcome:
+    """Esito di un tentativo di reserve sotto lock: id oppure wait RPM/TPM."""
+
     reservation_id: int | None
     wait_seconds: float
 
 
 @dataclass(frozen=True, slots=True)
 class _LaneLimits:
+    """Limiti numerici di una lane (0 = unmanaged su quella dimensione)."""
+
     rpm: int
     tpm: int
     rpd: int
@@ -99,6 +126,7 @@ class _LaneLimits:
 
 
 def _limits_from_cfg(cfg: LlmLaneConfig) -> _LaneLimits:
+    """Proietta ``LlmLaneConfig`` nei limiti usati dal ledger."""
     return _LaneLimits(
         rpm=cfg.rpm,
         tpm=cfg.tpm,
@@ -109,7 +137,11 @@ def _limits_from_cfg(cfg: LlmLaneConfig) -> _LaneLimits:
 
 
 class QuotaLedger:
-    """Transactional quota reservations keyed by classification lane."""
+    """Reservation transazionali di quota, chiave = lane di classificazione.
+
+    Protocollo chiamante: ``reserve`` → chiamata provider → ``complete`` | ``fail``
+    | ``release`` (cancel pre-call). Un advisory lock xact serializza i check.
+    """
 
     def __init__(
         self,
@@ -138,6 +170,7 @@ class QuotaLedger:
         simple_limits = _limits_from_cfg(simple_cfg)
         complex_limits = _limits_from_cfg(complex_cfg)
 
+        # Override test/legacy: rpm/tpm/rpd → SIMPLE; deepseek_* → COMPLEX.
         if rpm is not None or tpm is not None or rpd is not None:
             simple_limits = _LaneLimits(
                 rpm=rpm if rpm is not None else simple_limits.rpm,
@@ -190,6 +223,7 @@ class QuotaLedger:
         self._advisory_lock_key = advisory_lock_key
         self._default_estimated_tokens = default_estimated_tokens
 
+        # Spacing in-process per lane (non condiviso tra simple e complex).
         self._spacing_lock = asyncio.Lock()
         self._last_reserve_mono: dict[str, float] = {
             LANE_SIMPLE: 0.0,
@@ -213,6 +247,7 @@ class QuotaLedger:
         )
 
     def min_interval_seconds(self, lane: str = LANE_SIMPLE) -> float:
+        """Intervallo minimo tra reserve in-process (``60/rpm``); ``0`` se RPM unmanaged."""
         rpm = self._limits[_normalize_lane(lane)].rpm
         if rpm <= 0:
             return 0.0
@@ -227,6 +262,29 @@ class QuotaLedger:
         provider: str | None = None,
         lane: str | None = None,
     ) -> int:
+        """Riserva capacità sulla lane **prima** di una chiamata provider.
+
+        Preferire ``lane=`` esplicito (``simple``|``complex``). Se solo ``provider``,
+        fallback legacy: deepseek/openai/claude → complex, resto → simple
+        (glm/grok senza ``lane`` cadono su simple — i chiamanti devono passare lane).
+
+        Args:
+            estimated_tokens: Stima prudente per TPM/budget; default config.
+            model: Etichetta ledger (non seleziona limiti).
+            purpose: Ignorato per i limiti — ricalcolato da ``purpose_for_lane``.
+            provider: Solo se ``lane`` assente (mapping legacy).
+            lane: Lane dei contatori RPM/TPM/RPD/budget.
+        Returns:
+            ``reservation_id`` da ``complete`` / ``fail`` / ``release``.
+        Raises:
+            QuotaBudgetExceeded: soft-cap USD (no wait).
+            QuotaDailyExceeded: RPD pieno — residual cross-lane, non sleep day.
+        Side-effects:
+            INSERT ``llm_request_ledger`` status ``reserved``; può sleep su RPM/TPM
+            della **stessa** lane finché c'è slot.
+        SoT:
+            radar-quota-ledger; AGENTS.md §3.
+        """
         if lane is not None:
             quota_lane = _normalize_lane(lane)
         elif provider is not None:
@@ -261,6 +319,7 @@ class QuotaLedger:
                     self._last_reserve_mono[quota_lane] = self._monotonic()
                 return outcome.reservation_id
 
+            # Qui solo RPM/TPM: RPD solleva QuotaDailyExceeded dentro _try_reserve_once.
             wait = max(0.05, outcome.wait_seconds)
             logger.info(
                 "Quota window piena lane=%s (RPM/TPM/RPD). Attesa %.2fs (tz=%s)",
@@ -271,6 +330,10 @@ class QuotaLedger:
             await self._sleep(wait)
 
     async def complete(self, reservation_id: int, actual_tokens: int) -> None:
+        """Chiude una reservation con successo: status ``completed`` + token reali.
+
+        No-op warning se la riga non è più ``reserved`` (già chiusa / id errato).
+        """
         tokens = max(0, int(actual_tokens))
         result = await self._pool.execute(
             """
@@ -290,6 +353,10 @@ class QuotaLedger:
             )
 
     async def release(self, reservation_id: int) -> None:
+        """Rilascia una reservation non consumata (cancel pre-call / ConfigError).
+
+        Status ``released`` non conta nei contatori ``_ACTIVE_STATUSES``.
+        """
         result = await self._pool.execute(
             """
             UPDATE llm_request_ledger
@@ -311,6 +378,10 @@ class QuotaLedger:
         *,
         actual_tokens: int | None = None,
     ) -> None:
+        """Marca tentativo fallito: status ``failed`` (occupa ancora RPM/TPM/RPD del giorno).
+
+        Usato dopo errore provider o ValidationError con chiamata già avviata.
+        """
         tokens = None if actual_tokens is None else max(0, int(actual_tokens))
         result = await self._pool.execute(
             """
@@ -330,6 +401,7 @@ class QuotaLedger:
             )
 
     async def _in_process_spacing_wait(self, lane: str) -> float:
+        """Secondi residui di spacing monotonic per-lane; 0 se RPM unmanaged o primo call."""
         interval = self.min_interval_seconds(lane)
         if interval <= 0.0:
             return 0.0
@@ -350,6 +422,13 @@ class QuotaLedger:
         purpose: str,
         lane: str,
     ) -> _ReserveOutcome:
+        """Un tentativo sotto ``pg_advisory_xact_lock``: budget → RPM → TPM → RPD → INSERT.
+
+        Returns:
+            ``reservation_id`` oppure ``wait_seconds`` per RPM/TPM.
+        Raises:
+            QuotaBudgetExceeded / QuotaDailyExceeded (non ritornano wait).
+        """
         limits = self._limits[lane]
         purpose_exact = purpose_for_lane(lane)
 
@@ -473,8 +552,8 @@ class QuotaLedger:
                         purpose_exact,
                     )
                     if int(rpd_count or 0) >= limits.rpd:
-                        # Do NOT sleep until day rollover: unblock so ClassificationClient
-                        # can residual-failover to the other lane. RPM/TPM still wait.
+                        # Non sleep fino al rollover: sblocca ClassificationClient
+                        # per residual sull'altra lane. RPM/TPM invece attendono.
                         raise QuotaDailyExceeded(
                             f"lane={lane} RPD={limits.rpd} exhausted "
                             f"(until day_end={day_end.isoformat()})"
@@ -511,6 +590,7 @@ class QuotaLedger:
         day_end: datetime,
         usd_per_1m: float,
     ) -> float:
+        """Somma token attivi del giorno locale → stima USD spesi sulla lane."""
         purpose_exact = purpose_for_lane(lane)
         tokens = await conn.fetchval(
             """

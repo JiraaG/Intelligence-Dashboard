@@ -1,4 +1,12 @@
-"""Application configuration with bounded settings and production fail-fast."""
+"""Configurazione applicativa con limiti bounded e fail-fast in production.
+
+Carica `.env` all'import, costruisce le lane LLM via `load_lanes()`, poi espone
+DB/Miniflux/worker/CORS. Gli alias legacy (`GEMINI_*`, `DEEPSEEK_*`, `LLM_RPM`)
+sono comodità: i limiti autoritativi restano `LLM_SIMPLE` / `LLM_COMPLEX`.
+
+SoT:
+    docs/01_getting_started.md; .agents/AGENTS.md §3; SoT LLM §5–6.
+"""
 
 from __future__ import annotations
 
@@ -13,10 +21,18 @@ load_dotenv()
 
 
 class ConfigError(ValueError):
-    """Raised when configuration is invalid or incomplete for the active environment."""
+    """Configurazione invalida o incompleta per l'ambiente attivo."""
 
 
 def _env_str(name: str, default: str | None = None) -> str | None:
+    """Legge una stringa env; chiave assente o blank → ``default``.
+
+    Args:
+        name: Nome della variabile d'ambiente.
+        default: Valore se assente/blank (può essere ``None``).
+    Returns:
+        Stringa strip-pata, oppure ``default``.
+    """
     raw = os.getenv(name)
     if raw is None or raw.strip() == "":
         return default
@@ -31,6 +47,20 @@ def _env_int(
     max_value: int | None = None,
     allow_zero: bool = False,
 ) -> int:
+    """Parse intero env con range opzionale; blank/assente → ``default``.
+
+    Args:
+        name: Nome della variabile.
+        default: Valore se assente/blank.
+        min_value: Minimo inclusivo (ignorato se ``allow_zero`` e valore 0).
+        max_value: Massimo inclusivo.
+        allow_zero: Se True, ``0`` è ammesso anche sotto ``min_value``
+            (semaforo ``0`` = unmanaged sulle quote lane).
+    Returns:
+        Intero validato.
+    Raises:
+        ConfigError: valore non intero o fuori range.
+    """
     raw = os.getenv(name)
     if raw is None or raw.strip() == "":
         value = default
@@ -50,6 +80,7 @@ def _env_int(
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
+    """Parse booleano env (1/true/yes/on); blank/assente → ``default``."""
     raw = os.getenv(name)
     if raw is None or raw.strip() == "":
         return default
@@ -63,6 +94,11 @@ def _env_float(
     min_value: float | None = None,
     max_value: float | None = None,
 ) -> float:
+    """Parse float env con range; blank/assente → ``default``.
+
+    Raises:
+        ConfigError: valore non numerico o fuori range.
+    """
     raw = os.getenv(name)
     if raw is None or raw.strip() == "":
         value = default
@@ -79,6 +115,7 @@ def _env_float(
 
 
 def _csv_models(raw: str | None) -> list[str]:
+    """Split CSV di id modello: trim, scarta vuoti, dedup preservando l'ordine."""
     if not raw:
         return []
     out: list[str] = []
@@ -93,7 +130,15 @@ def _csv_models(raw: str | None) -> list[str]:
 
 
 def _resolve_time_zone(name: str):
-    """Resolve IANA timezone; UTC works without the tzdata package on Windows."""
+    """Risolve timezone IANA; UTC/GMT non richiedono il pacchetto tzdata su Windows.
+
+    Args:
+        name: Identificatore IANA o ``UTC``/``GMT``.
+    Returns:
+        Coppia ``(tzinfo, nome_canonico)``.
+    Raises:
+        ConfigError: nome IANA sconosciuto.
+    """
     if name.upper() in {"UTC", "GMT"}:
         return dt_timezone.utc, "UTC"
     try:
@@ -105,7 +150,7 @@ def _resolve_time_zone(name: str):
 RADAR_ENV = (_env_str("RADAR_ENV", "development") or "development").lower()
 IS_PRODUCTION = RADAR_ENV in {"production", "prod"}
 
-# ── LLM (per-lane: SIMPLE / COMPLEX; provider = adapter type) ─────────────────
+# ── LLM (per-lane: SIMPLE / COMPLEX; provider = tipo adapter) ─────────────────
 from app.core.llm_lanes import (  # noqa: E402
     LANE_COMPLEX,
     LANE_SIMPLE,
@@ -118,15 +163,16 @@ LLM_SIMPLE: LlmLaneConfig
 LLM_COMPLEX: LlmLaneConfig
 LLM_SIMPLE, LLM_COMPLEX = load_lanes()
 
-# Backward-compatible aliases (prefer LLM_SIMPLE / LLM_COMPLEX in new code).
+# Alias retrocompatibili (preferire LLM_SIMPLE / LLM_COMPLEX nel codice nuovo).
 GOOGLE_API_KEY = _env_str("GOOGLE_API_KEY")
 GEMINI_API_KEY = _env_str("GEMINI_API_KEY")
+# Chiave esposta per boot SDK Gemini: lane SIMPLE se provider=gemini, altrimenti legacy.
 LLM_API_KEY = (
     LLM_SIMPLE.api_key
     if LLM_SIMPLE.provider == "gemini"
     else (GOOGLE_API_KEY or GEMINI_API_KEY or LLM_SIMPLE.api_key)
 )
-# If simple is not gemini, still expose a gemini key for SDK boot when present.
+# Se SIMPLE non è gemini, espone comunque una chiave Gemini per l'SDK se presente.
 if not LLM_API_KEY:
     LLM_API_KEY = GOOGLE_API_KEY or GEMINI_API_KEY or ""
 
@@ -135,13 +181,22 @@ GEMINI_MODEL = LLM_SIMPLE.model if LLM_SIMPLE.provider == "gemini" else (
 )
 if GEMINI_MODEL in ("gemma-4-31b", "gemma-4-31b-it"):
     GEMINI_MODEL = "gemma-4-31b-it"
+# Se SIMPLE è gemini, i fallback autoritativi sono già in LLM_SIMPLE.fallbacks
+# (LLM_SIMPLE_FALLBACKS presente anche vuota sopprime GEMINI_MODEL_FALLBACKS — C-03).
 GEMINI_MODEL_FALLBACKS = list(LLM_SIMPLE.fallbacks) if LLM_SIMPLE.provider == "gemini" else (
     _csv_models(_env_str("GEMINI_MODEL_FALLBACKS", ""))
 )
 
 
 def gemini_model_chain() -> list[str]:
-    """Primary + fallbacks for the SIMPLE lane when provider=gemini."""
+    """Catena primary+fallback della lane SIMPLE quando il provider è gemini.
+
+    Returns:
+        Lista ordinata senza duplicati; se SIMPLE non è gemini, usa gli alias
+        ``GEMINI_MODEL`` / ``GEMINI_MODEL_FALLBACKS`` legacy.
+    SoT:
+        plan-audit/active/sot_llm_multi_model_fallback.md §5; C-03 su precedenza FALLBACKS.
+    """
     if LLM_SIMPLE.provider == "gemini":
         return list(LLM_SIMPLE.models)
     chain = [GEMINI_MODEL]
@@ -151,7 +206,7 @@ def gemini_model_chain() -> list[str]:
     return chain
 
 
-# Aliases di sola comodita → valori della lane SIMPLE (NON sono limiti globali).
+# Alias di sola comodità → valori della lane SIMPLE (NON sono limiti globali).
 # Nuovo codice: usare LLM_SIMPLE.rpm / .tpm / .rpd e LLM_COMPLEX.*.
 # 0 = dimensione non gestita su quella lane.
 LLM_RPM = LLM_SIMPLE.rpm
@@ -165,6 +220,7 @@ ESTIMATED_TOKENS_PER_REQUEST = _env_int(
     max_value=100_000,
 )
 
+# Alias legacy COMPLEX/deepseek: riflettono LLM_COMPLEX solo se provider allineato.
 DEEPSEEK_API_KEY = (
     LLM_COMPLEX.api_key
     if LLM_COMPLEX.provider == "deepseek"
@@ -201,7 +257,8 @@ DEEPSEEK_USD_PER_1M_TOKENS = (
     else 0.28
 )
 
-# Routing: off = simple-lane chain only; complexity = heuristic lanes.
+# Routing: off = sola catena SIMPLE; complexity = heuristic v2.2 sulle lane.
+# Default codice boot-safe: off + shadow=true (docs/01); .env.example attiva il profilo ops.
 _raw_routing = (_env_str("LLM_ROUTING_MODE", "off") or "off").lower()
 LLM_ROUTING_MODE = _raw_routing if _raw_routing in {"off", "complexity"} else "off"
 LLM_ROUTING_SHADOW = _env_bool("LLM_ROUTING_SHADOW", True)
@@ -222,6 +279,7 @@ pg_pass = _env_str("POSTGRES_PASSWORD", _DEFAULT_PG_PASSWORD) or _DEFAULT_PG_PAS
 pg_db = _env_str("POSTGRES_DB", "radar_db") or "radar_db"
 pg_host = _env_str("POSTGRES_HOST", "localhost") or "localhost"
 pg_port = _env_str("POSTGRES_PORT", "5432") or "5432"
+# URL di default da pezzi Postgres; in Compose di solito arriva DATABASE_URL già pronta.
 _default_db_url = (
     f"postgresql://{quote_plus(pg_user)}:{quote_plus(pg_pass)}"
     f"@{pg_host}:{pg_port}/{pg_db}"
@@ -235,6 +293,7 @@ MINIFLUX_API_URL = _env_str("MINIFLUX_API_URL", "http://localhost:8080") or "htt
 MINIFLUX_API_KEY = _env_str("MINIFLUX_API_KEY", "") or ""
 MINIFLUX_LIMIT = _env_int("MINIFLUX_LIMIT", 50, min_value=1, max_value=500)
 
+# Ceiling byte sullo stream HTTP e sul singolo entry prima del parse (docs/01).
 MAX_MINIFLUX_RESPONSE_BYTES = _env_int(
     "MAX_MINIFLUX_RESPONSE_BYTES",
     5_000_000,
@@ -254,6 +313,7 @@ MINIFLUX_MAX_RETRIES = _env_int("MINIFLUX_MAX_RETRIES", 3, min_value=0, max_valu
 MINIFLUX_RETRY_BASE_SECONDS = _env_int("MINIFLUX_RETRY_BASE_SECONDS", 1, min_value=1, max_value=60)
 MINIFLUX_RETRY_MAX_SECONDS = _env_int("MINIFLUX_RETRY_MAX_SECONDS", 30, min_value=1, max_value=300)
 
+# Outbox: soglia oltre la quale uno stato `writing` stale è recuperabile.
 OUTBOX_STALE_WRITING_SECONDS = _env_int(
     "OUTBOX_STALE_WRITING_SECONDS",
     300,
@@ -264,7 +324,7 @@ OUTBOX_STALE_WRITING_SECONDS = _env_int(
 _raw_tz = _env_str("RADAR_TIME_ZONE", "UTC") or "UTC"
 RADAR_TIME_ZONE, RADAR_TIME_ZONE_NAME = _resolve_time_zone(_raw_tz)
 
-# ── Worker (ingest daemon) ────────────────────────────────────────────────────
+# ── Worker (demone ingest; non l'API) ─────────────────────────────────────────
 WORKER_QUEUE_DEPTH = _env_int("WORKER_QUEUE_DEPTH", 100, min_value=1, max_value=10_000)
 WORKER_ENTRY_CONCURRENCY = _env_int("WORKER_ENTRY_CONCURRENCY", 4, min_value=1, max_value=64)
 WORKER_PARSE_CONCURRENCY = _env_int("WORKER_PARSE_CONCURRENCY", 8, min_value=1, max_value=64)
@@ -290,7 +350,7 @@ WORKER_ADVISORY_LOCK_BACKOFF_SECONDS = _env_int(
     min_value=1,
     max_value=300,
 )
-# Leader UPSERT interval for worker_heartbeat (readiness TTL uses STALE below).
+# Intervallo UPSERT su worker_heartbeat; la readiness TTL usa STALE sotto.
 WORKER_HEARTBEAT_INTERVAL_SECONDS = _env_int(
     "WORKER_HEARTBEAT_INTERVAL_SECONDS",
     30,
@@ -304,8 +364,8 @@ WORKER_HEARTBEAT_STALE_SECONDS = _env_int(
     max_value=600,
 )
 
-# CSV allowlist for direct browser→API origins. Empty = no CORS middleware (Nginx same-origin).
-# Never use "*".
+# CSV allowlist per origini browser→API dirette. Vuoto = nessun middleware CORS
+# (Nginx same-origin). Mai "*". SoT: AGENTS §4.11.
 _raw_cors = _env_str("CORS_ALLOW_ORIGINS", "") or ""
 _cors_parts = [origin.strip() for origin in _raw_cors.split(",") if origin.strip()]
 if any(part == "*" for part in _cors_parts):
@@ -314,7 +374,14 @@ CORS_ALLOW_ORIGINS: list[str] = _cors_parts
 
 
 def _validate_production_secrets() -> None:
-    """Fail startup in production when Miniflux/DB settings are missing or insecure defaults."""
+    """In production, fallisce lo startup se chiavi/DB sono assenti o usano default insicuri.
+
+    Side-effects:
+        Nessuna scrittura; solleva ``ConfigError`` se ``IS_PRODUCTION`` e mancano
+        chiave lane (o legacy), ``MINIFLUX_API_KEY``, oppure password/DB di default.
+    SoT:
+        docs/01_getting_started.md §2; AGENTS §4 password.
+    """
     if not IS_PRODUCTION:
         return
 

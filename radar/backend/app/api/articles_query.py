@@ -1,8 +1,11 @@
 """
-SQL builders for day-scoped article list, map-summary, and countries endpoints.
+Builder SQL per lista articoli day-scoped, map-summary e countries.
 
-Companies/tags use LATERAL subselects — never sibling LEFT JOINs of
-article_companies + article_tags in the same FROM (Cartesian risk).
+Companies/tags via ``LEFT JOIN LATERAL`` — mai due LEFT JOIN sibling di
+``article_companies`` + ``article_tags`` nello stesso FROM (rischio cartesiano).
+
+SoT:
+    skill radar-api-contract; docs/02 API Phase 5.
 """
 
 from __future__ import annotations
@@ -15,6 +18,7 @@ from fastapi import HTTPException
 DEFAULT_ARTICLES_LIMIT = 50
 MAX_ARTICLES_LIMIT = 100
 
+# Coord finite: esclude NULL e NaN (``x = x`` falso per NaN) e fuori range geografico.
 _FINITE_LAT_LON_FILTER = (
     "latitude IS NOT NULL "
     "AND longitude IS NOT NULL "
@@ -26,7 +30,7 @@ _FINITE_LAT_LON_FILTER = (
 
 
 def parse_published_date(raw: str) -> date:
-    """Parse YYYY-MM-DD (also accepts / separators). Raises HTTP 400 on failure."""
+    """Parse ``YYYY-MM-DD`` (accetta anche ``/``). HTTP 400 se invalida."""
     try:
         return datetime.strptime(raw.replace("/", "-"), "%Y-%m-%d").date()
     except ValueError as exc:
@@ -37,7 +41,7 @@ def parse_published_date(raw: str) -> date:
 
 
 def clamp_articles_limit(limit: int) -> int:
-    """Clamp page size to [1, MAX_ARTICLES_LIMIT]."""
+    """Clamp page size a ``[1, MAX_ARTICLES_LIMIT]`` (contratto FE ≤ 100)."""
     if limit < 1:
         return 1
     return min(limit, MAX_ARTICLES_LIMIT)
@@ -53,7 +57,7 @@ def _append_optional_filters(
     category: Optional[str] = None,
     column_prefix: str = "",
 ) -> None:
-    """Append AND filters; params already contains $1… so next index is len(params)+1."""
+    """Appende filtri AND dinamici; il prossimo placeholder è ``len(params)+1``."""
     if country:
         params.append(country.upper())
         query_parts.append(f"AND {column_prefix}country_code = ${len(params)}")
@@ -76,7 +80,7 @@ def build_articles_count_query(
     country: Optional[str] = None,
     category: Optional[str] = None,
 ) -> tuple[str, list[Any]]:
-    """COUNT(*) for filtered single-day articles (no cursor)."""
+    """``COUNT(*)`` articoli filtrati di un solo giorno (senza cursor)."""
     params: list[Any] = [pub_date]
     parts = ["SELECT COUNT(*) FROM articles a WHERE a.published_at = $1"]
     _append_optional_filters(
@@ -101,10 +105,11 @@ def build_articles_page_query(
     cursor: Optional[int] = None,
     limit: int,
 ) -> tuple[str, list[Any]]:
-    """
-    Keyset page for a single calendar day (id DESC, id < cursor exclusive).
+    """Pagina keyset di un giorno calendario (``id DESC``, ``id < cursor`` esclusivo).
 
-    Companies/tags via LATERAL — no double LEFT JOIN of junctions in FROM.
+    Companies/tags via LATERAL — niente doppio LEFT JOIN junction nel FROM.
+    Returns:
+        ``(sql, params)`` pronti per ``conn.fetch``.
     """
     params: list[Any] = [pub_date]
     parts = [
@@ -156,7 +161,7 @@ def build_map_summary_query(
     sentiment: Optional[str] = None,
     relevance_level: Optional[int] = None,
 ) -> tuple[str, list[Any]]:
-    """Aggregate by country_code × primary_category with finite representative coords."""
+    """Aggregato ``country_code × primary_category`` con media lat/lon solo finite."""
     params: list[Any] = [pub_date]
     finite = _FINITE_LAT_LON_FILTER
     parts = [
@@ -190,7 +195,7 @@ def build_countries_summary_query(
     sentiment: Optional[str] = None,
     relevance_level: Optional[int] = None,
 ) -> tuple[str, list[Any]]:
-    """Compat aggregate by country_code (no junction joins)."""
+    """Aggregato compat per ``country_code`` (nessun join junction)."""
     params: list[Any] = [pub_date]
     parts = [
         """

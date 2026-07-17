@@ -1,4 +1,12 @@
-"""Outbox reconcile: durable Vault projection + deferred Miniflux mark-read."""
+"""Reconcile outbox: proiezione Vault durable + mark-read Miniflux differito.
+
+Ordine vincolante: claim → checksum → write vault → ``completed`` → mark-read.
+Mark-read fallito lascia ``miniflux_marked_at`` NULL per retry. Righe ``writing``
+stale tornano ``pending`` dopo ``OUTBOX_STALE_WRITING_SECONDS``.
+
+SoT:
+    docs/02_architecture_and_backend.md; radar/docs/runbook.md (outbox).
+"""
 
 from __future__ import annotations
 
@@ -19,6 +27,7 @@ logger = logging.getLogger("radar.commit.outbox")
 
 
 def payload_checksum(payload: str) -> str:
+    """SHA-256 hex del payload UTF-8: rileva corruzione / race sul blob outbox."""
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -30,7 +39,11 @@ async def enqueue_outbox_row(
     payload: str,
     miniflux_entry_id: int | None,
 ) -> None:
-    """Insert or refresh an outbox row inside an existing transaction."""
+    """Inserisce o aggiorna una riga outbox **dentro** una transazione già aperta.
+
+    Se lo status corrente è ``completed``, resta ``completed`` (non riapre il lavoro).
+    Altrimenti forza ``pending`` e azzera errori / mark-read per un nuovo reconcile.
+    """
     checksum = payload_checksum(payload)
     await conn.execute(
         """
@@ -67,6 +80,11 @@ async def enqueue_outbox_row(
 
 
 async def _reset_stale_writing(conn: asyncpg.Connection) -> int:
+    """``writing`` più vecchie della soglia → ``pending`` (crash mid-write).
+
+    Returns:
+        Numero di righe resettate (parse del tag ``UPDATE N`` asyncpg).
+    """
     result = await conn.execute(
         """
         UPDATE article_outbox
@@ -86,6 +104,11 @@ async def _reset_stale_writing(conn: asyncpg.Connection) -> int:
 
 
 async def _claim_row(conn: asyncpg.Connection, outbox_id: int) -> Optional[asyncpg.Record]:
+    """Passa la riga a ``writing`` e incrementa ``attempt_count`` (claim ottimistico).
+
+    Returns:
+        Record claimed, oppure ``None`` se lo status non era claimabile.
+    """
     return await conn.fetchrow(
         """
         UPDATE article_outbox
@@ -102,6 +125,7 @@ async def _claim_row(conn: asyncpg.Connection, outbox_id: int) -> Optional[async
 
 
 async def _mark_completed(conn: asyncpg.Connection, outbox_id: int) -> None:
+    """Vault durable: status ``completed``. Mark-read Miniflux avviene dopo."""
     await conn.execute(
         """
         UPDATE article_outbox
@@ -116,6 +140,7 @@ async def _mark_completed(conn: asyncpg.Connection, outbox_id: int) -> None:
 
 
 async def _update_miniflux_marked_at(conn: asyncpg.Connection, outbox_id: int) -> None:
+    """Registra mark-read Miniflux riuscito (retry se resta NULL)."""
     await conn.execute(
         """
         UPDATE article_outbox
@@ -128,6 +153,7 @@ async def _update_miniflux_marked_at(conn: asyncpg.Connection, outbox_id: int) -
 
 
 async def _mark_failed(conn: asyncpg.Connection, outbox_id: int, error: str) -> None:
+    """Fallimento vault/checksum: status ``failed`` + ``last_error`` truncato."""
     await conn.execute(
         """
         UPDATE article_outbox
@@ -146,9 +172,20 @@ async def process_outbox_row(
     row: asyncpg.Record,
     miniflux_client: Optional["MinifluxClient"] = None,
 ) -> bool:
-    """
-    Write Vault projection for one outbox row and mark Miniflux read only after durable completed.
-    Returns True on success.
+    """Proietta una riga outbox sul Vault; mark-read solo dopo ``completed``.
+
+    Flusso: claim → verifica checksum → ``write_file_with_lock`` (thread) →
+    ``completed`` → eventuale ``mark_as_read``. Errore mark-read: vault resta
+    durable, ``miniflux_marked_at`` NULL per retry in ``reconcile_outbox``.
+
+    Args:
+        pool: Pool asyncpg (acquire brevi, non tiene lock per tutta la scrittura FS).
+        row: Riga con almeno ``id`` (pending/failed tipicamente).
+        miniflux_client: Opzionale; se assente salta mark-read.
+    Returns:
+        ``True`` se vault completed (mark-read può ancora essere in ritardo).
+    SoT:
+        docs/02; runbook (pending→writing→completed|failed).
     """
     outbox_id = row["id"]
 
@@ -194,7 +231,7 @@ async def process_outbox_row(
             async with pool.acquire() as conn:
                 await _update_miniflux_marked_at(conn, outbox_id)
         except Exception as mark_err:
-            # Vault already durable; leave miniflux_marked_at NULL so reconcile_outbox retries mark-read.
+            # Vault già durable; leave miniflux_marked_at NULL so reconcile ritenta mark-read.
             logger.warning(
                 "Outbox id=%s completed ma mark-read Miniflux fallito (entry_id=%s): %s",
                 outbox_id,
@@ -215,9 +252,15 @@ async def reconcile_outbox(
     pool: asyncpg.Pool,
     miniflux_client: Optional["MinifluxClient"] = None,
 ) -> dict[str, int]:
-    """
-    Reconcile pending / failed / stale-writing outbox rows, and retry failed Miniflux mark-read for completed rows.
-    Call on startup and before every Miniflux fetch.
+    """Reconcile pending/failed/stale-writing e retry mark-read su completed orfani.
+
+    Da chiamare all'avvio worker e prima di ogni fetch Miniflux. Limite 200 righe
+    per ciclo per non bloccare il poll.
+
+    Returns:
+        Stats ``reset_stale`` / ``attempted`` / ``succeeded`` / ``failed``.
+    SoT:
+        runbook outbox; docs/02 (vault prima di mark-read).
     """
     stats = {"reset_stale": 0, "attempted": 0, "succeeded": 0, "failed": 0}
 

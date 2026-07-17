@@ -1,4 +1,13 @@
-# lock.py — Atomic vault writes with permanent FileLock sidecar
+"""Scritture vault atomiche con sidecar FileLock permanente.
+
+Pattern: temp sibling → flush + fsync → ``os.replace`` → fsync directory
+(best-effort). Il file ``{path}.lock`` non viene unlink-ato al release
+(evita race su Windows e lascia evidenza del lock). Funzione sync: i caller
+async usano ``asyncio.to_thread``.
+
+SoT:
+    docs/02 persistence; runbook outbox (vault atomico).
+"""
 
 from __future__ import annotations
 
@@ -14,12 +23,14 @@ logger = logging.getLogger("radar.commit.lock")
 
 
 class PermanentFileLock(FileLock):
-    """
-    FileLock che rilascia il lock OS senza cancellare il file sidecar.
-    filelock>=3.x esegue unlink() in _release; qui il .lock resta permanente.
+    """FileLock che rilascia il lock OS **senza** cancellare il sidecar ``.lock``.
+
+    ``filelock>=3.x`` esegue ``unlink()`` in ``_release``; qui il ``.lock`` resta
+    permanente sul filesystem dopo lo unlock.
     """
 
     def _release(self) -> None:
+        """Unlock + close fd; non cancella ``lock_file`` dal disco."""
         fd = cast("int | None", self._context.lock_file_fd)
         self._context.lock_file_fd = None
         if fd is None:
@@ -39,7 +50,7 @@ class PermanentFileLock(FileLock):
 
 
 def _fsync_directory(directory: Path) -> None:
-    """Best-effort directory fsync; ignore OSError (common on Windows)."""
+    """Fsync della directory parent (durability del rename); ignora OSError (Windows)."""
     try:
         dir_fd = os.open(str(directory), os.O_RDONLY)
     except OSError:
@@ -53,6 +64,10 @@ def _fsync_directory(directory: Path) -> None:
 
 
 def _atomic_write(target_path: Path, content: str) -> None:
+    """Scrive ``content`` in ``target_path`` via temp + fsync + ``os.replace``.
+
+    Il temp vive nella stessa directory del target (rename atomico sullo stesso FS).
+    """
     target_path.parent.mkdir(parents=True, exist_ok=True)
 
     temp_path = target_path.parent / f".{target_path.name}.tmp.{os.getpid()}"
@@ -74,14 +89,18 @@ def _atomic_write(target_path: Path, content: str) -> None:
 
 
 def write_file_with_lock(file_path: str, content: str) -> None:
-    """
-    Scrive content in file_path in modo atomico sotto FileLock.
+    """Scrive ``content`` in ``file_path`` in modo atomico sotto ``PermanentFileLock``.
 
     - Crea le directory parent se mancanti.
-    - Scrive su sibling temporaneo nella stessa directory, flush + fsync, poi os.replace.
-    - Fsync della directory parent dove supportato (OSError ignorato su Windows).
-    - Il sidecar ``{file_path}.lock`` resta permanentemente sul filesystem (mai unlink dopo release).
-    - Funzione sincrona: i caller async possono usare asyncio.to_thread.
+    - Scrive su sibling temporaneo, flush + fsync, poi ``os.replace``.
+    - Fsync della directory parent dove supportato.
+    - Sidecar ``{file_path}.lock`` permanente (mai unlink dopo release).
+    - Sincrona: da async usare ``asyncio.to_thread`` (come in ``outbox.py``).
+
+    Raises:
+        Exception: errori di lock/IO — loggati e ri-lanciati.
+    SoT:
+        docs/02; runbook outbox.
     """
     target_path = Path(file_path)
     lock_path = str(target_path) + ".lock"
