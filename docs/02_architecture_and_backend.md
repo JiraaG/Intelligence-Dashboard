@@ -40,7 +40,7 @@ Moduli sotto `radar/backend/app/`:
 3. **`classification/`** — client Gemini (`google-genai`) + OpenAI-compat httpx (`deepseek`/`openai`/`glm`/`grok`; dialect); `claude` = stub; **`complexity.py`** v2.2; **`cooldown.py`**; `quota.py` per-lane; prompts (no CoT); validator Pydantic strict
 4. **`commit/`** — commit atomico, outbox, vault `yaml.safe_dump` + write atomica
 5. **`api/`** — query helpers Phase 5 (`articles_query.py`)
-6. **`scripts/`** — ops (`requeue_articles`, …) — dettaglio [runbook](../radar/docs/runbook.md)
+6. **`scripts/`** — ops `requeue_articles.py` — dettaglio [runbook](../radar/docs/runbook.md)
 
 ---
 
@@ -60,7 +60,7 @@ Moduli sotto `radar/backend/app/`:
 
 ### Cooldown modelli
 
-Hard-fail prolungati: tabella `llm_model_cooldown` (migrazione `009_llm_model_cooldown.sql`), codice `classification/cooldown.py`, knob `LLM_MODEL_COOLDOWN_HOURS`. Non confondere con `429` + `Retry-After` brevi. Clear / requeue: `python -m app.scripts.requeue_articles` — [runbook](../radar/docs/runbook.md).
+Hard-fail prolungati: tabella `llm_model_cooldown` (migrazione `009_llm_model_cooldown.sql`), codice `classification/cooldown.py`, knob `LLM_MODEL_COOLDOWN_HOURS`. Non confondere con `429` + `Retry-After` brevi. Clear cooldown + re-ingest: [runbook](../radar/docs/runbook.md) (`docker compose exec -T radar-worker python -m app.scripts.requeue_articles N`).
 
 ---
 
@@ -84,7 +84,14 @@ Commit: transazione DB + riga outbox → reconcile vault → mark-read Miniflux 
 
 ### Ops scripts
 
-Da container/`PYTHONPATH=backend`: `python -m app.scripts.requeue_articles` (e altri sotto `app/scripts/`). Procedura: [runbook](../radar/docs/runbook.md).
+Solo `app/scripts/requeue_articles.py`. Comando canonico (da `radar/`, stack up):
+
+```bash
+docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20
+docker compose restart radar-worker
+```
+
+Effetti collaterali e prerequisiti: [runbook](../radar/docs/runbook.md).
 
 ---
 

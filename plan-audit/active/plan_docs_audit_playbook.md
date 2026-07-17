@@ -1,6 +1,8 @@
 # Manuale Operativo Audit & Remediation — Radar Informativo Globale
 
 > **Versione:** 2.2 (manuale a fasi + check definitivo scratch + chiusura T-DOC-01 in FASE 0) · **Data riverifica:** 2026-07-15 · **Gate progetto:** Phase 6 / Gate Verde  
+> **Stato:** **CLOSED** — playbook di processo (non backlog). Ticket: tutti CLOSED in `plan_docs_audit_ticket_status.md`.  
+> **Anti-drift:** autorità runtime = product docs + Compose + SoT LLM. Migrazioni truth = **001–009**; FE ports = **80:8080**.  
 > **Audience:** operatore umano **e** agente LLM  
 > **Root repo:** `c:\Users\lucag\Documents\Dashboard finance` · **App:** `radar/`  
 > **Check definitivo:** vedi **APPENDICE F** (riconciliazione vs `scratch/*`, divergenze priorità).  
@@ -205,7 +207,7 @@ Riverifica + check definitivo 2026-07-15: finding del report docs originale **gi
 
 | ID | File | Sintomi originari (v2.1) | Stato attuale | Verifica |
 |----|------|--------------------------|---------------|----------|
-| **T-DOC-01** | `radar/.ecc/CLAUDE.md` | “Phase 0–2”, `radar-network`, sleep in `main.py`, MOCK_MODE “non fatto”, migrazioni ≤003 | **CLOSED** — file riporta Phase 0–5 DONE / Phase 6 Gate Verde; reti `radar-edge`/`radar-data`; migrazioni 001–007; MOCK_MODE esplicito; ingest in `worker.py` | `Select-String … radar-network\|Phase 0-2\|asyncio.sleep(900) loop in main` → **0 match** |
+| **T-DOC-01** | `radar/.ecc/CLAUDE.md` | “Phase 0–2”, `radar-network`, sleep in `main.py`, MOCK_MODE “non fatto”, migrazioni ≤003 | **CLOSED** — file riporta Phase 0–5 DONE / Phase 6 Gate Verde; reti `radar-edge`/`radar-data`; migrazioni **001–009**; MOCK_MODE esplicito; ingest in `worker.py` | `Select-String … radar-network\|Phase 0-2\|asyncio.sleep(900) loop in main` → **0 match** |
 
 > Non riaprire salvo regressione del file. Guardrail operativi restano `.agents/AGENTS.md` + `radar/.ecc/rules/*.md`.
 
@@ -223,7 +225,7 @@ Riverifica + check definitivo 2026-07-15: finding del report docs originale **gi
 | Outbox happy path | PASS | TX + vault atomic |
 | API Phase 5 BE | PASS | map-summary + envelope |
 | Reti edge/data | PASS | Compose |
-| Migrazioni 001–007 + indici | PASS | SQL + runner |
+| Migrazioni 001–009 + indici | PASS | SQL + runner |
 | GeoJSON verify in Docker | PASS | Dockerfile FE |
 | CMD `app.main:app` | PASS | Dockerfile BE |
 | Volume `./data/postgres` | PASS | Compose |

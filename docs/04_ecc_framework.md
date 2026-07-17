@@ -33,11 +33,11 @@ Harness per vincolare l’agente alle regole di produzione. Overlay Radar a **tr
 | `rules/radar-*.mdc` | Globs nativi → puntano al SoT in `.ecc/rules` (no testo duplicato) |
 | `commands/` | Shortcut: `radar-verify`, `radar-smoke`, `radar-lint` |
 
-Piani eseguibili: [`plan_impl_phase_0_6.md`](../plan-audit/active/plan_impl_phase_0_6.md) + [`plan_impl_phase_0_6_execution.md`](../plan-audit/active/plan_impl_phase_0_6_execution.md) (Phase **6 DONE / GATE VERDE**; voce **ECC expansion wiring — DONE**).  
+Piani Phase 0–6 (**DONE / GATE VERDE**, riferimento — non backlog): [`plan_impl_phase_0_6.md`](../plan-audit/active/plan_impl_phase_0_6.md) + [`plan_impl_phase_0_6_execution.md`](../plan-audit/active/plan_impl_phase_0_6_execution.md) (voce **ECC expansion wiring — DONE**).  
 Final Release (residui, **≠** GATE): [`plan_release_final_gate.md`](../plan-audit/active/plan_release_final_gate.md).  
 Checklist docs: [`plan_docs_monorepo_source.md`](../plan-audit/active/plan_docs_monorepo_source.md).  
 Manuale ECC: [`ecc_deep_dive_analysis_v2.md`](../ecc_deep_dive_analysis_v2.md) — descrittivo; per LLM multi-model / skill map aggiornata preferire SoT LLM + `.agents/skills/` (deep-dive può essere stale).  
-Handoff expansion (eseguito): [`ECC_Expansion_Handoff.md`](../plan-audit/archive/ecc/handoff_ecc_expansion.md).  
+Handoff expansion (eseguito): [`handoff_ecc_expansion.md`](../plan-audit/archive/ecc/handoff_ecc_expansion.md).  
 Non usare come piano vivo: `Fase2_Implementation_Plan.md`, `plan*.md` in archive, `ecc_deep_dive_analysis.md` (V1 assente).
 
 ---

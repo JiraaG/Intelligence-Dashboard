@@ -10,7 +10,7 @@ Guida per portare su **Radar Informativo Globale** con Docker. Fonte knobs: [`ra
 - RAM consigliata ≥ 4 GB
 - Porte host (compose base): **80** (frontend). Backend, DB e Miniflux restano interni.
 - Accesso rete a: feed RSS, API LLM (Gemini e/o OpenAI-compat: DeepSeek / OpenAI / GLM / Grok), tile Carto
-- Ops tipico LLM: **Profilo B** in [`radar/.env.example`](../radar/.env.example) (DeepSeek-only). Default codice boot-safe: `LLM_ROUTING_MODE=off` — non confondere con il profilo ops.
+- Ops tipico LLM: **Profilo B** in [`radar/.env.example`](../radar/.env.example) (DeepSeek-only) con `LLM_ROUTING_MODE=complexity` e `LLM_ROUTING_SHADOW=false`. Default codice boot-safe **senza** `.env`: `LLM_ROUTING_MODE=off` + `LLM_ROUTING_SHADOW=true` — copiare `.env.example` attiva già il profilo ops, non il default codice.
 
 Miniflux UI su host solo con overlay:
 
@@ -129,7 +129,7 @@ Con unread Miniflux alti, tenere `MINIFLUX_LIMIT` ≤ ~50 sotto il cap `MAX_MINI
 - Entry **unread** ultime ~48h, dedup URL in PostgreSQL
 - Complexity v2.2 → QuotaLedger reserve → classificazione multi-provider (lane SIMPLE / COMPLEX) → eventuale cooldown modello → commit DB + outbox → vault atomico → mark-read Miniflux solo se completed
 - Quote durable per lane: `llm_request_ledger` (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`; soft-trim = `LLM_SIMPLE.rpd` se >0; free=RPM/RPD, paid=budget)
-- Requeue ops (stati outbox / cooldown): `python -m app.scripts.requeue_articles` — vedi [runbook](../radar/docs/runbook.md)
+- Requeue ops (re-ingest distruttivo: unread Miniflux + purge articoli/vault/outbox + clear cooldown): comando canonico nel [runbook](../radar/docs/runbook.md) — `docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20` poi `docker compose restart radar-worker`
 
 Riavviare solo `radar-backend` **non** riavvia l’ingest: serve `radar-worker`.
 
@@ -140,11 +140,11 @@ Riavviare solo `radar-backend` **non** riavvia l’ingest: serve `radar-worker`.
 | Sintomo | Cosa controllare |
 |---------|------------------|
 | `InvalidPasswordError` | `$` in password Compose |
-| Miniflux exit | DB non ready → attendere `radar-db` healthy, poi `docker compose up -d radar-miniflux` (evitare `restart` di tutto lo stack in parallelo; vedi `docker.md` Regola 4) |
+| Miniflux exit | DB non ready → attendere `radar-db` healthy, poi `docker compose up -d radar-miniflux` (evitare `restart` di tutto lo stack in parallelo; vedi [`radar/.ecc/rules/docker.md`](../radar/.ecc/rules/docker.md) Regola 4) |
 | `/health/ready` 503 | Normale finché il worker non scrive heartbeat (~30–90s) |
 | 429 / rate limit LLM | Ledger + Retry-After; quote lane (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`); Studio / dashboard provider |
 | Auth / key LLM | Key lane o legacy (`GEMINI_*` / `DEEPSEEK_*` / `OPENAI_*`) allineate al `PROVIDER` della lane |
-| Articoli bloccati / requeue | [runbook](../radar/docs/runbook.md) — `python -m app.scripts.requeue_articles` |
+| Articoli bloccati / requeue | [runbook](../radar/docs/runbook.md) — `docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20` (+ restart worker) |
 | Mappa senza confini | Manca o SHA errato su `countries.geo.json` → `npm run verify-geojson:fetch` |
 | Nessun articolo nuovo | `MINIFLUX_API_KEY`, log `radar-worker`, quote lane (`LLM_SIMPLE_RPD` / budget), cooldown |
 | Payload Miniflux troppo grande / log 5MB | Abbassare `MINIFLUX_LIMIT` (tipico 50); non alzare cieco il cap |

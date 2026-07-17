@@ -2,52 +2,54 @@
 
 **Ruolo:** checklist eseguibile per aggiornare README / `docs/*` / ops / ECC.  
 **Non** sostituisce: SoT LLM, Phase scoreboard, manuali prodotto (questi sono i *target*).  
-**Data:** 2026-07-17 · **Stato:** ESEGUITO (rewrite product docs + puntatori)
+**Data:** 2026-07-17 · **Stato:** ESEGUITO + remediation coerenza (porte/health/requeue)
 
 **Product docs (target):** root `README.md`, `docs/01–04`, `radar/ops/README.md`, `radar/docs/runbook.md`, `radar/frontend/README.md`.  
 **Design LLM:** [`sot_llm_multi_model_fallback.md`](sot_llm_multi_model_fallback.md) · knobs: `radar/.env.example`.  
 **Phase GATE:** [`plan_impl_phase_0_6_execution.md`](plan_impl_phase_0_6_execution.md) · Final residui: [`plan_release_final_gate.md`](plan_release_final_gate.md).
 
-Audit: passata 1 (inventario/gap/SoT) + passata 2 (markdown/codice/piano/SoT↔code).
+Audit: passata 1–2 docs + passata coerenza (README→ECC) con fix P0–P2.
 
 ---
 
 ## 0. Stato AS-IS / TO-BE
 
-| Tema | AS-IS | TO-BE |
-|------|-------|-------|
-| Phase 0–6 | DONE / GATE VERDE (`56c2eff`) | Invariato; badge README chiaro |
-| Final Release | Premesse chiuse; gate residui **aperto** | README distingue ≠ Phase GATE |
-| LLM product voice | Tagline/ops ancora Gemini-only | Multi-provider + Profili A–E (link) |
-| Migrazioni | Disco 001–009; docs spesso ≤007 | Tabella 001–009 in docs/02 + tree README |
-| Cooldown | Codice + runbook + mig 009 | Pointer in README/01/02 |
-| Requeue | Solo runbook | Pointer README/01/02/ops |
-| Spiderfy | docs/03 no-cap-24; FE README max 24 | FE README allineato |
-| `claude` | Stub in codice/SoT/runbook | Sempre “stub” nei product docs |
+| Tema | AS-IS (post-remediation) | Note |
+|------|--------------------------|------|
+| Phase 0–6 | DONE / GATE VERDE | Badge README + Final ≠ GATE |
+| LLM product voice | Multi-provider + Profili A–E | Profilo B ops vs `MODE=off` codice chiarito |
+| Migrazioni | Tabella 001–009 in docs/02 + tree README | OK |
+| Cooldown / requeue | Pointer + comando worker canonico | Warning distruttivo in runbook |
+| Spiderfy | docs/03 + FE README no hard-cap 24 | OK |
+| Porte FE | `.env.example` `80:8080`; mermaid host/listen | OK |
+| `/health` | FE host ≠ API live separati in README | OK |
+| `claude` | stub nei product docs | OK |
 
-**Fuori scope:** codice produzione, `.env`, `radar-sidebar/**`, archive come SoT viva, Anthropic Messages, rewrite `ecc_deep_dive_analysis_v2.md`.
+**Fuori scope:** codice produzione, `.env` secrets, `radar-sidebar/**`, archive come SoT viva, Anthropic Messages, rewrite `ecc_deep_dive_analysis_v2.md`.
 
 ---
 
-## 1. Inventario (sintesi)
+## 1. Inventario (sintesi) — gap *pre-fix* (storico 2026-07-17)
 
 **Prodotto vivo:** solo `radar/` (5 servizi Compose: frontend, backend, worker, db, miniflux) su `radar-edge` + `radar-data`.
 
-| Area | Path | Owner doc | Gap tipico |
-|------|------|-----------|------------|
-| Hub | `README.md` | sé | Gemini-only, tree 001–007 |
-| Avvio | `docs/01_getting_started.md` | README | prereq Gemini, no stub/requeue |
-| Architettura | `docs/02_architecture_and_backend.md` | README | migrazioni ≤007, no cooldown |
+La colonna “Gap pre-fix” è lo **snapshot audit** prima della remediation docs; lo stato corrente è in §0 (OK). Non riaprire questi gap salvo regressione.
+
+| Area | Path | Owner doc | Gap pre-fix (storico) |
+|------|------|-----------|------------------------|
+| Hub | `README.md` | sé | Gemini-only, tree 001–007 — **FIXED** |
+| Avvio | `docs/01_getting_started.md` | README | prereq Gemini, no stub/requeue — **FIXED** |
+| Architettura | `docs/02_architecture_and_backend.md` | README | migrazioni ≤007, no cooldown — **FIXED** |
 | FE | `docs/03_frontend_and_ui.md` | README | ok |
-| ECC | `docs/04_ecc_framework.md` | README | skill blurbs |
-| Ops | `radar/ops/README.md` | docs/01 | one-liner Gemini |
-| Runbook | `radar/docs/runbook.md` | ops | deploy Gemini strings |
-| FE README | `radar/frontend/README.md` | sé | hard-cap 24 |
-| SoT LLM | `plan-audit/active/sot_llm_*.md` | plan-audit | link prompt/canvas |
-| AGENTS/CLAUDE | `.agents/AGENTS.md`, `radar/.ecc/CLAUDE.md` | docs/04 | obiettivo Gemini; tree CLAUDE incompleto |
+| ECC | `docs/04_ecc_framework.md` | README | skill blurbs — **FIXED** |
+| Ops | `radar/ops/README.md` | docs/01 | one-liner Gemini — **FIXED** |
+| Runbook | `radar/docs/runbook.md` | ops | deploy Gemini strings — **FIXED** |
+| FE README | `radar/frontend/README.md` | sé | hard-cap 24 — **FIXED** |
+| SoT LLM | `plan-audit/active/sot_llm_*.md` | plan-audit | link prompt/canvas — **FIXED** |
+| AGENTS/CLAUDE | `.agents/AGENTS.md`, `radar/.ecc/CLAUDE.md` | docs/04 | obiettivo Gemini; tree incompleto — **FIXED** |
 | Nginx | `radar/frontend/nginx.conf` | docker.md | listen 8080, host 80 |
-| Cooldown | `classification/cooldown.py` + `009_*.sql` | runbook | manca in 01/02 |
-| Requeue | `app/scripts/requeue_articles.py` | runbook | manca pointer hub |
+| Cooldown | `classification/cooldown.py` + `009_*.sql` | runbook | manca in 01/02 — **FIXED** |
+| Requeue | `app/scripts/requeue_articles.py` | runbook | manca pointer hub — **FIXED** |
 | Vendor | `ECC-GitHub/`, `.kilo/` | — | **omit** |
 
 ### Migrazioni 001–009 (copiare in docs/02)
@@ -126,47 +128,47 @@ Cooldown durable (migrazione 009): vedi runbook. Requeue: python -m app.scripts.
 ## 5. Checklist per file (heading / target / AC)
 
 ### 5.1 README.md
-- [ ] Tagline multi-provider
-- [ ] Dipendenze: RSS + LLM API + Carto
-- [ ] Stato: Phase GATE + Final Release link
-- [ ] Avvio: lane keys → `.env.example`
-- [ ] Mermaid: nodo LLM (non solo Gemini)
-- [ ] Doc table: SoT LLM, requeue→runbook, Final Release, questo source
-- [ ] Tree: migrations 001–009; `app/scripts/`
-- [ ] Mappa codice: llm_lanes, complexity, cooldown, requeue
-- **AC:** no “arricchisce via Google Gemini” come unica path; link SoT+Final+requeue; tree 001–009
+- [x] Tagline multi-provider
+- [x] Dipendenze: RSS + LLM API + Carto
+- [x] Stato: Phase GATE + Final Release link
+- [x] Avvio: lane keys → `.env.example` + Profilo B vs `MODE=off`
+- [x] Mermaid: nodo LLM + FE host:80 / listen:8080
+- [x] Doc table: SoT LLM, requeue→runbook, Final Release, fork per ruolo
+- [x] Tree: migrations 001–009; `app/scripts/requeue_articles.py`
+- [x] `/health` FE host ≠ API live separati; branch volatile documentato
+- **AC:** soddisfatto (remediation coerenza 2026-07-17)
 
 ### 5.2 docs/01
-- [ ] Requisiti multi-provider
-- [ ] claude=stub in tabella LLM
-- [ ] Ciclo QuotaLedger → lane → cooldown → commit
-- [ ] Troubleshooting multi-provider + requeue→runbook
-- [ ] Nota Profilo B ops vs MODE=off default codice
-- **AC:** stub + requeue + prereq non Gemini-only
+- [x] Requisiti multi-provider
+- [x] claude=stub in tabella LLM
+- [x] Ciclo QuotaLedger → lane → cooldown → commit
+- [x] Troubleshooting multi-provider + requeue worker canonico
+- [x] Nota Profilo B ops vs MODE=off default codice
+- **AC:** soddisfatto
 
 ### 5.3 docs/02
-- [ ] Intro GATE VERDE
-- [ ] Classification: stub + dialect
-- [ ] Sezione Cooldown (009)
-- [ ] Tabella migrazioni 001–009
-- [ ] Ops scripts requeue pointer
-- [ ] Layer: llm_lanes, complexity, cooldown
-- **AC:** 9 migrazioni + stub + cooldown + requeue
+- [x] Intro GATE VERDE
+- [x] Classification: stub + dialect
+- [x] Sezione Cooldown (009)
+- [x] Tabella migrazioni 001–009
+- [x] Ops scripts requeue comando worker
+- [x] Layer: llm_lanes, complexity, cooldown
+- **AC:** soddisfatto
 
 ### 5.4 docs/04
-- [ ] llm-json multi-provider
-- [ ] quota-ledger + claude=stub
-- [ ] Nota deep-dive / SoT LLM
-- **AC:** nessuno “solo Gemini SDK” come unica path skill
+- [x] llm-json multi-provider
+- [x] quota-ledger + claude=stub
+- [x] Nota deep-dive / SoT LLM
+- **AC:** soddisfatto
 
 ### 5.5 ops / runbook / FE README / AGENTS / CLAUDE / SoT
-- [ ] ops one-liner + pointers
-- [ ] runbook deploy multi-provider
-- [ ] FE README no-cap-24
-- [ ] AGENTS obiettivo
-- [ ] CLAUDE obiettivo + tree
-- [ ] SoT link fix
-- **AC:** FE senza max 24; CLAUDE con 009; SoT senza canvas fantasma
+- [x] ops one-liner + pointers
+- [x] runbook deploy multi-provider + warning requeue distruttivo
+- [x] FE README no-cap-24
+- [x] AGENTS obiettivo
+- [x] CLAUDE obiettivo + tree
+- [x] SoT link fix
+- **AC:** soddisfatto
 
 ---
 

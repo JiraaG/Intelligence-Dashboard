@@ -27,7 +27,12 @@ cp .env.example .env   # lane keys LLM (Profili A–E) + password DB/Miniflux (n
 docker compose up --build -d
 ```
 
-Apri **http://localhost/**. Knobs LLM / Profili A–E: [`radar/.env.example`](radar/.env.example) + SoT [`sot_llm_multi_model_fallback.md`](plan-audit/active/sot_llm_multi_model_fallback.md). Dettagli env, health e Miniflux: [docs/01_getting_started.md](docs/01_getting_started.md) e [radar/ops/README.md](radar/ops/README.md). Requeue ops: [radar/docs/runbook.md](radar/docs/runbook.md) (`python -m app.scripts.requeue_articles`).
+Apri **http://localhost/**. Knobs LLM / Profili A–E: [`radar/.env.example`](radar/.env.example) + SoT [`sot_llm_multi_model_fallback.md`](plan-audit/active/sot_llm_multi_model_fallback.md).
+
+**Routing LLM:** `.env.example` ops tipico = **Profilo B** + `LLM_ROUTING_MODE=complexity`. Default codice boot-safe (senza env) = `LLM_ROUTING_MODE=off` + `LLM_ROUTING_SHADOW=true` — non confondere i due.
+
+Dettagli env, health e Miniflux: [docs/01_getting_started.md](docs/01_getting_started.md) e [radar/ops/README.md](radar/ops/README.md).  
+Requeue (re-ingest distruttivo su N entry già lette): procedura canonica in [radar/docs/runbook.md](radar/docs/runbook.md) — `docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20` poi `docker compose restart radar-worker`.
 
 La build frontend richiede l’asset GeoJSON `radar/frontend/src/assets/data/countries.geo.json` (gitignored). Provisioning: [`ASSET_LICENSE.md`](radar/frontend/src/assets/data/ASSET_LICENSE.md) + `npm run verify-geojson:fetch` (Docker lo esegue in build).
 
@@ -54,7 +59,7 @@ Cinque servizi Compose su due reti: **`radar-edge`** (browser ↔ Nginx ↔ API)
 flowchart LR
   User((User))
   subgraph edge["radar-edge"]
-    FE[radar-frontend :80]
+    FE["radar-frontend host:80 / listen:8080"]
   end
   API[radar-backend<br/>edge + data]
   subgraph dataNet["radar-data"]
@@ -79,7 +84,7 @@ flowchart LR
   MF -->|fetch| RSS
 ```
 
-LLM: `gemini` (`google-genai`) e/o OpenAI-compat httpx (`deepseek`/`openai`/`glm`/`grok`); `claude` = stub. Ops tipico: Profilo B in `.env.example`.
+LLM (API esterna, non un servizio Compose): `gemini` (`google-genai`) e/o OpenAI-compat httpx (`deepseek`/`openai`/`glm`/`grok`); `claude` = stub. Ops tipico: Profilo B in `.env.example` (`complexity`); default codice senza env = `off` / shadow.
 
 | Servizio | Ruolo | Porta host (base) |
 |----------|--------|-------------------|
@@ -117,6 +122,8 @@ Build FE Docker: `npm ci --legacy-peer-deps` (peer matrix Angular/PrimeNG).
 | 03 | [docs/03_frontend_and_ui.md](docs/03_frontend_and_ui.md) | Mappa, map-summary, `MOCK_MODE`, stato UI |
 | 04 | [docs/04_ecc_framework.md](docs/04_ecc_framework.md) | Harness ECC: `.agents` + `.ecc` + wiring Cursor |
 
+**Percorso per ruolo (non è una sequenza unica 01→04):** day-1 ops → `docs/01` + [ops](radar/ops/README.md) + [runbook](radar/docs/runbook.md); backend/API → `docs/02`; FE prodotto → `docs/03` + [frontend README](radar/frontend/README.md); agenti Cursor → `docs/04` + AGENTS/CLAUDE.
+
 ### Ops e frontend
 
 | Documento | Contenuto |
@@ -133,8 +140,8 @@ Build FE Docker: `npm ci --legacy-peer-deps` (peer matrix Angular/PrimeNG).
 |-----------|--------|
 | [plan_docs_monorepo_source.md](plan-audit/active/plan_docs_monorepo_source.md) | Checklist allineamento docs (questa passata) |
 | [sot_llm_multi_model_fallback.md](plan-audit/active/sot_llm_multi_model_fallback.md) | SoT LLM multi-provider + Profili A–E |
-| [plan_impl_phase_0_6.md](plan-audit/active/plan_impl_phase_0_6.md) | Piano master Phase 0–6 + restore SHA |
-| [plan_impl_phase_0_6_execution.md](plan-audit/active/plan_impl_phase_0_6_execution.md) | Scoreboard post-restore (GATE VERDE) |
+| [plan_impl_phase_0_6.md](plan-audit/active/plan_impl_phase_0_6.md) | Piano Phase 0–6 (**chiuso** / GATE VERDE) + restore SHA |
+| [plan_impl_phase_0_6_execution.md](plan-audit/active/plan_impl_phase_0_6_execution.md) | Scoreboard Phase 0–6 (**chiuso**) |
 | [plan_release_final_gate.md](plan-audit/active/plan_release_final_gate.md) | Residui Final Release (**≠** Phase 6 GATE) |
 
 ### Governance agenti (ECC)
@@ -158,14 +165,15 @@ Handoff expansion (eseguito): [`handoff_ecc_expansion.md`](plan-audit/archive/ec
 
 ### Archivio storico (non eseguire)
 
-Non sono checklist di implementazione: `Fase2_Implementation_Plan.md` (se presente in archivio storico), [`plan_ecc_early_root.md`](plan-audit/archive/plans/plan_ecc_early_root.md), [`plan_backend_ecc.md`](plan-audit/archive/plans/plan_backend_ecc.md), [`plan_frontend_ecc.md`](plan-audit/archive/plans/plan_frontend_ecc.md), `ecc_deep_dive_analysis.md` (V1 archivio).  
+Non sono checklist di implementazione: [`plan_ecc_early_root.md`](plan-audit/archive/plans/plan_ecc_early_root.md), [`plan_backend_ecc.md`](plan-audit/archive/plans/plan_backend_ecc.md), [`plan_frontend_ecc.md`](plan-audit/archive/plans/plan_frontend_ecc.md).  
+`Fase2_Implementation_Plan.md` e `ecc_deep_dive_analysis.md` (V1) **non** sono in questo monorepo — usare solo [`ecc_deep_dive_analysis_v2.md`](ecc_deep_dive_analysis_v2.md) come manuale descrittivo (può essere stale su skill map).  
 In Execution, la sezione **A (pre-restore)** è solo storico — usare **§ B/C**.
 
 ---
 
 ## Piani e restore points
 
-Branch: `refactor/enterprise-consolidation`
+Restore SHA sotto (Phase 0–6). Il branch di lavoro corrente può differire — verificare con `git branch --show-current`.
 
 | Tag | Commit | Contenuto |
 |-----|--------|-----------|
@@ -210,9 +218,10 @@ Esempio: `git checkout 56c2eff` (tip Phase 6 / GATE VERDE; tip successivo = ECC 
 
 | Metodo | Path | Note |
 |--------|------|------|
-| GET | `/health/live` | Liveness (Compose healthcheck) |
-| GET | `/health/ready` | Pool + migrazioni + heartbeat worker (ops; può 503 al boot) |
-| GET | `/health` | Alias di live (API); anche healthcheck Nginx FE su `:80` |
+| GET | `/health/live` | Liveness API (Compose healthcheck backend; in-container `:8000`) |
+| GET | `/health/ready` | Pool + migrazioni + heartbeat worker (ops; può 503 al boot; in-container `:8000`) |
+| GET | `/health` (API `:8000`) | Alias di live sull’API |
+| GET | `/health` (host `:80`) | Healthcheck **Nginx FE** — risposta statica `ok`; **non** è l’API |
 | GET | `/api/articles` | Envelope `{items,next_cursor,total}` — `date` obbligatorio, `limit` ≤ 100 |
 | GET | `/api/map-summary` | Righe `country_code × primary_category` + count/lat/lon |
 | GET | `/api/countries` | Rollup paese (compat) |
@@ -253,7 +262,7 @@ Dashboard finance/
     │       ├── api/                   # articles_query (Phase 5)
     │       ├── core/                  # incl. llm_lanes.py, heartbeat
     │       ├── extraction/ classification/ commit/
-    │       ├── scripts/               # requeue_articles, …
+    │       ├── scripts/               # requeue_articles.py
     │       └── tests/
     ├── frontend/
     │   ├── nginx.conf                 # listen 8080, resolver DNS, CSP

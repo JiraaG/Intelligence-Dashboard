@@ -2,6 +2,10 @@
 
 Log operativo post–branch restore. Distingue **storico pre-restore** (lavoro perso col restore) da **stato attuale del codice**.
 
+> **Stato:** Phase **0–6 DONE / GATE VERDE** — scoreboard **chiuso**.  
+> Truth porte FE attuale: Compose `"80:8080"` (T-P1-05). Claim Phase 3 `80:80` sotto = snapshot storico.  
+> Non usare come backlog; Final Release: [`plan_release_final_gate.md`](plan_release_final_gate.md).
+
 ---
 
 ## Vincoli permanenti
@@ -123,7 +127,7 @@ cd radar && backend\.venv\Scripts\python.exe -m pytest -m "not live" -q
 
 ### Phase 3 — Secure container stack — COMPLETATA (2026-07-15)
 
-- [x] Default FE `80:80` (0.0.0.0) plug-and-play; Miniflux unpublished; `docker-compose.hardened.yml` (loopback) + `docker-compose.lan.yml` (Miniflux :8080).
+- [x] Default FE ports plug-and-play (storico Phase 3: `80:80`; **attuale:** `"80:8080"` / listen 8080 — T-P1-05); Miniflux unpublished; `docker-compose.hardened.yml` (loopback) + `docker-compose.lan.yml` (Miniflux :8080).
 - [x] CORS allowlist env (default vuota, mai `*`); reti `radar-edge` + `radar-data`; frontend solo edge.
 - [x] Healthcheck Miniflux; worker `depends_on` db+miniflux healthy; `/health/live` + `/health/ready` + migrazione `004_worker_heartbeat`.
 - [x] Runtime image senza pytest (`requirements-dev.txt`); `.dockerignore` rafforzati. Digest pin / Angular matrix / drop legacy-peer-deps **deferred**.

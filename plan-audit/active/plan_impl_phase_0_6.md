@@ -2,9 +2,13 @@
 
 This plan addresses the production blockers found during the code and architecture review. Execute phases in order. Do not release a later phase while an earlier acceptance gate is failing.
 
+> **Stato:** Phase **0–6 DONE / GATE VERDE** — piano **chiuso** (riferimento storico + restore SHA).  
+> **Non** è backlog operativo. Truth runtime attuale: product docs (`README`, `docs/01–04`), Compose (`80:8080`), SoT LLM, [`plan_docs_monorepo_source.md`](plan_docs_monorepo_source.md).  
+> Final Release residui: [`plan_release_final_gate.md`](plan_release_final_gate.md).
+
 **Progress (2026-07-15):** Phase **0–5 DONE**. Phase **6 DONE / GATE VERDE** (`56c2eff` — docs, GeoJSON fetch+verify, CI, runbook, hooks). ECC remediation tip = commit successivo su questo branch. Sidebar remains frozen.
 
-**Git restore points (branch `refactor/enterprise-consolidation`):**
+**Git restore points** (branch storico al momento del consolidamento: `refactor/enterprise-consolidation`; il branch di lavoro corrente può differire):
 | Tag semantico | Commit tipico | Contenuto |
 |---------------|---------------|-----------|
 | Phase 0 | `0189359` | pytest markers / frontend CI baseline |
@@ -184,7 +188,7 @@ cd radar && docker compose up -d --build
 
 ## Phase 3 - Secure And Operate The Container Stack
 
-**Status:** DONE (2026-07-15) — plug-and-play ports `80:80`; Miniflux unpublished; `radar-edge`/`radar-data`; `/health/live`+`/ready` + heartbeat `004`; CSP; ops backup; soft hardening; **Gemini structured output** via `build_gemini_response_schema()` (strip `additionalProperties` — evita 400 → summary fallback). Deferred: image digest pin, Angular peer-deps matrix, drop `--legacy-peer-deps`.
+**Status:** DONE (2026-07-15) — plug-and-play FE ports (storico Phase 3: `80:80`; **truth attuale post–T-P1-05:** host `80` → container Nginx `8080`, Compose `"80:8080"`); Miniflux unpublished; `radar-edge`/`radar-data`; `/health/live`+`/ready` + heartbeat `004`; CSP; ops backup; soft hardening; **Gemini structured output** via `build_gemini_response_schema()` (strip `additionalProperties` — evita 400 → summary fallback). Deferred: image digest pin, Angular peer-deps matrix, drop `--legacy-peer-deps`.
 
 ### Files to add
 
@@ -212,7 +216,7 @@ cd radar && docker compose up -d --build
 
 ### Changes
 
-1. [x] Default FE `80:80` (0.0.0.0) for ready-to-run; Miniflux unpublished; hardened loopback via `docker-compose.hardened.yml`; lan Miniflux via `docker-compose.lan.yml`. Document TLS reverse-proxy for remote.
+1. [x] Default FE ports for ready-to-run (storico: `80:80`; **attuale:** `"80:8080"` post–T-P1-05); Miniflux unpublished; hardened loopback via `docker-compose.hardened.yml`; lan Miniflux via `docker-compose.lan.yml`. Document TLS reverse-proxy for remote.
 2. [x] CORS allowlist env (`CORS_ALLOW_ORIGINS`); default empty; never `*`.
 3. [x] Networks `radar-edge` + `radar-data`; frontend only edge; backend both; worker/db/miniflux data only.
 4. [x] Miniflux healthcheck; worker waits db+Miniflux healthy; `/health/live` + `/health/ready` (pool, migration 004, heartbeat freshness, outbox counts). Compose uses live only.

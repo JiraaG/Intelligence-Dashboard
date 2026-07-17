@@ -1,5 +1,8 @@
 # Stato Chiusura Ticket Documentazione
 
+> **Stato:** **CLOSED** — trail ticket (0 OPEN). Non è backlog.  
+> **Anti-drift:** LLM = multi-provider (SoT LLM); migrazioni = **001–009**; FE ports = **80:8080**.
+
 ## Metadati di Stato
 * **Data di creazione:** 2026-07-15
 * **Data chiusura FASE 0:** 2026-07-15 (verifica aggiuntiva + riparazione handoff)
@@ -67,7 +70,7 @@ Priorità elevate storiche: T-P0-02 chiuso; T-P1-05 chiuso Path A (App. F §F.2)
 
 ## 1. Esito lettura FASE 1 — Sintesi Contesto Applicativo
 
-Il **Radar Informativo Globale** è un'applicazione web containerizzata self-hosted e plug-and-play per l'aggregazione e l'arricchimento semantico di feed RSS geopolitici tramite le API di Google Gemini, visualizzati su una mappa 2D interattiva.
+Il **Radar Informativo Globale** è un'applicazione web containerizzata self-hosted e plug-and-play per l'aggregazione e l'arricchimento semantico di feed RSS geopolitici tramite LLM multi-provider (Gemini SDK e/o OpenAI-compat httpx; `claude` = stub), visualizzati su una mappa 2D interattiva.
 
 ### Stack Tecnologico
 * **Frontend:** Angular 21 (Standalone Components) con PrimeNG 17+ (per il carosello/calendario) e Leaflet/MarkerCluster per la visualizzazione cartografica.
@@ -102,7 +105,7 @@ Il **Radar Informativo Globale** è un'applicazione web containerizzata self-hos
 ```
 [Miniflux] → [radar-worker]
   dedup SQL → sanitize HTML (strip tag; gap img/picture/source = T-P2-02 DONE)
-  → QuotaLedger reserve → Gemini → complete/fail ledger
+  → QuotaLedger reserve → LLM (lane SIMPLE/COMPLEX) → complete/fail ledger
   → TX article + outbox → vault atomic → outbox completed → mark-read Miniflux
 ```
 
@@ -217,7 +220,7 @@ Ordine FASE 4 (T-DOC-01 escluso: già CLOSED):
 | Outbox happy path | PASS | TX + vault atomic |
 | API Phase 5 BE | PASS | map-summary + envelope |
 | Reti edge/data | PASS | Compose |
-| Migrazioni 001–007 + indici | PASS | SQL + runner |
+| Migrazioni 001–009 + indici | PASS | SQL + runner |
 | GeoJSON verify in Docker | PASS | Dockerfile FE |
 | CMD `app.main:app` | PASS | Dockerfile BE |
 | Volume `./data/postgres` | PASS | Compose |
@@ -245,7 +248,7 @@ Verifica chiusura FASE 0 (2026-07-15) via tre sotto-agenti readonly dedicati:
 ```powershell
 Select-String -Path "radar\.ecc\CLAUDE.md" -Pattern "radar-network|Phase 0–2|Phase 0-2|asyncio.sleep\(900\) loop in main"
 # Atteso: 0 match — OBSERVED 2026-07-15: 0 match
-# File riporta: Phase 0–5 DONE; Phase 6 DONE / GATE VERDE; radar-edge/radar-data; migrazioni 001–007; MOCK_MODE esplicito
+# File riporta: Phase 0–5 DONE; Phase 6 DONE / GATE VERDE; radar-edge/radar-data; migrazioni 001–009; MOCK_MODE esplicito
 ```
 
 ---

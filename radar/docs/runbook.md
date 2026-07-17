@@ -90,7 +90,9 @@ docker compose exec radar-db psql -U radar_user -d radar_db \
 
 ## Requeue articoli (ops / E2E)
 
-Per riprovare la classificazione su N entry già lette (unread + purge DB/vault):
+**Distruttivo / re-ingest:** marca unread le ultime N entry *già lette* in Miniflux, cancella le righe `articles` / `article_outbox` e i markdown vault corrispondenti (hash URL), e svuota `llm_model_cooldown`. Non è un reconcile outbox “gentile”.
+
+**Prerequisiti:** stack up (`radar-worker` healthy-enough), `MINIFLUX_API_KEY` valida, vault montato sul worker.
 
 ```bash
 docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20

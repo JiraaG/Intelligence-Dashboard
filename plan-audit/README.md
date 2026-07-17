@@ -1,47 +1,58 @@
 # plan-audit — indice
 
 Cartella di audit, prompt orchestratore e SoT operativi del modulo Radar.  
-**Non** è codice di produzione; i documenti vivi stanno in `active/`.
+**Non** è codice di produzione.
 
 **Product docs (manuali operatori):** root [`README.md`](../README.md) + [`docs/01–04`](../docs/).  
-**Checklist allineamento docs (questa passata):** [`plan_docs_monorepo_source.md`](active/plan_docs_monorepo_source.md).
+**Checklist allineamento docs:** [`plan_docs_monorepo_source.md`](active/plan_docs_monorepo_source.md).
 
-## SoT e Piani Correnti (`active/`)
+**Anti-drift:** claim storici nei phase plans (es. porte `80:80`, migrazioni `001–007`) possono essere datati. Autorità runtime = product docs + Compose (`80:8080`, migrazioni `001–009`) + SoT LLM. Niente file operativi in root oltre questo README; scratch solo in `archive/scratch/`.
+
+## SoT e piani in `active/` — vivi vs chiusi
+
+### Vivi (usare)
 
 | Documento | Ruolo |
 |-----------|--------|
-| [plan_docs_monorepo_source.md](active/plan_docs_monorepo_source.md) | **Checklist operativa** allineamento README/docs/ops/ECC (non sostituisce SoT LLM) |
-| [sot_llm_multi_model_fallback.md](active/sot_llm_multi_model_fallback.md) | **Source of Truth** per Multi-model LLM + routing (lane env + complexity heuristic v2.2) |
-| [plan_release_final_gate.md](active/plan_release_final_gate.md) | Piano per la validazione dei Gate residuali Final Release |
-| [plan_docs_audit_playbook.md](active/plan_docs_audit_playbook.md) | Playbook operativo di audit & remediation documentazione |
-| [plan_docs_audit_ticket_status.md](active/plan_docs_audit_ticket_status.md) | Stato finale di chiusura e risoluzione dei ticket documentali |
-| [plan_impl_phase_0_6.md](active/plan_impl_phase_0_6.md) | Piano di consolidamento Phase 0–6 |
-| [plan_impl_phase_0_6_execution.md](active/plan_impl_phase_0_6_execution.md) | Log di esecuzione / scoreboard del consolidamento |
+| [sot_llm_multi_model_fallback.md](active/sot_llm_multi_model_fallback.md) | **SoT** LLM multi-provider + routing (lane env + complexity v2.2) |
+| [plan_release_final_gate.md](active/plan_release_final_gate.md) | Gate residuali Final Release (**≠** Phase 6 GATE) |
+| [plan_docs_monorepo_source.md](active/plan_docs_monorepo_source.md) | Checklist allineamento README/docs/ops/ECC |
 
-## Layout Cartelle
+### Chiusi (riferimento — non backlog)
+
+| Documento | Ruolo |
+|-----------|--------|
+| [plan_impl_phase_0_6.md](active/plan_impl_phase_0_6.md) | Piano Phase 0–6 (**DONE / GATE VERDE**) + restore SHA |
+| [plan_impl_phase_0_6_execution.md](active/plan_impl_phase_0_6_execution.md) | Scoreboard esecuzione Phase 0–6 (**chiuso**) |
+| [plan_docs_audit_playbook.md](active/plan_docs_audit_playbook.md) | Playbook audit/remediation (**CLOSED**) |
+| [plan_docs_audit_ticket_status.md](active/plan_docs_audit_ticket_status.md) | Trail ticket docs/codice (**CLOSED**, 0 OPEN) |
+
+> Phase plans restano in `active/` finché Final Release non è chiuso (ancora citati da README/docs). Poi: candidati a `archive/plans/`.
+
+## Layout cartelle
 
 ```text
 plan-audit/
-  README.md                 ← Questo file (indice SoT unico)
-  active/                   SoT e piani operativi correnti (vivi)
-  prompts/active/           Prompt orchestratore attivi / in esecuzione
-  prompts/done/             Archivio storico dei prompt già eseguiti
-  remediation/              Report di chiusura dei ticket di remediation (DONE)
-  archive/plans/            Piani operativi storici conclusi o PRD iniziali
-  archive/ecc/              Report e handoff storici dell'architettura ECC
-  archive/llm-stubs/        Vecchi stub e ricerche LLM superati dal SoT LLM
-  archive/scratch/          Checklist e log di audit grezzi (storico)
+  README.md                 ← Questo file (indice)
+  active/                   SoT vive + piani chiusi di riferimento
+  prompts/active/           Prompt orchestratore attivi
+  prompts/done/             Prompt già eseguiti (storico)
+  remediation/              Report chiusura ticket (DONE — non cancellare)
+  archive/plans/            Piani operativi storici / PRD
+  archive/ecc/              Handoff ECC storici
+  archive/llm-stubs/        Stub LLM SUPERSEDED
+  archive/scratch/          Checklist audit grezze
 ```
 
-## Prompt Attivi (`prompts/active/`)
+## Prompt attivi (`prompts/active/`)
 
-* [audit_prompt_final_release_gate.md](prompts/active/audit_prompt_final_release_gate.md) — Prompt per l'esecuzione e validazione dei gate finali di release.
+* [audit_prompt_final_release_gate.md](prompts/active/audit_prompt_final_release_gate.md) — Gate finali di release.
 
-## Note e Storico
+## Note e storico
 
-* **Limits Plan (DONE):** Il piano operativo LLM Limits è stato archiviato in [plan_llm_limits_periodicity_docs_ecc.md](archive/plans/plan_llm_limits_periodicity_docs_ecc.md).
-* **Remediation & Done Prompts:** Tutti i report di remediation dei singoli ticket (es. `audit_remediation_T-P*`) sono conservati nella cartella [remediation/](remediation/). I prompt storici eseguiti sono archiviati in [prompts/done/](prompts/done/).
-* **Stub LLM Storici:** Gli stub superati sono in [archive/llm-stubs/](archive/llm-stubs/) e non devono essere usati come riferimento.
-* **Complexity v2.2:** SIMPLE = solo `LLM_SIMPLE`; BORDERLINE+COMPLEX = `LLM_COMPLEX` (effort tipico high); L sola → SIMPLE.
+* **Limits Plan (DONE):** [plan_llm_limits_periodicity_docs_ecc.md](archive/plans/plan_llm_limits_periodicity_docs_ecc.md).
+* **Remediation & Done Prompts:** [remediation/](remediation/) + [prompts/done/](prompts/done/) — SoT storico del lavoro; **non eliminare**.
+* **Stub LLM:** [archive/llm-stubs/](archive/llm-stubs/) — non usare come riferimento.
+* **Complexity v2.2:** SIMPLE = `LLM_SIMPLE`; BORDERLINE+COMPLEX = `LLM_COMPLEX`; L sola → SIMPLE.
 * **Limiti:** per-lane `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (`0` = unmanaged); soft-trim = `LLM_SIMPLE.rpd`; free = RPM/RPD, paid = `BUDGET_USD_DAY`.
-* **Provider env-swap (2026-07-16):** `gemini` \| `deepseek` \| `openai` \| `glm` \| `grok` \| `claude` (stub). OpenAI-compat dialect: `deepseek` = thinking payload; `openai`/`glm`/`grok` = stock. SoT §5 Profili A–E.
+* **Provider:** `gemini` \| `deepseek` \| `openai` \| `glm` \| `grok` \| `claude` (stub). Dialect: deepseek=`thinking`; openai/glm/grok=`stock`. SoT §5 Profili A–E.

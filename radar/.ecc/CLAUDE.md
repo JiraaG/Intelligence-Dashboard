@@ -163,7 +163,7 @@ Ogni modifica al codice deve essere:
 
 ```bash
 # Avvio completo (prima esecuzione)
-docker compose up -d
+docker compose up -d --build
 
 # Avvio solo backend per sviluppo
 docker compose up radar-db radar-backend
