@@ -33,7 +33,7 @@ Apri **http://localhost/**. Knobs LLM / Profili A–E: [`radar/.env.example`](ra
 **Routing LLM:** `.env.example` ops tipico = **Profilo B** + `LLM_ROUTING_MODE=complexity`. Default codice boot-safe (senza env) = `LLM_ROUTING_MODE=off` + `LLM_ROUTING_SHADOW=true` — non confondere i due.
 
 Dettagli env, health e Miniflux: [docs/01_getting_started.md](docs/01_getting_started.md) e [radar/ops/README.md](radar/ops/README.md).  
-Requeue (re-ingest distruttivo su N entry già lette): procedura canonica in [radar/docs/runbook.md](radar/docs/runbook.md) — `docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20` poi `docker compose restart radar-worker`.
+Requeue (re-ingest distruttivo su N entry già lette): procedura canonica in [radar/docs/runbook.md](radar/docs/runbook.md) — preview `… requeue_articles 20 --dry-run`; reale senza `--dry-run` poi `docker compose restart radar-worker`.
 
 La build frontend richiede l’asset GeoJSON `radar/frontend/src/assets/data/countries.geo.json` (gitignored). Provisioning: [`ASSET_LICENSE.md`](radar/frontend/src/assets/data/ASSET_LICENSE.md) + `npm run verify-geojson:fetch` (Docker lo esegue in build).
 

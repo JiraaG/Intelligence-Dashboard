@@ -25,6 +25,8 @@ Segui tassativamente le seguenti regole operative per l'estrazione:
    - 'Sicurezza': cybersecurity, difesa militare, intelligence, attacchi hacker, spionaggio.
    Scegli sempre la categoria più pertinente tra le 10 elencate. Non usare categorie esterne allo schema.
    Categorie o sentiment non validi verranno rifiutati dal validatore: non inventare valori alternativi.
+   Se l'articolo è filosofia astratta, saggio off-topic, o il contenuto ammette assenza di fatti
+   geopolitici/industriali → usa 'Tecnologia' (mai 'Geopolitica'), relevance_level 1, country_code 'XX'.
 
 2. REQUISITI GEOGRAFICI:
    - country_code: codice ISO Alpha-2 (2 lettere maiuscole) del paese protagonista della notizia.

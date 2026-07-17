@@ -114,3 +114,5 @@ After restore, the worker reconciles remaining outbox rows on the next cycle.
 - Vault path is a Docker bind mount (`./vault`); keep it inside the project tree for Desktop file sharing.
 - Prefer `http://localhost` over exotic `127.0.0.1` vs hostname quirks unless using the hardened loopback bind.
 - If scripts are checked out with CRLF, run `sed -i 's/\r$//' ops/*.sh` once or enable `core.autocrlf` appropriately.
+- Scripts export `MSYS_NO_PATHCONV=1` so Git Bash does **not** rewrite container paths like `/tmp/radar_backup.dump` to `%TEMP%` (otherwise `pg_dump` fails with “could not open output file … AppData/Local/Temp”).
+- `docker compose cp` host paths use `cygpath -w` under Git Bash so the dest is `C:\Users\…` (not `C:\c\Users\…`).

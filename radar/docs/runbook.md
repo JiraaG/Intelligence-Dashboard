@@ -95,6 +95,10 @@ docker compose exec radar-db psql -U radar_user -d radar_db \
 **Prerequisiti:** stack up (`radar-worker` healthy-enough), `MINIFLUX_API_KEY` valida, vault montato sul worker.
 
 ```bash
+# Preview only (nessuna mutazione Miniflux/DB/vault)
+docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20 --dry-run
+
+# Re-ingest reale
 docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20
 docker compose restart radar-worker   # ciclo immediato (poll tipico 900s)
 ```

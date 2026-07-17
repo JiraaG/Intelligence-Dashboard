@@ -21,7 +21,8 @@ flowchart TD
   Loop -->|sì| Dedup{URL già in DB?}
   Dedup -->|sì| Loop
   Dedup -->|no| Parse[Sanitize HTML]
-  Parse --> Quota[QuotaLedger reserve]
+  Parse --> Cx[Complexity v2.2 → lane SIMPLE/COMPLEX]
+  Cx --> Quota[QuotaLedger reserve per lane]
   Quota --> LLM[LLM structured output]
   LLM -->|invalid / retryable| Retry{Tentativi rimasti?}
   Retry -->|sì| LLM
@@ -88,6 +89,7 @@ Commit: transazione DB + riga outbox → reconcile vault → mark-read Miniflux 
 Solo `app/scripts/requeue_articles.py`. Comando canonico (da `radar/`, stack up):
 
 ```bash
+docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20 --dry-run
 docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20
 docker compose restart radar-worker
 ```

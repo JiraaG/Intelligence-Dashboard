@@ -120,7 +120,7 @@ docker compose exec radar-db psql -U radar_user -d radar_db -c "\dt"
 3. `docker compose up -d` (rispetta `depends_on` healthy) per rileggere l’env. Evitare `docker compose restart` su tutti i servizi insieme: Postgres può essere ancora in recovery mentre backend/worker aprono il pool (`CannotConnectNowError`). Preferire `up -d` o restart ordinato (`radar-db` → wait healthy → resto); `init_pool` ritenta errori transienti di startup.
 4. Aggiungi feed (catalogo: [RSS.txt](../RSS.txt)).
 
-Con unread Miniflux alti, tenere `MINIFLUX_LIMIT` ≤ ~50 sotto il cap `MAX_MINIFLUX_RESPONSE_BYTES` (5MB). Se Gemma 31b restituisce HTTP 500 in classificazione, impostare in `.env` `GEMINI_MODEL=gemini-3.1-flash-lite` (o altro modello supportato) e riavviare solo `radar-worker` — **non** commitare `.env`.
+Con unread Miniflux alti, tenere `MINIFLUX_LIMIT` ≤ ~50 sotto il cap `MAX_MINIFLUX_RESPONSE_BYTES` (5MB). Se un modello Gemini/Gemma restituisce HTTP 500 in classificazione (tipico Profilo A), impostare in `.env` `LLM_SIMPLE_MODEL` / `LLM_COMPLEX_MODEL` (o legacy `GEMINI_MODEL`, es. `gemini-3.1-flash-lite`) e riavviare solo `radar-worker` — **non** commitare `.env`.
 
 **Ciclo reale (worker, non API):**
 
@@ -129,7 +129,7 @@ Con unread Miniflux alti, tenere `MINIFLUX_LIMIT` ≤ ~50 sotto il cap `MAX_MINI
 - Entry **unread** ultime ~48h, dedup URL in PostgreSQL
 - Complexity v2.2 → QuotaLedger reserve → classificazione multi-provider (lane SIMPLE / COMPLEX) → eventuale cooldown modello → commit DB + outbox → vault atomico → mark-read Miniflux solo se completed
 - Quote durable per lane: `llm_request_ledger` (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`; soft-trim = `LLM_SIMPLE.rpd` se >0; RPM/TPM=attesa stessa lane; RPD/cooldown=`QuotaDailyExceeded` → residual altra lane; free=RPM/RPD(+TPM), paid=budget)
-- Requeue ops (re-ingest distruttivo: unread Miniflux + purge articoli/vault/outbox + clear cooldown): comando canonico nel [runbook](../radar/docs/runbook.md) — `docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20` poi `docker compose restart radar-worker`
+- Requeue ops (re-ingest distruttivo: unread Miniflux + purge articoli/vault/outbox + clear cooldown): comando canonico nel [runbook](../radar/docs/runbook.md) — preview `docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20 --dry-run`; reale senza `--dry-run` poi `docker compose restart radar-worker`
 
 Riavviare solo `radar-backend` **non** riavvia l’ingest: serve `radar-worker`.
 
@@ -144,7 +144,7 @@ Riavviare solo `radar-backend` **non** riavvia l’ingest: serve `radar-worker`.
 | `/health/ready` 503 | Normale finché il worker non scrive heartbeat (~30–90s) |
 | 429 / rate limit LLM | Ledger + Retry-After; quote lane (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`); Studio / dashboard provider |
 | Auth / key LLM | Key lane o legacy (`GEMINI_*` / `DEEPSEEK_*` / `OPENAI_*`) allineate al `PROVIDER` della lane |
-| Articoli bloccati / requeue | [runbook](../radar/docs/runbook.md) — `docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20` (+ restart worker) |
+| Articoli bloccati / requeue | [runbook](../radar/docs/runbook.md) — `--dry-run` poi `requeue_articles 20` (+ restart worker) |
 | Mappa senza confini | Manca o SHA errato su `countries.geo.json` → `npm run verify-geojson:fetch` |
 | Nessun articolo nuovo | `MINIFLUX_API_KEY`, log `radar-worker`, quote lane (`LLM_SIMPLE_RPD` / budget), cooldown |
 | Payload Miniflux troppo grande / log 5MB | Abbassare `MINIFLUX_LIMIT` (tipico 50); non alzare cieco il cap |

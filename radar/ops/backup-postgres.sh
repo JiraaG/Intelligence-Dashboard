@@ -10,6 +10,11 @@
 #   docker compose run --rm --entrypoint bash radar-backend -c '...'
 set -euo pipefail
 
+# Git Bash on Windows rewrites args like /tmp/foo → %TEMP%/foo before docker sees them.
+# Keep container paths literal for pg_dump / compose cp / exec.
+export MSYS_NO_PATHCONV=1
+export MSYS2_ARG_CONV_EXCL='*'
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RADAR_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${RADAR_ROOT}"
@@ -61,12 +66,22 @@ else
   exit 1
 fi
 
+# Host path for `docker compose cp` (Git Bash: /c/Users → Windows path; avoid C:\c\Users)
+host_path() {
+  local p="$1"
+  if command -v cygpath >/dev/null 2>&1; then
+    cygpath -w "$p"
+  else
+    printf '%s' "$p"
+  fi
+}
+
 # ── PostgreSQL dump (custom format; file-in-container avoids Win CRLF on pipes) ─
 DUMP_FILE="${DEST}/radar_${POSTGRES_DB}.dump"
 echo "==> pg_dump → ${DUMP_FILE}"
 $COMPOSE exec -T radar-db \
   pg_dump -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -Fc -f /tmp/radar_backup.dump
-$COMPOSE cp "radar-db:/tmp/radar_backup.dump" "${DUMP_FILE}"
+$COMPOSE cp "radar-db:/tmp/radar_backup.dump" "$(host_path "${DUMP_FILE}")"
 $COMPOSE exec -T radar-db rm -f /tmp/radar_backup.dump
 
 # ── Vault tar (same stamp) ───────────────────────────────────────────────────

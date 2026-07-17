@@ -5,7 +5,7 @@
 **Data:** 2026-07-17 · **Stato:** ESEGUITO + remediation coerenza (porte/health/requeue)
 
 **Product docs (target):** root `README.md`, `docs/01–04`, `radar/ops/README.md`, `radar/docs/runbook.md`, `radar/frontend/README.md`.  
-**Design LLM:** [`sot_llm_multi_model_fallback.md`](sot_llm_multi_model_fallback.md) · knobs: `radar/.env.example`.  
+**Design LLM:** [`sot_llm_multi_model_fallback.md`](../active/sot_llm_multi_model_fallback.md) · knobs: `radar/.env.example`.  
 **Phase GATE:** [`plan_impl_phase_0_6_execution.md`](plan_impl_phase_0_6_execution.md) · Final Release: [`../STATUS.md`](../STATUS.md) · [`../active/plan_release_final_gate.md`](../active/plan_release_final_gate.md).  
 **Quadro:** [`../STATUS.md`](../STATUS.md).
 

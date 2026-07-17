@@ -16,6 +16,10 @@
 #   5. Start services; worker reconciles pending outbox
 set -euo pipefail
 
+# Git Bash on Windows rewrites args like /tmp/foo → %TEMP%/foo before docker sees them.
+export MSYS_NO_PATHCONV=1
+export MSYS2_ARG_CONV_EXCL='*'
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RADAR_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${RADAR_ROOT}"
@@ -83,9 +87,19 @@ read -r _
 echo "==> Stopping radar-worker (and radar-backend) to freeze writes..."
 $COMPOSE stop radar-worker radar-backend || true
 
+# Host path for `docker compose cp` under Git Bash (cygpath → Windows path)
+host_path() {
+  local p="$1"
+  if command -v cygpath >/dev/null 2>&1; then
+    cygpath -w "$p"
+  else
+    printf '%s' "$p"
+  fi
+}
+
 # ── Copy dump into db container and restore ──────────────────────────────────
 echo "==> pg_restore --clean --if-exists"
-$COMPOSE cp "${DUMP}" "radar-db:/tmp/radar_restore.dump"
+$COMPOSE cp "$(host_path "${DUMP}")" "radar-db:/tmp/radar_restore.dump"
 $COMPOSE exec -T radar-db \
   pg_restore -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" \
   --clean --if-exists --no-owner --no-acl \

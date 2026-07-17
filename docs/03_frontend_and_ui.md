@@ -74,7 +74,7 @@ Offline: `{ provide: MOCK_MODE, useValue: true }`. Errori API restano visibili �
 - Wiring toolbar: `[apiError]="!!state.error()"`
 - Fallimento `loadCountryArticles` → set `detailError` → `closeSidebar(false)` (UI chiusa, banner visibile)
 - Close intenzionale → `closeSidebar()` / `clearError: true` azzera l’errore
-- Test: `app.spec.ts` + `state.service.spec.ts` (Script J)
+- Test: `app.spec.ts` + `state.service.spec.ts`
 
 ---
 

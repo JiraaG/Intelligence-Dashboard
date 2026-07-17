@@ -87,6 +87,25 @@ def test_normalize_game_review_not_geopolitica() -> None:
     assert out["tags"].startswith("Tecnologia")
 
 
+def test_normalize_offtopic_philosophy_not_geopolitica() -> None:
+    out = normalize_llm_json_dict(
+        _valid_payload(
+            title="Analisi sulla fallacia deterministica",
+            summary=(
+                "L'articolo discute concetti filosofici relativi alla fallacia "
+                "deterministica. Il contenuto non presenta informazioni geopolitiche "
+                "o infrastrutturali rilevanti."
+            ),
+            tags="Geopolitica, filosofia",
+            primary_category="Geopolitica",
+            country_code="XX",
+            relevance_level=1,
+        )
+    )
+    assert out["primary_category"] == "Tecnologia"
+    assert out["tags"].startswith("Tecnologia")
+
+
 def test_normalize_published_at_datetime() -> None:
     out = normalize_llm_json_dict(
         _valid_payload(published_at="2026-07-16T12:30:00Z")

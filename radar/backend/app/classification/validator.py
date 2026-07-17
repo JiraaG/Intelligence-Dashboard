@@ -34,6 +34,16 @@ _GAME_REVIEW_HINT = re.compile(
     r"\bpc,\s*ps5\b|\bunreal\b|\bunity\b)",
     re.IGNORECASE | re.DOTALL,
 )
+# Soft remap: philosophy / explicit non-news fluff must not stay in Geopolitica.
+_OFFTOPIC_GEOPOLITICA_HINT = re.compile(
+    r"non\s+(presenta|contiene)\s+informazioni\s+geopolitic|"
+    r"nessun[ao]?\s+informazione\s+geopolitic|"
+    r"concetti?\s+filosofic|"
+    r"fallacia\s+determinist|"
+    r"\bfilosofia\b|"
+    r"no\s+geopolitical\s+(content|information|relevance)",
+    re.IGNORECASE,
+)
 
 # ISO 3166-1 alpha-2 (~249) + sentinel XX for undetermined geography.
 ISO_ALPHA2_CODES: frozenset[str] = frozenset(
@@ -287,13 +297,16 @@ def normalize_llm_json_dict(data: dict[str, Any]) -> dict[str, Any]:
             out[key] = val[:limit]
 
     # Soft remap: game/software reviews must not land in Geopolitica/Sicurezza/Infrastrutture.
+    # Same for philosophy / explicit "no geopolitical content" fluff.
     pc = out.get("primary_category")
     if isinstance(pc, str) and pc in ("Geopolitica", "Sicurezza", "Infrastrutture"):
         hint_blob = " ".join(
             str(out.get(k) or "")
             for k in ("title", "summary", "tags", "companies_involved", "infrastructural_entities")
         )
-        if _GAME_REVIEW_HINT.search(hint_blob):
+        if _GAME_REVIEW_HINT.search(hint_blob) or _OFFTOPIC_GEOPOLITICA_HINT.search(
+            hint_blob
+        ):
             out["primary_category"] = "Tecnologia"
 
     # Enforce schema rule: first CSV tag must equal primary_category.

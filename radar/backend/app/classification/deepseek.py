@@ -184,6 +184,8 @@ class DeepSeekClient:
             "primary_category MUST be exactly one of the 10 allowed Italian category names.\n"
             "Game/software/videogame reviews and entertainment products → Tecnologia "
             "(never Geopolitica, Sicurezza, or Infrastrutture).\n"
+            "Philosophy / abstract essays / explicit no-geopolitical-content fluff → "
+            "Tecnologia + relevance_level 1 + country_code XX (never Geopolitica).\n"
             "No markdown fences, no reasoning field."
         )
         if correction:
