@@ -54,7 +54,8 @@ Moduli sotto `radar/backend/app/`:
 - Fallback geografico su fallimento irreversibile: paese `XX`, categoria `Infrastrutture` (vedi `validator.py`)
 - Provider: `gemini` \| `deepseek` \| `openai` \| `glm` \| `grok` \| `claude` (**stub**; Messages API non implementata)
 - Dialect OpenAI-compat: deepseek=`thinking`; openai/glm/grok=`stock`; via httpx (**no** package `openai`)
-- Quote: `llm_request_ledger` via `QuotaLedger` — limiti **per lane** `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (`0` = unmanaged); soft-trim worker = `LLM_SIMPLE.rpd` se >0; free=RPM/RPD, paid=BUDGET; legacy fill-gap — **non** `COUNT(*)` su `articles` per RPD
+- Quote: `llm_request_ledger` via `QuotaLedger` — limiti **per lane** `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (`0` = unmanaged); soft-trim worker = `LLM_SIMPLE.rpd` se >0; free=RPM/RPD(+TPM), paid=BUDGET; legacy fill-gap — **non** `COUNT(*)` su `articles` per RPD
+- **Limiti e cambio modello (Profilo A hybrid):** RPM/TPM pieni → **attesa** sulla stessa lane (non si passa all’altro modello). **RPD esaurita** / cooldown / 429 daily → `QuotaDailyExceeded` + residual **cross-lane** (es. Gemini SIMPLE → DeepSeek COMPLEX e viceversa). Soft-trim: se RPD SIMPLE piena ma residual COMPLEX distinto, il ciclo **non** iberna (failover per-articolo). Caps Studio tipici Flash Lite: RPM≤12, TPM=250K, RPD=500 (VERIFY_IN_STUDIO).
 - Routing: SIMPLE → `LLM_SIMPLE_*`; BORDERLINE+COMPLEX → `LLM_COMPLEX_*`; residual SIMPLE↔COMPLEX se identity diversa; Profili A–E in `.env.example` + SoT
 - Periodicità ingest: `WORKER_POLL_INTERVAL_SECONDS` (default 900)
 

@@ -22,28 +22,44 @@
 | Cooldown 24h? | **SQL durable** `(provider, model, until_ts, reason)` |
 | Fase C? | **DONE** — vedi remediation; default codice `LLM_ROUTING_MODE=off` |
 
-**Catena ops attuale (2026-07-16)**
+**Catena ops attuale (2026-07-17) — Profilo A hybrid tipico locale**
 
 ```text
 LLM_ROUTING_MODE=complexity
 LLM_ROUTING_SHADOW=false
-# Bulk economico (thinking off)
-LLM_SIMPLE_PROVIDER=deepseek
-LLM_SIMPLE_MODEL=deepseek-v4-flash
-LLM_SIMPLE_REASONING_EFFORT=none
-# BORDERLINE + COMPLEX + escalate (thinking on)
+# SIMPLE bulk free (Studio VERIFY)
+LLM_SIMPLE_PROVIDER=gemini
+LLM_SIMPLE_MODEL=gemini-3.1-flash-lite
+LLM_SIMPLE_RPM=12          # Studio 15 — cap ops ≤12
+LLM_SIMPLE_TPM=250000      # Studio 250K
+LLM_SIMPLE_RPD=500         # Studio 500
+LLM_SIMPLE_FALLBACKS=      # VUOTO — residual = COMPLEX
+# BORDERLINE + COMPLEX + escalate (paid)
 LLM_COMPLEX_PROVIDER=deepseek
 LLM_COMPLEX_MODEL=deepseek-v4-flash
 LLM_COMPLEX_REASONING_EFFORT=high
-# Legacy Gemini ancora supportato se si ripunta SIMPLE/COMPLEX a gemini
-GEMINI_MODEL_FALLBACKS=
+LLM_COMPLEX_RPM=0          # unmanaged paid
+```
 
+### Limiti e cambio modello (normativa operativa)
+
+| Evento | Comportamento | Non fare |
+|--------|---------------|----------|
+| RPM o TPM lane pieni | `QuotaLedger.reserve` **attende** sulla **stessa** lane | Non passare all’altra lane “per sbrigarsi” |
+| RPD lane esaurita (ledger) | `QuotaDailyExceeded` → cooldown modello → **residual cross-lane** | Non ibernare il ciclo se l’altra lane è distinta e disponibile |
+| 429 daily / free_tier (provider) | `HARD_COOLDOWN` → stessa logica residual | Trattare come retry RPM breve |
+| Soft-trim `LLM_SIMPLE.rpd` | Se residual COMPLEX distinto: **bypass ibernazione** (failover per-articolo) | Hibernare tutto lo stack quando DeepSeek può elaborare |
+
+Entrambi i modelli (SIMPLE + COMPLEX) restano configurati e disponibili; il cambio avviene solo su esaurimento/cooldown, non su attesa RPM/TPM.
+
+Alt Gemma 4 31B: `gemma-4-31b-it` RPM=30 TPM=16000 RPD=14400 (contesto stretto; body già `[:4000]`).
+
+```text
 # Swap COMPLEX → Google senza codice:
 #   LLM_COMPLEX_PROVIDER=gemini
 #   LLM_COMPLEX_MODEL=gemini-3.5-flash
 # OpenAI / GLM / Grok: PROVIDER=openai|glm|grok + MODEL + API_KEY + BASE_URL
-#   (dialect openai = stock chat/completions, niente thinking DeepSeek)
-# Ricette Profili C/D/E in radar/.env.example
+# Ricette Profili B–E in radar/.env.example
 ```
 
 ---

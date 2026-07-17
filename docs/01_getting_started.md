@@ -34,7 +34,7 @@ Categorie principali (dettaglio in `.env.example`):
 |------|--------|
 | Runtime | `RADAR_ENV`, `RADAR_TIME_ZONE` |
 | CORS | `CORS_ALLOW_ORIGINS` (vuoto in prod dietro Nginx; es. `http://localhost:4200` per `ng serve`) |
-| LLM | Lane `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (provider=`gemini`\|`deepseek`\|`openai`\|`glm`\|`grok`\|`claude` **stub**; model/RPM/TPM/RPD/budget; `0`=unmanaged); dialect OpenAI-compat: deepseek=`thinking`, openai/glm/grok=stock; soft-trim = `LLM_SIMPLE.rpd` se >0; free=RPM/RPD, paid=BUDGET; legacy fill-gap; Profili A–E in `.env.example` + SoT LLM |
+| LLM | Lane `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (provider=`gemini`\|`deepseek`\|`openai`\|`glm`\|`grok`\|`claude` **stub**; model/RPM/TPM/RPD/budget; `0`=unmanaged); dialect OpenAI-compat: deepseek=`thinking`, openai/glm/grok=stock; soft-trim = `LLM_SIMPLE.rpd` se >0; **RPM/TPM wait stessa lane**; **RPD/cooldown → residual cross-lane**; free=RPM/RPD(+TPM), paid=BUDGET; legacy fill-gap; Profili A–E in `.env.example` + SoT LLM |
 | Worker | coda/concorrenza, `WORKER_POLL_INTERVAL_SECONDS` (default 900), heartbeat |
 | Miniflux | URL interno, API key, `MINIFLUX_LIMIT` (tipico **50**; `100` può superare `MAX_MINIFLUX_RESPONSE_BYTES=5MB`), timeout/byte caps |
 | Postgres | user/password/db, `DATABASE_URL` (Compose la costruisce in container) |
@@ -128,7 +128,7 @@ Con unread Miniflux alti, tenere `MINIFLUX_LIMIT` ≤ ~50 sotto il cap `MAX_MINI
 - Polling `WORKER_POLL_INTERVAL_SECONDS` (default **900** = 15 min)
 - Entry **unread** ultime ~48h, dedup URL in PostgreSQL
 - Complexity v2.2 → QuotaLedger reserve → classificazione multi-provider (lane SIMPLE / COMPLEX) → eventuale cooldown modello → commit DB + outbox → vault atomico → mark-read Miniflux solo se completed
-- Quote durable per lane: `llm_request_ledger` (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`; soft-trim = `LLM_SIMPLE.rpd` se >0; free=RPM/RPD, paid=budget)
+- Quote durable per lane: `llm_request_ledger` (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`; soft-trim = `LLM_SIMPLE.rpd` se >0; RPM/TPM=attesa stessa lane; RPD/cooldown=`QuotaDailyExceeded` → residual altra lane; free=RPM/RPD(+TPM), paid=budget)
 - Requeue ops (re-ingest distruttivo: unread Miniflux + purge articoli/vault/outbox + clear cooldown): comando canonico nel [runbook](../radar/docs/runbook.md) — `docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20` poi `docker compose restart radar-worker`
 
 Riavviare solo `radar-backend` **non** riavvia l’ingest: serve `radar-worker`.

@@ -15,7 +15,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 | Playbook audit docs | [`complete/plan_docs_audit_playbook.md`](complete/plan_docs_audit_playbook.md) | CLOSED |
 | Allineamento product docs | [`complete/plan_docs_monorepo_source.md`](complete/plan_docs_monorepo_source.md) | ESEGUITO + coerenza porte/health/requeue |
 | Final Release F1–F4 | [`active/plan_release_final_gate.md`](active/plan_release_final_gate.md) + report `remediation/*_F*.md` | Backup, seed 10k, chaos C1–C3, security |
-| SoT LLM multi-provider | [`active/sot_llm_multi_model_fallback.md`](active/sot_llm_multi_model_fallback.md) | **Vivo** (design/routing) |
+| SoT LLM multi-provider | [`active/sot_llm_multi_model_fallback.md`](active/sot_llm_multi_model_fallback.md) | **Vivo** — §0 limiti/failover RPM·TPM vs RPD (2026-07-17) |
 | Report ticket singoli | [`remediation/`](remediation/) | Storico — non cancellare |
 | Prompt eseguiti | [`prompts/done/`](prompts/done/) | Storico |
 | Piani ECC / Limits / stub | [`archive/`](archive/) | SUPERSEDED / PRD |

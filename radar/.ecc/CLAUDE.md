@@ -29,7 +29,7 @@ in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categ
 | Layer       | Tecnologia                              | Note                                       |
 |-------------|------------------------------------------|---------------------------------------------|
 | Backend     | Python 3.12-slim (Docker) / 3.14 (locale) | Demone asincrono; poll `WORKER_POLL_INTERVAL_SECONDS` (default 900) |
-| LLM         | google-genai (Gemini) + httpx OpenAI-compat (`deepseek`/`openai`/`glm`/`grok`; no package `openai`) | Lane env: `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (limiti per-lane; `0`=unmanaged). Soft-trim = `LLM_SIMPLE.rpd` se >0. Free=RPM/RPD; paid=budget. Dialect: deepseek=`thinking`; openai/glm/grok=stock. Complexity **v2.2**. Ops tipico: DeepSeek Flash none/high. Non hardcodare segreti. |
+| LLM         | google-genai (Gemini) + httpx OpenAI-compat (`deepseek`/`openai`/`glm`/`grok`; no package `openai`) | Lane env: `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (limiti per-lane; `0`=unmanaged). Soft-trim = `LLM_SIMPLE.rpd` se >0 (bypass ibernazione se residual COMPLEX). RPM/TPM=attesa stessa lane; RPD/cooldown=`QuotaDailyExceeded`→cross-lane. Free=RPM/RPD(+TPM); paid=budget. Caps Flash Lite tipici: RPM≤12/TPM=250K/RPD=500. Dialect: deepseek=`thinking`; openai/glm/grok=stock. Complexity **v2.2**. Non hardcodare segreti. |
 | Database    | PostgreSQL 15                            | Tabelle articles, companies, tags + sentiment, relevance + indici |
 | Feed Source | Miniflux REST API                       | Articoli non letti, deduplica per URL       |
 | Frontend    | Angular 21 (Standalone Components)      | Signals, lazy loading                       |

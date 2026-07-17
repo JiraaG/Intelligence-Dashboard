@@ -27,7 +27,8 @@ cp .env.example .env   # lane keys LLM (Profili A–E) + password DB/Miniflux (n
 docker compose up --build -d
 ```
 
-Apri **http://localhost/**. Knobs LLM / Profili A–E: [`radar/.env.example`](radar/.env.example) + SoT [`sot_llm_multi_model_fallback.md`](plan-audit/active/sot_llm_multi_model_fallback.md).
+Apri **http://localhost/**. Knobs LLM / Profili A–E: [`radar/.env.example`](radar/.env.example) + SoT [`sot_llm_multi_model_fallback.md`](plan-audit/active/sot_llm_multi_model_fallback.md).  
+**Limiti lane:** RPM/TPM pieni → attesa stessa lane; RPD/cooldown → residual cross-lane (es. Flash Lite → DeepSeek). Dettaglio: SoT §0 + skill `radar-quota-ledger`.
 
 **Routing LLM:** `.env.example` ops tipico = **Profilo B** + `LLM_ROUTING_MODE=complexity`. Default codice boot-safe (senza env) = `LLM_ROUTING_MODE=off` + `LLM_ROUTING_SHADOW=true` — non confondere i due.
 

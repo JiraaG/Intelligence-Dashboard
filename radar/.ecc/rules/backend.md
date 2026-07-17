@@ -246,14 +246,15 @@ Ogni tentativo provider (incluso retry/validazione) deve **reservare** capacità
 `llm_request_ledger` via `classification/quota.py` **prima** della chiamata Gemini **o** DeepSeek.
 Aggiornare **quella** reservation id con usage reale. Spacing in-process con
 `time.monotonic()`; RPD half-open su `RADAR_TIME_ZONE`. Rispettare `429` + `Retry-After`.
-Hard-fail (RPD day, 402, 404 model, 5xx esauriti) → `llm_model_cooldown` 24h, poi next model.
+Hard-fail (RPD day ledger → `QuotaDailyExceeded`, 402, 404 model, 5xx esauriti, 429 daily) → `llm_model_cooldown` 24h, poi **residual** altra lane.
+**RPM/TPM pieni → attesa stessa lane** (non cross). Soft-trim worker: se RPD SIMPLE piena ma residual COMPLEX distinto → **non** ibernare il ciclo.
 
 **Limiti per lane (obbligatorio):**
 - `LLM_SIMPLE_RPM/TPM/RPD` e `LLM_COMPLEX_*` — contatori separati via `purpose=classify:{lane}`
 - `0` = dimensione unmanaged su quella lane
 - Legacy `LLM_RPM` / `DEEPSEEK_RPM` = **alias fill-gap**, non tetto globale
-- Soft-trim worker = solo `LLM_SIMPLE.rpd` se `> 0` (indipendente dal provider)
-- Free → RPM/RPD `> 0`; paid → RPM/RPD `= 0` + `*_BUDGET_USD_DAY` / 402
+- Soft-trim worker = solo `LLM_SIMPLE.rpd` se `> 0` (bypass ibernazione se residual COMPLEX distinto)
+- Free → RPM/RPD(+TPM) `> 0`; paid → RPM/RPD `= 0` + `*_BUDGET_USD_DAY` / 402
 
 **OBBLIGATORIO:**
 ```python

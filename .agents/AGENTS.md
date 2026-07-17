@@ -11,7 +11,7 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 
 ### Stack Tecnologico Ufficiale
 * **Backend:** Python 3.12-slim (Docker) / 3.14 (locale). Demone asincrono con polling `WORKER_POLL_INTERVAL_SECONDS` (default 900).
-* **LLM:** `google-genai` SDK + OpenAI-compat via httpx (`deepseek`/`openai`/`glm`/`grok`; no package `openai`); default Gemini `GEMINI_MODEL=gemma-4-31b-it`. Lane: `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (limiti per-lane; soft-trim = `LLM_SIMPLE.rpd` se >0). Dialect: deepseek=`thinking`; openai/glm/grok=stock. `claude` = stub. Output strutturato via schema Pydantic. Ops locale: se Gemma 31b dà HTTP 500, impostare in `.env` un fallback (es. `gemini-3.1-flash-lite`) — non hardcodare chiavi.
+* **LLM:** `google-genai` SDK + OpenAI-compat via httpx (`deepseek`/`openai`/`glm`/`grok`; no package `openai`); lane `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (limiti per-lane; soft-trim = `LLM_SIMPLE.rpd` se >0). **RPM/TPM pieni → attesa stessa lane; RPD/cooldown → residual cross-lane** (`QuotaDailyExceeded`). Dialect: deepseek=`thinking`; openai/glm/grok=stock. `claude` = stub. Caps Studio Flash Lite tipici: RPM≤12 / TPM=250K / RPD=500. Ops: Profilo A hybrid o B DeepSeek-only in `.env.example` — non hardcodare chiavi.
 * **Database:** PostgreSQL 15 (`radar-db`). Accesso tramite driver asincrono `asyncpg` puro.
 * **Feed Source:** Miniflux REST API.
 * **Frontend:** Angular 21 (Standalone Components).
@@ -62,7 +62,7 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
    * Type hints obbligatori su tutte le funzioni pubbliche.
    * Utilizzare il logger centralizzato configurato in `core/logging.py`, evitando categoricamente l'uso di `print()`.
 6. **Rate Limiting & Rispetto delle Quote LLM:**
-   * Quote durable via `llm_request_ledger` + `classification/quota.py` (reserve RPM/TPM/RPD **prima di ogni** tentativo provider, anche retry). Limiti **per lane**: `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (`0` = unmanaged). Legacy `LLM_RPM` / `DEEPSEEK_RPM` = alias fill-gap, non tetto globale. Soft-trim worker = solo `LLM_SIMPLE.rpd` se `> 0`. Free → RPM/RPD; paid → `*_BUDGET_USD_DAY` / 402. Spacing in-process con `time.monotonic()`; finestre giornaliere half-open su `RADAR_TIME_ZONE`. Rispettare `429` + `Retry-After`. Non basarsi solo su `asyncio.sleep(4)` in-memory.
+   * Quote durable via `llm_request_ledger` + `classification/quota.py` (reserve RPM/TPM/RPD **prima di ogni** tentativo provider, anche retry). Limiti **per lane**: `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (`0` = unmanaged). Legacy `LLM_RPM` / `DEEPSEEK_RPM` = alias fill-gap, non tetto globale. Soft-trim worker = solo `LLM_SIMPLE.rpd` se `> 0` — **bypass ibernazione** se residual COMPLEX distinto (failover per-articolo). **RPM/TPM pieni → sleep stessa lane**; **RPD esaurita → `QuotaDailyExceeded` + cooldown + residual altra lane**. Free → RPM/RPD(+TPM); paid → `*_BUDGET_USD_DAY` / 402. Spacing in-process con `time.monotonic()`; finestre giornaliere half-open su `RADAR_TIME_ZONE`. Rispettare `429` + `Retry-After`.
 7. **Architettura Modulare Backend (Path: `backend/app/`):**
    * Layer: `core/`, `extraction/`, `classification/` (incluso `quota.py`), `commit/`, più `worker.py` (ingest) separato da `main.py` (API).
    * `core/logging.py`: il `RotatingFileHandler` e `makedirs` per `logs/` DEVONO essere in `try/except` — il container non-root con `WORKDIR=/app` può non avere permessi. Il fallback deve mantenere attivo il console handler.
