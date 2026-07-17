@@ -30,7 +30,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 |------|--------|------|
 | Fase 0 — PR `refactor/testing` → `develop` (senza merge auto) | **Aperto** | Branch pushed; aprire via [compare](https://github.com/JiraaG/Dashboard-finance/compare/develop...refactor/testing?expand=1) (`gh` opzionale) |
 | Fase 5 — digest pin + drop `--legacy-peer-deps` | **DEFERRED ACCETTATO** | Non blocca merge; vedi piano §7 |
-| Commenti codice P1/P2 | **Opt-in** | Solo su richiesta; batch in piano §5 (`P1-01`…`P1-03`, `P2-01`) |
+| Commenti codice P1/P2 | **Chiuso (P2-01)** | Altri P2 in inventario senza `batch_id` — solo se emerge gap reale |
 
 Prompt orchestratore (solo se serve chiudere Fase 0): [`prompts/active/audit_prompt_final_release_gate.md`](prompts/active/audit_prompt_final_release_gate.md) — **F1–F4 già PASS**, non rieseguire.
 
