@@ -19,7 +19,7 @@ from app.classification.complexity import Lane, score_complexity
 from app.classification.cooldown import ModelCooldownStore
 from app.classification.deepseek import DeepSeekClient, DeepSeekError
 from app.classification.prompts import SYSTEM_PROMPT, build_user_prompt
-from app.classification.quota import QuotaBudgetExceeded, QuotaLedger
+from app.classification.quota import QuotaBudgetExceeded, QuotaDailyExceeded, QuotaLedger
 from app.classification.validator import GeopoliticalArticleSchema, get_fallback_article, parse_llm_article_json
 from app.core.config import (
     ConfigError,
@@ -752,6 +752,21 @@ class ClassificationClient:
                 )
                 # Soft-cap USD: skip provider for this article — no 24h model cooldown.
                 return None, "exhausted"
+            except QuotaDailyExceeded as rpd_err:
+                logger.warning(
+                    "RPD esaurita %s/%s — failover residual: %s",
+                    ref.provider,
+                    ref.model,
+                    rpd_err,
+                )
+                # Mark cooldown so subsequent articles skip this model until reset;
+                # chain residual (other lane) remains available.
+                await self.cooldown.set_cooldown(
+                    ref.provider,
+                    ref.model,
+                    reason=str(rpd_err),
+                )
+                return None, "hard_cooldown"
             response_text: str | None = None
             provider_started = False
             try:

@@ -27,6 +27,8 @@ from app.commit.router import get_article_file_path, initialize_vault_directorie
 from app.core.config import (
     DATABASE_URL,
     LLM_API_KEY,
+    LLM_COMPLEX,
+    LLM_ROUTING_MODE,
     LLM_SIMPLE,
     MAX_MINIFLUX_RESPONSE_BYTES,
     MINIFLUX_API_KEY,
@@ -477,25 +479,44 @@ async def run_pipeline_cycle(state: WorkerState) -> None:
 
     # Soft-trim solo sulla lane SIMPLE (LLM_SIMPLE_RPD). 0 = nessun soft-trim.
     # Hard RPM/TPM/RPD restano in QuotaLedger.reserve(lane=...) per entrambe le lane.
+    # Se esiste residual COMPLEX distinto, NON ibernare: per-articolo QuotaDailyExceeded
+    # / cooldown fa failover sull'altra lane (entrambi i modelli restano utilizzabili).
     simple_rpd = LLM_SIMPLE.rpd
     processed_today = await _ledger_simple_rpd_used(state.db_pool)
-    if simple_rpd > 0 and processed_today >= simple_rpd:
+    has_complex_residual = (
+        LLM_ROUTING_MODE == "complexity"
+        and (
+            LLM_SIMPLE.provider != LLM_COMPLEX.provider
+            or LLM_SIMPLE.model != LLM_COMPLEX.model
+            or LLM_SIMPLE.reasoning_effort != LLM_COMPLEX.reasoning_effort
+        )
+    )
+    if simple_rpd > 0 and processed_today >= simple_rpd and not has_complex_residual:
         logger.warning(
             "LIMITE RPD LANE SIMPLE RAGGIUNTO (ledger): %s/%s tentativi oggi (tz window). "
-            "Ciclo in ibernazione (lane COMPLEX non conta su questo tetto).",
+            "Ciclo in ibernazione (nessun residual COMPLEX distinto).",
             processed_today,
             simple_rpd,
         )
         return
+    if simple_rpd > 0 and processed_today >= simple_rpd and has_complex_residual:
+        logger.warning(
+            "LIMITE RPD LANE SIMPLE RAGGIUNTO (ledger): %s/%s — soft-trim bypass: "
+            "residual COMPLEX disponibile (%s/%s); ciclo prosegue per failover.",
+            processed_today,
+            simple_rpd,
+            LLM_COMPLEX.provider,
+            LLM_COMPLEX.model,
+        )
 
     entries = await state.miniflux_client.fetch_unread_entries(limit=MINIFLUX_LIMIT)
     if not entries:
         logger.info("Nessun articolo non letto presente in Miniflux.")
         return
 
-    if simple_rpd > 0:
+    if simple_rpd > 0 and not has_complex_residual:
         remaining_rpd = simple_rpd - processed_today
-        if len(entries) > remaining_rpd:
+        if remaining_rpd > 0 and len(entries) > remaining_rpd:
             logger.info(
                 "Riduzione lotto da %d a %d per soft-trim RPD lane SIMPLE.",
                 len(entries),

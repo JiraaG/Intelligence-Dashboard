@@ -45,6 +45,10 @@ class QuotaBudgetExceeded(Exception):
     """Lane daily USD soft-cap reached — caller should skip this provider."""
 
 
+class QuotaDailyExceeded(Exception):
+    """Lane RPD (requests/day) exhausted — caller should failover to residual lane."""
+
+
 def compute_day_window(
     now_utc: datetime,
     tz: ZoneInfo | timezone,
@@ -469,8 +473,12 @@ class QuotaLedger:
                         purpose_exact,
                     )
                     if int(rpd_count or 0) >= limits.rpd:
-                        wait = max(0.05, (day_end - now).total_seconds())
-                        return _ReserveOutcome(reservation_id=None, wait_seconds=wait)
+                        # Do NOT sleep until day rollover: unblock so ClassificationClient
+                        # can residual-failover to the other lane. RPM/TPM still wait.
+                        raise QuotaDailyExceeded(
+                            f"lane={lane} RPD={limits.rpd} exhausted "
+                            f"(until day_end={day_end.isoformat()})"
+                        )
 
                 reservation_id = await conn.fetchval(
                     """

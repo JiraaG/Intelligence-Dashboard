@@ -1,0 +1,14 @@
+# Optional: Gemma 4 31B SIMPLE with AI Studio caps (RPM 30 / TPM 16K / RPD 14.4K).
+# Usage: docker compose -f docker-compose.yml -f docker-compose.gemma-simple.yml up -d radar-worker
+services:
+  radar-worker:
+    environment:
+      LLM_SIMPLE_PROVIDER: gemini
+      LLM_SIMPLE_MODEL: gemma-4-31b-it
+      LLM_SIMPLE_RPM: "30"
+      LLM_SIMPLE_TPM: "16000"
+      LLM_SIMPLE_RPD: "14400"
+      LLM_SIMPLE_BUDGET_USD_DAY: "0"
+      LLM_SIMPLE_REASONING_EFFORT: ""
+      GEMINI_MODEL: gemma-4-31b-it
+      # Keep COMPLEX DeepSeek from .env for residual failover

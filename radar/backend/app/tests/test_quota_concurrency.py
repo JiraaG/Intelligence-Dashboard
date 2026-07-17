@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.classification.client import ClassificationClient
-from app.classification.quota import QuotaBudgetExceeded, QuotaLedger, compute_day_window
+from app.classification.quota import QuotaBudgetExceeded, QuotaDailyExceeded, QuotaLedger, compute_day_window
 
 
 # ─── In-memory fake asyncpg ───────────────────────────────────────────────────
@@ -387,24 +387,13 @@ async def test_two_ledgers_cannot_exceed_rpd() -> None:
     async def one(ledger: QuotaLedger) -> int:
         return await ledger.reserve(estimated_tokens=1, purpose="rpd-test")
 
-    # First 4 succeed; further reserves wait for day rollover (sleep advances clock).
+    # First 4 succeed; further reserves raise QuotaDailyExceeded (failover, no day-wait).
     first = await asyncio.gather(one(ledger_a), one(ledger_b), one(ledger_a), one(ledger_b))
     assert len(first) == 4
     assert store.active_count() == 4
 
-    fifth = asyncio.create_task(ledger_a.reserve(estimated_tokens=1, purpose="rpd-overflow"))
-    await asyncio.sleep(0)
-    # Give the reserve loop a chance to sleep past day_end via ControllableClock.sleep.
-    rid = await asyncio.wait_for(fifth, timeout=5.0)
-    assert isinstance(rid, int)
-    # After day boundary advance, prior rows fall out of the local-day window.
-    day_start, day_end = compute_day_window(_clock.utc_now(), timezone.utc)
-    in_day = sum(
-        1
-        for r in store.rows.values()
-        if day_start <= r.created_at < day_end and r.status in _ACTIVE
-    )
-    assert in_day <= 4
+    with pytest.raises(QuotaDailyExceeded):
+        await ledger_a.reserve(estimated_tokens=1, purpose="rpd-overflow")
 
 
 @pytest.mark.unit
