@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
-# backup-postgres.sh — pg_dump + vault tar with SHA-256 checksums and retention.
+# backup-postgres.sh — pg_dump (-Fc) + tar vault + SHA-256 + retention.
 #
-# Usage (from radar/ with stack running, or via Git Bash / WSL on Windows):
+# Crash-consistency: il dump Postgres è coerente a livello DB; vault e outbox
+# non sono atomici cross-filesystem. Se outbox ha `writing`/`pending`, WARN
+# (dump ok, vault può essere mid-reconcile; dopo restore il worker recupera).
+#
+# Uso (da radar/, stack up; Git Bash / WSL — non PowerShell nativo):
 #   ./ops/backup-postgres.sh
 #   RETENTION_DAYS=14 BACKUP_ROOT=./backups ./ops/backup-postgres.sh
 #
-# Requires: docker compose, sha256sum (or shasum), tar.
-# Do NOT run from PowerShell directly — use Git Bash, WSL, or:
-#   docker compose run --rm --entrypoint bash radar-backend -c '...'
+# Richiede: docker compose, sha256sum|shasum, tar.
+# @see ops/README.md; runbook backup.
 set -euo pipefail
 
-# Git Bash on Windows rewrites args like /tmp/foo → %TEMP%/foo before docker sees them.
-# Keep container paths literal for pg_dump / compose cp / exec.
+# Git Bash su Windows riscrive /tmp/... → %TEMP% prima di docker — blocca pg_dump.
 export MSYS_NO_PATHCONV=1
 export MSYS2_ARG_CONV_EXCL='*'
 
@@ -28,7 +30,7 @@ DEST="${BACKUP_ROOT}/${STAMP}"
 POSTGRES_USER="${POSTGRES_USER:-radar_user}"
 POSTGRES_DB="${POSTGRES_DB:-radar_db}"
 
-# Load .env KEY=VALUE only (safe on Windows / comments with parentheses)
+# Solo KEY=VALUE da .env (sicuro su Windows / commenti con parentesi)
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/_load_dotenv.sh"
 radar_load_dotenv "${RADAR_ROOT}/.env"
@@ -39,7 +41,7 @@ mkdir -p "${DEST}"
 
 echo "==> Backup destination: ${DEST}"
 
-# ── Outbox consistency warning ───────────────────────────────────────────────
+# ── Warn crash-consistency outbox (non abort) ────────────────────────────────
 warn_outbox() {
   local pending writing
   pending="$($COMPOSE exec -T radar-db \
@@ -66,7 +68,7 @@ else
   exit 1
 fi
 
-# Host path for `docker compose cp` (Git Bash: /c/Users → Windows path; avoid C:\c\Users)
+# Path host per `docker compose cp` sotto Git Bash (cygpath → Windows)
 host_path() {
   local p="$1"
   if command -v cygpath >/dev/null 2>&1; then
@@ -76,7 +78,7 @@ host_path() {
   fi
 }
 
-# ── PostgreSQL dump (custom format; file-in-container avoids Win CRLF on pipes) ─
+# ── Dump Postgres (custom format in-container: evita CRLF su pipe Windows) ───
 DUMP_FILE="${DEST}/radar_${POSTGRES_DB}.dump"
 echo "==> pg_dump → ${DUMP_FILE}"
 $COMPOSE exec -T radar-db \
@@ -84,7 +86,7 @@ $COMPOSE exec -T radar-db \
 $COMPOSE cp "radar-db:/tmp/radar_backup.dump" "$(host_path "${DUMP_FILE}")"
 $COMPOSE exec -T radar-db rm -f /tmp/radar_backup.dump
 
-# ── Vault tar (same stamp) ───────────────────────────────────────────────────
+# ── Vault tar (stesso stamp; non atomico col dump) ───────────────────────────
 VAULT_DIR="${RADAR_ROOT}/vault"
 VAULT_TAR="${DEST}/vault.tar.gz"
 if [[ -d "${VAULT_DIR}" ]]; then
@@ -94,7 +96,7 @@ else
   echo "WARN: vault/ missing — skipping vault archive." >&2
 fi
 
-# ── Checksums ────────────────────────────────────────────────────────────────
+# ── Checksums (manifest escluso da se stesso) ────────────────────────────────
 MANIFEST="${DEST}/SHA256SUMS"
 echo "==> Writing ${MANIFEST}"
 (
@@ -107,12 +109,12 @@ echo "==> Writing ${MANIFEST}"
     echo "ERROR: need sha256sum or shasum" >&2
     exit 1
   fi
-  # Exclude the manifest itself from the listing
+  # Esclude il manifest dalla listing
   grep -v 'SHA256SUMS' SHA256SUMS.tmp > SHA256SUMS || true
   rm -f SHA256SUMS.tmp
 )
 
-# ── Retention ────────────────────────────────────────────────────────────────
+# ── Retention distruttiva: rimuove directory stamp più vecchie di N giorni ───
 echo "==> Applying retention: keep last ${RETENTION_DAYS} days under ${BACKUP_ROOT}"
 find "${BACKUP_ROOT}" -mindepth 1 -maxdepth 1 -type d -mtime "+${RETENTION_DAYS}" -exec rm -rf {} + 2>/dev/null || true
 

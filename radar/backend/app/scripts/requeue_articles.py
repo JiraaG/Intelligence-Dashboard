@@ -1,18 +1,20 @@
-"""Ops: re-queue recent Miniflux read entries for another classify cycle.
+"""
+Ops: riaccoda entry Miniflux già lette per un altro ciclo di classificazione.
 
-Marks the last N *read* Miniflux entries as *unread*, deletes matching
-PostgreSQL ``articles`` / ``article_outbox`` rows and vault markdown files
-(by URL SHA-256 hex[:16]), and clears ``llm_model_cooldown``.
+**Distruttivo** (senza ``--dry-run``):
+1. Marca le ultime N entry *read* come *unread* in Miniflux
+2. Cancella markdown vault corrispondenti (hash URL SHA-256 hex[:16]) + sidecar ``.lock``
+3. Svuota ``llm_model_cooldown`` e cancella ``articles`` / ``article_outbox`` per quegli URL
 
-Run inside ``radar-worker`` (has Miniflux + DB + vault mount)::
+Ordine: sempre prima ``--dry-run`` (skill radar-requeue-ops), poi write, poi
+``docker compose restart radar-worker`` (poll tipico 900s).
+
+Eseguire **dentro** ``radar-worker`` (Miniflux + DB + mount vault)::
 
     docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20 --dry-run
     docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20
 
-Default N=20. After requeue, restart the worker to force an immediate cycle
-(poll interval is typically 900s)::
-
-    docker compose restart radar-worker
+Default N=20 (max 500). @see radar-requeue-ops; runbook requeue.
 """
 from __future__ import annotations
 
@@ -28,14 +30,23 @@ import httpx
 from app.core.config import DATABASE_URL, OBSIDIAN_VAULT_PATH
 from app.extraction.client import MinifluxClient
 
+# Allineato a commit/router: filename vault usa hex[:16] dell'URL.
 URL_HASH_HEX_CHARS = 16
 
 
 def _url_hash(source_url: str) -> str:
+    """Prefisso hash usato nei nomi file vault (stesso contratto del router)."""
     return hashlib.sha256(source_url.encode("utf-8")).hexdigest()[:URL_HASH_HEX_CHARS]
 
 
 async def requeue(n: int, *, dry_run: bool = False) -> None:
+    """
+    Esegue anteprima o requeue completo.
+
+    Con ``dry_run=True``: lista candidati Miniflux, path vault e id DB che
+    verrebbero cancellati; **nessuna** scrittura (Miniflux status, unlink, DELETE).
+    Con ``dry_run=False``: applica unread → vault → cooldown → outbox/articles.
+    """
     if n < 1 or n > 500:
         raise SystemExit(f"N must be 1..500, got {n}")
 
@@ -63,6 +74,7 @@ async def requeue(n: int, *, dry_run: bool = False) -> None:
             print(f"  ... and {len(entries) - 10} more")
 
         if dry_run:
+            # Solo lettura totale unread — conferma che non abbiamo mutato Miniflux.
             unread = await mf._request(
                 "GET", "/v1/entries", params={"status": "unread", "limit": 1}
             )
@@ -106,6 +118,7 @@ async def requeue(n: int, *, dry_run: bool = False) -> None:
             if dry_run:
                 print(f"would_clear_cooldown_rows={cooldown_count}")
             else:
+                # Svuota cooldown così i modelli non restano skippati sul re-ingest.
                 cleared = await conn.execute("DELETE FROM llm_model_cooldown")
                 print(f"cooldown_delete={cleared}")
             for url in urls:
@@ -118,6 +131,7 @@ async def requeue(n: int, *, dry_run: bool = False) -> None:
                 if dry_run:
                     print(f"  would_delete_article_id={row['id']}")
                 else:
+                    # Outbox prima dell'articolo (FK / orphan avoid).
                     await conn.execute(
                         "DELETE FROM article_outbox WHERE article_id = $1",
                         row["id"],
@@ -135,6 +149,7 @@ async def requeue(n: int, *, dry_run: bool = False) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
+    """CLI: ``N`` opzionale (default 20) e ``--dry-run`` obbligatorio in anteprima ops."""
     parser = argparse.ArgumentParser(
         description="Re-queue last N Miniflux read entries for classify (ops)."
     )

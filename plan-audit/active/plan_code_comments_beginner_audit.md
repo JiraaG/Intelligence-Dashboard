@@ -280,7 +280,7 @@ Ogni batch è comment-only e contiene al massimo cinque file. I P0 rispettano l'
 
 1. **P1-01 — Supporto backend (5 file, ~M+S+M+M+M):** `classification/cooldown.py`, `commit/factory.py`, `core/database.py`, `core/heartbeat.py`, `core/migrations.py`. ✅ (2026-07-17)
 2. **P1-02 — Confine dati frontend (5 file, ~S+M+M+M+M):** `app.config.ts`, toolbar TS, `article.dto.ts`, `article.service.ts`, `article-mock.service.ts`. ✅ (2026-07-17)
-3. **P1-03 — Ops e sync (3 file, ~M+M+M):** `scripts/requeue_articles.py`, `radar/.ecc/scripts/sync_skills.py`, `ops/backup-postgres.sh`.
+3. **P1-03 — Ops e sync (3 file, ~M+M+M):** `scripts/requeue_articles.py`, `radar/.ecc/scripts/sync_skills.py`, `ops/backup-postgres.sh`. ✅ (2026-07-17)
 
 ### P2 — opt-in, nessun obbligo di edit
 
@@ -421,3 +421,4 @@ Il secondo comando deve restare vuoto. In caso di failure test/typecheck preesis
 |-------|--------|------|
 | P1-01 | DONE 2026-07-17 | 5 file supporto; AST equal; pytest `not live` 151 passed; nessun C-xx nuovo |
 | P1-02 | DONE 2026-07-17 | typecheck OK; C-07 mock `date` ignorato documentato (skill «data passata→0» ≠ codice) |
+| P1-03 | DONE 2026-07-17 | requeue dry-run, sync SoT→mirror, backup crash-consistency; pytest 151; nessun C-xx nuovo |

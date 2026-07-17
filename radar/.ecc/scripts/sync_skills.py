@@ -1,9 +1,19 @@
 #!/usr/bin/env python3
-"""Sync Radar ECC skill mirrors: .agents/skills/*/SKILL.md → radar/.ecc/skills/<name>.md
+"""
+Sync mirror skill ECC: SoT → mirror **unidirezionale**.
 
-Usage (from monorepo root):
+Sorgente di verità: ``.agents/skills/<name>/SKILL.md``
+Destinazione: ``radar/.ecc/skills/<name>.md`` (overwrite su ``--write``).
+
+Non copia mai mirror → SoT. ``--check`` segnala drift, mirror mancante e
+orphan (file in ``.ecc/skills`` senza cartella SoT).
+
+Uso (da monorepo root)::
+
   python radar/.ecc/scripts/sync_skills.py --check
   python radar/.ecc/scripts/sync_skills.py --write
+
+@see docs/04_ecc_framework.md (Sync mirror).
 """
 from __future__ import annotations
 
@@ -13,11 +23,16 @@ from pathlib import Path
 
 
 def repo_root() -> Path:
+    """Monorepo root: ``radar/.ecc/scripts/sync_skills.py`` → parents[3]."""
     # radar/.ecc/scripts/sync_skills.py → parents[3] = monorepo root
     return Path(__file__).resolve().parents[3]
 
 
 def skill_pairs(root: Path) -> list[tuple[str, Path, Path]]:
+    """
+    Triple ``(name, path_SoT, path_mirror)`` per ogni skill con ``SKILL.md``.
+    Solo directory sotto ``.agents/skills/`` — il mirror non guida la discovery.
+    """
     agents = root / ".agents" / "skills"
     mirror_dir = root / "radar" / ".ecc" / "skills"
     pairs: list[tuple[str, Path, Path]] = []
@@ -35,6 +50,10 @@ def skill_pairs(root: Path) -> list[tuple[str, Path, Path]]:
 
 
 def main() -> int:
+    """
+    ``--check``: exit 0 se allineati; 1 su missing/drift/orphan.
+    ``--write``: copia testo SoT sul mirror (newline ``\\n``), exit 0.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument(
@@ -64,6 +83,7 @@ def main() -> int:
         sot_text = sot.read_text(encoding="utf-8")
         if args.write:
             mirror_dir.mkdir(parents=True, exist_ok=True)
+            # Overwrite unidirezionale SoT → mirror (mai il contrario).
             mirror.write_text(sot_text, encoding="utf-8", newline="\n")
             written.append(name)
             continue
@@ -87,7 +107,7 @@ def main() -> int:
         print(f"DRIFT: {name} (.agents/skills/{name}/SKILL.md ≠ radar/.ecc/skills/{name}.md)", file=sys.stderr)
         ok = False
 
-    # Orphan mirrors (in .ecc but not in .agents)
+    # Orphan: presenti solo nel mirror — non cancellati da --write; falliscono --check.
     known = {name for name, _, _ in pairs}
     if mirror_dir.is_dir():
         for orphan in sorted(mirror_dir.glob("*.md")):
