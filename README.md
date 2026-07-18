@@ -188,9 +188,9 @@ Restore SHA sotto (Phase 0–6). Il branch di lavoro corrente può differire —
 | Phase 6 | `56c2eff` | GATE VERDE: docs, GeoJSON fetch+verify, CI, runbook, hooks |
 | Phase B | `885628f` | Real-time webhook + SSE soft-refresh (GATE VERDE) |
 | Fase H | `d9508a5` | Grafo geospaziale: `related_countries`, `/api/map-relations`, archi + chip |
-| Archi UI | `ac17c40` (`feature/upgrades`) | Multicolore &lt;5, tratteggio geometrico ≥5, `relationsPane`, click → sidebar bilaterale — **restore point** |
+| Archi UI | `5c74e57` (`feature/upgrades`) | Multicolore &lt;5, tratteggio geometrico ≥5, `relationsPane`, click → sidebar bilaterale — **restore point** |
 
-Esempio restore tip archi UI: `git checkout ac17c40` (branch `feature/upgrades`). Dettaglio: [plan_archi_hatching_multicolor.md](plan-audit/complete/plan_archi_hatching_multicolor.md) + [STATUS.md](plan-audit/STATUS.md).
+Esempio restore tip archi UI: `git checkout 5c74e57` (branch `feature/upgrades`). Dettaglio: [plan_archi_hatching_multicolor.md](plan-audit/complete/plan_archi_hatching_multicolor.md) + [STATUS.md](plan-audit/STATUS.md).
 
 Esempio Phase 6: `git checkout 56c2eff`. Dettaglio gate Phase 0–6: [plan_impl_phase_0_6_execution.md](plan-audit/complete/plan_impl_phase_0_6_execution.md).
 
