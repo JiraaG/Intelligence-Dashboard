@@ -4,7 +4,7 @@ This plan addresses the production blockers found during the code and architectu
 
 > **Stato:** Phase **0–6 DONE / GATE VERDE** — piano **chiuso** (riferimento storico + restore SHA).  
 > **Non** è backlog operativo. Truth runtime attuale: product docs (`README`, `docs/01–04`), Compose (`80:8080`), SoT LLM, [`plan_docs_monorepo_source.md`](plan_docs_monorepo_source.md).  
-> Final Release: **F1–F4 PASS** (2026-07-17); resta PR + Fase 5 deferred — [`../STATUS.md`](../STATUS.md) · [`../active/plan_release_final_gate.md`](../active/plan_release_final_gate.md) · handoff [`../remediation/audit_remediation_final_release_handoff.md`](../remediation/audit_remediation_final_release_handoff.md).
+> Final Release: **F0–F4 COMPLETE** (2026-07-18; PR #1 merged 2026-07-17); Fase 5 **DEFERRED ACCETTATO** (non richiesto) — [`../STATUS.md`](../STATUS.md) · [`../active/plan_release_final_gate.md`](../active/plan_release_final_gate.md) · handoff [`../remediation/audit_remediation_final_release_handoff.md`](../remediation/audit_remediation_final_release_handoff.md).
 
 **Progress (2026-07-15):** Phase **0–5 DONE**. Phase **6 DONE / GATE VERDE** (`56c2eff` — docs, GeoJSON fetch+verify, CI, runbook, hooks). ECC remediation tip = commit successivo su questo branch. Sidebar remains frozen.
 
@@ -456,3 +456,5 @@ cd radar/frontend && npm run typecheck && npm run test:ci && npm run build:ci
 - [x] SAST, dependency/image scans, CSP validation, and a manual XSS regression test pass. *(F4 PASS 2026-07-17 — `audit_remediation_final_release_F4_security.md`; CRITICAL perl base accepted)*
 - [x] The 10,000-article performance test meets the agreed budgets. *(F2 PASS 2026-07-17 — `audit_remediation_final_release_F2_seed10k.md`; EXPLAIN ~2–3 ms index-only)*
 - [x] Every public document and ECC rule has been reviewed against the deployed configuration. *(Phase 6 + polish tipografico/Mermaid/indici)*
+- [x] Pull Request `refactor/testing` → `develop` merged. *(PR #1, 2026-07-17; tip `develop` include Notizie Salvate)*
+- [ ] *(Opzionale / non bloccante)* Image digest pin SHA + drop `--legacy-peer-deps` — **DEFERRED ACCETTATO**; attivare solo con decisione esplicita.

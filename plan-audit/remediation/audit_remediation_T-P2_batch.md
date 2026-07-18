@@ -98,3 +98,5 @@ Nel frontend, all'interno del componente `radar-map.component.ts`, è stata otti
 ### Prossimo Passaggio (Handoff)
 Tutti i ticket correttivi del codice sono ora contrassegnati come **DONE**. 
 La prossima fase prevede la **Final Release** (merge PR del ramo `refactor/testing` su `develop` o `main`, e opzionalmente l'avvio della chaos suite, seed 10k e controlli SAST se richiesto dall'utente).
+
+> **Aggiornamento 2026-07-18:** Final Release **F0–F4 COMPLETE** (PR #1 merged; F1–F4 PASS). Fase 5 hardening resta deferred accettato. Vedi [`STATUS.md`](../STATUS.md).

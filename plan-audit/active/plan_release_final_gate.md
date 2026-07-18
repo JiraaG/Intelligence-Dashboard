@@ -1,8 +1,8 @@
 # Piano Operativo — Final Release Gate
 
-> **Stato (2026-07-17):** **F1–F4 PASS**; Fase 5 **DEFERRED ACCETTATO**; residuo operativo = **Fase 0 PR** (senza merge auto).  
+> **Stato (2026-07-18):** **F0–F4 COMPLETE**; Fase 5 **DEFERRED ACCETTATO** (hardening opzionale, non bloccante).  
 > **Premesse (2026-07-16):** remediation codice P0–P2 **CLOSED**; Phase 6 GATE VERDE; smoke UI manuale **fatto**.  
-> **Scopo:** procedure, report e decisioni Final Release (documento vivo finché resta la PR; poi archiviabile).  
+> **Scopo:** procedure, report e decisioni Final Release (archiviabile — gate chiuso; tip codice = `develop`).  
 > **Report:** [`../remediation/audit_remediation_final_release_F1_backup.md`](../remediation/audit_remediation_final_release_F1_backup.md) · [F2](../remediation/audit_remediation_final_release_F2_seed10k.md) · [F3](../remediation/audit_remediation_final_release_F3_chaos.md) · [F4](../remediation/audit_remediation_final_release_F4_security.md) · [handoff](../remediation/audit_remediation_final_release_handoff.md)  
 > **Quadro:** [`../STATUS.md`](../STATUS.md) · checkbox master [`../complete/plan_impl_phase_0_6.md`](../complete/plan_impl_phase_0_6.md) §Final Release Gate
 
@@ -16,29 +16,30 @@
 | Unit/integration offline | pytest `not live` ~117; FE typecheck + test:ci 30 |
 | Docs/ECC vs deploy | Phase 6 + remediation docs CLOSED |
 | Smoke UI letta + spiderfy | Eseguito dall’utente post-rebuild |
-| Commit + push branch | `refactor/testing` → `origin` @ `7bb8ed8` |
+| Commit + push branch | `refactor/testing` pushed; poi [PR #1](https://github.com/JiraaG/Dashboard-finance/pull/1) → `develop` merged 2026-07-17 |
+| Tip post-gate | `develop` @ `b08fd7e` (Notizie Salvate oltre al merge FRG) |
 
-**Non in scope di questo piano:** nuove feature prodotto; touch `radar-sidebar/**`; riaprire ticket remediation.
+**Non in scope di questo piano:** nuove feature prodotto; touch `radar-sidebar/**`; riaprire ticket remediation; attivare Fase 5 senza decisione esplicita.
 
 ---
 
-## 1. Mappa fasi (ordine raccomandato)
+## 1. Mappa fasi (ordine raccomandato — storico)
 
 ```text
-Fase 0  PR (senza merge automatico)
+Fase 0  PR → develop                         ← DONE (PR #1 merged 2026-07-17)
    ↓
-Fase 1  Backup / restore drill          ← valore ops più alto, script pronti
+Fase 1  Backup / restore drill             ← PASS
    ↓
-Fase 2  Seed 10k + misura budget        ← DB isolato / data dedicata
+Fase 2  Seed 10k + misura budget           ← PASS
    ↓
-Fase 3  Chaos kill/restart pipeline     ← dopo backup fresco
+Fase 3  Chaos kill/restart pipeline        ← PASS (C1–C3)
    ↓
-Fase 4  SAST / image scan / XSS spot    ← security release
+Fase 4  SAST / image scan / XSS spot       ← PASS
    ↓
-Fase 5  Deferred: digest pin + legacy-peer-deps  ← decisione prodotto (default: TENERE deferred)
+Fase 5  Deferred: digest pin + legacy-peer-deps  ← DEFERRED ACCETTATO (opzionale)
 ```
 
-**Perché questo ordine**
+**Perché questo ordine (storico)**
 
 1. **PR prima** — rende reviewabile lo stato già green senza mischiare drill ops.  
 2. **Backup/restore subito** — protegge i dati prima di chaos/seed aggressivi.  
@@ -55,38 +56,26 @@ Fase 5  Deferred: digest pin + legacy-peer-deps  ← decisione prodotto (default
 
 ---
 
-## 2. Fase 0 — Pull Request (processo)
+## 2. Fase 0 — Pull Request (processo) — **DONE**
 
-### Obiettivo
-Aprire PR `refactor/testing` → `develop` (o base scelta) **senza merge** finché non richiesto.
+### Obiettivo (raggiunto)
+PR `refactor/testing` → `develop` aperta e **merged**.
 
-### File / tool
-- Branch: `refactor/testing` @ `7bb8ed8+`
-- Tool: `gh pr create`
-- Handoff: `plan-audit/remediation/audit_remediation_final_release_handoff.md` §D voce 2
+### Esito
+- **PR:** [#1](https://github.com/JiraaG/Dashboard-finance/pull/1) — merged **2026-07-17T11:20:38Z**
+- `origin/refactor/testing` è ancestor di `origin/develop` (0 commit residui sul branch FRG)
+- Post-merge su `develop`: Notizie Salvate + ignore backups (`b08fd7e`)
 
-### Procedura
+### Procedura (storico — non rieseguire)
 ```powershell
-cd "c:\Users\lucag\Documents\Dashboard finance"
-git status -sb   # working tree clean
+git status -sb
 git push -u origin HEAD
 gh pr create --base develop --head refactor/testing --title "…" --body "…"
 ```
 
-### Body PR suggerito
+### Body PR (storico)
 - Summary: chiusura remediation P2 + handoff Final Release; P0–P2 DONE  
-- Test plan: pytest not live; FE test:ci; smoke UI; Compose healthy  
-- Non-goals: merge; chaos/SAST/seed (follow-up)
-
-### Pro / contro
-
-| Pro | Contro |
-|-----|--------|
-| Review umana prima di fondere in `develop` | `develop` può essere molto indietro → PR grande |
-| Traccia CI GitHub se attiva | Merge conflict possibili vs `develop` |
-
-### Scelta migliore
-**Aprire PR senza merge.** Risolvere eventuali conflitti in branch dedicato solo se `gh` li segnala.
+- Test plan: pytest not live; FE test:ci; smoke UI; Compose healthy
 
 ---
 
@@ -398,13 +387,13 @@ Questi **non** sono FAIL e **non** sono ticket SoT. Sono scelte di riproducibili
 
 | Item | Fare ora? | Scelta raccomandata |
 |------|-----------|---------------------|
-| PR → develop | **Sì (residuo)** | Aprire, **non** merge auto |
+| PR → develop | **Fatto** | PR #1 merged 2026-07-17 |
 | Backup/restore | **Fatto PASS** | Report F1 |
 | Seed 10k | **Fatto PASS** | Report F2 |
 | Chaos | **Fatto PASS** | Report F3 (C1–C3; C4/C5 SKIP) |
 | SAST/scan | **Fatto PASS** | Report F4 (CRITICAL perl base accettato) |
-| Digest pin | **No** | Deferred accettato |
-| Drop legacy-peer-deps | **No** | Deferred accettato |
+| Digest pin | **No** | Deferred accettato — non richiesto |
+| Drop legacy-peer-deps | **No** | Deferred accettato — non richiesto |
 
 ---
 
@@ -434,10 +423,10 @@ Questi **non** sono FAIL e **non** sono ticket SoT. Sono scelte di riproducibili
 
 ## 11. Definizione di “Final Release COMPLETE”
 
-**Stato 2026-07-17 (full gate ops):**
+**Stato 2026-07-18 (gate chiuso):**
+- Fase 0 PR **DONE** (PR #1 merged 2026-07-17)
 - Fase 1–4 **PASS** (report F1–F4)
-- Fase 5 **DEFERRED ACCETTATO**
-- Fase 0 PR: **ancora da aprire** (non blocca le prove live post-push)
+- Fase 5 **DEFERRED ACCETTATO** (hardening opzionale; non bloccante)
 
 **Minimum viable release (storico):**
 - Fase 0 PR aperta  
@@ -445,8 +434,8 @@ Questi **non** sono FAIL e **non** sono ticket SoT. Sono scelte di riproducibili
 - Fase 2 PASS (misure documentate)  
 - Smoke UI già fatto  
 
-**Full gate (piano master):** raggiunto per F1–F4 + deferred esplicito; manca solo apertura PR.
+**Full gate (piano master):** **raggiunto** — F0–F4 + deferred esplicito. Nessun residuo operativo obbligatorio.
 
 ---
 
-*Documento creato 2026-07-16 — post smoke UI e push `7bb8ed8`.*
+*Documento creato 2026-07-16 — post smoke UI e push `7bb8ed8`. Aggiornato 2026-07-18 (PR merged + tip `develop`).*

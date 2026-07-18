@@ -24,10 +24,11 @@ Modifiche a containerizzazione, reti, health, o build FE in Docker.
 7. Nginx: resolver `127.0.0.11` + variabile per `proxy_pass` (anti-502).
 8. Frontend runs as unprivileged nginx user listening on port 8080 (host mapped 80:8080).
 
-## Deferred (non inventare come fatto)
+## Deferred (non inventare come fatto; non trattare come backlog obbligatorio)
 
-- Drop `--legacy-peer-deps` solo con matrix allineata
-- Digest pin immagini = opzionale prodotto (Final Release Fase 5 **DEFERRED ACCETTATO** 2026-07-17)
+- Drop `--legacy-peer-deps` solo con matrix allineata (decisione esplicita)
+- Digest pin immagini = opzionale prodotto (Final Release Fase 5 **DEFERRED ACCETTATO** 2026-07-17; confermato non richiesto 2026-07-18)
+- Final Release F0–F4 **COMPLETE** (PR #1 merged); tip = `develop` — vedi `plan-audit/STATUS.md`
 
 ## Ops .env / backup Windows
 

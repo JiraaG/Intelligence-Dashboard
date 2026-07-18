@@ -4,7 +4,7 @@ Log operativo post–branch restore. Distingue **storico pre-restore** (lavoro p
 
 > **Stato:** Phase **0–6 DONE / GATE VERDE** — scoreboard **chiuso**.  
 > Truth porte FE attuale: Compose `"80:8080"` (T-P1-05). Claim Phase 3 `80:80` sotto = snapshot storico.  
-> Non usare come backlog; Final Release: [`../STATUS.md`](../STATUS.md) · [`../active/plan_release_final_gate.md`](../active/plan_release_final_gate.md).
+> Non usare come backlog; Final Release **F0–F4 COMPLETE** (2026-07-18): [`../STATUS.md`](../STATUS.md) · [`../active/plan_release_final_gate.md`](../active/plan_release_final_gate.md).
 
 ---
 

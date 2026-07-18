@@ -325,6 +325,8 @@ dallo stato Angular (Signals). Non inserire testo statico nei template HTML.
 
 A causa dei potenziali conflitti di compatibilità delle dipendenze tra Angular 21, PrimeNG e Leaflet (in particolare per pacchetti legacy o librerie secondarie come `@angular/cdk`), è **obbligatorio** utilizzare sempre il flag `--legacy-peer-deps` durante l'installazione di qualsiasi pacchetto npm per garantire la coerenza della build e prevenire errori di installazione.
 
+> **Nota Final Release (Fase 5):** il drop del flag resta **DEFERRED ACCETTATO** — non è un ticket OPEN. Si potrà rimuovere solo dopo upgrade coordinato CDK/PrimeNG compatibile con Angular 21, in branch dedicato, con smoke del carousel (sidebar freeze: sola osservazione).
+
 **OBBLIGATORIO:**
 ```bash
 # Dockerfile stage builder — OBBLIGATORIO riproducibile

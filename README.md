@@ -10,13 +10,6 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-5_services-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 
-**Stato piani (2026-07-17):** Phase **0–5 DONE**. Phase **6 DONE / GATE VERDE**.  
-**Final Release** ≠ Phase GATE: **F1–F4 PASS**; Fase 5 **DEFERRED ACCETTATO**; resta **PR** (Fase 0, no merge auto) — [`STATUS.md`](plan-audit/STATUS.md) · piano [`plan_release_final_gate.md`](plan-audit/active/plan_release_final_gate.md) · handoff [`audit_remediation_final_release_handoff.md`](plan-audit/remediation/audit_remediation_final_release_handoff.md).  
-**ECC expansion wiring DONE** (hooks/rules Cursor + skill dominio Radar).  
-Sorgente di verità avanzamento Phase 0–6: [`plan_impl_phase_0_6_execution.md`](plan-audit/complete/plan_impl_phase_0_6_execution.md).  
-Checklist allineamento docs (chiusa): [`plan_docs_monorepo_source.md`](plan-audit/complete/plan_docs_monorepo_source.md).  
-**Sidebar freeze:** non modificare `radar/frontend/src/app/components/radar-sidebar/`.
-
 ---
 
 ## Avvio rapido

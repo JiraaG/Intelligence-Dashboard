@@ -25,7 +25,7 @@ Internet/LAN → [Porta 80] → radar-frontend (Nginx) ──radar-edge──→
 
 Phase 3 DONE: edge/data, `/health/live`+`/ready`, CSP, ops backup, soft hardening.
 Phase 4 DONE: frontend lifecycle/security (non tocca Compose).
-Phase 6 DONE / GATE VERDE: docs/CI/GeoJSON/runbook. **Final Release F1–F4 PASS (2026-07-17)** — backup/restore, seed 10k, chaos C1–C3, security scan; vedi `plan-audit/STATUS.md`. **Deferred prodotto (Fase 5 accettato):** image digest pin SHA e drop `--legacy-peer-deps` (quando matrix Angular/CDK/PrimeNG allineata).
+Phase 6 DONE / GATE VERDE: docs/CI/GeoJSON/runbook. **Final Release F0–F4 COMPLETE (2026-07-18)** — PR #1 merged 2026-07-17; backup/restore, seed 10k, chaos C1–C3, security scan; vedi `plan-audit/STATUS.md`. **Deferred prodotto (Fase 5 accettato, non richiesto):** image digest pin SHA e drop `--legacy-peer-deps` (quando matrix Angular/CDK/PrimeNG allineata).
 ---
 
 ## Regola 1: Cinque Servizi, Nomi Immutabili
@@ -217,7 +217,7 @@ EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]
 ```
 
-> **Deferred post–Phase 6:** drop `--legacy-peer-deps` solo quando la matrix Angular/CDK/PrimeNG è allineata; digest pin immagini = opzionale prodotto.
+> **Deferred post–Final Release (Fase 5 accettato, non richiesto):** drop `--legacy-peer-deps` solo quando la matrix Angular/CDK/PrimeNG è allineata; digest pin immagini = opzionale prodotto / compliance. Non trattare come ticket OPEN.
 
 ---
 

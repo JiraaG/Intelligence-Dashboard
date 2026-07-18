@@ -1,9 +1,15 @@
 # Prompt — Final Release Gate (orchestratore multi-fase)
 
-> **Stato 2026-07-17:** Fasi **1–4 PASS** (report in `plan-audit/remediation/audit_remediation_final_release_F*.md`). Fase 5 = **DEFERRED ACCETTATO**.  
-> **Uso residuo:** solo **Fase 0 PR** (senza merge) se ancora aperta — non rieseguire backup/seed/chaos/SAST.  
-> **Piano SoT:** `plan-audit/active/plan_release_final_gate.md` + [`STATUS.md`](../../STATUS.md).  
-> **Precondizioni:** P0–P2 CLOSED; smoke UI fatto; branch `refactor/testing` pushed.
+> **ARCHIVIATO 2026-07-18 — NON RIESEGUIRE.**  
+> Gate **F0–F4 COMPLETE**: [PR #1](https://github.com/JiraaG/Dashboard-finance/pull/1) merged 2026-07-17; F1–F4 PASS; Fase 5 **DEFERRED ACCETTATO**.  
+> Tip codice: `develop`. Quadro: [`STATUS.md`](../../STATUS.md) · handoff [`audit_remediation_final_release_handoff.md`](../../remediation/audit_remediation_final_release_handoff.md).
+
+---
+
+> **Stato storico 2026-07-17 (pre-chiusura PR):** Fasi **1–4 PASS**. Uso residuo era solo Fase 0 PR.  
+> **Piano SoT:** `plan-audit/active/plan_release_final_gate.md`.
+
+Il blocco `/goal` sotto è **storico** (conservato per audit). Non avviare un nuovo orchestratore su questo prompt.
 
 ```text
 /goal Chiudi il residuo Final Release Gate del Radar: Fase 0 PR
@@ -112,6 +118,5 @@ git diff --stat -- radar/frontend/src/app/components/radar-sidebar
 
 ## Note per chi lancia
 
-- Per **una sola fase**: aggiungi in cima `/goal … Esegui SOLO Fase N`.
-- Per **minimum viable release** (consigliato): Fasi **0 + 1 + 2**, poi stop; 3–4 opzionali; 5 deferred.
-- Merge PR: **mai** in questo prompt — chiedilo in un turno dedicato dopo review.
+- **Chiuso:** non usare questo prompt per nuovi turni.
+- Per Fase 5 hardening: solo decisione esplicita utente + branch dedicato (vedi `plan_release_final_gate.md` §7).

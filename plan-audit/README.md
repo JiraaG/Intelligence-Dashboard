@@ -13,7 +13,7 @@ Cartella di audit, prompt orchestratore e SoT del modulo Radar.
 | Documento | Ruolo |
 |-----------|--------|
 | [sot_llm_multi_model_fallback.md](active/sot_llm_multi_model_fallback.md) | **SoT** LLM multi-provider + routing v2.2 |
-| [plan_release_final_gate.md](active/plan_release_final_gate.md) | Piano Final Release (**F1–F4 PASS**; resta PR + Fase 5 deferred) |
+| [plan_release_final_gate.md](active/plan_release_final_gate.md) | Piano Final Release (**F0–F4 COMPLETE**; Fase 5 deferred accettato) |
 | [plan_code_comments_beginner_audit.md](active/plan_code_comments_beginner_audit.md) | Piano commenti IT (**P0 DONE**; P1/P2 opt-in) |
 
 ## `complete/` — chiusi
@@ -26,21 +26,21 @@ Vedi [`complete/README.md`](complete/README.md): Phase 0–6, playbook, ticket s
 plan-audit/
   STATUS.md                 ← fatto vs da fare (leggere per primo)
   README.md                 ← questo indice
-  active/                   SoT LLM + Final Release + piano commenti
+  active/                   SoT LLM + Final Release (chiuso) + piano commenti
   complete/                 Piani/checklist COMPLETATI
-  prompts/active/           Prompt ancora utili (PR gate; ECC expansion)
-  prompts/done/             Prompt eseguiti (storico)
+  prompts/active/           Prompt non ancora eseguiti (ECC expansion)
+  prompts/done/             Prompt eseguiti (storico, incl. Final Release Gate)
   remediation/              Report ticket DONE (non cancellare)
   archive/plans|ecc|llm-stubs|scratch/
 ```
 
 ## Prompt attivi
 
-* [audit_prompt_final_release_gate.md](prompts/active/audit_prompt_final_release_gate.md) — F1–F4 PASS; utile solo per residuo PR
 * [plan_prompt_ecc_manual_and_expansion.md](prompts/active/plan_prompt_ecc_manual_and_expansion.md) — non ancora eseguito
 
 ## Prompt done (recente)
 
+* [audit_prompt_final_release_gate.md](prompts/done/audit_prompt_final_release_gate.md) — Final Release F0–F4 CLOSED (archiviato 2026-07-18)
 * [audit_prompt_code_comments_beginner_terra.md](prompts/done/audit_prompt_code_comments_beginner_terra.md) — audit Terra → piano commenti (P0 eseguiti)
 
 ## Note
