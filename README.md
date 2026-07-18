@@ -20,7 +20,7 @@ cp .env.example .env   # lane keys LLM (Profili A–E) + password DB/Miniflux (n
 docker compose up --build -d
 ```
 
-Apri **http://localhost/**. Knobs LLM / Profili A–E: [`radar/.env.example`](radar/.env.example) + SoT [`sot_llm_multi_model_fallback.md`](plan-audit/active/sot_llm_multi_model_fallback.md).  
+Apri **http://localhost/**. Knobs LLM / Profili A–E: [`radar/.env.example`](radar/.env.example) + SoT [`sot_llm_multi_model_fallback.md`](plan-audit/complete/sot_llm_multi_model_fallback.md).  
 **Limiti lane:** RPM/TPM pieni → attesa stessa lane; RPD/cooldown → residual cross-lane (es. Flash Lite → DeepSeek). Dettaglio: SoT §0 + skill `radar-quota-ledger`.
 
 **Routing LLM:** `.env.example` ops tipico = **Profilo B** + `LLM_ROUTING_MODE=complexity`. Default codice boot-safe (senza env) = `LLM_ROUTING_MODE=off` + `LLM_ROUTING_SHADOW=true` — non confondere i due.
@@ -133,8 +133,8 @@ Build FE Docker: `npm ci --legacy-peer-deps` (peer matrix Angular/PrimeNG).
 | Documento | Ruolo |
 |-----------|--------|
 | [STATUS.md](plan-audit/STATUS.md) | **Quadro** fatto vs residui post-gate |
-| [plan_release_final_gate.md](plan-audit/active/plan_release_final_gate.md) | Piano Final Release (**F1–F4 PASS**; PR + Fase 5 deferred — **≠** Phase 6 GATE) |
-| [sot_llm_multi_model_fallback.md](plan-audit/active/sot_llm_multi_model_fallback.md) | SoT LLM multi-provider + Profili A–E |
+| [plan_release_final_gate.md](plan-audit/complete/plan_release_final_gate.md) | Piano Final Release (**F1–F4 PASS**; PR + Fase 5 deferred — **≠** Phase 6 GATE) |
+| [sot_llm_multi_model_fallback.md](plan-audit/complete/sot_llm_multi_model_fallback.md) | SoT LLM multi-provider + Profili A–E |
 | [complete/](plan-audit/complete/) | Phase 0–6, playbook, ticket status, checklist docs (**chiusi**) |
 | [remediation/](plan-audit/remediation/) | Report ticket + Final Release F1–F4 |
 

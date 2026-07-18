@@ -310,7 +310,7 @@ deepseek → thinking; openai|glm|grok → stock. `claude` = stub.
 OpenAI-compat riceve `model=` + dialect da provider (`deepseek` = thinking; `openai`/`glm`/`grok` = stock);
 mai hardcodare API key; mai commit `.env`; no package `openai`.
 
-SoT: `plan-audit/active/sot_llm_multi_model_fallback.md` + skill `radar-quota-ledger`.
+SoT: `plan-audit/complete/sot_llm_multi_model_fallback.md` + skill `radar-quota-ledger`.
 
 ---
 

@@ -1,10 +1,12 @@
 # active/ — documenti vivi
 
-| File | Ruolo |
-|------|--------|
-| [sot_llm_multi_model_fallback.md](sot_llm_multi_model_fallback.md) | SoT design LLM |
-| [plan_release_final_gate.md](plan_release_final_gate.md) | Piano Final Release (**F0–F4 COMPLETE**; Fase 5 deferred accettato) |
-| [plan_code_comments_beginner_audit.md](plan_code_comments_beginner_audit.md) | Piano commenti IT (`execute-p0-done`; P1/P2 opt-in) |
-| [note_notizie_salvate.md](note_notizie_salvate.md) | Feature note Notizie Salvate (`is_saved`, API, FE, smoke) |
+Attualmente questa directory è vuota poiché tutti i piani di consolidamento e le specifiche sono stati completati con successo.
 
-Quadro globale: [`../STATUS.md`](../STATUS.md). Completati: [`../complete/`](../complete/).
+I file completati sono stati archiviati e organizzati all'interno della directory [`../complete/`](../complete/):
+- `sot_llm_multi_model_fallback.md`
+- `plan_release_final_gate.md`
+- `plan_code_comments_beginner_audit.md`
+- `note_notizie_salvate.md`
+
+Quadro globale: [`../STATUS.md`](../STATUS.md).
+

@@ -162,7 +162,7 @@ Soft-trim worker = solo `LLM_SIMPLE.rpd` se `> 0`. Free → RPM/RPD; paid → bu
 Residual SIMPLE↔COMPLEX se identity diversa (fattura `ref.quota_lane`).
 **Complexity v2.2:** BORDERLINE usa catena COMPLEX (`purpose=classify:complex`); SIMPLE → `classify:simple`.
 **Dialect:** `deepseek` → payload `thinking`; `openai`/`glm`/`grok` → stock (no campi DeepSeek-only). `claude` = stub.
-Package `openai` vietato. SoT: `plan-audit/active/sot_llm_multi_model_fallback.md` + skill `radar-quota-ledger`.
+Package `openai` vietato. SoT: `plan-audit/complete/sot_llm_multi_model_fallback.md` + skill `radar-quota-ledger`.
 
 ```python
 reservation_id = await self.quota.reserve(

@@ -10,15 +10,11 @@ Cartella di audit, prompt orchestratore e SoT del modulo Radar.
 
 ## `active/` — vivi
 
-| Documento | Ruolo |
-|-----------|--------|
-| [sot_llm_multi_model_fallback.md](active/sot_llm_multi_model_fallback.md) | **SoT** LLM multi-provider + routing v2.2 |
-| [plan_release_final_gate.md](active/plan_release_final_gate.md) | Piano Final Release (**F0–F4 COMPLETE**; Fase 5 deferred accettato) |
-| [plan_code_comments_beginner_audit.md](active/plan_code_comments_beginner_audit.md) | Piano commenti IT (**P0 DONE**; P1/P2 opt-in) |
+*Nessuno* (tutti i piani sono stati completati con successo).
 
 ## `complete/` — chiusi
 
-Vedi [`complete/README.md`](complete/README.md): Phase 0–6, playbook, ticket status, checklist docs.
+Vedi [`complete/README.md`](complete/README.md) per l'elenco dei piani completati (inclusi Phase 0-6, LLM multi-model fallback, commenti di codice, notizie salvate, Final Release Gate, playbook, ticket status e monorepo check).
 
 ## Layout
 
@@ -26,8 +22,8 @@ Vedi [`complete/README.md`](complete/README.md): Phase 0–6, playbook, ticket s
 plan-audit/
   STATUS.md                 ← fatto vs da fare (leggere per primo)
   README.md                 ← questo indice
-  active/                   SoT LLM + Final Release (chiuso) + piano commenti
-  complete/                 Piani/checklist COMPLETATI
+  active/                   Directory per piani attivi (attualmente vuota)
+  complete/                 Tutti i piani e checklist COMPLETATI (spostati qui)
   prompts/active/           Prompt non ancora eseguiti (ECC expansion)
   prompts/done/             Prompt eseguiti (storico, incl. Final Release Gate)
   remediation/              Report ticket DONE (non cancellare)

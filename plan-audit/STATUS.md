@@ -10,14 +10,14 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 
 | Area | Dove | Note |
 |------|------|------|
-| Notizie Salvate (`is_saved`) | [`active/note_notizie_salvate.md`](active/note_notizie_salvate.md) | Migration `010`; vault cross-day; save⇒read / unread⇒unsave; spiderfy parity LETTE/TROVATE (2026-07-17) |
+| Notizie Salvate (`is_saved`) | [`complete/note_notizie_salvate.md`](complete/note_notizie_salvate.md) | Migration `010`; vault cross-day; save⇒read / unread⇒unsave; spiderfy parity LETTE/TROVATE (2026-07-17) |
 | Phase 0–6 GATE VERDE | [`complete/plan_impl_phase_0_6.md`](complete/plan_impl_phase_0_6.md) + [`_execution`](complete/plan_impl_phase_0_6_execution.md) | Restore SHA; non backlog |
 | Ticket remediation P0–P2 | [`complete/plan_docs_audit_ticket_status.md`](complete/plan_docs_audit_ticket_status.md) | **0 OPEN** |
 | Playbook audit docs | [`complete/plan_docs_audit_playbook.md`](complete/plan_docs_audit_playbook.md) | CLOSED |
 | Allineamento product docs | [`complete/plan_docs_monorepo_source.md`](complete/plan_docs_monorepo_source.md) | ESEGUITO + coerenza porte/health/requeue |
-| Final Release F0–F4 | [`active/plan_release_final_gate.md`](active/plan_release_final_gate.md) + report `remediation/*_F*.md` | **PR #1 merged** 2026-07-17; backup, seed 10k, chaos C1–C3, security |
-| SoT LLM multi-provider | [`active/sot_llm_multi_model_fallback.md`](active/sot_llm_multi_model_fallback.md) | **Vivo** — §0 limiti/failover RPM·TPM vs RPD (2026-07-17) |
-| Commenti codice P0–P2 | [`active/plan_code_comments_beginner_audit.md`](active/plan_code_comments_beginner_audit.md) | **P0–P1–P2-01 DONE**; altri P2 inventario restano fuori batch |
+| Final Release F0–F4 | [`complete/plan_release_final_gate.md`](complete/plan_release_final_gate.md) + report `remediation/*_F*.md` | **PR #1 merged** 2026-07-17; backup, seed 10k, chaos C1–C3, security |
+| SoT LLM multi-provider | [`complete/sot_llm_multi_model_fallback.md`](complete/sot_llm_multi_model_fallback.md) | **Vivo** — §0 limiti/failover RPM·TPM vs RPD (2026-07-17) |
+| Commenti codice P0–P2 | [`complete/plan_code_comments_beginner_audit.md`](complete/plan_code_comments_beginner_audit.md) | **P0–P1–P2-01 DONE**; altri P2 inventario restano fuori batch |
 | Prompt audit commenti | [`prompts/done/audit_prompt_code_comments_beginner_terra.md`](prompts/done/audit_prompt_code_comments_beginner_terra.md) | Pipeline Terra→Grok chiusa |
 | Prompt Final Release Gate | [`prompts/done/audit_prompt_final_release_gate.md`](prompts/done/audit_prompt_final_release_gate.md) | Archiviato 2026-07-18 — gate chiuso |
 | Report ticket singoli | [`remediation/`](remediation/) | Storico — non cancellare |
@@ -47,8 +47,8 @@ Prompt Final Release: [`prompts/done/audit_prompt_final_release_gate.md`](prompt
 ```text
 plan-audit/
   STATUS.md          ← questo file (quadro fatto / residui)
-  active/            ← SoT LLM + Final Release (archiviabile) + piano commenti
-  complete/          ← piani e checklist COMPLETATI
+  active/            ← Directory per piani attivi (attualmente vuota)
+  complete/          ← Piani e checklist COMPLETATI (tutti i piani spostati qui)
   prompts/active/    ← solo prompt non eseguiti (ECC expansion)
   prompts/done/      ← storico (incl. Final Release Gate + audit commenti)
   remediation/       ← report DONE (incl. F1–F4)

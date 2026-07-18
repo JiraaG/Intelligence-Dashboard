@@ -79,7 +79,7 @@ LLM_COMPLEX_RPD=0
 # Profili A/C/D/E (hybrid / OpenAI / GLM / Grok) in .env.example
 ```
 
-SoT: `plan-audit/active/sot_llm_multi_model_fallback.md` §5–§6.
+SoT: `plan-audit/complete/sot_llm_multi_model_fallback.md` §5–§6.
 
 ---
 

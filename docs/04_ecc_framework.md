@@ -47,7 +47,7 @@ Harness per vincolare l’agente alle regole di produzione. Overlay Radar a **tr
 | `commands/` | Shortcut: `radar-verify`, `radar-smoke`, `radar-lint` |
 
 Piani Phase 0–6 (**DONE / GATE VERDE**, riferimento — non backlog): [`plan_impl_phase_0_6.md`](../plan-audit/complete/plan_impl_phase_0_6.md) + [`plan_impl_phase_0_6_execution.md`](../plan-audit/complete/plan_impl_phase_0_6_execution.md) (voce **ECC expansion wiring — DONE**).  
-Final Release (**F0–F4 COMPLETE** 2026-07-18; PR #1 merged; Fase 5 deferred accettato, non richiesto): [`STATUS.md`](../plan-audit/STATUS.md) · [`plan_release_final_gate.md`](../plan-audit/active/plan_release_final_gate.md) · handoff [`audit_remediation_final_release_handoff.md`](../plan-audit/remediation/audit_remediation_final_release_handoff.md).  
+Final Release (**F0–F4 COMPLETE** 2026-07-18; PR #1 merged; Fase 5 deferred accettato, non richiesto): [`STATUS.md`](../plan-audit/STATUS.md) · [`plan_release_final_gate.md`](../plan-audit/complete/plan_release_final_gate.md) · handoff [`audit_remediation_final_release_handoff.md`](../plan-audit/remediation/audit_remediation_final_release_handoff.md).  
 Checklist docs: [`plan_docs_monorepo_source.md`](../plan-audit/complete/plan_docs_monorepo_source.md).  
 Handoff expansion (eseguito): [`handoff_ecc_expansion.md`](../plan-audit/archive/ecc/handoff_ecc_expansion.md).  
 Non usare come piano vivo: `Fase2_Implementation_Plan.md`, `plan*.md` in archive, `ecc_deep_dive_analysis.md` (V1 assente).

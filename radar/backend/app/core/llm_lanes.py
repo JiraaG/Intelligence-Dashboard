@@ -16,7 +16,7 @@ Attenzione unset vs blank: per ``*_FALLBACKS`` chiave presente anche vuota ≠ a
 (sopprime il legacy); per RPM/TPM/RPD blank ≡ assente (usa default/legacy). Vedi C-03/C-04.
 
 SoT:
-    plan-audit/active/sot_llm_multi_model_fallback.md §5–6; skill radar-quota-ledger;
+    plan-audit/complete/sot_llm_multi_model_fallback.md §5–6; skill radar-quota-ledger;
     .agents/AGENTS.md §3.
 """
 

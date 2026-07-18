@@ -4,7 +4,8 @@ This plan addresses the production blockers found during the code and architectu
 
 > **Stato:** Phase **0–6 DONE / GATE VERDE** — piano **chiuso** (riferimento storico + restore SHA).  
 > **Non** è backlog operativo. Truth runtime attuale: product docs (`README`, `docs/01–04`), Compose (`80:8080`), SoT LLM, [`plan_docs_monorepo_source.md`](plan_docs_monorepo_source.md).  
-> Final Release: **F0–F4 COMPLETE** (2026-07-18; PR #1 merged 2026-07-17); Fase 5 **DEFERRED ACCETTATO** (non richiesto) — [`../STATUS.md`](../STATUS.md) · [`../active/plan_release_final_gate.md`](../active/plan_release_final_gate.md) · handoff [`../remediation/audit_remediation_final_release_handoff.md`](../remediation/audit_remediation_final_release_handoff.md).
+> Final Release: **F0–F4 COMPLETE** (2026-07-18; PR #1 merged 2026-07-17); Fase 5 **DEFERRED ACCETTATO** (non richiesto) — [`../STATUS.md`](../STATUS.md) · [`plan_release_final_gate.md`](plan_release_final_gate.md) · handoff [`../remediation/audit_remediation_final_release_handoff.md`](../remediation/audit_remediation_final_release_handoff.md).
+
 
 **Progress (2026-07-15):** Phase **0–5 DONE**. Phase **6 DONE / GATE VERDE** (`56c2eff` — docs, GeoJSON fetch+verify, CI, runbook, hooks). ECC remediation tip = commit successivo su questo branch. Sidebar remains frozen.
 

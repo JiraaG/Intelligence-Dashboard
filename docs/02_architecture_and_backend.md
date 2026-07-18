@@ -1,6 +1,6 @@
 # Architettura e backend
 
-Stack Phase **0–6 DONE / GATE VERDE**. Piano master: [`plan_impl_phase_0_6.md`](../plan-audit/complete/plan_impl_phase_0_6.md). Scoreboard: [`plan_impl_phase_0_6_execution.md`](../plan-audit/complete/plan_impl_phase_0_6_execution.md). SoT LLM: [`sot_llm_multi_model_fallback.md`](../plan-audit/active/sot_llm_multi_model_fallback.md). Codice: `radar/backend/`.
+Stack Phase **0–6 DONE / GATE VERDE**. Piano master: [`plan_impl_phase_0_6.md`](../plan-audit/complete/plan_impl_phase_0_6.md). Scoreboard: [`plan_impl_phase_0_6_execution.md`](../plan-audit/complete/plan_impl_phase_0_6_execution.md). SoT LLM: [`sot_llm_multi_model_fallback.md`](../plan-audit/complete/sot_llm_multi_model_fallback.md). Codice: `radar/backend/`.
 
 ---
 

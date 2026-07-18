@@ -11,7 +11,7 @@ Lane (v2.2):
 Lo score numerico è solo per logging.
 
 SoT:
-    plan-audit/active/sot_llm_multi_model_fallback.md §4; .agents/AGENTS.md §3.
+    plan-audit/complete/sot_llm_multi_model_fallback.md §4; .agents/AGENTS.md §3.
 """
 
 from __future__ import annotations

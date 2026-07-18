@@ -195,7 +195,7 @@ def gemini_model_chain() -> list[str]:
         Lista ordinata senza duplicati; se SIMPLE non è gemini, usa gli alias
         ``GEMINI_MODEL`` / ``GEMINI_MODEL_FALLBACKS`` legacy.
     SoT:
-        plan-audit/active/sot_llm_multi_model_fallback.md §5; C-03 su precedenza FALLBACKS.
+        plan-audit/complete/sot_llm_multi_model_fallback.md §5; C-03 su precedenza FALLBACKS.
     """
     if LLM_SIMPLE.provider == "gemini":
         return list(LLM_SIMPLE.models)
