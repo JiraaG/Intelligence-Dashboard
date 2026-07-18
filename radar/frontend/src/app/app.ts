@@ -60,31 +60,18 @@ export class App {
 
       const detail = this.state.detailArticles();
       const byId = new Map(detail.map((a) => [a.id, a]));
-      const prevCluster = this.clusterArticles();
-      const categoryFilter =
-        prevCluster.length > 0 &&
-        prevCluster.every((a) => a.primary_category === prevCluster[0].primary_category)
-          ? prevCluster[0].primary_category
-          : null;
-
-      let nextCluster = categoryFilter
-        ? detail.filter((a) => a.primary_category === categoryFilter)
-        : detail;
-      if (nextCluster.length === 0) nextCluster = detail;
-
-      this.clusterArticles.set(nextCluster.map((a) => byId.get(a.id) ?? a));
-
-      const sel = this.selectedArticle();
-      if (sel) {
-        const updated = byId.get(sel.id);
-        if (updated) this.selectedArticle.set(updated);
+      const incoming = byId.get(evt.article_id);
+      if (!incoming) {
+        // Articolo filtrato via toolbar (sentiment/categoria): niente salto carosello.
+        return;
       }
 
-      const cat =
-        this.selectedArticle()?.primary_category ??
-        nextCluster[0]?.primary_category ??
-        evt.primary_category;
-      this.scheduleCategorySpiderfy(focus, cat as PrimaryCategory);
+      // Carosello = tutta la nazione (tutte le categorie); focus sulla card nuova.
+      // Spiderfy solo la categoria dell'articolo appena arrivato (icone/colore pin).
+      this.selectedArticle.set(incoming);
+      this.clusterArticles.set(detail.map((a) => byId.get(a.id) ?? a));
+      this.lastSpiderfyKey = null;
+      this.scheduleCategorySpiderfy(focus, incoming.primary_category);
     } catch {
       // Soft-refresh fallito: non chiudere sidebar
     }

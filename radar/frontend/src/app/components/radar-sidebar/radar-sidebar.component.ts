@@ -38,16 +38,25 @@ export class RadarSidebarComponent {
         this.activeArticleChanged.emit(null);
         return;
       }
-      
+
       if (this.mode() === 'single') {
         this.activeArticleChanged.emit(this.displayArticle() || null);
       } else {
         const arts = this.sortedClusterArticles();
         if (arts.length > 0) {
-          // Quando si apre il cluster, di default p-carousel parte dalla pagina 0
-          this.carouselCurrentPage.set(0);
-          this.activeArticleChanged.emit(arts[0]);
+          // Preferisci l'articolo richiesto dal parent (soft-refresh SSE / focus card).
+          const focus = this.article();
+          const focusIdx = focus ? arts.findIndex((a) => a.id === focus.id) : -1;
+          const page = focusIdx >= 0 ? focusIdx : 0;
+          this.carouselCurrentPage.set(page);
+          this.activeArticleChanged.emit(arts[page]);
           this.updateCarouselHeight();
+          // Allinea PrimeNG dopo il tick (ViewChild / rebuild items).
+          queueMicrotask(() => {
+            if (this.carousel && this.carousel.page !== page) {
+              this.carousel.page = page;
+            }
+          });
         }
       }
     }, { allowSignalWrites: true });
