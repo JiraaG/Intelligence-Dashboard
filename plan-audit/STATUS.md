@@ -18,7 +18,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 
 | Area | Dove | Note |
 |------|------|------|
-| Affinamento classificazione (tipologia / anti-XX / archi star) | [`prompts/done/plan_prompt_classification_geo_arcs_refine.md`](prompts/done/plan_prompt_classification_geo_arcs_refine.md) | **DONE** 2026-07-18 — prompt + soft-remap sport; `requeue --purge-all`; docs star; prova da zero 48 elab / 0 err; %XX ~4.5. **Restore point** tip `feature/upgrades` dopo questo commit. |
+| Affinamento classificazione (tipologia / anti-XX / archi star) | [`prompts/done/plan_prompt_classification_geo_arcs_refine.md`](prompts/done/plan_prompt_classification_geo_arcs_refine.md) | **DONE** 2026-07-18 — prompt + soft-remap sport; `requeue --purge-all`; docs star; prova da zero 48 elab / 0 err; %XX ~4.5. **Restore point:** `f7cf83d` su `feature/upgrades`. |
 | Notizie Salvate (`is_saved`) | [`complete/note_notizie_salvate.md`](complete/note_notizie_salvate.md) | Migration `010`; vault cross-day; save⇒read / unread⇒unsave; spiderfy parity LETTE/TROVATE (2026-07-17) |
 | Phase 0–6 GATE VERDE | [`complete/plan_impl_phase_0_6.md`](complete/plan_impl_phase_0_6.md) + [`_execution`](complete/plan_impl_phase_0_6_execution.md) | Restore SHA; non backlog |
 | Ticket remediation P0–P2 | [`complete/plan_docs_audit_ticket_status.md`](complete/plan_docs_audit_ticket_status.md) | **0 OPEN** |
@@ -51,7 +51,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 
 **Nessun residuo operativo obbligatorio sulla Fase B / H / archi UI / classification refine.** Branch di riferimento feature: `feature/upgrades`.
 
-**Restore point (classification/geo/arcs + purge-all):** dopo il merge/push di questo lavoro, tip `feature/upgrades` = checkpoint per `git checkout` / `git revert` se regressioni prompt/validator/requeue. Precedente restore archi UI: `5c74e57`.
+**Restore point (classification/geo/arcs + purge-all):** `f7cf83d` su `feature/upgrades` — checkpoint per `git checkout f7cf83d` / revert se regressioni prompt/validator/requeue. Precedente restore archi UI: `5c74e57`.
 
 Prompt Final Release: [`prompts/done/audit_prompt_final_release_gate.md`](prompts/done/audit_prompt_final_release_gate.md) — **non rieseguire** (F0–F4 chiusi).
 
