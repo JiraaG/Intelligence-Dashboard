@@ -91,4 +91,40 @@ describe('StateService detailError (T-P1-04)', () => {
     expect(state.detailError()).toBeNull();
     expect(state.error()).toBeNull();
   });
+
+  describe('mergeDetailArticlesFromServer (Fase B)', () => {
+    it('preserves existing article object references by ID', () => {
+      const art1 = { ...SAMPLE, id: 10, title: 'Original' };
+      state.detailArticles.set([art1]);
+
+      const incoming = { ...SAMPLE, id: 10, title: 'Updated' };
+      const merged = state.mergeDetailArticlesFromServer([incoming]);
+
+      expect(merged).toHaveLength(1);
+      expect(merged[0]).toBe(art1); // strict object equality
+      expect(art1.title).toBe('Updated');
+    });
+
+    it('does not overwrite is_read if it is in pendingReadIds', () => {
+      const art1 = { ...SAMPLE, id: 10, is_read: true };
+      state.detailArticles.set([art1]);
+      state.pendingReadIds.add(10);
+
+      const incoming = { ...SAMPLE, id: 10, is_read: false };
+      state.mergeDetailArticlesFromServer([incoming]);
+
+      expect(art1.is_read).toBe(true); // preserved because it was pending
+    });
+
+    it('does not overwrite is_saved if it is in pendingSaveIds', () => {
+      const art1 = { ...SAMPLE, id: 10, is_saved: true };
+      state.detailArticles.set([art1]);
+      state.pendingSaveIds.add(10);
+
+      const incoming = { ...SAMPLE, id: 10, is_saved: false };
+      state.mergeDetailArticlesFromServer([incoming]);
+
+      expect(art1.is_saved).toBe(true); // preserved because it was pending
+    });
+  });
 });

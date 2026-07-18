@@ -11,12 +11,18 @@ SoT:
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
+import hmac
+import json
 import logging
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, Optional
+from typing import Any, AsyncGenerator, Optional, AsyncIterator
 
-from fastapi import FastAPI, HTTPException, Query, Response
+import asyncpg
+from fastapi import FastAPI, HTTPException, Query, Response, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.api.articles_query import (
@@ -30,7 +36,12 @@ from app.api.articles_query import (
     normalize_sentiments,
     parse_published_date,
 )
-from app.core.config import CORS_ALLOW_ORIGINS, DATABASE_URL, WORKER_HEARTBEAT_STALE_SECONDS
+from app.core.config import (
+    CORS_ALLOW_ORIGINS,
+    DATABASE_URL,
+    MINIFLUX_WEBHOOK_SECRET,
+    WORKER_HEARTBEAT_STALE_SECONDS,
+)
 from app.core.database import bootstrap_database, init_pool
 from app.core.heartbeat import evaluate_readiness
 from app.core.logging import setup_logging
@@ -38,28 +49,113 @@ from app.core.logging import setup_logging
 logger = logging.getLogger("radar.main")
 
 
+class SSEBroadcastManager:
+    """Fan-out in-process: 1 publisher, N code client SSE (event-loop singolo)."""
+
+    def __init__(self, *, queue_maxsize: int = 32) -> None:
+        self._queue_maxsize = queue_maxsize
+        self._subscribers: set[asyncio.Queue[str | None]] = set()
+
+    def subscribe(self) -> asyncio.Queue[str | None]:
+        q: asyncio.Queue[str | None] = asyncio.Queue(maxsize=self._queue_maxsize)
+        self._subscribers.add(q)
+        return q
+
+    def unsubscribe(self, q: asyncio.Queue[str | None]) -> None:
+        self._subscribers.discard(q)
+
+    def publish(self, payload: str) -> None:
+        for q in list(self._subscribers):
+            try:
+                q.put_nowait(payload)
+            except asyncio.QueueFull:
+                try:
+                    q.get_nowait()
+                except asyncio.QueueEmpty:
+                    pass
+                try:
+                    q.put_nowait(payload)
+                except asyncio.QueueFull:
+                    logger.warning("SSE client queue piena: evento scartato.")
+
+    def close_all(self) -> None:
+        for q in list(self._subscribers):
+            try:
+                q.put_nowait(None)
+            except asyncio.QueueFull:
+                pass
+        self._subscribers.clear()
+
+
 class AppState:
-    """Stato globale API: solo pool database (nessun client ingest)."""
+    """Stato globale API: pool database e gestore eventi real-time SSE (Fase B)."""
 
     def __init__(self) -> None:
         self.db_pool: Optional[Any] = None
+        self.sse: SSEBroadcastManager = SSEBroadcastManager()
+        self.listen_conn: Optional[asyncpg.Connection] = None
+        self.listen_ready: asyncio.Event = asyncio.Event()
+        self._article_notify_callback: Any = None
 
 
 state = AppState()
 
 
+async def backend_article_listener() -> None:
+    """Una LISTEN globale su radar_article_processed → SSEBroadcastManager."""
+    conn = await asyncpg.connect(DATABASE_URL)
+    state.listen_conn = conn
+
+    def _on_notify(
+        _conn: asyncpg.Connection,
+        _pid: int,
+        _channel: str,
+        payload: str,
+    ) -> None:
+        state.sse.publish(payload)
+
+    state._article_notify_callback = _on_notify
+    await conn.add_listener("radar_article_processed", _on_notify)
+    state.listen_ready.set()
+    logger.info("LISTEN backend attivo su radar_article_processed.")
+    try:
+        while True:
+            await asyncio.sleep(3600)
+    except asyncio.CancelledError:
+        raise
+    finally:
+        try:
+            await conn.close()
+        except Exception as err:
+            logger.debug("Chiusura listen_conn API: %s", err)
+        state.listen_conn = None
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Avvio: pool → migrazioni; shutdown: chiudi pool. Nessuna pipeline LLM/Miniflux."""
+    """Avvio: pool → migrazioni → listen; shutdown: listen task cancel → chiudi pool."""
     setup_logging()
     logger.info("Avvio del server FastAPI (API only). Inizializzazione pool...")
-
+    listener_task: asyncio.Task | None = None
     try:
         state.db_pool = await init_pool(DATABASE_URL)
         await bootstrap_database(state.db_pool)
-        logger.info("Bootstrap API completato.")
+
+        # Avvio del listener dedicato PG LISTEN per gli SSE (Fase B)
+        listener_task = asyncio.create_task(
+            backend_article_listener(),
+            name="radar-backend-article-listener",
+        )
+        await asyncio.wait_for(state.listen_ready.wait(), timeout=30.0)
+        logger.info("Bootstrap API + LISTEN SSE completato.")
     except Exception as init_err:
         logger.critical("Errore critico all'avvio del lifespan: %s", init_err, exc_info=True)
+        if listener_task is not None:
+            listener_task.cancel()
+            try:
+                await listener_task
+            except asyncio.CancelledError:
+                pass
         if state.db_pool is not None:
             await state.db_pool.close()
             state.db_pool = None
@@ -68,6 +164,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     yield
 
     logger.info("Arresto del server FastAPI in corso...")
+    state.sse.close_all()
+    if listener_task is not None:
+        listener_task.cancel()
+        try:
+            await listener_task
+        except asyncio.CancelledError:
+            pass
     if state.db_pool is not None:
         await state.db_pool.close()
         state.db_pool = None
@@ -361,3 +464,91 @@ async def update_article_saved_status(article_id: int, status: SavedStatusUpdate
     if is_read is not None:
         payload["is_read"] = bool(is_read)
     return payload
+
+
+def verify_miniflux_signature(raw_body: bytes, signature_header: str | None) -> bool:
+    """Verifica HMAC-SHA256 Miniflux (hex) con confronto a tempo costante."""
+    if not MINIFLUX_WEBHOOK_SECRET:
+        return False
+    if not signature_header:
+        return False
+    expected = hmac.new(
+        MINIFLUX_WEBHOOK_SECRET.encode("utf-8"),
+        raw_body,
+        hashlib.sha256,
+    ).hexdigest()
+    return hmac.compare_digest(expected, signature_header.strip())
+
+
+@app.post("/api/webhooks/miniflux", status_code=202)
+async def miniflux_webhook(
+    request: Request,
+    x_miniflux_signature: str | None = Header(default=None, alias="X-Miniflux-Signature"),
+    x_miniflux_event_type: str | None = Header(default=None, alias="X-Miniflux-Event-Type"),
+) -> dict[str, str]:
+    """Trigger-only: HMAC + NOTIFY. Nessuna classificazione / commit qui."""
+    if state.db_pool is None:
+        raise HTTPException(status_code=503, detail="database_unavailable")
+
+    raw_body = await request.body()
+    if not verify_miniflux_signature(raw_body, x_miniflux_signature):
+        logger.warning("Webhook Miniflux rifiutato: firma assente o non valida.")
+        raise HTTPException(status_code=401, detail="invalid_signature")
+
+    try:
+        payload: dict[str, Any] = json.loads(raw_body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=400, detail="invalid_json") from exc
+
+    event_type = (x_miniflux_event_type or payload.get("event_type") or "").strip()
+    if event_type != "new_entries":
+        return {"status": "ignored", "event_type": event_type or "unknown"}
+
+    entry_id = "0"
+    entries = payload.get("entries")
+    if isinstance(entries, list) and entries:
+        first = entries[0]
+        if isinstance(first, dict) and first.get("id") is not None:
+            entry_id = str(first["id"])
+
+    async with state.db_pool.acquire() as conn:
+        await conn.execute("SELECT pg_notify($1, $2)", "radar_worker_trigger", entry_id)
+
+    logger.info("Webhook new_entries accettato; NOTIFY radar_worker_trigger id=%s", entry_id)
+    return {"status": "accepted"}
+
+
+SSE_PING_INTERVAL_SECONDS = 30.0
+
+
+@app.get("/api/articles/events")
+async def articles_events() -> StreamingResponse:
+    """Endpoint SSE per lo streaming degli articoli processati in tempo reale (Fase B)."""
+    async def event_generator() -> AsyncIterator[bytes]:
+        queue = state.sse.subscribe()
+        try:
+            while True:
+                try:
+                    item = await asyncio.wait_for(
+                        queue.get(),
+                        timeout=SSE_PING_INTERVAL_SECONDS,
+                    )
+                except asyncio.TimeoutError:
+                    yield b": ping\n\n"
+                    continue
+                if item is None:
+                    break
+                data = item.replace("\n", " ").replace("\r", " ")
+                yield f"event: article_processed\ndata: {data}\n\n".encode("utf-8")
+        finally:
+            state.sse.unsubscribe(queue)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

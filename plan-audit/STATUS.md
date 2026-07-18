@@ -23,6 +23,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 | Report ticket singoli | [`remediation/`](remediation/) | Storico — non cancellare |
 | Prompt eseguiti | [`prompts/done/`](prompts/done/) | Storico |
 | Piani ECC / Limits / stub | [`archive/`](archive/) | SUPERSEDED / PRD |
+| Phase B Real-Time (webhook/SSE/soft-refresh) | [`complete/master_plan_impl_phase_B.md`](complete/master_plan_impl_phase_B.md) + [`implementation`](complete/implementation_plan_phase_B.md) + [`analisi`](complete/analisi_dettagliata_fase_B.md) | **DONE / GATE VERDE** 2026-07-18 — HMAC webhook, LISTEN dedicate, SSE, Angular soft-refresh |
 
 ---
 
@@ -33,8 +34,9 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 | Fase 0 — PR `refactor/testing` → `develop` | **DONE** | [PR #1](https://github.com/JiraaG/Dashboard-finance/pull/1) merged 2026-07-17; tip `develop` include Notizie Salvate (`b08fd7e`) oltre al branch |
 | Fase 5 — digest pin + drop `--legacy-peer-deps` | **DEFERRED ACCETTATO** | Hardening opzionale; **non** da fare per release. Vedi piano §7 |
 | Commenti codice P1/P2 | **Chiuso (P2-01)** | Altri P2 in inventario senza `batch_id` — solo se emerge gap reale |
+| Fase C — Dedup semantica `pgvector` | **NEXT** | Vedi `radar_overview_and_upgrades.md` §C; non iniziata |
 
-**Nessun residuo operativo obbligatorio.** Branch corrente di riferimento: `develop`.
+**Nessun residuo operativo obbligatorio sulla Fase B.** Branch corrente di riferimento: `feature/upgrades` (Phase B) / `develop` (baseline release).
 
 Prompt Final Release: [`prompts/done/audit_prompt_final_release_gate.md`](prompts/done/audit_prompt_final_release_gate.md) — **non rieseguire** (F0–F4 chiusi).
 
@@ -47,8 +49,8 @@ Prompt Final Release: [`prompts/done/audit_prompt_final_release_gate.md`](prompt
 ```text
 plan-audit/
   STATUS.md          ← questo file (quadro fatto / residui)
-  active/            ← Directory per piani attivi (attualmente vuota)
-  complete/          ← Piani e checklist COMPLETATI (tutti i piani spostati qui)
+  active/            ← Piani in corso (vuota post–Fase B GATE)
+  complete/          ← Piani COMPLETATI (incl. Phase 0–6 + Fase B)
   prompts/active/    ← solo prompt non eseguiti (ECC expansion)
   prompts/done/      ← storico (incl. Final Release Gate + audit commenti)
   remediation/       ← report DONE (incl. F1–F4)

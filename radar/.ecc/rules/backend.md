@@ -354,3 +354,19 @@ Questi pattern nel codice causano un BLOCCO immediato:
 | Solo `asyncio.sleep(4)` senza ledger     | Quote non durable cross-process           |
 | `os.makedirs()` senza try/except nei log | Crash startup per permessi container      |
 | Swallow di `CancelledError`              | Shutdown non cancellabile                 |
+
+---
+
+## Regola 11: LISTEN/NOTIFY PostgreSQL — connessioni dedicate (Fase B)
+
+> **DIVIETO:** Usare `async with pool.acquire() as conn` per `LISTEN` di lunga durata.
+> Sottrarrebbe slot permanenti al pool (`max_size` tipico 10) e causerebbe starvation.
+
+**OBBLIGATORIO:**
+- Worker: connessione dedicata `await asyncpg.connect(DATABASE_URL)` per `LISTEN radar_worker_trigger` (distinta da `lock_conn` leadership).
+- API FastAPI: **una sola** connessione dedicata nel `lifespan` per `LISTEN radar_article_processed`, con fan-out in-process (`SSEBroadcastManager`) verso i client SSE.
+- `NOTIFY` di breve durata può usare connessioni del pool (`pg_notify`).
+
+**VIETATO:**
+- Un `LISTEN` per ogni client SSE.
+- Tenere `LISTEN` su connessioni ottenute dal pool HTTP request-scoped.

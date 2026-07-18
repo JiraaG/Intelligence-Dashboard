@@ -97,12 +97,15 @@ const EMPTY_GEOJSON = {
 })
 class ToolbarStubComponent {
   countries = input<CountrySummary[]>([]);
+  savedCountries = input<CountrySummary[]>([]);
   articleCount = input(0);
   readCount = input(0);
+  savedCount = input(0);
   isLoading = input(false);
   apiError = input(false);
   filtersChange = output<ArticleFilters>();
   countrySelected = output<string>();
+  savedCountrySelected = output<string>();
 }
 
 @Component({
@@ -192,11 +195,21 @@ function createStateStub(initial: Article[] = FIXTURE_ARTICLES, error: unknown =
     detailArticles: detailSignal,
     detailLoading: signal(false),
     detailError: detailErrorSignal,
+    sidebarMode: signal<string>('nation'),
+    lastProcessedArticleEvent: signal<any>(null),
+    async softReloadCountryArticles(countryCode: string): Promise<Article[]> {
+      return detailSignal();
+    },
+    async softReloadSavedCountryArticles(countryCode: string): Promise<Article[]> {
+      return detailSignal();
+    },
     articles: computed(() => detailSignal()),
     countries: computed(() => [] as CountrySummary[]),
+    savedCountries: computed(() => [] as CountrySummary[]),
     filteredSummary: computed(() => [] as import('./models/map-summary.model').MapSummaryRow[]),
     articleCount: computed(() => detailSignal().length),
     readCount: computed(() => detailSignal().filter((a) => a.is_read).length),
+    savedCount: computed(() => 0),
     isLoading: computed(() => false),
     error: computed(() => errorSignal() ?? detailErrorSignal()),
     clearDetailArticles(options?: { clearError?: boolean }): void {

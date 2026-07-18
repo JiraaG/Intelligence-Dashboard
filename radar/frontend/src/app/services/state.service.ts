@@ -1,9 +1,17 @@
-import { Injectable, inject, signal, computed } from '@angular/core';
+import { Injectable, inject, signal, computed, NgZone, DestroyRef } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { firstValueFrom } from 'rxjs';
 import { ArticleService } from './article.service';
 import { Article, ArticleFilters, CountrySummary, PrimaryCategory } from '../models/article.model';
 import { MapSummaryRow } from '../models/map-summary.model';
+import { MOCK_MODE } from './mock-mode.token';
+
+export interface ArticleProcessedEvent {
+  article_id: number;
+  country_code: string;
+  primary_category: string;
+  published_at: string;
+}
 
 export type SidebarMode = 'nation' | 'saved';
 
@@ -18,6 +26,59 @@ export type SidebarMode = 'nation' | 'saved';
 @Injectable({ providedIn: 'root' })
 export class StateService {
   private readonly articleService = inject(ArticleService);
+  private readonly zone = inject(NgZone);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly mockMode = inject(MOCK_MODE);
+  private eventSource: EventSource | null = null;
+
+  readonly pendingReadIds = new Set<number>();
+  readonly pendingSaveIds = new Set<number>();
+
+  /** Ultimo evento SSE (null = nessuno). Consumato da App effect. */
+  readonly lastProcessedArticleEvent = signal<ArticleProcessedEvent | null>(null);
+
+  constructor() {
+    if (!this.mockMode) {
+      this.initRealTimeConnection();
+    }
+    this.destroyRef.onDestroy(() => this.closeRealTimeConnection());
+  }
+
+  private initRealTimeConnection(): void {
+    if (typeof EventSource === 'undefined') {
+      console.warn('[StateService] EventSource non definita (ad es. ambiente Node/SSR).');
+      return;
+    }
+    this.zone.runOutsideAngular(() => {
+      const es = new EventSource('/api/articles/events');
+      this.eventSource = es;
+      es.addEventListener('article_processed', (evt: Event) => {
+        const msg = evt as MessageEvent<string>;
+        let data: ArticleProcessedEvent;
+        try {
+          data = JSON.parse(msg.data) as ArticleProcessedEvent;
+        } catch {
+          console.error('[StateService] SSE payload non JSON:', msg.data);
+          return;
+        }
+        this.zone.run(() => {
+          this.lastProcessedArticleEvent.set(data);
+          this.mapSummaryResource.reload();
+          this.savedSummaryResource.reload();
+        });
+      });
+      es.onerror = () => {
+        console.warn('[StateService] SSE connection error (browser will retry).');
+      };
+    });
+  }
+
+  private closeRealTimeConnection(): void {
+    if (this.eventSource) {
+      this.eventSource.close();
+      this.eventSource = null;
+    }
+  }
 
   /** Contatore per-articolo: solo l'ultima toggle può applicare risposta/rollback. */
   private readonly readMutationVersion = new Map<number, number>();
@@ -225,6 +286,66 @@ export class StateService {
     }
   }
 
+  /**
+   * Soft-merge lista nazione/salvati: preserva reference Article esistenti
+   * e flag ottimistici se mutazione in-flight (sidebar freeze / no flicker).
+   */
+  mergeDetailArticlesFromServer(serverArticles: Article[]): Article[] {
+    const prev = this.detailArticles();
+    const prevById = new Map(prev.map((a) => [a.id, a]));
+    const merged: Article[] = [];
+
+    for (const incoming of serverArticles) {
+      const existing = prevById.get(incoming.id);
+      if (!existing) {
+        merged.push(incoming);
+        continue;
+      }
+      const pendingRead = this.pendingReadIds.has(incoming.id);
+      const pendingSave = this.pendingSaveIds.has(incoming.id);
+
+      existing.title = incoming.title;
+      existing.summary = incoming.summary;
+      existing.primary_category = incoming.primary_category;
+      existing.sentiment = incoming.sentiment;
+      existing.relevance_level = incoming.relevance_level;
+      existing.country_code = incoming.country_code;
+      existing.latitude = incoming.latitude;
+      existing.longitude = incoming.longitude;
+      existing.published_at = incoming.published_at;
+      existing.source_url = incoming.source_url;
+      existing.feed_title = incoming.feed_title;
+      if (!pendingRead) {
+        existing.is_read = incoming.is_read;
+      }
+      if (!pendingSave) {
+        existing.is_saved = incoming.is_saved;
+      }
+      merged.push(existing);
+    }
+
+    this.detailArticles.set(merged);
+    return merged;
+  }
+
+  async softReloadCountryArticles(countryCode: string): Promise<Article[]> {
+    const f = this.filters();
+    const all = await firstValueFrom(
+      this.articleService.getAllArticlesForCountry(f.date, countryCode.toUpperCase()),
+    );
+    const filtered = all.filter((art) => this.matchesClientFilters(art, f));
+    return this.mergeDetailArticlesFromServer(filtered);
+  }
+
+  async softReloadSavedCountryArticles(countryCode: string): Promise<Article[]> {
+    const f = this.filters();
+    const all = await firstValueFrom(
+      this.articleService.getAllSavedArticlesForCountry(countryCode.toUpperCase()),
+    );
+    const filtered = all.filter((art) => this.matchesClientFilters(art, f));
+    return this.mergeDetailArticlesFromServer(filtered);
+  }
+
   /** Filtri toolbar applicati in memoria sulla lista nazione già scaricata. */
   private matchesClientFilters(art: Article, f: ArticleFilters): boolean {
     if (f.sentiment && f.sentiment.length > 0 && !f.sentiment.includes(art.sentiment)) {
@@ -246,6 +367,7 @@ export class StateService {
    * @see SoT: radar-sidebar-freeze; frontend.md §2b.
    */
   toggleReadStatus(articleId: number, isRead: boolean): void {
+    this.pendingReadIds.add(articleId);
     const version = (this.readMutationVersion.get(articleId) ?? 0) + 1;
     this.readMutationVersion.set(articleId, version);
 
@@ -271,6 +393,7 @@ export class StateService {
 
     this.articleService.updateReadStatus(articleId, isRead).subscribe({
       next: (res) => {
+        this.pendingReadIds.delete(articleId);
         if (this.readMutationVersion.get(articleId) !== version) return;
         const art = this.detailArticles().find((a) => a.id === articleId);
         const beforeRead = !!art?.is_read;
@@ -299,6 +422,7 @@ export class StateService {
         }
       },
       error: (err) => {
+        this.pendingReadIds.delete(articleId);
         console.error('[StateService] Impossibile aggiornare lo stato letto/non letto:', err);
         if (this.readMutationVersion.get(articleId) !== version) return;
         const art = this.detailArticles().find((a) => a.id === articleId);
@@ -330,6 +454,7 @@ export class StateService {
    * Save ⇒ anche ``is_read=true`` (coupling). Unsave non forza unread.
    */
   toggleSavedStatus(articleId: number, isSaved: boolean): void {
+    this.pendingSaveIds.add(articleId);
     const version = (this.saveMutationVersion.get(articleId) ?? 0) + 1;
     this.saveMutationVersion.set(articleId, version);
 
@@ -355,6 +480,7 @@ export class StateService {
 
     this.articleService.updateSavedStatus(articleId, isSaved).subscribe({
       next: (res) => {
+        this.pendingSaveIds.delete(articleId);
         if (this.saveMutationVersion.get(articleId) !== version) return;
         const art = this.detailArticles().find((a) => a.id === articleId);
         const beforeSaved = !!art?.is_saved;
@@ -383,6 +509,7 @@ export class StateService {
         }
       },
       error: (err) => {
+        this.pendingSaveIds.delete(articleId);
         console.error('[StateService] Impossibile aggiornare lo stato salvato:', err);
         if (this.saveMutationVersion.get(articleId) !== version) return;
         const art = this.detailArticles().find((a) => a.id === articleId);

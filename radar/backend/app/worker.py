@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
 import signal
 import struct
@@ -85,6 +86,10 @@ class WorkerState:
         self.lock_conn: Optional[asyncpg.Connection] = None
         self.lock_held: bool = False
         self.heartbeat_task: Optional[asyncio.Task] = None
+        # Fase B
+        self.listen_conn: Optional[asyncpg.Connection] = None
+        self.wake_event: asyncio.Event = asyncio.Event()
+        self._trigger_callback: Any = None
 
 
 def build_worker_semaphores(
@@ -192,6 +197,9 @@ async def shutdown_worker_resources(
         state.http_client = None
         logger.info("httpx.AsyncClient chiuso.")
 
+    # Fase B: Ferma il trigger listener prima di chiudere la connessione/pool
+    await stop_postgres_trigger_listener(state)
+
     if state.lock_conn is not None:
         if state.lock_held:
             try:
@@ -204,13 +212,49 @@ async def shutdown_worker_resources(
             except Exception as unlock_err:
                 logger.warning("Rilascio advisory lock fallito: %s", unlock_err)
             state.lock_held = False
-        await state.lock_conn.close()
+        try:
+            await state.lock_conn.close()
+        except Exception as lock_close_err:
+            logger.warning("Errore chiusura lock_conn: %s", lock_close_err)
         state.lock_conn = None
 
     if state.db_pool is not None:
         await state.db_pool.close()
         state.db_pool = None
         logger.info("Pool PostgreSQL chiuso.")
+
+
+async def start_postgres_trigger_listener(state: WorkerState) -> None:
+    """LISTEN dedicato su radar_worker_trigger (mai dal pool)."""
+    assert state.listen_conn is None
+    state.wake_event = asyncio.Event()
+    state.listen_conn = await asyncpg.connect(DATABASE_URL)
+
+    def _callback(_conn: asyncpg.Connection, _pid: int, _channel: str, _payload: str) -> None:
+        state.wake_event.set()
+
+    state._trigger_callback = _callback
+    await state.listen_conn.add_listener("radar_worker_trigger", _callback)
+    logger.info("LISTEN attivo sul canale radar_worker_trigger.")
+
+
+async def stop_postgres_trigger_listener(state: WorkerState) -> None:
+    if state.listen_conn is None:
+        return
+    try:
+        if state._trigger_callback is not None:
+            await state.listen_conn.remove_listener(
+                "radar_worker_trigger",
+                state._trigger_callback,
+            )
+    except Exception as err:
+        logger.debug("remove_listener: %s", err)
+    try:
+        await state.listen_conn.close()
+    except Exception as err:
+        logger.warning("Chiusura listen_conn: %s", err)
+    state.listen_conn = None
+    state._trigger_callback = None
 
 
 async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry) -> bool:
@@ -374,6 +418,22 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                         outbox_target_path=file_path,
                         outbox_payload=md_content,
                         miniflux_entry_id=entry_id,
+                    )
+
+                    # Fase B: Notifica processed per lo streaming SSE del frontend
+                    notify_payload = json.dumps(
+                        {
+                            "article_id": article_id,
+                            "country_code": extracted_article.country_code,
+                            "primary_category": extracted_article.primary_category,
+                            "published_at": extracted_article.published_at,
+                        },
+                        separators=(",", ":"),
+                    )
+                    await conn.execute(
+                        "SELECT pg_notify($1, $2)",
+                        "radar_article_processed",
+                        notify_payload,
                     )
 
                     outbox_row = await conn.fetchrow(
@@ -603,6 +663,15 @@ async def run_heartbeat_loop(
         await asyncio.sleep(interval_seconds)
 
 
+async def _wait_interval(state: WorkerState, interval: float) -> None:
+    """Attesa wake NOTIFY o timeout poll di sicurezza (Fase B)."""
+    try:
+        await asyncio.wait_for(state.wake_event.wait(), timeout=interval)
+        logger.info("Risveglio da radar_worker_trigger.")
+    except asyncio.TimeoutError:
+        logger.info("Timeout poll di sicurezza: avvio ciclo periodico.")
+
+
 async def run_pipeline_loop(state: WorkerState) -> None:
     """Loop demone: ciclo + sleep di poll **fuori** da qualsiasi ``finally`` di shutdown.
 
@@ -634,11 +703,12 @@ async def run_pipeline_loop(state: WorkerState) -> None:
                 exc_info=True,
             )
 
+        state.wake_event.clear()
         logger.info(
-            "Attesa di %s secondi prima del prossimo ciclo di polling...",
+            "Attesa wake NOTIFY o timeout poll (%ss)...",
             WORKER_POLL_INTERVAL_SECONDS,
         )
-        await asyncio.sleep(WORKER_POLL_INTERVAL_SECONDS)
+        await _wait_interval(state, float(WORKER_POLL_INTERVAL_SECONDS))
 
 
 async def run_worker() -> None:
@@ -705,6 +775,8 @@ async def run_worker() -> None:
             await state.lock_conn.close()
             state.lock_conn = None
             raise
+
+        await start_postgres_trigger_listener(state)
 
         hb_status = "running" if ingest_enabled else "degraded"
         hb_detail = None if ingest_enabled else "missing_llm_api_key"

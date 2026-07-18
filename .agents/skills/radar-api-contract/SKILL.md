@@ -3,14 +3,15 @@ name: radar-api-contract
 description: >
   Contratto API Phase 5+: GET /api/map-summary (day view), GET /api/saved-summary
   (vault salvati, no date), GET /api/articles envelope {items,next_cursor,total}
-  con saved=true cross-day, PATCH read_status / saved_status. DTO FE, MOCK_MODE
-  esplicito, main.py API-only.
+  con saved=true cross-day, PATCH read_status / saved_status, POST webhook (HMAC),
+  e GET events (SSE). DTO FE, MOCK_MODE esplicito, main.py API-only.
 when_to_use:
   - Modifiche a main.py, articles_query, article.service, article-mock.service
   - Nuovi endpoint o cambi envelope/paginazione
   - Toggle mock vs produzione
   - Notizie salvate / is_saved
-version: 1.1.0
+  - Webhook di ingestione o streaming SSE
+version: 1.2.0
 ---
 
 ## Quando attivare
@@ -27,8 +28,10 @@ Lavori su FastAPI REST, query articoli, o servizi Angular che chiamano l’API.
 | Saved open | `GET /api/articles?saved=true&country=` | Stesso envelope; **ignora date**; solo `is_saved` |
 | Read | `PATCH /api/articles/{id}/read_status` | `{ is_read }` → `{ status, is_read, is_saved? }`; unread ⇒ `is_saved=false` |
 | Save | `PATCH /api/articles/{id}/saved_status` | `{ is_saved }` → `{ status, is_saved, is_read? }`; save ⇒ `is_read=true` |
+| Webhook ingest | `POST /api/webhooks/miniflux` | Header `X-Miniflux-Signature` (HMAC-SHA256 hex sul raw body); event utile `new_entries`. Risposta `202` accepted / `401` firma / `ignored` altri eventi. **Trigger-only** → `NOTIFY radar_worker_trigger`. Nessuna classificazione in `main.py`. |
+| SSE real-time | `GET /api/articles/events` | `text/event-stream`; event `article_processed` + data JSON `{article_id,country_code,primary_category,published_at}`; commenti `: ping` ogni 30s; header `X-Accel-Buffering: no`. |
 
-- `main.py` = **API-only** (pool, migrations, REST). Ingest solo in `worker.py`.
+- `main.py` = **API-only** (pool, migrations, REST, webhook, SSE). Ingest solo in `worker.py`.
 - FE: `getMapSummary` / `getSavedSummary` / `getArticlesPage` allineati a `article.service.ts` e `article-mock.service.ts`.
 - Colonna DB: `articles.is_saved` (migration `010_articles_is_saved.sql`).
 
@@ -36,6 +39,7 @@ Lavori su FastAPI REST, query articoli, o servizi Angular che chiamano l’API.
 
 - Token `MOCK_MODE` in `services/mock-mode.token.ts` (default `false`).
 - **Vietato** fallback silenzioso su mock se l’API fallisce — errore visibile in toolbar.
+- Se `MOCK_MODE` è `true`, il frontend **non** deve connettersi ad `EventSource('/api/articles/events')`.
 
 ## DTO / schema
 
@@ -48,5 +52,8 @@ Lavori su FastAPI REST, query articoli, o servizi Angular che chiamano l’API.
 
 - Restituire `Article[]` globale del giorno al posto di map-summary
 - Inventare campi `reasoning` nello schema strict
-- Mettere polling ingest in `main.py`
+- Mettere polling ingest o classificazione in `main.py`
 - Riusare `loadCountryArticles(date, …)` per il vault salvati (serve path `saved=true`)
+- Fare LISTEN PostgreSQL dal pool asyncpg o per-client SSE
+- Soft-refresh FE che sostituisce tutte le reference `Article` del carosello (viola sidebar freeze UX)
+- Omettere verifica HMAC o usare `==` invece di `hmac.compare_digest`

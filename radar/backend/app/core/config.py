@@ -291,6 +291,7 @@ OBSIDIAN_VAULT_PATH = _env_str("OBSIDIAN_VAULT_PATH", "/app/vault") or "/app/vau
 # ── Miniflux ─────────────────────────────────────────────────────────────────
 MINIFLUX_API_URL = _env_str("MINIFLUX_API_URL", "http://localhost:8080") or "http://localhost:8080"
 MINIFLUX_API_KEY = _env_str("MINIFLUX_API_KEY", "") or ""
+MINIFLUX_WEBHOOK_SECRET = _env_str("MINIFLUX_WEBHOOK_SECRET", "") or ""
 MINIFLUX_LIMIT = _env_int("MINIFLUX_LIMIT", 50, min_value=1, max_value=500)
 
 # Ceiling byte sullo stream HTTP e sul singolo entry prima del parse (docs/01).

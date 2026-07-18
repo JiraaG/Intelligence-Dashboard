@@ -68,6 +68,7 @@ flowchart LR
   User -->|HTTP :80| FE
   User -.->|tile| Carto
   FE -->|/api proxy| API
+  FE -.->|SSE events| API
   API --- DB
   W --- DB
   W --- MF
@@ -76,17 +77,24 @@ flowchart LR
   API --> Vault
   MF --- DB
   MF -->|fetch| RSS
+  MF -->|webhook POST| API
 ```
 
 LLM (API esterna, non un servizio Compose): `gemini` (`google-genai`) e/o OpenAI-compat httpx (`deepseek`/`openai`/`glm`/`grok`); `claude` = stub. Ops tipico: Profilo B in `.env.example` (`complexity`); default codice senza env = `off` / shadow.
 
 | Servizio | Ruolo | Porta host (base) |
 |----------|--------|-------------------|
-| `radar-frontend` | Nginx + SPA Angular (listen **8080** in container) | **80** |
-| `radar-backend` | FastAPI (API + health) | nessuna (raggiungibile via Nginx su edge; anche su `radar-data`) |
-| `radar-worker` | Polling Miniflux + LLM + commit/outbox | nessuna |
-| `radar-db` | PostgreSQL 15 | nessuna |
-| `radar-miniflux` | Aggregatore RSS | nessuna (usa overlay lan/hardened) |
+| `radar-frontend` | Nginx + Angular SPA (listen **8080** in container, SSE proxying) | **80** |
+| `radar-backend` | FastAPI (API + health + webhook + SSE) | nessuna (raggiungibile via Nginx su edge; anche su `radar-data`) |
+| `radar-worker` | Ingest (Miniflux polling + wake trigger + LLM + commit) | nessuna |
+| `radar-db` | PostgreSQL 15 (LISTEN/NOTIFY bus) | nessuna |
+| `radar-miniflux` | Aggregatore RSS (webhook dispatch on new_entries) | nessuna (usa overlay lan/hardened) |
+
+### Variabili d'ambiente Webhook (Fase B)
+
+| Variabile | Descrizione |
+|-----------|-------------|
+| `MINIFLUX_WEBHOOK_SECRET` | Secret HMAC-SHA256 per validare le richieste push inviate da Miniflux a `POST /api/webhooks/miniflux`. Se vuoto o non impostato, l'endpoint risponde con `401 Unauthorized` per sicurezza. |
 
 ---
 

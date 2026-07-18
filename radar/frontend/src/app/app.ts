@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal, viewChild, HostListener } from '@angular/core';
+import { Component, computed, effect, inject, signal, viewChild, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { StateService } from './services/state.service';
 import { Article, ArticleFilters, PrimaryCategory } from './models/article.model';
@@ -26,6 +26,69 @@ import { RadarSidebarComponent } from './components/radar-sidebar/radar-sidebar.
 })
 export class App {
   readonly state = inject(StateService);
+
+  constructor() {
+    effect(() => {
+      const evt = this.state.lastProcessedArticleEvent();
+      if (!evt) return;
+      void this.handleProcessedArticle(evt);
+    });
+  }
+
+  private async handleProcessedArticle(evt: {
+    article_id: number;
+    country_code: string;
+    primary_category: string;
+    published_at: string;
+  }): Promise<void> {
+    if (!this.isSidebarOpen()) {
+      return;
+    }
+    const focus = this.focusCountryCode();
+    if (!focus || focus.toUpperCase() !== evt.country_code.toUpperCase()) {
+      return;
+    }
+
+    const gen = this.nationOpenGeneration;
+    try {
+      await (
+        this.state.sidebarMode() === 'saved'
+          ? this.state.softReloadSavedCountryArticles(focus)
+          : this.state.softReloadCountryArticles(focus)
+      );
+      if (gen !== this.nationOpenGeneration) return;
+
+      const detail = this.state.detailArticles();
+      const byId = new Map(detail.map((a) => [a.id, a]));
+      const prevCluster = this.clusterArticles();
+      const categoryFilter =
+        prevCluster.length > 0 &&
+        prevCluster.every((a) => a.primary_category === prevCluster[0].primary_category)
+          ? prevCluster[0].primary_category
+          : null;
+
+      let nextCluster = categoryFilter
+        ? detail.filter((a) => a.primary_category === categoryFilter)
+        : detail;
+      if (nextCluster.length === 0) nextCluster = detail;
+
+      this.clusterArticles.set(nextCluster.map((a) => byId.get(a.id) ?? a));
+
+      const sel = this.selectedArticle();
+      if (sel) {
+        const updated = byId.get(sel.id);
+        if (updated) this.selectedArticle.set(updated);
+      }
+
+      const cat =
+        this.selectedArticle()?.primary_category ??
+        nextCluster[0]?.primary_category ??
+        evt.primary_category;
+      this.scheduleCategorySpiderfy(focus, cat as PrimaryCategory);
+    } catch {
+      // Soft-refresh fallito: non chiudere sidebar
+    }
+  }
 
   selectedArticle  = signal<Article | null>(null);
   clusterArticles  = signal<Article[]>([]);

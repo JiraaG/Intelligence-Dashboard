@@ -1,12 +1,12 @@
-# active/ — documenti vivi
+# active/ — Documenti attivi
 
-Attualmente questa directory è vuota poiché tutti i piani di consolidamento e le specifiche sono stati completati con successo.
+Questa directory contiene i piani di progettazione e di implementazione attualmente in corso.
 
-I file completati sono stati archiviati e organizzati all'interno della directory [`../complete/`](../complete/):
-- `sot_llm_multi_model_fallback.md`
-- `plan_release_final_gate.md`
-- `plan_code_comments_beginner_audit.md`
-- `note_notizie_salvate.md`
+## Stato
+
+**Fase B (Real-Time Ingestion & Soft Refresh) — DONE / GATE VERDE** (2026-07-18).  
+I piani Fase B sono archiviati in [`../complete/`](../complete/).
+
+Prossima fase roadmap (`radar_overview_and_upgrades.md`): **Fase C — Deduplicazione semantica (`pgvector`)**.
 
 Quadro globale: [`../STATUS.md`](../STATUS.md).
-

@@ -61,15 +61,15 @@ async def test_cancel_during_poll_wait_completes_quickly() -> None:
     state = _make_state()
     poll_entered = asyncio.Event()
 
-    async def fake_sleep(seconds: float) -> None:
-        if seconds >= 10:
+    async def fake_wait_interval(state: Any, interval: float) -> None:
+        if interval >= 10:
             poll_entered.set()
         await asyncio.Event().wait()
 
     with (
         patch("app.worker.run_pipeline_cycle", new_callable=AsyncMock),
         patch("app.worker.WORKER_POLL_INTERVAL_SECONDS", 900),
-        patch("app.worker.asyncio.sleep", side_effect=fake_sleep),
+        patch("app.worker._wait_interval", side_effect=fake_wait_interval),
     ):
         task = asyncio.create_task(run_pipeline_loop(state))
         await asyncio.wait_for(poll_entered.wait(), timeout=2.0)
@@ -116,7 +116,7 @@ async def test_cancel_when_idle_between_cycles() -> None:
         nonlocal cycles
         cycles += 1
 
-    async def fake_sleep(seconds: float) -> None:
+    async def fake_wait_interval(state: Any, interval: float) -> None:
         poll_entered.set()
         try:
             await asyncio.Event().wait()
@@ -126,7 +126,7 @@ async def test_cancel_when_idle_between_cycles() -> None:
     with (
         patch("app.worker.run_pipeline_cycle", side_effect=empty_cycle),
         patch("app.worker.WORKER_POLL_INTERVAL_SECONDS", 60),
-        patch("app.worker.asyncio.sleep", side_effect=fake_sleep),
+        patch("app.worker._wait_interval", side_effect=fake_wait_interval),
     ):
         task = asyncio.create_task(run_pipeline_loop(state))
         await asyncio.wait_for(poll_entered.wait(), timeout=2.0)
