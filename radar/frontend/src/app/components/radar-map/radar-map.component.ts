@@ -168,6 +168,8 @@ export class RadarMapComponent implements AfterViewInit {
   /** Day-view: un pin per paese (non pallini cluster per-categoria). */
   private summaryMarkerGroup: Leaflet.LayerGroup | null = null;
   private relationsLayerGroup: Leaflet.LayerGroup | null = null;
+  /** Canvas renderer per archi: evita lo "scorrimento" del dash su pan (artefatto SVG Leaflet). */
+  private relationsRenderer: Leaflet.Renderer | null = null;
   private countryCentroids = new Map<string, Leaflet.LatLng>();
   /** Nation open: hub singolo mentre lo spiderfy è chiuso. */
   private detailHubGroup: Leaflet.LayerGroup | null = null;
@@ -182,6 +184,7 @@ export class RadarMapComponent implements AfterViewInit {
   private countryLayersMap = new Map<string, Leaflet.Path[]>();
   private activeRootMarkers: Leaflet.Marker[] = [];
   private lastGeometryFingerprint = '';
+  private lastRelationsZoomWasLegacy: boolean | null = null;
   private destroyed = false;
   private geoJsonSub: Subscription | null = null;
   private geoJsonRafId: number | null = null;
@@ -445,6 +448,9 @@ export class RadarMapComponent implements AfterViewInit {
     this.geoJsonLayerGroup = L.layerGroup();
     this.summaryMarkerGroup = L.layerGroup();
     this.relationsLayerGroup = L.layerGroup();
+    // Canvas: il dashArray resta ancorato alla geografia; con SVG Leaflet resetta il
+    // transform a ogni moveend e il stroke-dasharray sembra "scorrere".
+    this.relationsRenderer = typeof L.canvas === 'function' ? L.canvas({ padding: 0.5 }) : null;
     this.detailHubGroup = L.layerGroup().addTo(this.map);
 
     this.map.on('click', (e: Leaflet.LeafletMouseEvent) => {
@@ -593,7 +599,15 @@ export class RadarMapComponent implements AfterViewInit {
       this.currentZoomLevel.set(zoom);
       this.refreshHatchingStyles();
       this.syncSummaryMarkerVisibility();
+
+      const isLegacyZoom = zoom >= 5;
+      const relationsChangedZoom = this.lastRelationsZoomWasLegacy !== null && isLegacyZoom !== this.lastRelationsZoomWasLegacy;
+
       this.syncRelationsVisibility();
+
+      if (relationsChangedZoom && this.articles().length === 0) {
+        this.drawGeospatialRelations(this.mapRelations());
+      }
 
       // Nation open: tieni spider fino a hatching (zoom < 5); sotto chiudi anche sidebar.
       // MC zoom-unspiderfy disabilitato; ri-spiderfy dopo zoom per riposizionare le gambe.
@@ -1268,10 +1282,10 @@ export class RadarMapComponent implements AfterViewInit {
     }
   }
 
-  /** Relational arcs solo a zoom ≥ 5 e senza nazione aperta. */
+  /** Relational arcs solo in day-view (senza nazione aperta). */
   private syncRelationsVisibility(): void {
     if (!this.map || !this.relationsLayerGroup) return;
-    const show = this.map.getZoom() >= 5 && this.articles().length === 0;
+    const show = this.articles().length === 0;
     const onMap = this.map.hasLayer(this.relationsLayerGroup);
     if (show && !onMap) {
       this.map.addLayer(this.relationsLayerGroup);
@@ -1282,14 +1296,141 @@ export class RadarMapComponent implements AfterViewInit {
 
   /**
    * Disegna gli archi curvi di relazione geopolitica bilaterale.
+   * Se zoom >= 5 disegna in modalità legacy (per categoria, invariato).
+   * Se zoom < 5 disegna in modalità macro (linea singola multicolore).
    */
   private drawGeospatialRelations(relations: MapRelationRow[]): void {
-    if (!this.relationsLayerGroup || !this.L) return;
+    if (!this.relationsLayerGroup || !this.L || !this.map) return;
     this.relationsLayerGroup.clearLayers();
 
+    if (relations.length === 0) {
+      this.lastRelationsZoomWasLegacy = null;
+      return;
+    }
+
+    const isLegacyZoom = this.map.getZoom() >= 5;
+    this.lastRelationsZoomWasLegacy = isLegacyZoom;
+
+    if (isLegacyZoom) {
+      this.drawLegacyRelations(relations);
+    } else {
+      this.drawMacroRelations(relations);
+    }
+  }
+
+  private drawLegacyRelations(relations: MapRelationRow[]): void {
+    if (!this.relationsLayerGroup || !this.L) return;
+
+    // Stessa coppia paese → stessa Bézier: senza offset le linee per-categoria
+    // si sovrappongono (es. CN↔IT Economia+Energia) e resta visibile solo lo strato sopra.
+    const byPair = new Map<string, MapRelationRow[]>();
     for (const r of relations) {
-      const p0 = this.getCountryCentroid(r.source_country);
-      const p2 = this.getCountryCentroid(r.target_country);
+      const key = `${r.source_country}|${r.target_country}`;
+      const list = byPair.get(key);
+      if (list) {
+        list.push(r);
+      } else {
+        byPair.set(key, [r]);
+      }
+    }
+
+    const docStyle = getComputedStyle(document.documentElement);
+    // Sampling fine: tratti geometrici corti ≈ densità del vecchio dashArray 8,12
+    const steps = 60;
+    const baseCurvature = 0.2;
+    const curvatureStep = 0.07;
+
+    for (const group of byPair.values()) {
+      group.sort((a, b) => b.volume - a.volume || a.primary_category.localeCompare(b.primary_category));
+      const n = group.length;
+
+      for (let idx = 0; idx < n; idx++) {
+        const r = group[idx];
+        const p0 = this.getCountryCentroid(r.source_country);
+        const p2 = this.getCountryCentroid(r.target_country);
+        if (!p0 || !p2) continue;
+
+        const lat0 = p0.lat;
+        const lng0 = p0.lng;
+        const lat2 = p2.lat;
+        const lng2 = p2.lng;
+        const midLat = (lat0 + lat2) / 2;
+        const midLng = (lng0 + lng2) / 2;
+        const dLat = lat2 - lat0;
+        const dLng = lng2 - lng0;
+
+        // Fan parallelo centrato sulla curvatura base
+        const curvature = baseCurvature + (idx - (n - 1) / 2) * curvatureStep;
+        const p1Lat = midLat - dLng * curvature;
+        const p1Lng = midLng + dLat * curvature;
+
+        const points: Leaflet.LatLng[] = [];
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const lat = (1 - t) * (1 - t) * lat0 + 2 * (1 - t) * t * p1Lat + t * t * lat2;
+          const lng = (1 - t) * (1 - t) * lng0 + 2 * (1 - t) * t * p1Lng + t * t * lng2;
+          points.push(this.L.latLng(lat, lng));
+        }
+
+        const colorVar = this.CATEGORY_CSS_VARS[r.primary_category] || '--color-text-accent';
+        const color = docStyle.getPropertyValue(colorVar).trim() || '#58a6ff';
+        const weight = Math.min(6, 1 + r.volume * 0.5);
+        const tooltipText = `${r.source_country} ↔ ${r.target_country} · ${r.primary_category} · n=${r.volume}`;
+
+        // Tratteggio geometrico (segmenti lat/lng): evita lo sfasamento del dashArray
+        // a ogni moveend quando Leaflet ridisegna Canvas/SVG.
+        this.addGeometricDashedPolyline(
+          points,
+          {
+            color,
+            weight,
+            opacity: 0.8,
+            className: 'relational-arc-flow',
+            interactive: true,
+            ...(this.relationsRenderer ? { renderer: this.relationsRenderer } : {}),
+          },
+          tooltipText,
+        );
+      }
+    }
+  }
+
+  /**
+   * Disegna una polilinea tratteggiata come tratti solidi geografici + gap.
+   * Non usa `dashArray` (pattern in pixel che “scorre” a ogni pan/reset Leaflet).
+   */
+  private addGeometricDashedPolyline(
+    points: Leaflet.LatLng[],
+    options: Record<string, unknown>,
+    tooltipText: string,
+  ): void {
+    if (!this.relationsLayerGroup || !this.L || points.length < 2) return;
+
+    // 1 on / 1 off su sampling fine → tanti tratti corti (look precedente, senza dashArray)
+    const dashSteps = 1;
+    const gapSteps = 1;
+    let i = 0;
+    while (i < points.length - 1) {
+      const dashEnd = Math.min(points.length - 1, i + dashSteps);
+      const slice = points.slice(i, dashEnd + 1);
+      if (slice.length >= 2) {
+        const polyline = this.L.polyline(slice, options);
+        polyline.bindTooltip(tooltipText, { sticky: true });
+        this.relationsLayerGroup.addLayer(polyline);
+      }
+      i = dashEnd + gapSteps;
+    }
+  }
+
+  private drawMacroRelations(relations: MapRelationRow[]): void {
+    if (!this.relationsLayerGroup || !this.L) return;
+
+    const aggregated = this.aggregateRelations(relations);
+    const docStyle = getComputedStyle(document.documentElement);
+
+    for (const agg of aggregated) {
+      const p0 = this.getCountryCentroid(agg.source_country);
+      const p2 = this.getCountryCentroid(agg.target_country);
       if (!p0 || !p2) continue;
 
       // Generazione punti curva Bezier quadratica
@@ -1318,25 +1459,93 @@ export class RadarMapComponent implements AfterViewInit {
         points.push(this.L.latLng(lat, lng));
       }
 
-      const colorVar = this.CATEGORY_CSS_VARS[r.primary_category] || '--color-text-accent';
-      const docStyle = getComputedStyle(document.documentElement);
-      const color = docStyle.getPropertyValue(colorVar).trim() || '#58a6ff';
-      const weight = Math.min(6, 1 + r.volume * 0.5);
+      // Costruiamo anche il tooltip breakdown
+      // "IT ↔ CN · Sicurezza 5 · Economia 2 · n=7" (breakdown + totale)
+      const breakdownText = agg.breakdown.map(b => `${b.category} ${b.volume}`).join(' · ');
+      const tooltipText = `${agg.source_country} ↔ ${agg.target_country} · ${breakdownText} · n=${agg.totalVolume}`;
+      const weight = Math.min(3, 1 + agg.totalVolume * 0.3); // weight soft, min(3, ...)
+      const opacity = 0.45; // opacity ~0.4-0.5
 
-      const polyline = this.L.polyline(points, {
-        color,
-        weight,
-        opacity: 0.8,
-        className: 'relational-arc-flow',
-        interactive: true,
-      });
+      let currentStep = 0;
 
-      // Tooltip informativo opzionale (sticky)
-      const tooltipText = `${r.source_country} ↔ ${r.target_country} · ${r.primary_category} · n=${r.volume}`;
-      polyline.bindTooltip(tooltipText, { sticky: true });
+      for (let idx = 0; idx < agg.breakdown.length; idx++) {
+        const item = agg.breakdown[idx];
+        
+        // Calcola quanti passi appartengono a questa categoria
+        let itemSteps = Math.round((item.volume / agg.totalVolume) * steps);
+        
+        // Assicurati che l'ultimo prenda tutto il residuo per evitare buchi
+        if (idx === agg.breakdown.length - 1) {
+          itemSteps = steps - currentStep;
+        }
 
-      this.relationsLayerGroup.addLayer(polyline);
+        // Forza almeno 1 passo se presente per non far sparire la categoria
+        if (itemSteps <= 0 && currentStep < steps) {
+          itemSteps = 1;
+        }
+
+        const startIdx = currentStep;
+        const endIdx = Math.min(steps, currentStep + itemSteps);
+        
+        if (startIdx >= endIdx) continue;
+
+        const slicePoints = points.slice(startIdx, endIdx + 1);
+        if (slicePoints.length < 2) continue;
+
+        const colorVar = this.CATEGORY_CSS_VARS[item.category] || '--color-text-accent';
+        const color = docStyle.getPropertyValue(colorVar).trim() || '#58a6ff';
+
+        const polyline = this.L.polyline(slicePoints, {
+          color,
+          weight,
+          opacity,
+          className: 'relational-arc-flow--macro',
+          interactive: true,
+          ...(this.relationsRenderer ? { renderer: this.relationsRenderer } : {}),
+        });
+
+        polyline.bindTooltip(tooltipText, { sticky: true });
+        this.relationsLayerGroup.addLayer(polyline);
+
+        currentStep = endIdx;
+      }
     }
+  }
+
+  private aggregateRelations(relations: MapRelationRow[]): {
+    source_country: string;
+    target_country: string;
+    totalVolume: number;
+    breakdown: { category: string; volume: number }[];
+  }[] {
+    const map = new Map<string, {
+      source_country: string;
+      target_country: string;
+      totalVolume: number;
+      breakdown: { category: string; volume: number }[];
+    }>();
+
+    for (const r of relations) {
+      const key = `${r.source_country}|${r.target_country}`;
+      let agg = map.get(key);
+      if (!agg) {
+        agg = {
+          source_country: r.source_country,
+          target_country: r.target_country,
+          totalVolume: 0,
+          breakdown: []
+        };
+        map.set(key, agg);
+      }
+      agg.totalVolume += r.volume;
+      agg.breakdown.push({ category: r.primary_category, volume: r.volume });
+    }
+
+    const result = Array.from(map.values());
+    for (const agg of result) {
+      agg.breakdown.sort((a, b) => b.volume - a.volume);
+    }
+    return result;
   }
 
   /**
@@ -1800,6 +2009,7 @@ export class RadarMapComponent implements AfterViewInit {
       this.map.removeLayer(this.relationsLayerGroup);
     }
     this.relationsLayerGroup = null;
+    this.relationsRenderer = null;
     this.map?.remove();
     this.map = null;
   }

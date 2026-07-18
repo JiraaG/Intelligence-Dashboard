@@ -184,14 +184,10 @@
   }
 }
 
-:host ::ng-deep .relational-arc-flow {
-  stroke-dasharray: 8, 12;
-  animation: relational-dash 20s linear infinite;
-}
-
-@keyframes relational-dash {
-  to {
-    stroke-dashoffset: -1000;
-  }
+/* Archi pin: tratteggio geometrico in TS (addGeometricDashedPolyline).
+   Niente stroke-dasharray / dashArray: a ogni pan Leaflet ridisegna e il pattern
+   in pixel sembra scorrere. Macro: linea continua. */
+:host ::ng-deep .relational-arc-flow--macro {
+  stroke-dasharray: none;
 }
 

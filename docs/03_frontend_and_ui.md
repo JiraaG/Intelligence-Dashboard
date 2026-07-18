@@ -144,15 +144,16 @@ Per collegare le notizie multilaterali, la mappa disegna archi curvi bidireziona
 1. **Gestione dello Stato**: `StateService` espone `mapRelationsResource` sincronizzato con la data attiva e i filtri della toolbar. Al riceversi del segnale SSE `article_processed`, viene scatenato il reload atomico sia per il summary che per le relazioni.
 2. **Visualizzazione e Zoom**:
    - Gli archi vengono disegnati in un `relationsLayerGroup` dedicato, posizionato sopra il layer dei confini nazionali.
-   - Sono visibili esclusivamente in modalità "Day View" con livello di zoom `>= 5`.
-   - Vengono nascosti se lo zoom scende sotto `5` o se viene aperta la vista di dettaglio di una specifica nazione (per evitare sovrapposizioni visive con il ventaglio di spiderfy).
+   - **Zoom ≥ 5 (vista pin)**: gli archi sono divisi per categoria (1 linea per categoria geopolitica attiva per coppia paese), con spessore proporzionale al volume (`Math.min(6, 1 + volume * 0.5)`), opacity 0.8, e tratteggio **geometrico** (tratti solidi lat/lng + gap — niente `dashArray`/CSS, così non “scorre” a ogni pan). Se la stessa coppia ha più categorie, le Bézier usano un **offset di curvatura** (fan parallelo) così le linee non si sovrappongono.
+   - **Zoom < 5 (vista hatching)**: gli archi vengono aggregati per coppia di paesi come una **singola linea multicolore** (spezzata in segmenti consecutivi proporzionali al volume di ciascuna categoria collegata, ordinata per volume decrescente). Hanno uno stile soft con spessore ridotto (`Math.min(3, 1 + totalVolume * 0.3)`), opacity ~0.45, classe `.relational-arc-flow--macro` (linea continua, senza dash) ed il tooltip mostra il breakdown delle categorie e del volume totale (es. `Sicurezza 5 · Economia 2 · n=7`).
+   - Vengono nascosti se viene aperta la vista di dettaglio di una specifica nazione (per evitare sovrapposizioni visive con il ventaglio di spiderfy).
 3. **Calcolo Centroidi**:
    - I centroidi vengono estratti dinamicamente dai confini GeoJSON caricati in cache.
    - Per gli Stati Uniti (`US`) e la Russia (`RU`), data la loro estensione trans-antimeridiana, si utilizzano coordinate statiche hardcoded per posizionare l'arco al centro della terraferma principale (mainland).
 4. **Stile Visivo**:
    - Colore dell'arco allineato alle variabili di stile della categoria geopolitica (`CATEGORY_CSS_VARS`).
-   - Spessore proporzionale al volume aggregato di notizie (`Math.min(6, 1 + volume * 0.5)`).
-   - Animazione a tratteggio continuo tramite CSS keyframe `.relational-arc-flow` che simula un flusso continuo di informazioni.
+   - Spessore proporzionale al volume aggregato di notizie.
+   - Zoom ≥ 5: tratteggio geometrico denso (sampling Bézier 60, tratti on/off 1/1 via `addGeometricDashedPolyline`); zoom &lt; 5: linea continua soft `.relational-arc-flow--macro`.
 
 Dettaglio ops FE: [`radar/frontend/README.md`](../radar/frontend/README.md).
 

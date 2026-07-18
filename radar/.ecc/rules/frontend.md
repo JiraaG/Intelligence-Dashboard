@@ -419,13 +419,16 @@ I tipi TypeScript vengono usati solo a compile-time, il runtime usa sempre `wind
 2. **Layer Dedicato sulla Mappa**:
    - Gli archi delle relazioni bilaterali devono essere disegnati all'interno di un layer dedicato chiamato `relationsLayerGroup` (istanza di `L.layerGroup` o `L.featureGroup`).
 3. **Visibilità e Sincronizzazione**:
-   - La visibilità del layer relazioni deve essere sincronizzata direttamente con lo stato dei marker di riepilogo nazionale.
-   - Usare la logica allineata a `syncSummaryMarkerVisibility()`: le relazioni devono essere visibili solo nella modalità "Day View" con livello di zoom `>= 5`, e devono essere nascoste automaticamente quando lo zoom scende sotto `5` o quando una nazione è aperta (nation detail view).
+   - La visibilità del layer relazioni deve essere sincronizzata con la modalità Day View (`articles().length === 0`).
+   - Gli archi devono essere nascosti automaticamente solo se una nazione è aperta (nation detail view).
+   - Su `zoomend` / attraversamento della soglia zoom 5, la mappa deve ricalcolare e ridisegnare gli archi passando dalla modalità legacy (zoom >= 5) alla modalità macro multicolor (zoom < 5) e viceversa.
 4. **Fingerprint Geometria Mappa**:
    - Per ottimizzare le prestazioni, il ricalcolo degli elementi della mappa (inclusi gli archi) deve basarsi su un fingerprint che include lo stato delle relazioni, per evitare di ridisegnare la mappa inutilmente se non ci sono cambiamenti strutturali.
 5. **Drawing degli Archi (Divieto leaflet-curve)**:
    - È **severamente vietato** installare ed importare pacchetti npm aggiuntivi come `leaflet-curve` o librerie esterne non verificate.
    - Gli archi devono essere disegnati usando la classe nativa `L.polyline` con coordinate interpolate a runtime per riprodurre una curva di Bézier quadratica.
+   - **Zoom ≥ 5**: disegnato in modalità legacy (una curva per-categoria allineata a `CATEGORY_CSS_VARS`, spessore `Math.min(6, 1 + volume * 0.5)`, opacity 0.8, tratteggio **geometrico** via `addGeometricDashedPolyline` con sampling 60 e pattern on/off 1/1 — vietato `dashArray`/CSS stroke-dasharray che sfasa a ogni pan). Stessa coppia con N categorie → N curve con **offset di curvatura** (fan parallelo) per evitare sovrapposizione totale.
+   - **Zoom < 5**: disegnato in modalità macro aggregata per coppia paese↔paese (una singola linea Bézier divisa in segmenti consecutivi colorati, proporzionali alle quote di volume di ciascuna categoria, ordinata decrescente per volume). Spessore soft (`Math.min(3, 1 + totalVolume * 0.3)`), opacity ~0.45, classe `.relational-arc-flow--macro` (linea continua) e tooltip dettagliato (breakdown + totale).
 
 ---
 
@@ -451,4 +454,4 @@ I tipi TypeScript vengono usati solo a compile-time, il runtime usa sempre `wind
 | Zoom all'indietro senza `minZoom` o `maxBounds`       | Consente la navigazione verso aree nere / infinite  |
 | Legenda con `flex-wrap: wrap` senza nowrap/scroll     | Rischia di spezzarsi verticalmente su schermi piccoli|
 | Utilizzo di `leaflet-curve` o nuove dipendenze npm per archi | Vietato; usare interpolazione Bézier quadratica + `L.polyline` nativa |
-| Archi relazioni visibili a zoom < 5 o in nation detail | Vietato; devono essere nascosti in accordo a `syncSummaryMarkerVisibility()` |
+| Archi relazioni visibili in nation detail o non aggiornati al cambio zoom | Vietato; devono essere nascosti in nation detail e ridisegnati tra macro/legacy crossing zoom 5 |

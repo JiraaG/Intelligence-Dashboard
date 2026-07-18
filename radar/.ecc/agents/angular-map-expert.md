@@ -458,11 +458,13 @@ Per connettere le notizie multilaterali, il componente mappa riceve le relazioni
    - Sincronizzare gli archi basandosi su `mapRelationsResource` e `filteredMapRelations`.
 2. **Layer e Visibilità**:
    - Utilizzare un `relationsLayerGroup` dedicato sibling di `summaryMarkerGroup`.
-   - Gli archi devono essere visibili solo a zoom `>= 5` in modalità "Day View" e devono essere nascosti automaticamente (allineati a `syncSummaryMarkerVisibility()`) a zoom `< 5` o quando si apre il dettaglio di una singola nazione.
+   - Gli archi devono essere visibili sia a zoom >= 5 che a zoom < 5, in modalità "Day View" (nascosti in nation detail view).
+   - Su `zoomend` (attraversamento soglia zoom 5), gli archi devono essere ricalcolati e ridisegnati per cambiare stile.
 3. **Drawing e Divieti**:
    - **VIETATO** l'uso di nuove dipendenze npm come `leaflet-curve`.
    - Gli archi devono essere disegnati calcolando punti intermedi a runtime per simulare una curva di Bézier quadratica e renderizzandoli tramite `L.polyline` nativa di Leaflet.
-   - Il ricalcolo degli archi sulla mappa deve essere ottimizzato controllando la variazione del fingerprint che include anche le relazioni.
+   - **Zoom ≥ 5 (Pin)**: 1 linea per categoria attiva, spessore proporzionale al volume, opacity 0.8, tratteggio geometrico denso (segmenti lat/lng on/off 1/1, sampling 60, no `dashArray`). Stessa coppia multi-categoria → fan parallelo con offset di curvatura.
+   - **Zoom < 5 (Hatching)**: disegnato in modalità macro aggregata per coppia paese↔paese (1 curva multicolore consecutiva spezzata per categoria, spessore soft, opacity ~0.45, classe `.relational-arc-flow--macro` linea continua, e tooltip con breakdown completo).
 
 ---
 
@@ -492,7 +494,7 @@ cd frontend && npm run typecheck
 - **BLOCCA** se: colori hardcoded diversi dalla palette Palantir definita
 - **BLOCCA** se: `import * as L from 'leaflet'` o `import 'leaflet.markercluster'` nei componenti (causa TypeError con esbuild)
 - **BLOCCA** se: uso di nuove dipendenze npm (es. `leaflet-curve`) per il disegno degli archi
-- **BLOCCA** se: archi relazioni visibili a zoom < 5 o in nation-open
+- **BLOCCA** se: archi relazioni visibili in nation detail o non aggiornati al cambio zoom (devono essere ridisegnati quando si attraversa la soglia zoom 5)
 - **AVVISA** se: manca la transizione CSS per split-screen
 - **AVVISA** se: `maxClusterRadius` ≠ 40 o `spiderfyOnMaxZoom` ≠ false
 - **BLOCCA** se: modifiche a `radar-sidebar/**` o introduzione di `app-article-list`

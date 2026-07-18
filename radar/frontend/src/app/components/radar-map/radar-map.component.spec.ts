@@ -82,6 +82,9 @@ describe('RadarMapComponent (Phase 4)', () => {
     installLeafletStub();
     (window as any).L.polyline = (points: any, options: any) => {
       const p = new (window as any).L.Path();
+      p.options = options || {};
+      p._latlngs = points;
+      p.getLatLngs = () => p._latlngs;
       p.bindTooltip = vi.fn().mockReturnThis();
       p.addTo = vi.fn().mockReturnThis();
       return p;
@@ -562,6 +565,140 @@ describe('RadarMapComponent (Phase 4)', () => {
     const group = (
       mapCmp as unknown as { relationsLayerGroup: { getLayers(): unknown[] } }
     ).relationsLayerGroup;
-    expect(group.getLayers().length).toBe(1);
+    // Tratteggio geometrico: più segmenti solidi per un solo arco
+    expect(group.getLayers().length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('draws macro multicolor relations curve when zoom is < 5', async () => {
+    const summary = [
+      {
+        country_code: 'DE',
+        primary_category: 'Energia' as const,
+        article_count: 1,
+        read_count: 0,
+        latitude: 51.05,
+        longitude: 13.73,
+      },
+      {
+        country_code: 'IT',
+        primary_category: 'Energia' as const,
+        article_count: 1,
+        read_count: 0,
+        latitude: 41.87,
+        longitude: 12.56,
+      }
+    ];
+    const relations = [
+      {
+        source_country: 'DE',
+        target_country: 'IT',
+        primary_category: 'Energia' as const,
+        volume: 2
+      },
+      {
+        source_country: 'DE',
+        target_country: 'IT',
+        primary_category: 'Tecnologia' as const,
+        volume: 3
+      }
+    ];
+
+    const fixture = TestBed.createComponent(MapHostComponent);
+    fixture.componentInstance.mapSummary = summary;
+    fixture.componentInstance.mapRelations = relations;
+    fixture.detectChanges();
+    flushGeoJson();
+    await fixture.whenStable();
+
+    const mapCmp = getMapCmp(fixture);
+    const mapInstance = (mapCmp as unknown as { map: StubMap }).map;
+    mapInstance.setView([45, 10], 3);
+
+    (
+      mapCmp as unknown as {
+        updateMapData: (a: Article[], c: CountrySummary[], s: unknown[], r: unknown[]) => void;
+      }
+    ).updateMapData([], [], summary, relations);
+
+    const group = (
+      mapCmp as unknown as { relationsLayerGroup: { getLayers(): { options: { color: string, className: string } }[] } }
+    ).relationsLayerGroup;
+    
+    expect(group.getLayers().length).toBe(2);
+    expect(group.getLayers()[0].options.className).toBe('relational-arc-flow--macro');
+  });
+
+  it('draws parallel per-category arcs at pin zoom when pair has multiple categories', async () => {
+    const summary = [
+      {
+        country_code: 'CN',
+        primary_category: 'Economia' as const,
+        article_count: 2,
+        read_count: 0,
+        latitude: 35.86,
+        longitude: 104.2,
+      },
+      {
+        country_code: 'IT',
+        primary_category: 'Economia' as const,
+        article_count: 2,
+        read_count: 0,
+        latitude: 41.87,
+        longitude: 12.56,
+      },
+    ];
+    const relations = [
+      {
+        source_country: 'CN',
+        target_country: 'IT',
+        primary_category: 'Economia' as const,
+        volume: 2,
+      },
+      {
+        source_country: 'CN',
+        target_country: 'IT',
+        primary_category: 'Energia' as const,
+        volume: 1,
+      },
+    ];
+
+    const fixture = TestBed.createComponent(MapHostComponent);
+    fixture.componentInstance.mapSummary = summary;
+    fixture.componentInstance.mapRelations = relations;
+    fixture.detectChanges();
+    flushGeoJson();
+    await fixture.whenStable();
+
+    const mapCmp = getMapCmp(fixture);
+    const mapInstance = (mapCmp as unknown as { map: StubMap }).map;
+    mapInstance.setView([45, 10], 5);
+
+    (
+      mapCmp as unknown as {
+        updateMapData: (a: Article[], c: CountrySummary[], s: unknown[], r: unknown[]) => void;
+      }
+    ).updateMapData([], [], summary, relations);
+
+    const group = (
+      mapCmp as unknown as {
+        relationsLayerGroup: {
+          getLayers(): {
+            options: { className: string; color: string; dashArray?: string };
+            getLatLngs(): { lat: number; lng: number }[];
+          }[];
+        };
+      }
+    ).relationsLayerGroup;
+
+    const layers = group.getLayers();
+    // 2 categorie × molti tratti corti (sampling 60, dash 1/1)
+    expect(layers.length).toBeGreaterThanOrEqual(20);
+    expect(layers.every((l) => l.options.className === 'relational-arc-flow')).toBe(true);
+    expect(layers.every((l) => !l.options.dashArray)).toBe(true);
+
+    const midA = layers[0].getLatLngs()[1];
+    const midB = layers[Math.floor(layers.length / 2)].getLatLngs()[1];
+    // Offset curvatura: tratti della 2ª categoria non coincidono con la 1ª
+    expect(midA.lat !== midB.lat || midA.lng !== midB.lng).toBe(true);
   });
 });

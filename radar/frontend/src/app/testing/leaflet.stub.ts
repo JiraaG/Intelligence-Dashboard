@@ -187,6 +187,7 @@ export interface LeafletStubApi {
     clearLayers(): unknown;
     getLayers(): unknown[];
   };
+  canvas: (options?: Record<string, unknown>) => { _stubCanvas: true };
   geoJSON: (
     feature: unknown,
     options?: Record<string, unknown>,
@@ -488,6 +489,7 @@ export const LeafletStub: LeafletStubApi = {
   markerClusterGroup: createClusterGroup,
   tileLayer: createTileLayer,
   layerGroup: createLayerGroup,
+  canvas: (_options?: Record<string, unknown>) => ({ _stubCanvas: true }),
   geoJSON: createGeoJson,
   divIcon: (options: Record<string, unknown> = {}) => ({ ...options, _stub: true }),
   latLng: createLatLng,
