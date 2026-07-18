@@ -13,4 +13,5 @@ Documenti **completati**. Non sono backlog. Per il quadro fatto vs da fare vedi 
 | [plan_release_final_gate.md](plan_release_final_gate.md) | Piano Final Release (F0–F4) | COMPLETATO |
 | [plan_code_comments_beginner_audit.md](plan_code_comments_beginner_audit.md) | Piano commenti IT (P0 done) | COMPLETATO |
 | [note_notizie_salvate.md](note_notizie_salvate.md) | Feature note Notizie Salvate (`is_saved`) | COMPLETATO |
+| [master_plan_impl_phase_H_geospatial_graph.md](master_plan_impl_phase_H_geospatial_graph.md) | Fase H (Grafo Geospaziale) | COMPLETATO / GATE VERDE |
 

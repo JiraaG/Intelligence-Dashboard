@@ -3,15 +3,16 @@ name: radar-api-contract
 description: >
   Contratto API Phase 5+: GET /api/map-summary (day view), GET /api/saved-summary
   (vault salvati, no date), GET /api/articles envelope {items,next_cursor,total}
-  con saved=true cross-day, PATCH read_status / saved_status, POST webhook (HMAC),
-  e GET events (SSE). DTO FE, MOCK_MODE esplicito, main.py API-only.
+  con saved=true cross-day, GET /api/map-relations (archi relazioni),
+  PATCH read_status / saved_status, POST webhook (HMAC), e GET events (SSE).
+  DTO FE, MOCK_MODE esplicito, main.py API-only.
 when_to_use:
   - Modifiche a main.py, articles_query, article.service, article-mock.service
   - Nuovi endpoint o cambi envelope/paginazione
   - Toggle mock vs produzione
   - Notizie salvate / is_saved
   - Webhook di ingestione o streaming SSE
-version: 1.2.0
+version: 1.3.0
 ---
 
 ## Quando attivare
@@ -23,6 +24,7 @@ Lavori su FastAPI REST, query articoli, o servizi Angular che chiamano l’API.
 | Vista | Endpoint | Shape |
 |-------|----------|--------|
 | Day (mappa) | `GET /api/map-summary?date=` | Righe `country_code × primary_category` (+ count/read, lat/lon finite) |
+| Relations | `GET /api/map-relations?date=` | Righe undirected `source_country ↔ target_country` per categoria (+ volume) |
 | Saved vault | `GET /api/saved-summary` | Stessa shape di map-summary; filtro `is_saved=true`; **senza date** |
 | Nation open | `GET /api/articles?date=&country=` | Envelope `{ items, next_cursor, total }` — page ≤ 100; FE concatena |
 | Saved open | `GET /api/articles?saved=true&country=` | Stesso envelope; **ignora date**; solo `is_saved` |
@@ -33,7 +35,7 @@ Lavori su FastAPI REST, query articoli, o servizi Angular che chiamano l’API.
 
 - `main.py` = **API-only** (pool, migrations, REST, webhook, SSE). Ingest solo in `worker.py`.
 - FE: `getMapSummary` / `getSavedSummary` / `getArticlesPage` allineati a `article.service.ts` e `article-mock.service.ts`.
-- Colonna DB: `articles.is_saved` (migration `010_articles_is_saved.sql`).
+- Colonna DB: `articles.is_saved` (migration `010_articles_is_saved.sql`) e `articles.related_countries` (migration `011_articles_related_countries.sql`).
 
 ## MOCK_MODE
 

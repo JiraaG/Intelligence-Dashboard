@@ -16,6 +16,7 @@ import { Subscription } from 'rxjs';
 import type * as Leaflet from 'leaflet';
 import { Article, CountrySummary, PrimaryCategory } from '../../models/article.model';
 import { MapSummaryRow } from '../../models/map-summary.model';
+import { MapRelationRow } from '../../models/map-relation.model';
 
 /** Payload quando si apre una nazione da poligono o pin summary. */
 export interface CountryOpenRequest {
@@ -105,6 +106,7 @@ export class RadarMapComponent implements AfterViewInit {
   countries = input.required<CountrySummary[]>();
   /** Aggregati day-view: un pin nazione (anello conic categorie), non pallini per-categoria. */
   mapSummary = input<MapSummaryRow[]>([]);
+  mapRelations = input<MapRelationRow[]>([]);
   focusCountryCode = input<string | null>(null);
 
   markerClicked = output<Article>();
@@ -165,6 +167,8 @@ export class RadarMapComponent implements AfterViewInit {
   private categoryClusterGroups = new Map<string, MarkerClusterGroupLike>();
   /** Day-view: un pin per paese (non pallini cluster per-categoria). */
   private summaryMarkerGroup: Leaflet.LayerGroup | null = null;
+  private relationsLayerGroup: Leaflet.LayerGroup | null = null;
+  private countryCentroids = new Map<string, Leaflet.LatLng>();
   /** Nation open: hub singolo mentre lo spiderfy è chiuso. */
   private detailHubGroup: Leaflet.LayerGroup | null = null;
   /**
@@ -202,6 +206,7 @@ export class RadarMapComponent implements AfterViewInit {
       const arts = this.articles();
       const ctrs = this.countries();
       const summary = this.mapSummary();
+      const relations = this.mapRelations();
       if (!this.map || this.isParsingGeoJson() || this.destroyed) {
         return;
       }
@@ -209,7 +214,7 @@ export class RadarMapComponent implements AfterViewInit {
         this.pendingGeometryRefresh = true;
         return;
       }
-      this.applyGeometryInputs(arts, ctrs, summary);
+      this.applyGeometryInputs(arts, ctrs, summary, relations);
     });
 
     effect(() => {
@@ -280,8 +285,17 @@ export class RadarMapComponent implements AfterViewInit {
   /**
    * Fingerprint geometria (id/cat/paese/coord o summary) — **senza** ``is_read``.
    * Stesso fingerprint → solo sync DOM read; diverso → rebuild layer.
+   * Include la firma delle relazioni (source|target|cat|vol) come richiesto da spec.
    */
-  private geometryFingerprint(articles: Article[], summary: MapSummaryRow[]): string {
+  private geometryFingerprint(
+    articles: Article[],
+    summary: MapSummaryRow[],
+    relations: MapRelationRow[],
+  ): string {
+    const relPart = relations
+      .map((r) => `${r.source_country}|${r.target_country}|${r.primary_category}|${r.volume}`)
+      .sort()
+      .join(';');
     if (articles.length > 0) {
       return (
         'detail:' +
@@ -290,7 +304,9 @@ export class RadarMapComponent implements AfterViewInit {
             (a) => `${a.id}|${a.primary_category}|${a.country_code}|${a.latitude}|${a.longitude}`,
           )
           .sort()
-          .join(';')
+          .join(';') +
+        '::' +
+        relPart
       );
     }
     return (
@@ -301,7 +317,9 @@ export class RadarMapComponent implements AfterViewInit {
             `${r.country_code}|${r.primary_category}|${r.article_count}|${r.latitude}|${r.longitude}`,
         )
         .sort()
-        .join(';')
+        .join(';') +
+      '::' +
+      relPart
     );
   }
 
@@ -313,13 +331,14 @@ export class RadarMapComponent implements AfterViewInit {
     articles: Article[],
     countries: CountrySummary[],
     summary: MapSummaryRow[],
+    relations: MapRelationRow[],
   ): void {
-    const fingerprint = this.geometryFingerprint(articles, summary);
+    const fingerprint = this.geometryFingerprint(articles, summary, relations);
     if (fingerprint === this.lastGeometryFingerprint) {
       if (articles.length > 0) this.syncMarkerReadState(articles);
       return;
     }
-    this.updateMapData(articles, countries, summary);
+    this.updateMapData(articles, countries, summary, relations);
   }
 
   /** Fine lock flyTo/fitBounds e applica geometria deferita durante la navigazione. */
@@ -329,7 +348,7 @@ export class RadarMapComponent implements AfterViewInit {
       return;
     }
     this.pendingGeometryRefresh = false;
-    this.applyGeometryInputs(this.articles(), this.countries(), this.mapSummary());
+    this.applyGeometryInputs(this.articles(), this.countries(), this.mapSummary(), this.mapRelations());
   }
 
   /** MarkerCluster può tenere layer ma non disegnare dopo race clearLayers/setView. */
@@ -425,6 +444,7 @@ export class RadarMapComponent implements AfterViewInit {
 
     this.geoJsonLayerGroup = L.layerGroup();
     this.summaryMarkerGroup = L.layerGroup();
+    this.relationsLayerGroup = L.layerGroup();
     this.detailHubGroup = L.layerGroup().addTo(this.map);
 
     this.map.on('click', (e: Leaflet.LeafletMouseEvent) => {
@@ -573,6 +593,7 @@ export class RadarMapComponent implements AfterViewInit {
       this.currentZoomLevel.set(zoom);
       this.refreshHatchingStyles();
       this.syncSummaryMarkerVisibility();
+      this.syncRelationsVisibility();
 
       // Nation open: tieni spider fino a hatching (zoom < 5); sotto chiudi anche sidebar.
       // MC zoom-unspiderfy disabilitato; ri-spiderfy dopo zoom per riposizionare le gambe.
@@ -1247,6 +1268,136 @@ export class RadarMapComponent implements AfterViewInit {
     }
   }
 
+  /** Relational arcs solo a zoom ≥ 5 e senza nazione aperta. */
+  private syncRelationsVisibility(): void {
+    if (!this.map || !this.relationsLayerGroup) return;
+    const show = this.map.getZoom() >= 5 && this.articles().length === 0;
+    const onMap = this.map.hasLayer(this.relationsLayerGroup);
+    if (show && !onMap) {
+      this.map.addLayer(this.relationsLayerGroup);
+    } else if (!show && onMap) {
+      this.map.removeLayer(this.relationsLayerGroup);
+    }
+  }
+
+  /**
+   * Disegna gli archi curvi di relazione geopolitica bilaterale.
+   */
+  private drawGeospatialRelations(relations: MapRelationRow[]): void {
+    if (!this.relationsLayerGroup || !this.L) return;
+    this.relationsLayerGroup.clearLayers();
+
+    for (const r of relations) {
+      const p0 = this.getCountryCentroid(r.source_country);
+      const p2 = this.getCountryCentroid(r.target_country);
+      if (!p0 || !p2) continue;
+
+      // Generazione punti curva Bezier quadratica
+      const points: Leaflet.LatLng[] = [];
+      const steps = 30;
+      const lat0 = p0.lat;
+      const lng0 = p0.lng;
+      const lat2 = p2.lat;
+      const lng2 = p2.lng;
+
+      const midLat = (lat0 + lat2) / 2;
+      const midLng = (lng0 + lng2) / 2;
+
+      const dLat = lat2 - lat0;
+      const dLng = lng2 - lng0;
+
+      // Deviazione perpendicolare proporzionale alla distanza
+      const curvature = 0.2;
+      const p1Lat = midLat - dLng * curvature;
+      const p1Lng = midLng + dLat * curvature;
+
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const lat = (1 - t) * (1 - t) * lat0 + 2 * (1 - t) * t * p1Lat + t * t * lat2;
+        const lng = (1 - t) * (1 - t) * lng0 + 2 * (1 - t) * t * p1Lng + t * t * lng2;
+        points.push(this.L.latLng(lat, lng));
+      }
+
+      const colorVar = this.CATEGORY_CSS_VARS[r.primary_category] || '--color-text-accent';
+      const docStyle = getComputedStyle(document.documentElement);
+      const color = docStyle.getPropertyValue(colorVar).trim() || '#58a6ff';
+      const weight = Math.min(6, 1 + r.volume * 0.5);
+
+      const polyline = this.L.polyline(points, {
+        color,
+        weight,
+        opacity: 0.8,
+        className: 'relational-arc-flow',
+        interactive: true,
+      });
+
+      // Tooltip informativo opzionale (sticky)
+      const tooltipText = `${r.source_country} ↔ ${r.target_country} · ${r.primary_category} · n=${r.volume}`;
+      polyline.bindTooltip(tooltipText, { sticky: true });
+
+      this.relationsLayerGroup.addLayer(polyline);
+    }
+  }
+
+  /**
+   * Restituisce il centroide di una nazione con caching,
+   * override manuali per US/RU e fallback summary.
+   */
+  private getCountryCentroid(code: string): Leaflet.LatLng | null {
+    if (!this.L) return null;
+    if (code === 'US') {
+      return this.L.latLng(37.0902, -95.7129);
+    }
+    if (code === 'RU') {
+      return this.L.latLng(61.524, 105.3187);
+    }
+    if (this.countryCentroids.has(code)) {
+      return this.countryCentroids.get(code)!;
+    }
+    const layers = this.countryLayersMap.get(code);
+    if (layers && layers.length > 0) {
+      const b = this.L.latLngBounds([]);
+      layers.forEach((layer) => {
+        const withBounds = layer as Leaflet.Path & { getBounds?: () => Leaflet.LatLngBounds };
+        if (typeof withBounds.getBounds === 'function') {
+          b.extend(withBounds.getBounds());
+        }
+      });
+      if (b.isValid()) {
+        const center =
+          typeof b.getCenter === 'function'
+            ? b.getCenter()
+            : this.L.latLng(
+                (b.getSouthWest().lat + b.getNorthEast().lat) / 2,
+                (b.getSouthWest().lng + b.getNorthEast().lng) / 2,
+              );
+        this.countryCentroids.set(code, center);
+        return center;
+      }
+    }
+
+    // Fallback coordinate medie dal mapSummary
+    const rows = this.mapSummary().filter((r) => r.country_code === code);
+    if (rows.length > 0) {
+      let latSum = 0;
+      let lngSum = 0;
+      let countSum = 0;
+      for (const r of rows) {
+        if (this.hasFiniteCoordinates(r.latitude, r.longitude)) {
+          latSum += r.latitude * r.article_count;
+          lngSum += r.longitude * r.article_count;
+          countSum += r.article_count;
+        }
+      }
+      if (countSum > 0) {
+        const fallbackLatLng = this.L.latLng(latSum / countSum, lngSum / countSum);
+        // non salviamo in cache centroids da fallback summary temporanei
+        return fallbackLatLng;
+      }
+    }
+    return null;
+  }
+
   /**
    * Rebuild layer: unspiderfy → clear → day (summary) o detail (cluster + hub).
    * Chiama sempre prima di clearLayers per evitare icone fantasma MarkerCluster.
@@ -1255,6 +1406,7 @@ export class RadarMapComponent implements AfterViewInit {
     articles: Article[],
     countries: CountrySummary[],
     summary: MapSummaryRow[],
+    relations: MapRelationRow[] = [],
   ): void {
     const L = this.L;
     if (!L || !this.map) return;
@@ -1271,13 +1423,16 @@ export class RadarMapComponent implements AfterViewInit {
 
     this.categoryClusterGroups.forEach((group) => group.clearLayers());
     this.summaryMarkerGroup?.clearLayers();
+    this.relationsLayerGroup?.clearLayers();
     this.clearDetailHubPin();
 
     if (articles.length === 0) {
       this.renderSummaryMarkers(L, summary);
-      this.lastGeometryFingerprint = this.geometryFingerprint(articles, summary);
+      this.drawGeospatialRelations(relations);
+      this.lastGeometryFingerprint = this.geometryFingerprint(articles, summary, relations);
       this.refreshClusterVisibility();
       this.syncSummaryMarkerVisibility();
+      this.syncRelationsVisibility();
       this.refreshHatchingStyles();
       void countries;
       return;
@@ -1285,9 +1440,10 @@ export class RadarMapComponent implements AfterViewInit {
 
     this.renderDetailMarkers(L, articles);
     this.upsertDetailHubPin(L, articles);
-    this.lastGeometryFingerprint = this.geometryFingerprint(articles, summary);
+    this.lastGeometryFingerprint = this.geometryFingerprint(articles, summary, relations);
     this.refreshClusterVisibility();
     this.syncSummaryMarkerVisibility();
+    this.syncRelationsVisibility();
     this.refreshHatchingStyles();
     void countries;
   }
@@ -1640,6 +1796,10 @@ export class RadarMapComponent implements AfterViewInit {
     }
     this.clearPendingTimeouts();
     this.clearRootMarkers();
+    if (this.relationsLayerGroup && this.map?.hasLayer(this.relationsLayerGroup)) {
+      this.map.removeLayer(this.relationsLayerGroup);
+    }
+    this.relationsLayerGroup = null;
     this.map?.remove();
     this.map = null;
   }

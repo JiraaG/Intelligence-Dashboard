@@ -152,6 +152,10 @@ class GeopoliticalArticleSchema(BaseModel):
         max_length=2000,
         description="Stringa CSV di asset fisici. Scrivi 'Nessuno' se nessuno.",
     )
+    related_countries: str = Field(
+        max_length=2000,
+        description="Stringa CSV dei codici ISO Alpha-2 dei paesi secondari coinvolti. Scrivi 'Nessuno' se nessuno.",
+    )
     relevance_level: int = Field(
         ge=1,
         le=5,
@@ -219,6 +223,14 @@ class GeopoliticalArticleSchema(BaseModel):
             raise ValueError("longitude deve essere compresa tra -180 e 180")
         return value
 
+    @field_validator("related_countries")
+    @classmethod
+    def validate_related_countries(cls, value: str) -> str:
+        """Stringa CSV di codici ISO Alpha-2 validi (o Nessuno)."""
+        if not isinstance(value, str):
+            raise ValueError("related_countries deve essere una stringa")
+        return value
+
     @model_validator(mode="after")
     def first_tag_matches_primary(self) -> Self:
         """Invariante schema: primo CSV tag == ``primary_category`` (non Nessuno)."""
@@ -229,6 +241,29 @@ class GeopoliticalArticleSchema(BaseModel):
             raise ValueError(
                 f"primo tag {first!r} != primary_category {self.primary_category!r}"
             )
+        return self
+
+    @model_validator(mode="after")
+    def validate_related_countries_constraints(self) -> Self:
+        """Invariante: related_countries non contiene country_code, XX, codici invalidi o duplicati, max 5."""
+        primary = self.country_code
+        related_list = parse_csv_list(self.related_countries)
+
+        seen = set()
+        for c in related_list:
+            if c == "XX":
+                raise ValueError("related_countries non deve contenere il codice di fallback 'XX'")
+            if c == primary:
+                raise ValueError(f"related_countries non deve contenere il paese primario '{primary}'")
+            if c not in ISO_ALPHA2_CODES:
+                raise ValueError(f"related_countries contiene codice non ISO '{c}'")
+            if c in seen:
+                raise ValueError(f"related_countries contiene codici duplicati: '{c}'")
+            seen.add(c)
+
+        if len(related_list) > 5:
+            raise ValueError("related_countries non deve contenere più di 5 codici")
+
         return self
 
 
@@ -339,6 +374,27 @@ def normalize_llm_json_dict(data: dict[str, Any]) -> dict[str, Any]:
             if not parts or parts[0] != pc:
                 rest = [p for p in parts if p != pc]
                 out["tags"] = ", ".join([pc, *rest]) if rest else pc
+
+    # Normalizza related_countries
+    rc = out.get("related_countries")
+    primary = str(out.get("country_code") or "").strip().upper()
+    if isinstance(rc, list):
+        rc = ", ".join(str(x) for x in rc if x)
+
+    if isinstance(rc, str):
+        parts = [x.strip().upper() for x in rc.split(",") if x.strip()]
+        valid_parts = []
+        seen = set()
+        for p in parts:
+            if p in ISO_ALPHA2_CODES and p != "XX" and p != primary and p not in seen:
+                seen.add(p)
+                valid_parts.append(p)
+        if valid_parts:
+            out["related_countries"] = ", ".join(valid_parts[:5])
+        else:
+            out["related_countries"] = "Nessuno"
+    else:
+        out["related_countries"] = "Nessuno"
 
     return out
 
@@ -459,5 +515,6 @@ def get_fallback_article(title: str, source_url: str, published_at: str) -> Geop
         primary_category="Infrastrutture",
         sentiment="Neutrale",
         infrastructural_entities="Nessuno",
+        related_countries="Nessuno",
         relevance_level=1,
     )

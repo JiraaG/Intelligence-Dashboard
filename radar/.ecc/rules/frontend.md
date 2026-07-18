@@ -7,11 +7,11 @@
 
 ## Regola CRITICAL: Sidebar freeze (non negoziabile)
 
-- **VIETATO** modificare `src/app/components/radar-sidebar/**` (TS/HTML/SCSS/spec).
+- **VIETATO** modificare `src/app/components/radar-sidebar/**` (TS/HTML/SCSS/spec), tranne per le due eccezioni mirate: il toggle Salva/Rimuovi e la sezione chip dei paesi correlati (`related_countries`).
 - Conservare `p-carousel` e la logica esistente `updateCarouselHeight` / `article-card-{id}`.
 - **VIETATO** introdurre `app-article-list`, infinite scroll, o sostituire il polling altezza con ResizeObserver.
 - Fix **letta/non letta** (`.marker-read`): solo `services/state.service.ts` + `components/radar-map/**`.
-- Phase 4/5 UI: mappa, toolbar, state, shell — non la sidebar.
+- Phase 4/5/H UI: mappa, toolbar, state, shell — non la sidebar (tranne le eccezioni sopra indicate).
 
 ---
 
@@ -411,6 +411,24 @@ I tipi TypeScript vengono usati solo a compile-time, il runtime usa sempre `wind
 
 ---
 
+## Regola 12: Relazioni Geospaziali (Grafo — Fase H)
+
+1. **Gestione Stato e Risorsa**:
+   - Utilizzare `StateService.mapRelationsResource` per caricare le relazioni bilaterali dal backend.
+   - Esporre il segnale derivato `filteredMapRelations` che filtra le relazioni in base ai filtri attivi (se presenti).
+2. **Layer Dedicato sulla Mappa**:
+   - Gli archi delle relazioni bilaterali devono essere disegnati all'interno di un layer dedicato chiamato `relationsLayerGroup` (istanza di `L.layerGroup` o `L.featureGroup`).
+3. **Visibilità e Sincronizzazione**:
+   - La visibilità del layer relazioni deve essere sincronizzata direttamente con lo stato dei marker di riepilogo nazionale.
+   - Usare la logica allineata a `syncSummaryMarkerVisibility()`: le relazioni devono essere visibili solo nella modalità "Day View" con livello di zoom `>= 5`, e devono essere nascoste automaticamente quando lo zoom scende sotto `5` o quando una nazione è aperta (nation detail view).
+4. **Fingerprint Geometria Mappa**:
+   - Per ottimizzare le prestazioni, il ricalcolo degli elementi della mappa (inclusi gli archi) deve basarsi su un fingerprint che include lo stato delle relazioni, per evitare di ridisegnare la mappa inutilmente se non ci sono cambiamenti strutturali.
+5. **Drawing degli Archi (Divieto leaflet-curve)**:
+   - È **severamente vietato** installare ed importare pacchetti npm aggiuntivi come `leaflet-curve` o librerie esterne non verificate.
+   - Gli archi devono essere disegnati usando la classe nativa `L.polyline` con coordinate interpolate a runtime per riprodurre una curva di Bézier quadratica.
+
+---
+
 ## Criteri di Accettazione Automatici
 
 | Pattern Vietato                                       | Motivo                                              |
@@ -432,3 +450,5 @@ I tipi TypeScript vengono usati solo a compile-time, il runtime usa sempre `wind
 | `maxZoom` per fitBounds del focus maggiore di 4        | Lo zoom di focus risulterebbe troppo profondo        |
 | Zoom all'indietro senza `minZoom` o `maxBounds`       | Consente la navigazione verso aree nere / infinite  |
 | Legenda con `flex-wrap: wrap` senza nowrap/scroll     | Rischia di spezzarsi verticalmente su schermi piccoli|
+| Utilizzo di `leaflet-curve` o nuove dipendenze npm per archi | Vietato; usare interpolazione Bézier quadratica + `L.polyline` nativa |
+| Archi relazioni visibili a zoom < 5 o in nation detail | Vietato; devono essere nascosti in accordo a `syncSummaryMarkerVisibility()` |

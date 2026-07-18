@@ -100,6 +100,9 @@ curl.exe -s "http://localhost/api/articles?date=2026-07-15"
 # Map summary
 curl.exe -s "http://localhost/api/map-summary?date=2026-07-15"
 
+# Map relations (bilateral arcs)
+curl.exe -s "http://localhost/api/map-relations?date=2026-07-15"
+
 # Saved vault (cross-day, no date)
 curl.exe -s "http://localhost/api/saved-summary"
 curl.exe -s "http://localhost/api/articles?saved=true&limit=10"

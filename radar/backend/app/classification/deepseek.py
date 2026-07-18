@@ -207,7 +207,7 @@ class DeepSeekClient:
             "Use ONLY these top-level keys (no nested coordinates/coordinate object, no 'category'):\n"
             "title, summary, published_at, source_url, country_code, latitude, longitude,\n"
             "companies_involved, tags, primary_category, sentiment, infrastructural_entities,\n"
-            "relevance_level.\n"
+            "related_countries, relevance_level.\n"
             "latitude and longitude MUST be separate top-level numbers (floats).\n"
             "primary_category MUST be exactly one of the 10 allowed Italian category names.\n"
             "Game/software/videogame reviews and entertainment products → Tecnologia "

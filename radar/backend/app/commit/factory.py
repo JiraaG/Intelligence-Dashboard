@@ -49,6 +49,7 @@ def _dump_frontmatter(frontmatter: dict) -> str:
         "title": frontmatter["title"],
         "location": _FlowList(frontmatter["location"]),
         "country": frontmatter["country"],
+        "related_countries": _FlowList(frontmatter["related_countries"]),
         "category": frontmatter["category"],
         "tags": _FlowList(frontmatter["tags"]),
         "companies": _FlowList(frontmatter["companies"]),
@@ -77,6 +78,7 @@ def generate_markdown_content(article: GeopoliticalArticleSchema) -> str:
     tags_list = parse_csv_list(article.tags)
     companies_list = parse_csv_list(article.companies_involved)
     entities_list = parse_csv_list(article.infrastructural_entities)
+    related_countries_list = parse_csv_list(article.related_countries)
 
     summary = _truncate_text(article.summary, MAX_SUMMARY_CHARS, "summary")
 
@@ -96,6 +98,7 @@ def generate_markdown_content(article: GeopoliticalArticleSchema) -> str:
             "title": article.title,
             "location": [article.latitude, article.longitude],
             "country": article.country_code,
+            "related_countries": related_countries_list,
             "category": article.primary_category,
             "tags": tags_list,
             "companies": companies_list,

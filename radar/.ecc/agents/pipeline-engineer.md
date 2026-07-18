@@ -104,10 +104,11 @@ class GeopoliticalArticleSchema(BaseModel):
     ] = Field(description="Una delle 10 categorie chiuse")
     sentiment: Literal["Positivo", "Neutrale", "Negativo"] = Field(description="Sentiment strategico")
     infrastructural_entities: str = Field(description="Asset fisici separati da virgola; 'Nessuno' se nessuno")
+    related_countries: str = Field(description="Stringa CSV dei codici ISO Alpha-2 dei paesi secondari coinvolti; 'Nessuno' se nessuno")
     relevance_level: int = Field(description="Grado di rilevanza geopolitica da 1 a 5.", ge=1, le=5)
 ```
 
-> Post-restore: questi campi sono `str` CSV in `validator.py`. Non ripristinare `List[str]` né `reasoning`. Il FE può ricevere array da `array_agg` SQL — non confondere i layer.
+> Post-restore: questi campi sono `str` CSV in `validator.py`. Non ripristinare `List[str]` né `reasoning`. Il FE può ricevere array da `array_agg` SQL — non confondere i layer. Esempio: `companies_involved` / `tags` / `infrastructural_entities` / `related_countries` sono `str` CSV.
 
 ### 3b. Outbox, overwrite Miniflux e mark-read
 

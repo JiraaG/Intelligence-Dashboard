@@ -38,6 +38,7 @@ def test_geopolitical_schema_valid_article():
         "primary_category": "Tecnologia",
         "sentiment": "Positivo",
         "infrastructural_entities": "Fabbrica TSMC",
+        "related_countries": "Nessuno",
         "relevance_level": 3,
     }
     article = GeopoliticalArticleSchema(**data)
@@ -64,6 +65,7 @@ def test_geopolitical_schema_rejects_invalid_category():
         "primary_category": "CATEGORIA_NON_ESISTENTE",
         "sentiment": "Neutrale",
         "infrastructural_entities": "Nessuno",
+        "related_countries": "Nessuno",
         "relevance_level": 2,
     }
     with pytest.raises(ValidationError):

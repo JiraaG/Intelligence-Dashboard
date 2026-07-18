@@ -61,6 +61,7 @@ async def commit_article_to_db(
     entities_list = parse_csv_list(article.infrastructural_entities)
     companies_list = parse_csv_list(article.companies_involved)
     tags_list = parse_csv_list(article.tags)
+    related_countries_list = parse_csv_list(article.related_countries)
 
     normalized_url = normalize_source_url(article.source_url)
 
@@ -69,8 +70,8 @@ async def commit_article_to_db(
             INSERT INTO articles
                 (title, summary, published_at, source_url, country_code,
                  latitude, longitude, primary_category, sentiment, relevance_level,
-                 infrastructural_entities, feed_title)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                 infrastructural_entities, feed_title, related_countries)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             ON CONFLICT (source_url) DO NOTHING
             RETURNING id
         """
@@ -94,6 +95,7 @@ async def commit_article_to_db(
             article.relevance_level,
             entities_list,
             feed_title,
+            related_countries_list,
         )
 
         if article_id is None:

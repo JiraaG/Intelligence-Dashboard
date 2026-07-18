@@ -353,6 +353,13 @@ con i dati mockati prima di connettere il backend reale.
 - [ ] Card: **Salva notizia** / **Rimuovi dai salvati**; save ⇒ letta; unread ⇒ unsave
 - [ ] Mock: `getSavedSummary` + `getArticlesPage({ saved: true })`
 
+### ✅ Test 7: Relazioni Geospaziali (Fase H)
+
+- [ ] In modalità Day View a zoom >= 5 gli archi delle relazioni sono visibili sulla mappa
+- [ ] A zoom < 5 gli archi delle relazioni vengono nascosti automaticamente
+- [ ] Quando viene aperta una nazione (nation-open) gli archi delle relazioni vengono nascosti automaticamente per evitare interferenze con lo spiderfy
+- [ ] Le card degli articoli nella sidebar (sia visualizzazione singola che carosello) mostrano la sezione "Paesi correlati" con i relativi chip se `related_countries` non è vuoto
+
 ---
 
 ## Dati Mock per Scenari di Test Aggiuntivi

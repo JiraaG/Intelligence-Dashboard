@@ -39,6 +39,7 @@ def _article_row(article_id: int, **overrides: Any) -> dict[str, Any]:
         "feed_title": "Feed",
         "is_read": False,
         "is_saved": False,
+        "related_countries": [],
         "companies_involved": [],
         "tags": [],
     }

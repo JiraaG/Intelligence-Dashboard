@@ -25,6 +25,7 @@ Remote / internet exposure: put a TLS reverse proxy with auth and ACLs in front 
 ```bash
 curl -s http://localhost/health/live
 curl -s "http://localhost/api/map-summary?date=$(date -I)"
+curl -s "http://localhost/api/map-relations?date=$(date -I)"
 curl -s http://localhost/api/saved-summary
 curl -s "http://localhost/api/articles?saved=true&limit=10"
 ```

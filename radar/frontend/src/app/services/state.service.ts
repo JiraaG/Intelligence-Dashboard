@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import { ArticleService } from './article.service';
 import { Article, ArticleFilters, CountrySummary, PrimaryCategory } from '../models/article.model';
 import { MapSummaryRow } from '../models/map-summary.model';
+import { MapRelationRow } from '../models/map-relation.model';
 import { MOCK_MODE } from './mock-mode.token';
 
 export interface ArticleProcessedEvent {
@@ -65,6 +66,7 @@ export class StateService {
           this.lastProcessedArticleEvent.set(data);
           this.mapSummaryResource.reload();
           this.savedSummaryResource.reload();
+          this.mapRelationsResource.reload();
         });
       });
       es.onerror = () => {
@@ -112,6 +114,21 @@ export class StateService {
       }),
   });
 
+  /** Day-view: `GET /api/map-relations` in base a data (+ sentiment selezionati, OR). */
+  readonly mapRelationsResource = rxResource({
+    params: () => {
+      const f = this.filters();
+      const sentiment =
+        f.sentiment && f.sentiment.length > 0 ? f.sentiment : undefined;
+      return { date: f.date, sentiment };
+    },
+    stream: (p) =>
+      this.articleService.getMapRelations({
+        date: p.params.date,
+        sentiment: p.params.sentiment ?? null,
+      }),
+  });
+
   /** Vault salvati: `GET /api/saved-summary` (no date; sentiment OR). */
   readonly savedSummaryResource = rxResource({
     params: () => {
@@ -129,6 +146,14 @@ export class StateService {
   /** Righe summary con filtro categoria client-side (toolbar). */
   readonly filteredSummary = computed((): MapSummaryRow[] => {
     const raw = this.mapSummaryResource.value() ?? [];
+    const cats = this.filters().categories;
+    if (!cats || cats.length === 0) return raw;
+    return raw.filter((row) => cats.includes(row.primary_category));
+  });
+
+  /** Righe relations con filtro categoria client-side (toolbar). */
+  readonly filteredMapRelations = computed((): MapRelationRow[] => {
+    const raw = this.mapRelationsResource.value() ?? [];
     const cats = this.filters().categories;
     if (!cats || cats.length === 0) return raw;
     return raw.filter((row) => cats.includes(row.primary_category));
@@ -173,6 +198,7 @@ export class StateService {
   readonly isLoading = computed(
     () =>
       this.mapSummaryResource.isLoading() ||
+      this.mapRelationsResource.isLoading() ||
       this.savedSummaryResource.isLoading() ||
       this.detailLoading(),
   );
@@ -187,6 +213,7 @@ export class StateService {
   readonly error = computed(
     () =>
       this.mapSummaryResource.error() ??
+      this.mapRelationsResource.error() ??
       this.savedSummaryResource.error() ??
       this.detailError(),
   );

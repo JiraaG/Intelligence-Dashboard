@@ -222,11 +222,12 @@ Phase 2: stessa immagine, due processi.
 
 **API Phase 5+ (query layer):**
 - Day: `GET /api/map-summary` → righe aggregate `country_code × primary_category`
+- Relations: `GET /api/map-relations` → righe aggregate relazioni undirected `source_country ↔ target_country` per categoria
 - Saved vault: `GET /api/saved-summary` → stessa shape, `is_saved=true`, **senza date**
-- Nation: `GET /api/articles` → envelope `{ items, next_cursor, total }` (keyset, page ≤ 100)
+- Nation: `GET /api/articles` → envelope `{ items, next_cursor, total }` (keyset, page ≤ 100; include `related_countries` string array)
 - Saved open: `GET /api/articles?saved=true&country=` → stesso envelope, ignora `date`
 - `PATCH .../read_status` (unread ⇒ `is_saved=false`); `PATCH .../saved_status` (save ⇒ `is_read=true`)
-- Implementazione SQL: `backend/app/api/articles_query.py` + migrazioni `007` + `010_articles_is_saved`
+- Implementazione SQL: `backend/app/api/articles_query.py` + migrazioni `007` + `010_articles_is_saved` + `011_articles_related_countries`
 
 **OBBLIGATORIO (Dockerfile / Compose):**
 ```bash

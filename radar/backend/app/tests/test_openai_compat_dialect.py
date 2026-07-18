@@ -174,3 +174,45 @@ def test_load_lane_custom_base_url(
 
     lane = load_lane("simple", default_provider="gemini")
     assert lane.base_url == "https://proxy.example/v1"
+
+
+@pytest.mark.asyncio
+async def test_deepseek_classify_json_payload_contains_related_countries() -> None:
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    client = DeepSeekClient(
+        api_key="sk-test",
+        base_url="https://api.deepseek.com",
+        model="deepseek-chat",
+        effort="none",
+        api_dialect="deepseek",
+    )
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "choices": [
+            {
+                "message": {
+                    "content": '{"title": "test"}'
+                }
+            }
+        ],
+        "usage": {"total_tokens": 100}
+    }
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = mock_resp
+
+        await client.classify_json(
+            title="A title",
+            content="Some content",
+            url="https://example.com/art",
+            date="2026-07-18"
+        )
+
+        call_kwargs = mock_post.call_args.kwargs
+        payload = call_kwargs["json"]
+        user_msg = payload["messages"][1]["content"]
+        assert "related_countries" in user_msg
+

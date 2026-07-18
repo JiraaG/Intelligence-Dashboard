@@ -24,6 +24,7 @@ def _valid_payload(**overrides: object) -> dict:
         "primary_category": "Tecnologia",
         "sentiment": "Neutrale",
         "infrastructural_entities": "Nessuno",
+        "related_countries": "Nessuno",
         "relevance_level": 3,
     }
     base.update(overrides)
@@ -136,3 +137,28 @@ def test_parse_ground_truth_overrides_bad_date() -> None:
     )
     assert article.published_at == "2026-07-16"
     assert article.source_url == "https://example.com/real"
+
+
+def test_normalize_related_countries_list_to_csv() -> None:
+    raw = _valid_payload(country_code="IT", related_countries=["FR", "de", "US"])
+    out = normalize_llm_json_dict(raw)
+    assert out["related_countries"] == "FR, DE, US"
+
+
+def test_normalize_related_countries_drops_invalid_primary_xx() -> None:
+    raw = _valid_payload(country_code="IT", related_countries="FR, IT, XX, INVALID, DE, FR")
+    out = normalize_llm_json_dict(raw)
+    assert out["related_countries"] == "FR, DE"
+
+
+def test_normalize_related_countries_limits_to_5() -> None:
+    raw = _valid_payload(country_code="IT", related_countries="FR, DE, US, ES, PT, GR, JP")
+    out = normalize_llm_json_dict(raw)
+    assert out["related_countries"] == "FR, DE, US, ES, PT"
+
+
+def test_normalize_related_countries_empty_to_nessuno() -> None:
+    raw = _valid_payload(country_code="IT", related_countries="XX, IT, INVALID")
+    out = normalize_llm_json_dict(raw)
+    assert out["related_countries"] == "Nessuno"
+

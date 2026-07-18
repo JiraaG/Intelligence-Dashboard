@@ -356,6 +356,7 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                                 primary_category=row["primary_category"],
                                 sentiment="Neutrale",
                                 infrastructural_entities="Nessuno",
+                                related_countries="Nessuno",
                                 relevance_level=3,
                             )
                             try:

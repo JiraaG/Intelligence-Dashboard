@@ -31,6 +31,7 @@ from app.api.articles_query import (
     build_articles_page_query,
     build_countries_summary_query,
     build_map_summary_query,
+    build_map_relations_query,
     build_saved_summary_query,
     clamp_articles_limit,
     normalize_sentiments,
@@ -321,6 +322,33 @@ async def get_map_summary(
     pub_date = parse_published_date(date)
     sentiments = normalize_sentiments(sentiment)
     sql, params = build_map_summary_query(
+        pub_date,
+        sentiment=sentiments,
+        relevance_level=relevance_level,
+    )
+
+    async with state.db_pool.acquire() as conn:
+        rows = await conn.fetch(sql, *params)
+
+    return [dict(row) for row in rows]
+
+
+@app.get("/api/map-relations")
+async def get_map_relations(
+    date: str,
+    sentiment: Optional[list[str]] = Query(None),
+    relevance_level: Optional[int] = Query(None, ge=1, le=5),
+):
+    """Aggregato delle relazioni undirected ``source_country ↔ target_country`` per categoria.
+
+    Stessi filtri opzionali di map-summary (sentiment e relevance_level).
+    """
+    if not state.db_pool:
+        return []
+
+    pub_date = parse_published_date(date)
+    sentiments = normalize_sentiments(sentiment)
+    sql, params = build_map_relations_query(
         pub_date,
         sentiment=sentiments,
         relevance_level=relevance_level,

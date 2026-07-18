@@ -30,6 +30,7 @@ def _article() -> GeopoliticalArticleSchema:
         primary_category="Tecnologia",
         sentiment="Neutrale",
         infrastructural_entities="Nessuno",
+        related_countries="Nessuno",
         relevance_level=2,
     )
 

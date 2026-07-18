@@ -25,6 +25,7 @@ function makeArticle(overrides: Partial<Article> & Pick<Article, 'id' | 'title'>
     tags: [],
     infrastructural_entities: [],
     feed_title: 'Fixture Feed',
+    related_countries: [],
     is_read: false,
     ...overrides,
   };
@@ -61,6 +62,7 @@ const EMPTY_GEOJSON = {
       [articles]="articles"
       [countries]="countries"
       [mapSummary]="mapSummary"
+      [mapRelations]="mapRelations"
       [focusCountryCode]="focusCountryCode"
     />
   `,
@@ -69,6 +71,7 @@ class MapHostComponent {
   articles: Article[] = [];
   countries: CountrySummary[] = [];
   mapSummary: import('../../models/map-summary.model').MapSummaryRow[] = [];
+  mapRelations: import('../../models/map-relation.model').MapRelationRow[] = [];
   focusCountryCode: string | null = null;
 }
 
@@ -77,6 +80,12 @@ describe('RadarMapComponent (Phase 4)', () => {
 
   beforeEach(async () => {
     installLeafletStub();
+    (window as any).L.polyline = (points: any, options: any) => {
+      const p = new (window as any).L.Path();
+      p.bindTooltip = vi.fn().mockReturnThis();
+      p.addTo = vi.fn().mockReturnThis();
+      return p;
+    };
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
       cb(0);
       return 0;
@@ -506,5 +515,53 @@ describe('RadarMapComponent (Phase 4)', () => {
       mapCmp as unknown as { summaryMarkerGroup: { getLayers(): unknown[] } }
     ).summaryMarkerGroup;
     expect(group.getLayers().length).toBe(2);
+  });
+
+  it('draws relations layer with polylines when mapRelations is provided', async () => {
+    const summary = [
+      {
+        country_code: 'DE',
+        primary_category: 'Energia' as const,
+        article_count: 1,
+        read_count: 0,
+        latitude: 51.05,
+        longitude: 13.73,
+      },
+      {
+        country_code: 'IT',
+        primary_category: 'Energia' as const,
+        article_count: 1,
+        read_count: 0,
+        latitude: 41.87,
+        longitude: 12.56,
+      }
+    ];
+    const relations = [
+      {
+        source_country: 'DE',
+        target_country: 'IT',
+        primary_category: 'Energia' as const,
+        volume: 1
+      }
+    ];
+
+    const fixture = TestBed.createComponent(MapHostComponent);
+    fixture.componentInstance.mapSummary = summary;
+    fixture.componentInstance.mapRelations = relations;
+    fixture.detectChanges();
+    flushGeoJson();
+    await fixture.whenStable();
+
+    const mapCmp = getMapCmp(fixture);
+    (
+      mapCmp as unknown as {
+        updateMapData: (a: Article[], c: CountrySummary[], s: unknown[], r: unknown[]) => void;
+      }
+    ).updateMapData([], [], summary, relations);
+
+    const group = (
+      mapCmp as unknown as { relationsLayerGroup: { getLayers(): unknown[] } }
+    ).relationsLayerGroup;
+    expect(group.getLayers().length).toBe(1);
   });
 });

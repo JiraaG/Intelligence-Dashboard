@@ -246,6 +246,10 @@
   border-color: rgba(0, 212, 255, 0.12) !important;
 }
 
+::ng-deep .related-chip {
+  border-color: rgba(255, 179, 64, 0.25) !important;
+}
+
 /* -----------------------------
    VISTA CLUSTER & CAROSELLO
 ------------------------------ */

@@ -33,6 +33,7 @@ function makeArticle(overrides: Partial<Article> & Pick<Article, 'id' | 'title'>
     tags: [],
     infrastructural_entities: [],
     feed_title: 'Fixture Feed',
+    related_countries: [],
     is_read: false,
     ...overrides,
   };
@@ -131,6 +132,7 @@ class MapStubComponent {
   articles = input.required<Article[]>();
   countries = input.required<CountrySummary[]>();
   mapSummary = input<import('./models/map-summary.model').MapSummaryRow[]>([]);
+  mapRelations = input<import('./models/map-relation.model').MapRelationRow[]>([]);
   focusCountryCode = input<string | null>(null);
   markerClicked = output<Article>();
   clusterClicked = output<Article[]>();
@@ -207,6 +209,7 @@ function createStateStub(initial: Article[] = FIXTURE_ARTICLES, error: unknown =
     countries: computed(() => [] as CountrySummary[]),
     savedCountries: computed(() => [] as CountrySummary[]),
     filteredSummary: computed(() => [] as import('./models/map-summary.model').MapSummaryRow[]),
+    filteredMapRelations: computed(() => [] as import('./models/map-relation.model').MapRelationRow[]),
     articleCount: computed(() => detailSignal().length),
     readCount: computed(() => detailSignal().filter((a) => a.is_read).length),
     savedCount: computed(() => 0),

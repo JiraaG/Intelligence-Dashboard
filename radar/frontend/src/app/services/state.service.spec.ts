@@ -23,6 +23,7 @@ const SAMPLE: Article = {
   tags: [],
   infrastructural_entities: [],
   feed_title: 'Feed',
+  related_countries: [],
   is_read: false,
 };
 
@@ -30,6 +31,8 @@ describe('StateService detailError (T-P1-04)', () => {
   let state: StateService;
   let articleService: {
     getMapSummary: ReturnType<typeof vi.fn>;
+    getMapRelations: ReturnType<typeof vi.fn>;
+    getSavedSummary: ReturnType<typeof vi.fn>;
     getAllArticlesForCountry: ReturnType<typeof vi.fn>;
     updateReadStatus: ReturnType<typeof vi.fn>;
   };
@@ -37,6 +40,8 @@ describe('StateService detailError (T-P1-04)', () => {
   beforeEach(() => {
     articleService = {
       getMapSummary: vi.fn(() => of([])),
+      getMapRelations: vi.fn(() => of([])),
+      getSavedSummary: vi.fn(() => of([])),
       getAllArticlesForCountry: vi.fn(),
       updateReadStatus: vi.fn(() => of({ status: 'ok', is_read: true })),
     };

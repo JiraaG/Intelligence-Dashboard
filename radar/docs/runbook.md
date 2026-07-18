@@ -144,7 +144,7 @@ Windows: Git Bash / WSL. Preferire drill su stack usa-e-getta prima del restore 
 3. Ricrea **`radar-backend`** per applicare migrazioni (`schema_migrations` — abort su checksum mismatch).
 4. Ricrea **`radar-worker`** (uno solo); ready 503 breve fino a heartbeat.
 5. Ricrea **`radar-frontend`** (depends on live).
-6. Smoke: live, ready, `GET /api/articles?date=YYYY-MM-DD`, `GET /api/map-summary?date=…`, `GET /api/saved-summary`, `GET /api/articles?saved=true`, `PATCH /api/articles/{id}/saved_status` (save⇒read), UI mappa + toolbar **NOTIZIE SALVATE** (tooltip → zoom + spiderfy).
+6. Smoke: live, ready, `GET /api/articles?date=YYYY-MM-DD`, `GET /api/map-summary?date=…`, `GET /api/map-relations?date=…`, `GET /api/saved-summary`, `GET /api/articles?saved=true`, `PATCH /api/articles/{id}/saved_status` (save⇒read), UI mappa + toolbar **NOTIZIE SALVATE** (tooltip → zoom + spiderfy).
 
 Non puntare un load balancer a `/health/ready` se quello **riavvia** l’API su 503 transitori.
 

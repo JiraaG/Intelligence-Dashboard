@@ -22,6 +22,7 @@ EXPECTED_FRONTMATTER_KEYS = frozenset(
         "title",
         "location",
         "country",
+        "related_countries",
         "category",
         "tags",
         "companies",
@@ -47,6 +48,7 @@ def _base_article(**overrides) -> GeopoliticalArticleSchema:
         "primary_category": "Geopolitica",
         "sentiment": "Neutrale",
         "infrastructural_entities": "Nessuno",
+        "related_countries": "Nessuno",
         "relevance_level": 3,
     }
     data.update(overrides)
@@ -343,5 +345,6 @@ def test_schema_no_silent_coerce_category_or_sentiment() -> None:
             primary_category="geopolitica",  # wrong case — not coerced
             sentiment="neutrale",
             infrastructural_entities="Nessuno",
+            related_countries="Nessuno",
             relevance_level=3,
         )

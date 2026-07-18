@@ -18,4 +18,4 @@ cd radar
 node frontend/scripts/verify-geojson.mjs
 ```
 
-Do not touch `radar/frontend/src/app/components/radar-sidebar/**`.
+Do not touch `radar/frontend/src/app/components/radar-sidebar/**` (except for toggle Save and related_countries chips).

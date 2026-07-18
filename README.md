@@ -226,6 +226,7 @@ Esempio: `git checkout 56c2eff` (tip Phase 6 / GATE VERDE; tip successivo = ECC 
 | GET | `/health` (host `:80`) | Healthcheck **Nginx FE** — risposta statica `ok`; **non** è l’API |
 | GET | `/api/articles` | Envelope `{items,next_cursor,total}` — `date` obbligatorio salvo `saved=true` (cross-day), `limit` ≤ 100 |
 | GET | `/api/map-summary` | Righe `country_code × primary_category` + count/lat/lon (day) |
+| GET | `/api/map-relations` | Righe undirected `source_country ↔ target_country` per categoria + volume |
 | GET | `/api/saved-summary` | Stessa shape; solo `is_saved`; **senza date** |
 | GET | `/api/countries` | Rollup paese (compat) |
 | PATCH | `/api/articles/{id}/read_status` | Body `{is_read}`; unread ⇒ `is_saved=false` |

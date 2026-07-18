@@ -79,7 +79,7 @@ Regola d’oro (upstream cross-harness): comportamento durevole in skill/rules/h
 
 **Dominio Radar** (SoT `.agents/skills/radar-*/SKILL.md`)
 
-4. **radar-sidebar-freeze** — freeze `radar-sidebar/**` + eccezione mirata toggle Salva; `p-carousel` only  
+4. **radar-sidebar-freeze** — freeze `radar-sidebar/**` + eccezione mirata (toggle Salva e chip `related_countries`); `p-carousel` only  
 5. **radar-api-contract** — map-summary + saved-summary + envelope `{items,next_cursor,total}` (+ `saved=true`); PATCH read/save coupling; `MOCK_MODE`  
 6. **radar-docker-ops** — edge/data, live/ready, verify-geojson, `./data/postgres`; ops backup → [`ops/README.md`](../radar/ops/README.md) §Windows  
 7. **radar-geojson-assets** — gitignore + `--fetch` in Docker build; `ASSET_LICENSE`  
@@ -162,7 +162,7 @@ Prerequisito host per post-hook Python: `ruff` sul `PATH`.
 
 ## Vincoli da non contraddire
 
-- Sidebar freeze: `radar-sidebar/**` + `p-carousel` (eccezione mirata: toggle Salva)
+- Sidebar freeze: `radar-sidebar/**` + `p-carousel` (eccezione mirata: toggle Salva e chip `related_countries`)
 - Ingest solo `worker.py`; API in `main.py`
 - Reti `radar-edge` / `radar-data`; health live vs ready
 - Cluster: radius **40**, `spiderfyOnMaxZoom: false`; nation hub disco + fan tutte le icone (no hard cap 24; size/distanza adattivi)

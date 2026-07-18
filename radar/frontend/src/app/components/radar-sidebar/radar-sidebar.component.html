@@ -73,6 +73,17 @@
         </div>
       </div>
 
+      <div class="badge-section" *ngIf="displayArticle()?.related_countries?.length">
+        <span class="badge-label">🌐 Paesi correlati</span>
+        <div class="badge-list">
+          <p-chip
+            *ngFor="let iso of displayArticle()?.related_countries || []"
+            [label]="getCountryName(iso)"
+            styleClass="radar-chip related-chip">
+          </p-chip>
+        </div>
+      </div>
+
       <div class="badge-section" *ngIf="displayArticle()?.tags?.length">
         <span class="badge-label">🏷️ Tag</span>
         <div class="badge-list">
@@ -173,6 +184,17 @@
                 *ngFor="let c of a.companies_involved || []"
                 [label]="c"
                 styleClass="radar-chip company-chip">
+              </p-chip>
+            </div>
+          </div>
+
+          <div class="badge-section" *ngIf="a.related_countries?.length">
+            <span class="badge-label">🌐 Paesi correlati</span>
+            <div class="badge-list">
+              <p-chip
+                *ngFor="let iso of a.related_countries || []"
+                [label]="getCountryName(iso)"
+                styleClass="radar-chip related-chip">
               </p-chip>
             </div>
           </div>

@@ -42,9 +42,10 @@ def test_get_article_file_path() -> None:
         primary_category="Nucleare",
         sentiment="Neutrale",
         infrastructural_entities="Centrale Zaporizhzhia",
+        related_countries="Nessuno",
         relevance_level=4,
     )
-    
+
     path = get_article_file_path(article, vault_path="/app/vault")
 
     # Struttura: {vault}/{primary_category}/{country_code}/{published_at}_{slug}_{url_hash}.md
@@ -71,6 +72,7 @@ def test_generate_markdown_content() -> None:
         primary_category="Energia",
         sentiment="Positivo",
         infrastructural_entities="Gasdotto TAP",
+        related_countries="CN, US",
         relevance_level=4,
     )
 
@@ -79,6 +81,7 @@ def test_generate_markdown_content() -> None:
     assert "TAP Pipeline gas Azerbaigian" in md
     assert "location: [40.14, 47.57]" in md
     assert "AZ" in md
+    assert "related_countries: [CN, US]" in md
     assert "Energia" in md and "Pipeline" in md
     assert "TAP AG" in md and "SOCAR" in md
     assert "Positivo" in md
@@ -138,6 +141,7 @@ async def test_commit_article_to_db_success() -> None:
         primary_category="Tecnologia",
         sentiment="Positivo",
         infrastructural_entities="Nessuno",
+        related_countries="FR, US",
         relevance_level=3,
     )
 
@@ -157,6 +161,7 @@ async def test_commit_article_to_db_success() -> None:
     assert "relevance_level" in insert_call_args[0]
     assert insert_call_args[9] == "Positivo"
     assert insert_call_args[10] == 3
+    assert insert_call_args[13] == ["FR", "US"]
 
     exec_calls = [call[0][0] for call in mock_conn.execute.call_args_list]
     assert any("INSERT INTO article_companies" in c for c in exec_calls)
@@ -191,6 +196,7 @@ async def test_commit_article_to_db_conflict_fallback() -> None:
         primary_category="Tecnologia",
         sentiment="Positivo",
         infrastructural_entities="Nessuno",
+        related_countries="Nessuno",
         relevance_level=3,
     )
 

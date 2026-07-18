@@ -611,80 +611,152 @@ Questo modulo permette di tracciare visivamente le relazioni bilaterali e multil
                  [Spessore = Volume Articoli del Giorno]
 ```
 
-#### 1. Struttura del Query Helper nel Backend (`articles_query.py`)
+#### 1. Modello Dati e Migrazione del Database (`011_articles_related_countries.sql`)
 
-Aggiungere una query per estrarre le relazioni bilaterali a partire dagli articoli che menzionano più paesi o aziende collegate:
+Nel database, la colonna `related_countries TEXT[]` contiene l'elenco dei codici ISO Alpha-2 dei paesi secondari coinvolti nell'articolo:
 
-```python
-def build_geospatial_relations_query(pub_date: date) -> tuple[str, list[Any]]:
-    """Estrae le relazioni geografiche basate sugli articoli multi-paese del giorno."""
-    sql = """
-        SELECT 
-            a.country_code as source_country,
-            unnest(a.infrastructural_entities) as entity, -- Esempio semplificato
-            a.primary_category,
-            COUNT(*) as volume
-        FROM articles a
-        WHERE a.published_at = $1 
-          AND a.country_code != 'XX'
-        GROUP BY a.country_code, a.primary_category, entity
-    """
-    return sql, [pub_date]
+```sql
+ALTER TABLE articles
+  ADD COLUMN IF NOT EXISTS related_countries TEXT[] NOT NULL DEFAULT '{}';
+
+COMMENT ON COLUMN articles.related_countries IS
+  'ISO Alpha-2 secondari (escluso country_code e XX); vuoto = nessun arco';
 ```
 
-#### 2. Integrazione Frontend in Leaflet (`radar-map.component.ts`)
+Il prompt del LLM ed il validatore normalizzano e filtrano i codici per assicurare che:
+- Non sia duplicato il codice primario (`country_code`).
+- Sia esclusa la sigla fittizia `XX` o codici non appartenenti allo standard ISO Alpha-2.
+- Siano limitati a un massimo di 5 paesi secondari per articolo.
 
-Disegnare archi curvi georiferiti (utilizzando curve di Bézier calcolate tra le coordinate dei centroidi nazionali) per visualizzare i flussi strategici:
+#### 2. Query di Estrazione Relazioni (`articles_query.py`)
+
+A livello di database, la query estrae le relazioni bilaterali aggregando gli articoli del giorno per categoria e coppia di paesi. Le coppie sono ordinate alfabeticamente (`LEAST` e `GREATEST`) per garantire archi non orientati univoci:
+
+```sql
+SELECT
+  LEAST(a.country_code, r.related) AS source_country,
+  GREATEST(a.country_code, r.related) AS target_country,
+  a.primary_category,
+  COUNT(*)::int AS volume
+FROM articles a
+CROSS JOIN LATERAL unnest(a.related_countries) AS r(related)
+WHERE a.published_at = $1
+  AND a.country_code <> 'XX'
+  AND r.related <> 'XX'
+  AND r.related <> a.country_code
+GROUP BY 1, 2, 3
+ORDER BY volume DESC, source_country, target_country;
+```
+
+#### 3. Endpoint API (`GET /api/map-relations`)
+
+L'endpoint `GET /api/map-relations?date=YYYY-MM-DD` restituisce un payload JSON strutturato:
+
+```json
+[
+  {
+    "source_country": "AZ",
+    "target_country": "IT",
+    "primary_category": "Energia",
+    "volume": 2
+  }
+]
+```
+
+#### 4. Integrazione Frontend in Leaflet (`radar-map.component.ts`)
+
+Il frontend recupera le relazioni tramite `ArticleService` e le inserisce in `StateService.mapRelationsResource`. Al riceversi di un SSE `article_processed`, viene eseguito un soft-refresh della risorsa.
+Le relazioni sono disegnate sotto forma di polilinee con interpolazione quadratica di Bezier per generare una curva fluida:
 
 ```typescript
-private drawGeospatialRelations(relations: any[]): void {
-  // Rimuove eventuali archi esistenti
+private drawGeospatialRelations(relations: MapRelationRow[]): void {
+  if (!this.relationsLayerGroup || !this.L) return;
   this.relationsLayerGroup.clearLayers();
 
-  relations.forEach(rel => {
-    const startLatLng = this.getCountryCentroid(rel.source_country);
-    const endLatLng = this.getCountryCentroid(rel.target_country);
-    
-    if (!startLatLng || !endLatLng) return;
+  for (const r of relations) {
+    const p0 = this.getCountryCentroid(r.source_country);
+    const p2 = this.getCountryCentroid(r.target_country);
+    if (!p0 || !p2) continue;
 
-    // Calcolo del punto medio con offset perpendicolare per creare la curva
-    const midPoint = this.calculateCurveLatLng(startLatLng, endLatLng);
+    // Generazione punti curva Bezier quadratica
+    const points: Leaflet.LatLng[] = [];
+    const steps = 30;
+    const lat0 = p0.lat;
+    const lng0 = p0.lng;
+    const lat2 = p2.lat;
+    const lng2 = p2.lng;
 
-    // Disegno dell'arco curvo tramite Polyline standard (o Canvas / SVG Bezier)
-    const curve = L.curve([
-      'M', [startLatLng.lat, startLatLng.lng],
-      'Q', [midPoint.lat, midPoint.lng],
-      [endLatLng.lat, endLatLng.lng]
-    ], {
-      color: this.getCategoryColor(rel.primary_category),
-      weight: Math.min(6, 1 + rel.volume * 0.5), // Spessore dinamico proporzionale
-      opacity: 0.7,
-      className: 'relational-arc-flow' // Animato tramite CSS keyframes
+    const midLat = (lat0 + lat2) / 2;
+    const midLng = (lng0 + lng2) / 2;
+
+    const dLat = lat2 - lat0;
+    const dLng = lng2 - lng0;
+
+    // Deviazione perpendicolare proporzionale alla distanza
+    const curvature = 0.2;
+    const p1Lat = midLat - dLng * curvature;
+    const p1Lng = midLng + dLat * curvature;
+
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const lat = (1 - t) * (1 - t) * lat0 + 2 * (1 - t) * t * p1Lat + t * t * lat2;
+      const lng = (1 - t) * (1 - t) * lng0 + 2 * (1 - t) * t * p1Lng + t * t * lng2;
+      points.push(this.L.latLng(lat, lng));
+    }
+
+    const colorVar = this.CATEGORY_CSS_VARS[r.primary_category] || '--color-text-accent';
+    const docStyle = getComputedStyle(document.documentElement);
+    const color = docStyle.getPropertyValue(colorVar).trim() || '#58a6ff';
+    const weight = Math.min(6, 1 + r.volume * 0.5);
+
+    const polyline = this.L.polyline(points, {
+      color,
+      weight,
+      opacity: 0.8,
+      className: 'relational-arc-flow',
+      interactive: true,
     });
 
-    curve.addTo(this.relationsLayerGroup);
-  });
-}
+    const tooltipText = `${r.source_country} ↔ ${r.target_country} · ${r.primary_category} · n=${r.volume}`;
+    polyline.bindTooltip(tooltipText, { sticky: true });
 
-private calculateCurveLatLng(p1: Leaflet.LatLng, p2: Leaflet.LatLng): Leaflet.LatLng {
-  // Calcola coordinate ortogonali intermedie per inarcare la linea
-  const lat = (p1.lat + p2.lat) / 2 + (p2.lng - p1.lng) * 0.15;
-  const lng = (p1.lng + p2.lng) / 2 - (p2.lat - p1.lat) * 0.15;
-  return new L.LatLng(lat, lng);
+    this.relationsLayerGroup.addLayer(polyline);
+  }
 }
 ```
 
-#### 3. Styling CSS dell'Arco Animato (`radar-map.component.scss`)
+La visibilità degli archi è governata a seconda dello stato di zoom:
+- Visibili in modalità "Day View" a livelli di zoom `>= 5`.
+- Nascosti a livelli di zoom `< 5` o quando si apre il dettaglio di una singola nazione.
 
-Aggiungere un micro-flusso luminoso che scorre lungo la linea tramite CSS per dare dinamismo all'estetica dark:
+#### 5. Visualizzazione nel Carosello e Sidebar
+
+Le card degli articoli includono una sezione dedicata "🌐 Paesi correlati" posizionata dopo "Aziende" e prima di "Tag", che visualizza i codici ISO normalizzati traducendoli nei nomi reali in lingua italiana (utilizzando `Intl.DisplayNames`) tramite chip display-only `.related-chip`:
+
+```html
+<div class="badge-section" *ngIf="article()?.related_countries?.length">
+  <span class="badge-label">🌐 Paesi correlati</span>
+  <div class="badge-list">
+    <p-chip
+      *ngFor="let iso of article()?.related_countries"
+      [label]="getCountryName(iso)"
+      styleClass="radar-chip related-chip">
+    </p-chip>
+  </div>
+</div>
+```
+
+#### 6. Styling CSS dell'Arco Animato (`radar-map.component.scss`)
+
+Il movimento tratteggiato dell'arco viene realizzato tramite animazione delle proprietà SVG `stroke-dasharray` e `stroke-dashoffset` per creare un flusso continuo:
 
 ```scss
 .relational-arc-flow {
   stroke-dasharray: 8, 12;
-  animation: dash 20s linear infinite;
+  animation: relational-dash 20s linear infinite;
 }
 
-@keyframes dash {
+@keyframes relational-dash {
   to {
     stroke-dashoffset: -1000;
   }

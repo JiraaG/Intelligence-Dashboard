@@ -10,11 +10,11 @@ Cartella di audit, prompt orchestratore e SoT del modulo Radar.
 
 ## `active/` — vivi
 
-*Nessuno* (tutti i piani sono stati completati con successo).
+* Nessuno (tutti i piani correntemente completati)
 
 ## `complete/` — chiusi
 
-Vedi [`complete/README.md`](complete/README.md) per l'elenco dei piani completati (inclusi Phase 0-6, LLM multi-model fallback, commenti di codice, notizie salvate, Final Release Gate, playbook, ticket status e monorepo check).
+Vedi [`complete/README.md`](complete/README.md) per l'elenco dei piani completati (inclusi Phase 0-6, LLM multi-model fallback, commenti di codice, notizie salvate, Final Release Gate, playbook, ticket status, monorepo check e Fase H Grafo Geospaziale).
 
 ## Layout
 
@@ -22,10 +22,10 @@ Vedi [`complete/README.md`](complete/README.md) per l'elenco dei piani completat
 plan-audit/
   STATUS.md                 ← fatto vs da fare (leggere per primo)
   README.md                 ← questo indice
-  active/                   Directory per piani attivi (attualmente vuota)
+  active/                   Piani in corso (vuoto)
   complete/                 Tutti i piani e checklist COMPLETATI (spostati qui)
-  prompts/active/           Prompt non ancora eseguiti (ECC expansion)
-  prompts/done/             Prompt eseguiti (storico, incl. Final Release Gate)
+  prompts/active/           Prompt non ancora eseguiti (ECC manual/expansion)
+  prompts/done/             Prompt eseguiti (storico, incl. Fase H wave 1–3, Final Release Gate)
   remediation/              Report ticket DONE (non cancellare)
   archive/plans|ecc|llm-stubs|scratch/
 ```
@@ -36,6 +36,9 @@ plan-audit/
 
 ## Prompt done (recente)
 
+* [plan_prompt_phase_H_wave3_carousel_docs_gate.md](prompts/done/plan_prompt_phase_H_wave3_carousel_docs_gate.md) — H5+H6 chip + docs/ECC GATE (2026-07-18)
+* [plan_prompt_phase_H_wave2_frontend_map.md](prompts/done/plan_prompt_phase_H_wave2_frontend_map.md) — H3+H4 mappa (2026-07-18)
+* [plan_prompt_phase_H_wave1_backend.md](prompts/done/plan_prompt_phase_H_wave1_backend.md) — H1+H2 backend (2026-07-18)
 * [audit_prompt_final_release_gate.md](prompts/done/audit_prompt_final_release_gate.md) — Final Release F0–F4 CLOSED (archiviato 2026-07-18)
 * [audit_prompt_code_comments_beginner_terra.md](prompts/done/audit_prompt_code_comments_beginner_terra.md) — audit Terra → piano commenti (P0 eseguiti)
 

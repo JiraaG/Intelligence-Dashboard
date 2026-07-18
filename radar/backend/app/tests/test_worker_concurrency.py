@@ -123,6 +123,7 @@ async def test_concurrent_same_url_serialization(mock_commit) -> None:
             primary_category="Geopolitica",
             sentiment="Neutrale",
             infrastructural_entities="Nessuno",
+            related_countries="Nessuno",
             relevance_level=3,
         )
     state.classification_client.classify_article.side_effect = slow_classify

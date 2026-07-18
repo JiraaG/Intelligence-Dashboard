@@ -89,6 +89,7 @@ def test_schema_valid_article() -> None:
         "primary_category": "Tecnologia",
         "sentiment": "Positivo",
         "infrastructural_entities": "Fabbrica Dresda",
+        "related_countries": "Nessuno",
         "relevance_level": 4,
     }
 
@@ -115,6 +116,7 @@ def test_schema_rejects_invalid_category() -> None:
         "primary_category": "CATEGORIA_INVENTATA",
         "sentiment": "Neutrale",
         "infrastructural_entities": "Nessuno",
+        "related_countries": "Nessuno",
         "relevance_level": 1,
     }
     with pytest.raises(ValidationError):
@@ -136,6 +138,7 @@ def test_schema_rejects_invalid_relevance() -> None:
         "primary_category": "Infrastrutture",
         "sentiment": "Neutrale",
         "infrastructural_entities": "Nessuno",
+        "related_countries": "Nessuno",
         "relevance_level": "alto",
     }
     with pytest.raises(ValidationError):
@@ -155,6 +158,7 @@ def test_schema_first_tag_validation() -> None:
         "companies_involved": "Nessuno",
         "sentiment": "Neutrale",
         "infrastructural_entities": "Nessuno",
+        "related_countries": "Nessuno",
         "relevance_level": 1,
     }
 
@@ -179,6 +183,7 @@ def test_schema_first_tag_validation() -> None:
     assert fallback.tags == "Infrastrutture"
     assert fallback.companies_involved == "Nessuno"
     assert fallback.infrastructural_entities == "Nessuno"
+    assert fallback.related_countries == "Nessuno"
 
 
 def test_day_window_half_open_utc() -> None:

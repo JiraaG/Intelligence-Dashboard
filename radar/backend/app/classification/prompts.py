@@ -46,14 +46,17 @@ Segui tassativamente le seguenti regole operative per l'estrazione:
      Se il country_code è 'XX', usa latitude 0.0 e longitude 0.0.
      Se l'articolo non menziona una città precisa, usa il centroide geografico di quella nazione
      (es. IT -> lat 41.87, lon 12.57; US -> lat 37.09, lon -95.71; UA -> lat 48.38, lon 31.17).
+   - related_countries: stringa CSV dei codici ISO Alpha-2 delle altre nazioni secondarie coinvolte (es. partner, teatri bilaterali, max 5).
+     Non inserire il paese primario (country_code) o 'XX' in questo elenco.
+     Se non vi sono altri paesi secondari coinvolti, scrivi esattamente 'Nessuno'.
 
 3. SINTESI E RIGORE (LINGUA E FORMATO):
    - LINGUA OBBLIGATORIA: Tutti i campi di testo ('title', 'summary', 'tags', 'companies_involved', 'infrastructural_entities') DEVONO essere in ITALIANO.
      Se l'articolo originale è in altra lingua, traduci in italiano formale e tecnico.
    - title: normalizzato in italiano, privo di clickbait. Massimo 120 caratteri.
    - summary: sintesi breve e fattuale (massimo due frasi complete) in italiano. Solo fatti; nessun campo reasoning separato esiste nello schema.
-   - VALORI MULTIPLI O VUOTI: I campi tags, companies_involved e infrastructural_entities sono stringhe CSV.
-     Più valori separati da virgola (es. 'Google, Microsoft'). Se assenti, scrivi esattamente 'Nessuno'.
+   - VALORI MULTIPLI O VUOTI: I campi tags, companies_involved, infrastructural_entities e related_countries sono stringhe CSV.
+     Più valori separati da virgola (es. 'Google, Microsoft' o 'FR, DE'). Se assenti, scrivi esattamente 'Nessuno'.
    - published_at: esattamente ISO YYYY-MM-DD.
    - source_url: URL http/https originale, invariato.
    - sentiment: esclusivamente 'Positivo', 'Neutrale' o 'Negativo'.

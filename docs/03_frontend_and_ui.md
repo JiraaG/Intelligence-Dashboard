@@ -2,7 +2,7 @@
 
 SPA Angular 21 (standalone + signals). Codice: `radar/frontend/`.  
 Stack allineato a Phase **6 DONE / GATE VERDE**.  
-**Freeze:** non modificare `radar/frontend/src/app/components/radar-sidebar/**` (niente `article-list` / infinite scroll / restyle carousel).
+**Freeze:** non modificare `radar/frontend/src/app/components/radar-sidebar/**` (niente `article-list` / infinite scroll / restyle carousel) tranne per le due eccezioni mirate: il toggle Salva/Rimuovi e la sezione chip dei paesi correlati (`related_countries`).
 
 ---
 
@@ -135,4 +135,24 @@ PATCH saved status: update ottimistico + rollback; risposta `{status, is_saved, 
 
 GeoJSON locale: `assets/data/countries.geo.json` (no CDN in produzione; pin in `ASSET_LICENSE.md`). Bounding box speciali US/RU; `minZoom` ~2.2.
 
+---
+
+## Relazioni Geospaziali (Grafo — Fase H)
+
+Per collegare le notizie multilaterali, la mappa disegna archi curvi bidirezionali (mediante interpolazione di punti tramite `L.polyline`) tra i centroidi dei paesi.
+
+1. **Gestione dello Stato**: `StateService` espone `mapRelationsResource` sincronizzato con la data attiva e i filtri della toolbar. Al riceversi del segnale SSE `article_processed`, viene scatenato il reload atomico sia per il summary che per le relazioni.
+2. **Visualizzazione e Zoom**:
+   - Gli archi vengono disegnati in un `relationsLayerGroup` dedicato, posizionato sopra il layer dei confini nazionali.
+   - Sono visibili esclusivamente in modalità "Day View" con livello di zoom `>= 5`.
+   - Vengono nascosti se lo zoom scende sotto `5` o se viene aperta la vista di dettaglio di una specifica nazione (per evitare sovrapposizioni visive con il ventaglio di spiderfy).
+3. **Calcolo Centroidi**:
+   - I centroidi vengono estratti dinamicamente dai confini GeoJSON caricati in cache.
+   - Per gli Stati Uniti (`US`) e la Russia (`RU`), data la loro estensione trans-antimeridiana, si utilizzano coordinate statiche hardcoded per posizionare l'arco al centro della terraferma principale (mainland).
+4. **Stile Visivo**:
+   - Colore dell'arco allineato alle variabili di stile della categoria geopolitica (`CATEGORY_CSS_VARS`).
+   - Spessore proporzionale al volume aggregato di notizie (`Math.min(6, 1 + volume * 0.5)`).
+   - Animazione a tratteggio continuo tramite CSS keyframe `.relational-arc-flow` che simula un flusso continuo di informazioni.
+
 Dettaglio ops FE: [`radar/frontend/README.md`](../radar/frontend/README.md).
+

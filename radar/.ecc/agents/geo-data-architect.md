@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS articles (
     is_saved        BOOLEAN NOT NULL DEFAULT FALSE,
     infrastructural_entities TEXT[] NOT NULL DEFAULT '{}',
     feed_title      TEXT NOT NULL DEFAULT 'RSS Feed',
+    related_countries TEXT[] NOT NULL DEFAULT '{}',
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -80,6 +81,7 @@ COMMENT ON TABLE articles IS 'Articoli geopolitici processati da Gemini. source_
 COMMENT ON COLUMN articles.primary_category IS 'Categoria univoca per determinare icona/colore marker sulla mappa Leaflet.';
 COMMENT ON COLUMN articles.country_code IS 'ISO Alpha-2 (IT, US, CN...). XX = fallback errore Gemini.';
 COMMENT ON COLUMN articles.infrastructural_entities IS 'Elenco di asset o infrastrutture fisiche citate (es. dighe, porti, fabbriche).';
+COMMENT ON COLUMN articles.related_countries IS 'ISO Alpha-2 secondari (escluso country_code e XX); vuoto = nessun arco.';
 COMMENT ON COLUMN articles.is_read IS 'Stato letto/non letto lato FE (marker-read).';
 COMMENT ON COLUMN articles.is_saved IS 'Vault salvati cross-day (Notizie Salvate). Save ⇒ is_read=true; unread ⇒ is_saved=false.';
 COMMENT ON COLUMN articles.feed_title IS 'Titolo feed Miniflux associato all entry.';

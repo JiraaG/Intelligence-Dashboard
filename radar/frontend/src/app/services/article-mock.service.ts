@@ -9,6 +9,7 @@ import {
   Sentiment,
 } from '../models/article.model';
 import { MapSummaryRow } from '../models/map-summary.model';
+import { MapRelationRow } from '../models/map-relation.model';
 
 /** Data ISO di generazione fixture — usata come ``published_at``, non come filtro query. */
 const TODAY = new Date().toISOString().split('T')[0];
@@ -18,8 +19,7 @@ const TODAY = new Date().toISOString().split('T')[0];
  * Attivo solo se ``MOCK_MODE=true`` (mai fallback silenzioso da ArticleService).
  *
  * @see skill spatial-data-mocking.
- */
-export const MOCK_ARTICLES: Article[] = [
+ */export const MOCK_ARTICLES: Article[] = [
   // --- CLUSTER TEST: Due articoli in Germania (città diverse) ---
   {
     id: 1,
@@ -37,6 +37,7 @@ export const MOCK_ARTICLES: Article[] = [
     relevance_level: 4,
     infrastructural_entities: ['TSMC Dresden Fab', 'Silicon Saxony Campus'],
     feed_title: 'Silicon Saxony News',
+    related_countries: [],
     is_read: false,
     is_saved: true,
   },
@@ -56,6 +57,7 @@ export const MOCK_ARTICLES: Article[] = [
     relevance_level: 3,
     infrastructural_entities: ['Rete di trasmissione 380kV Baviera', 'Interconnessione DE-AT'],
     feed_title: 'Bavarian Grid Monitor',
+    related_countries: ['AT'],
     is_read: true,
     is_saved: false,
   },
@@ -76,6 +78,7 @@ export const MOCK_ARTICLES: Article[] = [
     relevance_level: 5,
     infrastructural_entities: ['Centrale Nucleare di Zaporizhzhia', 'Sito di stoccaggio combustibile'],
     feed_title: 'IAEA Bulletin',
+    related_countries: [],
     is_read: false,
     is_saved: true,
   },
@@ -95,6 +98,7 @@ export const MOCK_ARTICLES: Article[] = [
     relevance_level: 3,
     infrastructural_entities: ['Diga di Kakhovka', 'Serbatoio di Kakhovka'],
     feed_title: 'EU Reconstruction Index',
+    related_countries: [],
     is_read: false,
     is_saved: false,
   },
@@ -115,6 +119,7 @@ export const MOCK_ARTICLES: Article[] = [
     relevance_level: 5,
     infrastructural_entities: ['Impianto di Natanz', 'Impianto di Fordow'],
     feed_title: 'United Nations Security News',
+    related_countries: ['US', 'RU'],
     is_read: false,
     is_saved: false,
   },
@@ -134,6 +139,7 @@ export const MOCK_ARTICLES: Article[] = [
     relevance_level: 4,
     infrastructural_entities: ['Samsung Fab Hwaseong', 'Samsung R&D Campus Suwon'],
     feed_title: 'Korea Tech Herald',
+    related_countries: [],
     is_read: false,
     is_saved: true,
   },
@@ -153,6 +159,7 @@ export const MOCK_ARTICLES: Article[] = [
     relevance_level: 4,
     infrastructural_entities: ['Trans-Adriatic Pipeline (TAP)', 'Terminale di Melendugno', 'Campo di Shah Deniz II'],
     feed_title: 'Trans-Adriatic Pipeline Press',
+    related_countries: ['IT'],
     is_read: false,
     is_saved: false,
   },
@@ -274,6 +281,45 @@ export class ArticleMockService {
       const c = a.country_code.localeCompare(b.country_code);
       return c !== 0 ? c : a.primary_category.localeCompare(b.primary_category);
     }));
+  }
+
+  /**
+   * Deriva le relazioni undirected geopolitiche basate sui paesi secondari degli articoli mock.
+   * ``date`` ignorato.
+   */
+  getMapRelations(date: string, sentiment?: Sentiment | Sentiment[] | null): Observable<MapRelationRow[]> {
+    void date;
+    let arts = MOCK_ARTICLES;
+    if (Array.isArray(sentiment) && sentiment.length > 0) {
+      const allowed = new Set(sentiment);
+      arts = arts.filter((a) => allowed.has(a.sentiment));
+    } else if (typeof sentiment === 'string') {
+      arts = arts.filter((a) => a.sentiment === sentiment);
+    }
+
+    const grouped = new Map<string, MapRelationRow>();
+    for (const a of arts) {
+      if (!a.related_countries || a.related_countries.length === 0) continue;
+      if (a.country_code === 'XX') continue;
+      for (const rel of a.related_countries) {
+        if (rel === 'XX' || rel === a.country_code) continue;
+        const source = a.country_code < rel ? a.country_code : rel;
+        const target = a.country_code < rel ? rel : a.country_code;
+        const key = `${source}|${target}|${a.primary_category}`;
+        const existing = grouped.get(key);
+        if (existing) {
+          existing.volume += 1;
+        } else {
+          grouped.set(key, {
+            source_country: source,
+            target_country: target,
+            primary_category: a.primary_category,
+            volume: 1,
+          });
+        }
+      }
+    }
+    return of([...grouped.values()].sort((a, b) => b.volume - a.volume));
   }
 
   /** Helper legacy: tutti i mock (``date`` ignorato). */

@@ -17,12 +17,12 @@ in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categ
 - **Phase 0–5 DONE**; Phase **6 DONE / GATE VERDE**. Vedi `plan-audit/complete/plan_impl_phase_0_6.md` / `plan-audit/complete/plan_impl_phase_0_6_execution.md`.
 - **Phase B (Real-Time Ingestion & Soft Refresh) DONE / GATE VERDE**: Webhook HMAC (`POST /api/webhooks/miniflux`), streaming SSE (`GET /api/articles/events`), dedicated Postgres LISTEN connections (no pool), Angular zone-isolated soft refresh with reference-preserving merge, and pending mutation protection.
 - **Final Release F0–F4 COMPLETE** (2026-07-18): PR #1 `refactor/testing` → `develop` merged 2026-07-17; F1–F4 PASS. Fase 5 (digest pin / drop `--legacy-peer-deps`) = **DEFERRED ACCETTATO**, non richiesto. Quadro: `plan-audit/STATUS.md`.
-- **Presenti (Phase 1–5 + follow-up):** migrazioni `001`–`010` (incluso `008_outbox_miniflux_marked_at`, `009_llm_model_cooldown`, `010_articles_is_saved`), outbox, ledger quote, cooldown modelli, `radar-worker`, reti `radar-edge`/`radar-data`, `/health/live`+`/ready`, CSP Nginx, `ops/` backup, Gemini `build_gemini_response_schema()`, FE `MOCK_MODE` / DestroyRef / XSS-safe markers / read-unread senza rebuild cluster / **`detailError` nation-fetch → banner toolbar (T-P1-04)** / **Notizie Salvate** (`is_saved`, saved-summary, toolbar vault).
-- **Phase 5 API/FE:** `GET /api/map-summary` (`country×category`); `GET /api/saved-summary` (vault, no date); `GET /api/articles` → `{items,next_cursor,total}` (keyset `id`, limit≤100, LATERAL; `saved=true` cross-day); `PATCH read_status` / `saved_status` (unread⇒unsave; save⇒read); `backend/app/api/articles_query.py`; migrazioni `007`+. FE: giorno da summary + **pin nazione**; nazione = tutti gli articoli + hub disco compatto + spiderfy categoria attiva; vault salvati = tooltip nazioni + carosello multi-day con **stesso zoom/spiderfy di LETTE/TROVATE**. **Vietato** `article-list`. Sidebar freeze resta (eccezione mirata: toggle Salva sulle card).
+- **Presenti (Phase 1–5 + follow-up):** migrazioni `001`–`011` (incluso `008_outbox_miniflux_marked_at`, `009_llm_model_cooldown`, `010_articles_is_saved`, `011_articles_related_countries`), outbox, ledger quote, cooldown modelli, `radar-worker`, reti `radar-edge`/`radar-data`, `/health/live`+`/ready`, CSP Nginx, `ops/` backup, Gemini `build_gemini_response_schema()`, FE `MOCK_MODE` / DestroyRef / XSS-safe markers / read-unread senza rebuild cluster / **`detailError` nation-fetch → banner toolbar (T-P1-04)** / **Notizie Salvate** (`is_saved`, saved-summary, toolbar vault).
+- **Phase 5 API/FE:** `GET /api/map-summary` (`country×category`); `GET /api/map-relations` (archi relazioni per categoria); `GET /api/saved-summary` (vault, no date); `GET /api/articles` → `{items,next_cursor,total}` (keyset `id`, limit≤100, LATERAL; `saved=true` cross-day); `PATCH read_status` / `saved_status` (unread⇒unsave; save⇒read); `backend/app/api/articles_query.py`; migrazioni `007`+. FE: giorno da summary + **pin nazione**; nazione = tutti gli articoli + hub disco compatto + spiderfy categoria attiva; vault salvati = tooltip nazioni + carosello multi-day con **stesso zoom/spiderfy di LETTE/TROVATE**. **Vietato** `article-list`. Sidebar freeze resta (due eccezioni mirate: toggle Salva e chip `related_countries`).
 - Pipeline ingest in `backend/app/worker.py`; `main.py` è API-only. Compose: 5 servizi su edge+data.
-- **Sidebar freeze:** non refactorare `frontend/src/app/components/radar-sidebar/**`; tenere `p-carousel` + altezza via `article-card-{id}`; vietato `app-article-list`. Eccezione: solo toggle Salva / binding `is_saved`.
+- **Sidebar freeze:** non refactorare `frontend/src/app/components/radar-sidebar/**`; tenere `p-carousel` + altezza via `article-card-{id}`; vietato `app-article-list`. Eccezione: toggle Salva (`is_saved`) + sezione chip `related_countries`.
 - Bug **read/unread** (`.marker-read`): risolto in Phase 4 via `state.service.ts` + `radar-map.component.ts`. Unread ⇒ unsave; save ⇒ read.
-- Pydantic: `companies_involved` / `tags` / `infrastructural_entities` sono **`str` CSV** (non `List[str]`). Nessun campo `reasoning`; `ConfigDict(strict=True, extra="forbid")`. Il modello FE può ancora usare `string[]` dopo `array_agg` API — non confondere i due.
+- Pydantic: `companies_involved` / `tags` / `infrastructural_entities` / `related_countries` sono **`str` CSV** (non `List[str]`). Nessun campo `reasoning`; `ConfigDict(strict=True, extra="forbid")`. Il modello FE può ancora usare `string[]` dopo `array_agg` API — non confondere i due.
 
 ---
 
@@ -64,7 +64,8 @@ radar/
 │   │   ├── 007_articles_query_indexes.sql
 │   │   ├── 008_outbox_miniflux_marked_at.sql
 │   │   ├── 009_llm_model_cooldown.sql
-│   │   └── 010_articles_is_saved.sql
+│   │   ├── 010_articles_is_saved.sql
+│   │   └── 011_articles_related_countries.sql
 │   └── app/
 │       ├── __init__.py
 │       ├── main.py                # FastAPI API-only (pool + migrations + REST)

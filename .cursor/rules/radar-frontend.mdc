@@ -9,5 +9,5 @@ alwaysApply: false
 **Source of truth:** `radar/.ecc/rules/frontend.md`
 
 Before editing any file under `radar/frontend/**`, read that file and follow it.
-**Sidebar freeze:** never modify `radar/frontend/src/app/components/radar-sidebar/**`.
+**Sidebar freeze:** never modify `radar/frontend/src/app/components/radar-sidebar/**` (except for toggle Save and related_countries chips).
 Do not invent alternate frontend conventions here — this rule only scopes the SoT into Cursor.

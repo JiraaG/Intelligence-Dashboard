@@ -5,6 +5,7 @@ import {
   Sentiment,
 } from './article.model';
 import { MapSummaryRow } from './map-summary.model';
+import { MapRelationRow } from './map-relation.model';
 
 const PRIMARY_CATEGORIES: ReadonlySet<string> = new Set<PrimaryCategory>([
   'Nucleare',
@@ -64,6 +65,7 @@ export function isArticleDto(value: unknown): value is Article {
   if (!isStringArray(row['tags'])) return false;
   if (!isStringArray(row['infrastructural_entities'])) return false;
   if (typeof row['feed_title'] !== 'string') return false;
+  if (!isStringArray(row['related_countries'])) return false;
   if (row['is_read'] !== undefined && typeof row['is_read'] !== 'boolean') return false;
   if (row['is_saved'] !== undefined && typeof row['is_saved'] !== 'boolean') return false;
 
@@ -144,6 +146,31 @@ export function parseMapSummaryDto(payload: unknown): MapSummaryRow[] {
   for (const item of payload) {
     if (!isMapSummaryRowDto(item)) {
       throw new Error('Invalid map-summary DTO in API payload');
+    }
+    rows.push(item);
+  }
+  return rows;
+}
+
+export function isMapRelationRowDto(value: unknown): value is MapRelationRow {
+  if (!value || typeof value !== 'object') return false;
+  const row = value as Record<string, unknown>;
+  if (typeof row['source_country'] !== 'string') return false;
+  if (typeof row['target_country'] !== 'string') return false;
+  if (typeof row['primary_category'] !== 'string') return false;
+  if (!PRIMARY_CATEGORIES.has(row['primary_category'] as PrimaryCategory)) return false;
+  if (!isFiniteNumber(row['volume'])) return false;
+  return true;
+}
+
+export function parseMapRelationsDto(payload: unknown): MapRelationRow[] {
+  if (!Array.isArray(payload)) {
+    throw new Error('Map-relations payload must be an array');
+  }
+  const rows: MapRelationRow[] = [];
+  for (const item of payload) {
+    if (!isMapRelationRowDto(item)) {
+      throw new Error('Invalid map-relations DTO in API payload');
     }
     rows.push(item);
   }

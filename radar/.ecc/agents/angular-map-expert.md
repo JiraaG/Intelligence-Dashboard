@@ -32,9 +32,9 @@ scope:
 
 ### Sidebar freeze (obbligatorio)
 
-- **NON** aprire/modificare `components/radar-sidebar/**`.
+- **NON** aprire/modificare `components/radar-sidebar/**` (eccetto per il toggle Salva e per i chip `related_countries`).
 - Conservare `p-carousel` e altezza dinamica esistente; vietato `app-article-list`.
-- Fix `.marker-read` / read-status: solo `state.service.ts` + `radar-map` (e test correlati).
+- Fix `.marker-read` / read-status: solo `state.service.ts` + `radar-map` (e test correlati; tranne eccezioni sidebar).
 - **Phase 4 DONE:** XSS-safe markers, `MOCK_MODE` token (no silent fallback), DestroyRef,
   geometry fingerprint (no `clearLayers` su solo `is_read`), hatch owner = `getOrCreateComboPattern`
   (niente `appLeafletHatch`), overlay full-bleed + `invalidateSize`.
@@ -449,6 +449,23 @@ export class ArticleMockService {
 
 ---
 
+## Relazioni Geospaziali (Grafo — Fase H)
+
+Per connettere le notizie multilaterali, il componente mappa riceve le relazioni tramite input `mapRelations` e le disegna sulla mappa.
+
+1. **Gestione Stato e Input**:
+   - Ricevere in input `mapRelations` (tipo `MapRelationRow[]`) per disegnare le relazioni bilaterali.
+   - Sincronizzare gli archi basandosi su `mapRelationsResource` e `filteredMapRelations`.
+2. **Layer e Visibilità**:
+   - Utilizzare un `relationsLayerGroup` dedicato sibling di `summaryMarkerGroup`.
+   - Gli archi devono essere visibili solo a zoom `>= 5` in modalità "Day View" e devono essere nascosti automaticamente (allineati a `syncSummaryMarkerVisibility()`) a zoom `< 5` o quando si apre il dettaglio di una singola nazione.
+3. **Drawing e Divieti**:
+   - **VIETATO** l'uso di nuove dipendenze npm come `leaflet-curve`.
+   - Gli archi devono essere disegnati calcolando punti intermedi a runtime per simulare una curva di Bézier quadratica e renderizzandoli tramite `L.polyline` nativa di Leaflet.
+   - Il ricalcolo degli archi sulla mappa deve essere ottimizzato controllando la variazione del fingerprint che include anche le relazioni.
+
+---
+
 ## Comandi Diagnostici
 
 ```bash
@@ -474,6 +491,8 @@ cd frontend && npm run typecheck
 - **BLOCCA** se: `subscribe()` invece di Signals per stato globale
 - **BLOCCA** se: colori hardcoded diversi dalla palette Palantir definita
 - **BLOCCA** se: `import * as L from 'leaflet'` o `import 'leaflet.markercluster'` nei componenti (causa TypeError con esbuild)
+- **BLOCCA** se: uso di nuove dipendenze npm (es. `leaflet-curve`) per il disegno degli archi
+- **BLOCCA** se: archi relazioni visibili a zoom < 5 o in nation-open
 - **AVVISA** se: manca la transizione CSS per split-screen
 - **AVVISA** se: `maxClusterRadius` ≠ 40 o `spiderfyOnMaxZoom` ≠ false
 - **BLOCCA** se: modifiche a `radar-sidebar/**` o introduzione di `app-article-list`

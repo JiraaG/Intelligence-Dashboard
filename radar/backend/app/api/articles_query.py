@@ -177,7 +177,7 @@ def build_articles_page_query(
             a.id, a.title, a.summary, a.published_at::text AS published_at, a.source_url,
             a.country_code, a.latitude, a.longitude, a.primary_category,
             a.sentiment, a.relevance_level, a.infrastructural_entities, a.feed_title,
-            a.is_read, a.is_saved,
+            a.is_read, a.is_saved, a.related_countries,
             COALESCE(companies.names, '{}') AS companies_involved,
             COALESCE(tags.names, '{}') AS tags
         FROM articles a
@@ -313,4 +313,45 @@ def build_saved_summary_query(
     )
     parts.append("GROUP BY country_code, primary_category")
     parts.append("ORDER BY country_code, primary_category")
+    return " ".join(parts), params
+
+
+def build_map_relations_query(
+    pub_date: date,
+    *,
+    sentiment: Optional[Sequence[str]] = None,
+    relevance_level: Optional[int] = None,
+) -> tuple[str, list[Any]]:
+    """Undirected relations between country_code and unnested related_countries.
+
+    Aggregates by source_country, target_country and primary_category, and filters out:
+    - self loops (related_countries = country_code)
+    - country_code = XX
+    - related_countries = XX
+    """
+    params: list[Any] = [pub_date]
+    parts = [
+        """
+        SELECT
+            LEAST(a.country_code, r.related) AS source_country,
+            GREATEST(a.country_code, r.related) AS target_country,
+            a.primary_category,
+            COUNT(*)::int AS volume
+        FROM articles a
+        CROSS JOIN LATERAL unnest(a.related_countries) AS r(related)
+        WHERE a.published_at = $1
+          AND a.country_code <> 'XX'
+          AND r.related <> 'XX'
+          AND r.related <> a.country_code
+        """
+    ]
+    _append_optional_filters(
+        parts,
+        params,
+        sentiment=sentiment,
+        relevance_level=relevance_level,
+        column_prefix="a.",
+    )
+    parts.append("GROUP BY 1, 2, 3")
+    parts.append("ORDER BY volume DESC, source_country, target_country")
     return " ".join(parts), params

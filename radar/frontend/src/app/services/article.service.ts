@@ -10,7 +10,8 @@ import {
   Sentiment,
 } from '../models/article.model';
 import { MapSummaryRow } from '../models/map-summary.model';
-import { parseArticlesPageDto, parseMapSummaryDto } from '../models/article.dto';
+import { MapRelationRow } from '../models/map-relation.model';
+import { parseArticlesPageDto, parseMapSummaryDto, parseMapRelationsDto } from '../models/article.dto';
 import { ArticleMockService } from './article-mock.service';
 import { MOCK_MODE } from './mock-mode.token';
 
@@ -66,6 +67,31 @@ export class ArticleService {
     }
     return this.http.get<unknown>('/api/map-summary', { params }).pipe(
       map((payload) => parseMapSummaryDto(payload)),
+    );
+  }
+
+  /**
+   * Day view relations: ``GET /api/map-relations`` (o mock derivato).
+   * Sentiment multiplo: query ripetuta ``sentiment=`` (OR lato API).
+   */
+  getMapRelations(filters: {
+    date: string;
+    sentiment?: Sentiment | Sentiment[] | null;
+  }): Observable<MapRelationRow[]> {
+    if (this.mockMode) {
+      return this.mock.getMapRelations(filters.date, filters.sentiment ?? undefined);
+    }
+    let params = new HttpParams().set('date', filters.date);
+    const sentiments = Array.isArray(filters.sentiment)
+      ? filters.sentiment
+      : filters.sentiment
+        ? [filters.sentiment]
+        : [];
+    for (const s of sentiments) {
+      params = params.append('sentiment', s);
+    }
+    return this.http.get<unknown>('/api/map-relations', { params }).pipe(
+      map((payload) => parseMapRelationsDto(payload)),
     );
   }
 

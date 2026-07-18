@@ -29,6 +29,7 @@ export interface Article {
   tags:                     string[];         // Tag geopolitici associati
   infrastructural_entities: string[];         // Asset fisici identificati (es. "Zaporizhzhia Nuclear Plant")
   feed_title:               string;           // Fonte di acquisizione (es. "Yahoo Finance")
+  related_countries:        string[];         // ISO Alpha-2 secondari
   is_read?:                 boolean;          // Stato letto/da leggere
   is_saved?:                boolean;          // Vault salvati (cross-day)
 }
