@@ -33,6 +33,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 | Piani ECC / Limits / stub | [`archive/`](archive/) | SUPERSEDED / PRD |
 | Phase B Real-Time (webhook/SSE/soft-refresh) | [`complete/master_plan_impl_phase_B.md`](complete/master_plan_impl_phase_B.md) + [`implementation`](complete/implementation_plan_phase_B.md) + [`analisi`](complete/analisi_dettagliata_fase_B.md) | **DONE / GATE VERDE** 2026-07-18 — HMAC webhook, LISTEN dedicate, SSE, Angular soft-refresh |
 | Fase H — Grafo geospaziale | [`complete/master_plan_impl_phase_H_geospatial_graph.md`](complete/master_plan_impl_phase_H_geospatial_graph.md) | **DONE / GATE VERDE** (2026-07-18) — related_countries, GET /api/map-relations, archi mappa, chip carosello, allineamento docs + ECC. |
+| Archi multicolore + click bilaterale | [`complete/plan_archi_hatching_multicolor.md`](complete/plan_archi_hatching_multicolor.md) | **DONE / GATE VERDE** (2026-07-18) — macro multicolore &lt;5, tratteggio geometrico ≥5, `relationsPane`, hover/click → `loadRelationArticles`. |
 
 ---
 
@@ -45,8 +46,9 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 | Commenti codice P1/P2 | **Chiuso (P2-01)** | Altri P2 in inventario senza `batch_id` — solo se emerge gap reale |
 | Fase C — Dedup semantica `pgvector` | **BACKLOG** | Vedi `radar_overview_and_upgrades.md` §C; non iniziata; indipendente da H |
 | Fase H — Grafo geospaziale | **DONE** | related_countries + GET /api/map-relations + archi mappa + chip carosello (2026-07-18). |
+| Archi UI (multicolore + click) | **DONE** | Piano [`complete/plan_archi_hatching_multicolor.md`](complete/plan_archi_hatching_multicolor.md). Residuo **opzionale**: multicolore aggregato anche a zoom ≥ 5. |
 
-**Nessun residuo operativo obbligatorio sulla Fase B.** Branch corrente di riferimento: `feature/upgrades` (Phase B) / `develop` (baseline release).
+**Nessun residuo operativo obbligatorio sulla Fase B / H / archi UI.** Branch di riferimento feature: `feature/upgrades`.
 
 Prompt Final Release: [`prompts/done/audit_prompt_final_release_gate.md`](prompts/done/audit_prompt_final_release_gate.md) — **non rieseguire** (F0–F4 chiusi).
 
@@ -60,7 +62,7 @@ Prompt Final Release: [`prompts/done/audit_prompt_final_release_gate.md`](prompt
 plan-audit/
   STATUS.md          ← questo file (quadro fatto / residui)
   active/            ← Piani in corso (vuoto)
-  complete/          ← Piani COMPLETATI (incl. Phase 0–6, Fase B, Fase H)
+  complete/          ← Piani COMPLETATI (incl. Phase 0–6, Fase B, Fase H, archi UI)
   prompts/active/    ← solo prompt non eseguiti (ECC manual/expansion)
   prompts/done/      ← storico (incl. Fase H wave 1–3, Final Release Gate + audit commenti)
   remediation/       ← report DONE (incl. F1–F4)

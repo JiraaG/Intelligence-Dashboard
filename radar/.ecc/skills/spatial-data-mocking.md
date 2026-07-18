@@ -353,12 +353,15 @@ con i dati mockati prima di connettere il backend reale.
 - [ ] Card: **Salva notizia** / **Rimuovi dai salvati**; save ⇒ letta; unread ⇒ unsave
 - [ ] Mock: `getSavedSummary` + `getArticlesPage({ saved: true })`
 
-### ✅ Test 7: Relazioni Geospaziali (Fase H)
+### ✅ Test 7: Relazioni Geospaziali (Fase H + archi UI)
 
-- [ ] In modalità Day View a zoom >= 5 gli archi delle relazioni sono visibili sulla mappa
-- [ ] A zoom < 5 gli archi delle relazioni vengono nascosti automaticamente
-- [ ] Quando viene aperta una nazione (nation-open) gli archi delle relazioni vengono nascosti automaticamente per evitare interferenze con lo spiderfy
-- [ ] Le card degli articoli nella sidebar (sia visualizzazione singola che carosello) mostrano la sezione "Paesi correlati" con i relativi chip se `related_countries` non è vuoto
+- [ ] Day view zoom **&lt; 5**: archi **multicolore** aggregati visibili sopra hatching (non nascosti)
+- [ ] Day view zoom **≥ 5**: archi **per-categoria** con tratteggio geometrico (fermo al pan); multi-cat stessa coppia → fan parallelo
+- [ ] Hover arco: tooltip + highlight (anche in Europa densa; linee sopra i nomi tile)
+- [ ] Click arco macro: sidebar/carosello con notizie bilaterali A↔B **tutte** le categorie (entrambi i versi)
+- [ ] Click arco pin: stessa cosa filtrata per la **tipologia** dell’arco
+- [ ] Nation-open: archi nascosti (no interferenza spiderfy)
+- [ ] Card: sezione "Paesi correlati" con chip se `related_countries` non vuoto
 
 ---
 

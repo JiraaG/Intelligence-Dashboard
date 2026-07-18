@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Article } from '../models/article.model';
 import { ArticleService } from './article.service';
-import { StateService } from './state.service';
+import { isBilateralRelationArticle, StateService } from './state.service';
 import { MOCK_MODE } from './mock-mode.token';
 
 const SAMPLE: Article = {
@@ -26,6 +26,42 @@ const SAMPLE: Article = {
   related_countries: [],
   is_read: false,
 };
+
+describe('isBilateralRelationArticle', () => {
+  it('matches both directions of the pair', () => {
+    expect(
+      isBilateralRelationArticle(
+        { ...SAMPLE, country_code: 'IT', related_countries: ['CN'] },
+        'CN',
+        'IT',
+      ),
+    ).toBe(true);
+    expect(
+      isBilateralRelationArticle(
+        { ...SAMPLE, country_code: 'CN', related_countries: ['IT'] },
+        'CN',
+        'IT',
+      ),
+    ).toBe(true);
+  });
+
+  it('rejects articles not linking the pair', () => {
+    expect(
+      isBilateralRelationArticle(
+        { ...SAMPLE, country_code: 'IT', related_countries: ['US'] },
+        'CN',
+        'IT',
+      ),
+    ).toBe(false);
+    expect(
+      isBilateralRelationArticle(
+        { ...SAMPLE, country_code: 'DE', related_countries: ['IT'] },
+        'CN',
+        'IT',
+      ),
+    ).toBe(false);
+  });
+});
 
 describe('StateService detailError (T-P1-04)', () => {
   let state: StateService;
@@ -95,6 +131,51 @@ describe('StateService detailError (T-P1-04)', () => {
     state.clearDetailArticles();
     expect(state.detailError()).toBeNull();
     expect(state.error()).toBeNull();
+  });
+
+  describe('loadRelationArticles', () => {
+    it('keeps only bilateral articles and optional category', async () => {
+      const itCnEco = {
+        ...SAMPLE,
+        id: 1,
+        country_code: 'IT',
+        related_countries: ['CN'],
+        primary_category: 'Economia' as const,
+      };
+      const cnItEco = {
+        ...SAMPLE,
+        id: 2,
+        country_code: 'CN',
+        related_countries: ['IT'],
+        primary_category: 'Economia' as const,
+      };
+      const itCnEnergy = {
+        ...SAMPLE,
+        id: 3,
+        country_code: 'IT',
+        related_countries: ['CN'],
+        primary_category: 'Energia' as const,
+      };
+      const itUs = {
+        ...SAMPLE,
+        id: 4,
+        country_code: 'IT',
+        related_countries: ['US'],
+        primary_category: 'Economia' as const,
+      };
+
+      articleService.getAllArticlesForCountry.mockImplementation((_date: string, country: string) => {
+        if (country === 'IT') return of([itCnEco, itCnEnergy, itUs]);
+        if (country === 'CN') return of([cnItEco]);
+        return of([]);
+      });
+
+      const all = await state.loadRelationArticles('IT', 'CN');
+      expect(all.map((a) => a.id).sort()).toEqual([1, 2, 3]);
+
+      const pin = await state.loadRelationArticles('IT', 'CN', 'Economia');
+      expect(pin.map((a) => a.id).sort()).toEqual([1, 2]);
+    });
   });
 
   describe('mergeDetailArticlesFromServer (Fase B)', () => {

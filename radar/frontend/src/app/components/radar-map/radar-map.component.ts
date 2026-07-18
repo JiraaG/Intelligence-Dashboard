@@ -27,6 +27,14 @@ export interface CountryOpenRequest {
   preserveZoom?: boolean;
 }
 
+/** Payload click su arco bilaterale → sidebar con notizie A↔B. */
+export interface RelationOpenRequest {
+  sourceCountry: string;
+  targetCountry: string;
+  /** Zoom pin: solo questa tipologia; zoom macro: assente = tutte le categorie. */
+  category?: PrimaryCategory;
+}
+
 /** Forma minima del MarkerCluster UMD su ``window.L`` (non ESM). */
 interface MarkerClusterGroupLike {
   addLayer(layer: Leaflet.Layer): this;
@@ -113,6 +121,8 @@ export class RadarMapComponent implements AfterViewInit {
   clusterClicked = output<Article[]>();
   /** Apertura nazione — category / preserveZoom opzionali (pallini summary). */
   countryClicked = output<CountryOpenRequest>();
+  /** Click arco relazione → sidebar bilaterale (macro: tutte le cat.; pin: una cat.). */
+  relationClicked = output<RelationOpenRequest>();
 
   currentZoomLevel = signal<number>(3);
   /** True se zoom &lt; 5 (macro: hatching, pin summary nascosti). */
@@ -448,9 +458,15 @@ export class RadarMapComponent implements AfterViewInit {
     this.geoJsonLayerGroup = L.layerGroup();
     this.summaryMarkerGroup = L.layerGroup();
     this.relationsLayerGroup = L.layerGroup();
-    // Canvas: il dashArray resta ancorato alla geografia; con SVG Leaflet resetta il
-    // transform a ogni moveend e il stroke-dasharray sembra "scorrere".
-    this.relationsRenderer = typeof L.canvas === 'function' ? L.canvas({ padding: 0.5 }) : null;
+    // Pane dedicato sopra confini (overlay 400) e label tile (450), sotto i marker (600):
+    // così hover/click archi non vengono rubati dai poligoni nazione, e i nomi
+    // non coprono le linee. Canvas sul pane relazioni (dash geometrico stabile al pan).
+    const relationsPane = this.map.createPane('relationsPane');
+    relationsPane.style.zIndex = '550';
+    this.relationsRenderer =
+      typeof L.canvas === 'function'
+        ? L.canvas({ padding: 0.5, pane: 'relationsPane' })
+        : null;
     this.detailHubGroup = L.layerGroup().addTo(this.map);
 
     this.map.on('click', (e: Leaflet.LeafletMouseEvent) => {
@@ -467,8 +483,9 @@ export class RadarMapComponent implements AfterViewInit {
       maxZoom: 19,
     }).addTo(this.map);
 
+    // Label sotto relationsPane (550): pointer-events none resta (solo decorazione).
     const labelsPane = this.map.createPane('labelsPane');
-    labelsPane.style.zIndex = '650';
+    labelsPane.style.zIndex = '450';
     labelsPane.style.pointerEvents = 'none';
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
@@ -1375,22 +1392,34 @@ export class RadarMapComponent implements AfterViewInit {
         const colorVar = this.CATEGORY_CSS_VARS[r.primary_category] || '--color-text-accent';
         const color = docStyle.getPropertyValue(colorVar).trim() || '#58a6ff';
         const weight = Math.min(6, 1 + r.volume * 0.5);
+        const baseOpacity = 0.8;
         const tooltipText = `${r.source_country} ↔ ${r.target_country} · ${r.primary_category} · n=${r.volume}`;
 
         // Tratteggio geometrico (segmenti lat/lng): evita lo sfasamento del dashArray
         // a ogni moveend quando Leaflet ridisegna Canvas/SVG.
-        this.addGeometricDashedPolyline(
+        const visualLayers = this.addGeometricDashedPolyline(
           points,
           {
             color,
             weight,
-            opacity: 0.8,
+            opacity: baseOpacity,
             className: 'relational-arc-flow',
-            interactive: true,
+            interactive: false,
+            pane: 'relationsPane',
             ...(this.relationsRenderer ? { renderer: this.relationsRenderer } : {}),
           },
-          tooltipText,
         );
+
+        this.bindRelationInteraction({
+          points,
+          visualLayers,
+          tooltipText,
+          baseWeight: weight,
+          baseOpacity,
+          sourceCountry: r.source_country,
+          targetCountry: r.target_country,
+          category: r.primary_category,
+        });
       }
     }
   }
@@ -1398,14 +1427,15 @@ export class RadarMapComponent implements AfterViewInit {
   /**
    * Disegna una polilinea tratteggiata come tratti solidi geografici + gap.
    * Non usa `dashArray` (pattern in pixel che “scorre” a ogni pan/reset Leaflet).
+   * I tratti sono non-interattivi; l'hit-area è aggiunta a parte.
    */
   private addGeometricDashedPolyline(
     points: Leaflet.LatLng[],
     options: Record<string, unknown>,
-    tooltipText: string,
-  ): void {
-    if (!this.relationsLayerGroup || !this.L || points.length < 2) return;
+  ): Leaflet.Polyline[] {
+    if (!this.relationsLayerGroup || !this.L || points.length < 2) return [];
 
+    const visualLayers: Leaflet.Polyline[] = [];
     // 1 on / 1 off su sampling fine → tanti tratti corti (look precedente, senza dashArray)
     const dashSteps = 1;
     const gapSteps = 1;
@@ -1415,11 +1445,74 @@ export class RadarMapComponent implements AfterViewInit {
       const slice = points.slice(i, dashEnd + 1);
       if (slice.length >= 2) {
         const polyline = this.L.polyline(slice, options);
-        polyline.bindTooltip(tooltipText, { sticky: true });
         this.relationsLayerGroup.addLayer(polyline);
+        visualLayers.push(polyline);
       }
       i = dashEnd + gapSteps;
     }
+    return visualLayers;
+  }
+
+  /**
+   * Hit-area trasparente + tooltip/hover/click per un arco (macro o pin).
+   * I layer visivi restano non-interattivi; solo l'hit riceve eventi mouse.
+   */
+  private bindRelationInteraction(opts: {
+    points: Leaflet.LatLng[];
+    visualLayers: Leaflet.Polyline[];
+    tooltipText: string;
+    baseWeight: number;
+    baseOpacity: number;
+    sourceCountry: string;
+    targetCountry: string;
+    category?: PrimaryCategory;
+  }): void {
+    if (!this.relationsLayerGroup || !this.L || !this.map || opts.points.length < 2) return;
+
+    const hitWeight = Math.max(18, opts.baseWeight * 4);
+    const hit = this.L.polyline(opts.points, {
+      color: '#ffffff',
+      weight: hitWeight,
+      opacity: 0.001,
+      className: 'relational-arc-hit',
+      interactive: true,
+      pane: 'relationsPane',
+      ...(this.relationsRenderer ? { renderer: this.relationsRenderer } : {}),
+    });
+
+    hit.bindTooltip(opts.tooltipText, { sticky: true });
+
+    hit.on('mouseover', () => {
+      for (const layer of opts.visualLayers) {
+        layer.setStyle({
+          opacity: Math.min(1, opts.baseOpacity + 0.25),
+          weight: opts.baseWeight + 1.5,
+        });
+      }
+      if (typeof hit.bringToFront === 'function') {
+        hit.bringToFront();
+      }
+    });
+
+    hit.on('mouseout', () => {
+      for (const layer of opts.visualLayers) {
+        layer.setStyle({
+          opacity: opts.baseOpacity,
+          weight: opts.baseWeight,
+        });
+      }
+    });
+
+    hit.on('click', (e: Leaflet.LeafletMouseEvent) => {
+      this.L?.DomEvent.stopPropagation(e);
+      this.relationClicked.emit({
+        sourceCountry: opts.sourceCountry,
+        targetCountry: opts.targetCountry,
+        ...(opts.category ? { category: opts.category } : {}),
+      });
+    });
+
+    this.relationsLayerGroup.addLayer(hit);
   }
 
   private drawMacroRelations(relations: MapRelationRow[]): void {
@@ -1467,6 +1560,7 @@ export class RadarMapComponent implements AfterViewInit {
       const opacity = 0.45; // opacity ~0.4-0.5
 
       let currentStep = 0;
+      const visualLayers: Leaflet.Polyline[] = [];
 
       for (let idx = 0; idx < agg.breakdown.length; idx++) {
         const item = agg.breakdown[idx];
@@ -1500,14 +1594,27 @@ export class RadarMapComponent implements AfterViewInit {
           weight,
           opacity,
           className: 'relational-arc-flow--macro',
-          interactive: true,
+          interactive: false,
+          pane: 'relationsPane',
           ...(this.relationsRenderer ? { renderer: this.relationsRenderer } : {}),
         });
 
-        polyline.bindTooltip(tooltipText, { sticky: true });
         this.relationsLayerGroup.addLayer(polyline);
+        visualLayers.push(polyline);
 
         currentStep = endIdx;
+      }
+
+      if (visualLayers.length > 0) {
+        this.bindRelationInteraction({
+          points,
+          visualLayers,
+          tooltipText,
+          baseWeight: weight,
+          baseOpacity: opacity,
+          sourceCountry: agg.source_country,
+          targetCountry: agg.target_country,
+        });
       }
     }
   }

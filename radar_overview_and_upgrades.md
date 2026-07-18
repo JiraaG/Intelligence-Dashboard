@@ -663,102 +663,24 @@ L'endpoint `GET /api/map-relations?date=YYYY-MM-DD` restituisce un payload JSON 
 ]
 ```
 
-#### 4. Integrazione Frontend in Leaflet (`radar-map.component.ts`)
+#### 4. Integrazione Frontend in Leaflet (`radar-map.component.ts`) — **AS-IS (GATE)**
 
-Il frontend recupera le relazioni tramite `ArticleService` e le inserisce in `StateService.mapRelationsResource`. Al riceversi di un SSE `article_processed`, viene eseguito un soft-refresh della risorsa.
-Le relazioni sono disegnate sotto forma di polilinee con interpolazione quadratica di Bezier per generare una curva fluida:
+Il frontend recupera le relazioni tramite `ArticleService` → `StateService.mapRelationsResource` (+ soft-refresh SSE). Disegno:
 
-```typescript
-private drawGeospatialRelations(relations: MapRelationRow[]): void {
-  if (!this.relationsLayerGroup || !this.L) return;
-  this.relationsLayerGroup.clearLayers();
+- **Zoom &lt; 5 (hatching):** una Bézier **multicolore** aggregata per coppia (`aggregateRelations` + segmenti ∝ volume), classe `.relational-arc-flow--macro`.
+- **Zoom ≥ 5 (pin):** una linea **per categoria**, tratteggio **geometrico** (`addGeometricDashedPolyline`, no `dashArray`), fan parallelo se multi-categoria sulla stessa coppia.
+- **Pane:** `relationsPane` z **550** (canvas renderer) sopra confini/label (`labelsPane` z 450, `pointer-events: none`), sotto i marker (600).
+- **Hover/click:** hit-area `.relational-arc-hit` → emit `relationClicked` → `loadRelationArticles(A,B,category?)` apre sidebar/carosello bilaterale (macro: tutte le cat.; pin: sola tipologia; entrambi i versi via `related_countries`). Camera preservata.
+- **Nation open:** layer relazioni nascosto.
 
-  for (const r of relations) {
-    const p0 = this.getCountryCentroid(r.source_country);
-    const p2 = this.getCountryCentroid(r.target_country);
-    if (!p0 || !p2) continue;
+Piano chiuso: [`plan-audit/complete/plan_archi_hatching_multicolor.md`](plan-audit/complete/plan_archi_hatching_multicolor.md). Dettaglio UI: [`docs/03_frontend_and_ui.md`](docs/03_frontend_and_ui.md).
 
-    // Generazione punti curva Bezier quadratica
-    const points: Leaflet.LatLng[] = [];
-    const steps = 30;
-    const lat0 = p0.lat;
-    const lng0 = p0.lng;
-    const lat2 = p2.lat;
-    const lng2 = p2.lng;
-
-    const midLat = (lat0 + lat2) / 2;
-    const midLng = (lng0 + lng2) / 2;
-
-    const dLat = lat2 - lat0;
-    const dLng = lng2 - lng0;
-
-    // Deviazione perpendicolare proporzionale alla distanza
-    const curvature = 0.2;
-    const p1Lat = midLat - dLng * curvature;
-    const p1Lng = midLng + dLat * curvature;
-
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const lat = (1 - t) * (1 - t) * lat0 + 2 * (1 - t) * t * p1Lat + t * t * lat2;
-      const lng = (1 - t) * (1 - t) * lng0 + 2 * (1 - t) * t * p1Lng + t * t * lng2;
-      points.push(this.L.latLng(lat, lng));
-    }
-
-    const colorVar = this.CATEGORY_CSS_VARS[r.primary_category] || '--color-text-accent';
-    const docStyle = getComputedStyle(document.documentElement);
-    const color = docStyle.getPropertyValue(colorVar).trim() || '#58a6ff';
-    const weight = Math.min(6, 1 + r.volume * 0.5);
-
-    const polyline = this.L.polyline(points, {
-      color,
-      weight,
-      opacity: 0.8,
-      className: 'relational-arc-flow',
-      interactive: true,
-    });
-
-    const tooltipText = `${r.source_country} ↔ ${r.target_country} · ${r.primary_category} · n=${r.volume}`;
-    polyline.bindTooltip(tooltipText, { sticky: true });
-
-    this.relationsLayerGroup.addLayer(polyline);
-  }
-}
-```
-
-La visibilità degli archi è governata a seconda dello stato di zoom:
-- Visibili in modalità "Day View" a livelli di zoom `>= 5`.
-- Nascosti a livelli di zoom `< 5` o quando si apre il dettaglio di una singola nazione.
+**Residuo opzionale:** multicolore aggregato anche a zoom ≥ 5 (oggi restano linee per-categoria).
 
 #### 5. Visualizzazione nel Carosello e Sidebar
 
-Le card degli articoli includono una sezione dedicata "🌐 Paesi correlati" posizionata dopo "Aziende" e prima di "Tag", che visualizza i codici ISO normalizzati traducendoli nei nomi reali in lingua italiana (utilizzando `Intl.DisplayNames`) tramite chip display-only `.related-chip`:
+Le card degli articoli includono una sezione dedicata "🌐 Paesi correlati" (dopo "Aziende", prima di "Tag") con chip display-only `.related-chip` (`Intl.DisplayNames`). **Sidebar freeze:** solo toggle Salva + chip related; niente navigazione da chip.
 
-```html
-<div class="badge-section" *ngIf="article()?.related_countries?.length">
-  <span class="badge-label">🌐 Paesi correlati</span>
-  <div class="badge-list">
-    <p-chip
-      *ngFor="let iso of article()?.related_countries"
-      [label]="getCountryName(iso)"
-      styleClass="radar-chip related-chip">
-    </p-chip>
-  </div>
-</div>
-```
+#### 6. Stile archi (no animazione CSS dash)
 
-#### 6. Styling CSS dell'Arco Animato (`radar-map.component.scss`)
-
-Il movimento tratteggiato dell'arco viene realizzato tramite animazione delle proprietà SVG `stroke-dasharray` e `stroke-dashoffset` per creare un flusso continuo:
-
-```scss
-.relational-arc-flow {
-  stroke-dasharray: 8, 12;
-  animation: relational-dash 20s linear infinite;
-}
-
-@keyframes relational-dash {
-  to {
-    stroke-dashoffset: -1000;
-  }
-}
-```
+Il tratteggio a zoom pin **non** usa `stroke-dasharray` / animazione CSS (sfasa a ogni pan Leaflet). I tratti sono segmenti lat/lng solidi + gap. Macro = linea continua soft.

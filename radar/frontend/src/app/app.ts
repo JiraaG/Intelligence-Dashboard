@@ -5,6 +5,7 @@ import { Article, ArticleFilters, PrimaryCategory } from './models/article.model
 import {
   CountryOpenRequest,
   RadarMapComponent,
+  RelationOpenRequest,
 } from './components/radar-map/radar-map.component';
 import { RadarToolbarComponent } from './components/radar-toolbar/radar-toolbar.component';
 import { RadarSidebarComponent } from './components/radar-sidebar/radar-sidebar.component';
@@ -44,18 +45,37 @@ export class App {
     if (!this.isSidebarOpen()) {
       return;
     }
+
+    const relation = this.relationFocus;
     const focus = this.focusCountryCode();
-    if (!focus || focus.toUpperCase() !== evt.country_code.toUpperCase()) {
+
+    if (relation) {
+      const code = evt.country_code.toUpperCase();
+      if (
+        code !== relation.sourceCountry.toUpperCase() &&
+        code !== relation.targetCountry.toUpperCase()
+      ) {
+        return;
+      }
+    } else if (!focus || focus.toUpperCase() !== evt.country_code.toUpperCase()) {
       return;
     }
 
     const gen = this.nationOpenGeneration;
     try {
-      await (
-        this.state.sidebarMode() === 'saved'
-          ? this.state.softReloadSavedCountryArticles(focus)
-          : this.state.softReloadCountryArticles(focus)
-      );
+      if (relation) {
+        await this.state.softReloadRelationArticles(
+          relation.sourceCountry,
+          relation.targetCountry,
+          relation.category,
+        );
+      } else {
+        await (
+          this.state.sidebarMode() === 'saved'
+            ? this.state.softReloadSavedCountryArticles(focus!)
+            : this.state.softReloadCountryArticles(focus!)
+        );
+      }
       if (gen !== this.nationOpenGeneration) return;
 
       const detail = this.state.detailArticles();
@@ -66,12 +86,12 @@ export class App {
         return;
       }
 
-      // Carosello = tutta la nazione (tutte le categorie); focus sulla card nuova.
+      // Carosello = lista detail corrente; focus sulla card nuova.
       // Spiderfy solo la categoria dell'articolo appena arrivato (icone/colore pin).
       this.selectedArticle.set(incoming);
       this.clusterArticles.set(detail.map((a) => byId.get(a.id) ?? a));
       this.lastSpiderfyKey = null;
-      this.scheduleCategorySpiderfy(focus, incoming.primary_category);
+      this.scheduleCategorySpiderfy(incoming.country_code, incoming.primary_category);
     } catch {
       // Soft-refresh fallito: non chiudere sidebar
     }
@@ -94,6 +114,8 @@ export class App {
   private nationOpenGeneration = 0;
   /** Evita re-spiderfy a ogni slide carosello nella stessa categoria. */
   private lastSpiderfyKey: string | null = null;
+  /** Focus bilaterale da click arco (null = nation/saved classico). */
+  private relationFocus: RelationOpenRequest | null = null;
 
   @HostListener('window:resize')
   onWindowResize(): void {
@@ -115,6 +137,7 @@ export class App {
   }
 
   onMarkerClick(article: Article): void {
+    this.relationFocus = null;
     this.selectedArticle.set(article);
     this.clusterArticles.set([article]);
     this.isSidebarOpen.set(true);
@@ -122,6 +145,7 @@ export class App {
   }
 
   onClusterClick(articles: Article[]): void {
+    this.relationFocus = null;
     if (!articles || articles.length === 0) {
       this.closeSidebar();
       return;
@@ -144,6 +168,7 @@ export class App {
     if (!open.countryCode) return;
 
     const gen = ++this.nationOpenGeneration;
+    this.relationFocus = null;
 
     try {
       const arts = await this.state.loadCountryArticles(open.countryCode);
@@ -192,6 +217,49 @@ export class App {
   }
 
   /**
+   * Click arco: notizie bilaterali A↔B (macro = tutte le cat.; pin = una cat.).
+   * Camera invariata; marker detail per gli articoli filtrati.
+   */
+  async onRelationClick(req: RelationOpenRequest): Promise<void> {
+    if (!req.sourceCountry || !req.targetCountry) return;
+
+    const gen = ++this.nationOpenGeneration;
+    this.relationFocus = {
+      sourceCountry: req.sourceCountry.toUpperCase(),
+      targetCountry: req.targetCountry.toUpperCase(),
+      ...(req.category ? { category: req.category } : {}),
+    };
+
+    try {
+      const arts = await this.state.loadRelationArticles(
+        req.sourceCountry,
+        req.targetCountry,
+        req.category,
+      );
+      if (gen !== this.nationOpenGeneration) return;
+
+      if (arts.length === 0) {
+        this.closeSidebar();
+        return;
+      }
+
+      const displayArticle =
+        [...arts].sort((a, b) => a.primary_category.localeCompare(b.primary_category))[0] ??
+        arts[0];
+
+      this.selectedArticle.set(displayArticle);
+      this.clusterArticles.set(arts);
+      this.isSidebarOpen.set(true);
+      this.mapComponent()?.armSkipCountryFit();
+      this.focusCountryCode.set(displayArticle.country_code);
+      this.scheduleCategorySpiderfy(displayArticle.country_code, displayArticle.primary_category);
+    } catch {
+      if (gen !== this.nationOpenGeneration) return;
+      this.closeSidebar(false);
+    }
+  }
+
+  /**
    * Dopo i marker detail: resize mappa, poi spiderfy.
    * Ordine obbligatorio — ``invalidateSize`` non deve arrivare dopo spiderfy.
    */
@@ -218,6 +286,7 @@ export class App {
     if (!countryCode) return;
 
     const gen = ++this.nationOpenGeneration;
+    this.relationFocus = null;
 
     try {
       const arts = await this.state.loadSavedCountryArticles(countryCode);
@@ -254,6 +323,7 @@ export class App {
   closeSidebar(clearError = true): void {
     this.nationOpenGeneration++;
     this.lastSpiderfyKey = null;
+    this.relationFocus = null;
     this.isSidebarOpen.set(false);
     this.selectedArticle.set(null);
     this.clusterArticles.set([]);

@@ -186,8 +186,12 @@
 
 /* Archi pin: tratteggio geometrico in TS (addGeometricDashedPolyline).
    Niente stroke-dasharray / dashArray: a ogni pan Leaflet ridisegna e il pattern
-   in pixel sembra scorrere. Macro: linea continua. */
+   in pixel sembra scorrere. Macro: linea continua. Hit-area: cursore pointer. */
 :host ::ng-deep .relational-arc-flow--macro {
   stroke-dasharray: none;
+}
+
+:host ::ng-deep .relational-arc-hit {
+  cursor: pointer;
 }
 

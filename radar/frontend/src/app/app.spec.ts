@@ -137,6 +137,7 @@ class MapStubComponent {
   markerClicked = output<Article>();
   clusterClicked = output<Article[]>();
   countryClicked = output<import('./components/radar-map/radar-map.component').CountryOpenRequest>();
+  relationClicked = output<import('./components/radar-map/radar-map.component').RelationOpenRequest>();
   collapseAllGraphs(_emitClose?: boolean): void {
     /* no-op stub */
   }

@@ -465,6 +465,7 @@ Per connettere le notizie multilaterali, il componente mappa riceve le relazioni
    - Gli archi devono essere disegnati calcolando punti intermedi a runtime per simulare una curva di Bézier quadratica e renderizzandoli tramite `L.polyline` nativa di Leaflet.
    - **Zoom ≥ 5 (Pin)**: 1 linea per categoria attiva, spessore proporzionale al volume, opacity 0.8, tratteggio geometrico denso (segmenti lat/lng on/off 1/1, sampling 60, no `dashArray`). Stessa coppia multi-categoria → fan parallelo con offset di curvatura.
    - **Zoom < 5 (Hatching)**: disegnato in modalità macro aggregata per coppia paese↔paese (1 curva multicolore consecutiva spezzata per categoria, spessore soft, opacity ~0.45, classe `.relational-arc-flow--macro` linea continua, e tooltip con breakdown completo).
+   - **Hover/click**: hit-area `.relational-arc-hit` su `relationsPane` (z 550); emit `relationClicked` → carosello bilaterale (macro: tutte le cat.; pin: sola tipologia).
 
 ---
 

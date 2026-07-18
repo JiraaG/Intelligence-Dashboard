@@ -143,7 +143,7 @@ Per collegare le notizie multilaterali, la mappa disegna archi curvi bidireziona
 
 1. **Gestione dello Stato**: `StateService` espone `mapRelationsResource` sincronizzato con la data attiva e i filtri della toolbar. Al riceversi del segnale SSE `article_processed`, viene scatenato il reload atomico sia per il summary che per le relazioni.
 2. **Visualizzazione e Zoom**:
-   - Gli archi vengono disegnati in un `relationsLayerGroup` dedicato, posizionato sopra il layer dei confini nazionali.
+   - Gli archi vengono disegnati in un `relationsLayerGroup` dedicato sul pane Leaflet **`relationsPane`** (z-index **550**: sopra confini GeoJSON e label tile z 450, sotto i marker z 600), così hover/click non sono rubati dai poligoni nazione né coperti dai nomi CartoDB.
    - **Zoom ≥ 5 (vista pin)**: gli archi sono divisi per categoria (1 linea per categoria geopolitica attiva per coppia paese), con spessore proporzionale al volume (`Math.min(6, 1 + volume * 0.5)`), opacity 0.8, e tratteggio **geometrico** (tratti solidi lat/lng + gap — niente `dashArray`/CSS, così non “scorre” a ogni pan). Se la stessa coppia ha più categorie, le Bézier usano un **offset di curvatura** (fan parallelo) così le linee non si sovrappongono.
    - **Zoom < 5 (vista hatching)**: gli archi vengono aggregati per coppia di paesi come una **singola linea multicolore** (spezzata in segmenti consecutivi proporzionali al volume di ciascuna categoria collegata, ordinata per volume decrescente). Hanno uno stile soft con spessore ridotto (`Math.min(3, 1 + totalVolume * 0.3)`), opacity ~0.45, classe `.relational-arc-flow--macro` (linea continua, senza dash) ed il tooltip mostra il breakdown delle categorie e del volume totale (es. `Sicurezza 5 · Economia 2 · n=7`).
    - Vengono nascosti se viene aperta la vista di dettaglio di una specifica nazione (per evitare sovrapposizioni visive con il ventaglio di spiderfy).
@@ -154,6 +154,7 @@ Per collegare le notizie multilaterali, la mappa disegna archi curvi bidireziona
    - Colore dell'arco allineato alle variabili di stile della categoria geopolitica (`CATEGORY_CSS_VARS`).
    - Spessore proporzionale al volume aggregato di notizie.
    - Zoom ≥ 5: tratteggio geometrico denso (sampling Bézier 60, tratti on/off 1/1 via `addGeometricDashedPolyline`); zoom &lt; 5: linea continua soft `.relational-arc-flow--macro`.
+5. **Hover / click**: hit-area su pane `relationsPane` (z 550, sopra confini e label tile, sotto i pin) per tooltip/highlight affidabili anche in Europa densa; click emette `relationClicked` → `StateService.loadRelationArticles` apre il carosello con le notizie bilaterali A↔B (macro: tutte le categorie; pin: sola tipologia dell’arco; entrambi i versi via `related_countries`).
 
 Dettaglio ops FE: [`radar/frontend/README.md`](../radar/frontend/README.md).
 

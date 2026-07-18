@@ -16,6 +16,19 @@ export interface ArticleProcessedEvent {
 
 export type SidebarMode = 'nation' | 'saved';
 
+/** Articolo coinvolto nel collegamento undirected A↔B (entrambi i versi). */
+export function isBilateralRelationArticle(
+  art: Article,
+  sourceCountry: string,
+  targetCountry: string,
+): boolean {
+  const a = sourceCountry.toUpperCase();
+  const b = targetCountry.toUpperCase();
+  const code = art.country_code.toUpperCase();
+  const related = (art.related_countries ?? []).map((c) => c.toUpperCase());
+  return (code === a && related.includes(b)) || (code === b && related.includes(a));
+}
+
 /**
  * Stato Signals condiviso: map-summary day-view + saved vault + detail + read/save.
  *
@@ -311,6 +324,67 @@ export class StateService {
     } finally {
       this.detailLoading.set(false);
     }
+  }
+
+  /**
+   * Articoli bilaterali A↔B per click arco: fetch parallela delle due nazioni,
+   * dedupe, filtro related_countries (+ categoria opzionale a zoom pin).
+   */
+  async loadRelationArticles(
+    sourceCountry: string,
+    targetCountry: string,
+    category?: PrimaryCategory,
+  ): Promise<Article[]> {
+    this.sidebarMode.set('nation');
+    this.detailLoading.set(true);
+    this.detailError.set(null);
+    try {
+      const filtered = await this.fetchRelationArticles(sourceCountry, targetCountry, category);
+      this.detailArticles.set(filtered);
+      return filtered;
+    } catch (err) {
+      console.error('[StateService] Impossibile caricare articoli relazione:', err);
+      this.detailArticles.set([]);
+      this.detailError.set(err);
+      throw err;
+    } finally {
+      this.detailLoading.set(false);
+    }
+  }
+
+  /**
+   * Soft-reload lista bilaterale (SSE): stesso filtro, merge reference.
+   */
+  async softReloadRelationArticles(
+    sourceCountry: string,
+    targetCountry: string,
+    category?: PrimaryCategory,
+  ): Promise<Article[]> {
+    const filtered = await this.fetchRelationArticles(sourceCountry, targetCountry, category);
+    return this.mergeDetailArticlesFromServer(filtered);
+  }
+
+  private async fetchRelationArticles(
+    sourceCountry: string,
+    targetCountry: string,
+    category?: PrimaryCategory,
+  ): Promise<Article[]> {
+    const f = this.filters();
+    const a = sourceCountry.toUpperCase();
+    const b = targetCountry.toUpperCase();
+    const [artsA, artsB] = await Promise.all([
+      firstValueFrom(this.articleService.getAllArticlesForCountry(f.date, a)),
+      firstValueFrom(this.articleService.getAllArticlesForCountry(f.date, b)),
+    ]);
+    const byId = new Map<number, Article>();
+    for (const art of [...artsA, ...artsB]) {
+      byId.set(art.id, art);
+    }
+    return Array.from(byId.values()).filter((art) => {
+      if (!isBilateralRelationArticle(art, a, b)) return false;
+      if (category && art.primary_category !== category) return false;
+      return this.matchesClientFilters(art, f);
+    });
   }
 
   /**

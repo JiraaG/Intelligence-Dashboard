@@ -81,12 +81,29 @@ describe('RadarMapComponent (Phase 4)', () => {
   beforeEach(async () => {
     installLeafletStub();
     (window as any).L.polyline = (points: any, options: any) => {
+      const events = new Map<string, Array<(e?: unknown) => void>>();
       const p = new (window as any).L.Path();
       p.options = options || {};
       p._latlngs = points;
       p.getLatLngs = () => p._latlngs;
       p.bindTooltip = vi.fn().mockReturnThis();
       p.addTo = vi.fn().mockReturnThis();
+      p.bringToFront = vi.fn().mockReturnThis();
+      p.setStyle = (style: Record<string, unknown>) => {
+        p.options = { ...p.options, ...style };
+        return p;
+      };
+      p.on = (event: string, handler: (e?: unknown) => void) => {
+        const list = events.get(event) ?? [];
+        list.push(handler);
+        events.set(event, list);
+        return p;
+      };
+      p.fire = (event: string, payload?: unknown) => {
+        for (const handler of events.get(event) ?? []) {
+          handler(payload);
+        }
+      };
       return p;
     };
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
@@ -624,8 +641,9 @@ describe('RadarMapComponent (Phase 4)', () => {
       mapCmp as unknown as { relationsLayerGroup: { getLayers(): { options: { color: string, className: string } }[] } }
     ).relationsLayerGroup;
     
-    expect(group.getLayers().length).toBe(2);
-    expect(group.getLayers()[0].options.className).toBe('relational-arc-flow--macro');
+    expect(group.getLayers().length).toBe(3);
+    expect(group.getLayers().filter((l) => l.options.className === 'relational-arc-flow--macro').length).toBe(2);
+    expect(group.getLayers().filter((l) => l.options.className === 'relational-arc-hit').length).toBe(1);
   });
 
   it('draws parallel per-category arcs at pin zoom when pair has multiple categories', async () => {
@@ -691,14 +709,155 @@ describe('RadarMapComponent (Phase 4)', () => {
     ).relationsLayerGroup;
 
     const layers = group.getLayers();
-    // 2 categorie × molti tratti corti (sampling 60, dash 1/1)
-    expect(layers.length).toBeGreaterThanOrEqual(20);
-    expect(layers.every((l) => l.options.className === 'relational-arc-flow')).toBe(true);
-    expect(layers.every((l) => !l.options.dashArray)).toBe(true);
+    // 2 categorie × tratti geometrici + 1 hit-area per arco
+    expect(layers.length).toBeGreaterThanOrEqual(22);
+    const visual = layers.filter((l) => l.options.className === 'relational-arc-flow');
+    const hits = layers.filter((l) => l.options.className === 'relational-arc-hit');
+    expect(visual.length).toBeGreaterThanOrEqual(20);
+    expect(hits.length).toBe(2);
+    expect(visual.every((l) => !l.options.dashArray)).toBe(true);
 
-    const midA = layers[0].getLatLngs()[1];
-    const midB = layers[Math.floor(layers.length / 2)].getLatLngs()[1];
+    const midA = visual[0].getLatLngs()[1];
+    const midB = visual[Math.floor(visual.length / 2)].getLatLngs()[1];
     // Offset curvatura: tratti della 2ª categoria non coincidono con la 1ª
     expect(midA.lat !== midB.lat || midA.lng !== midB.lng).toBe(true);
+  });
+
+  it('emits relationClicked without category on macro arc hit click', async () => {
+    const summary = [
+      {
+        country_code: 'DE',
+        primary_category: 'Energia' as const,
+        article_count: 1,
+        read_count: 0,
+        latitude: 51.05,
+        longitude: 13.73,
+      },
+      {
+        country_code: 'IT',
+        primary_category: 'Tecnologia' as const,
+        article_count: 1,
+        read_count: 0,
+        latitude: 41.87,
+        longitude: 12.56,
+      },
+    ];
+    const relations = [
+      {
+        source_country: 'DE',
+        target_country: 'IT',
+        primary_category: 'Energia' as const,
+        volume: 2,
+      },
+      {
+        source_country: 'DE',
+        target_country: 'IT',
+        primary_category: 'Tecnologia' as const,
+        volume: 3,
+      },
+    ];
+
+    const fixture = TestBed.createComponent(MapHostComponent);
+    fixture.componentInstance.mapSummary = summary;
+    fixture.componentInstance.mapRelations = relations;
+    fixture.detectChanges();
+    flushGeoJson();
+    await fixture.whenStable();
+
+    const mapCmp = getMapCmp(fixture);
+    const mapInstance = (mapCmp as unknown as { map: StubMap }).map;
+    mapInstance.setView([45, 10], 3);
+
+    (
+      mapCmp as unknown as {
+        updateMapData: (a: Article[], c: CountrySummary[], s: unknown[], r: unknown[]) => void;
+      }
+    ).updateMapData([], [], summary, relations);
+
+    const emitted: unknown[] = [];
+    mapCmp.relationClicked.subscribe((v) => emitted.push(v));
+
+    const group = (
+      mapCmp as unknown as {
+        relationsLayerGroup: {
+          getLayers(): { options: { className: string }; fire: (e: string, p?: unknown) => void }[];
+        };
+      }
+    ).relationsLayerGroup;
+    const hit = group.getLayers().find((l) => l.options.className === 'relational-arc-hit');
+    expect(hit).toBeTruthy();
+    hit!.fire('click', { originalEvent: {} });
+
+    expect(emitted).toEqual([
+      { sourceCountry: 'DE', targetCountry: 'IT' },
+    ]);
+  });
+
+  it('emits relationClicked with category on pin-zoom arc hit click', async () => {
+    const summary = [
+      {
+        country_code: 'CN',
+        primary_category: 'Infrastrutture' as const,
+        article_count: 1,
+        read_count: 0,
+        latitude: 35.86,
+        longitude: 104.2,
+      },
+      {
+        country_code: 'IT',
+        primary_category: 'Infrastrutture' as const,
+        article_count: 1,
+        read_count: 0,
+        latitude: 41.87,
+        longitude: 12.56,
+      },
+    ];
+    const relations = [
+      {
+        source_country: 'CN',
+        target_country: 'IT',
+        primary_category: 'Infrastrutture' as const,
+        volume: 2,
+      },
+    ];
+
+    const fixture = TestBed.createComponent(MapHostComponent);
+    fixture.componentInstance.mapSummary = summary;
+    fixture.componentInstance.mapRelations = relations;
+    fixture.detectChanges();
+    flushGeoJson();
+    await fixture.whenStable();
+
+    const mapCmp = getMapCmp(fixture);
+    const mapInstance = (mapCmp as unknown as { map: StubMap }).map;
+    mapInstance.setView([45, 10], 5);
+
+    (
+      mapCmp as unknown as {
+        updateMapData: (a: Article[], c: CountrySummary[], s: unknown[], r: unknown[]) => void;
+      }
+    ).updateMapData([], [], summary, relations);
+
+    const emitted: unknown[] = [];
+    mapCmp.relationClicked.subscribe((v) => emitted.push(v));
+
+    const group = (
+      mapCmp as unknown as {
+        relationsLayerGroup: {
+          getLayers(): { options: { className: string }; fire: (e: string, p?: unknown) => void }[];
+        };
+      }
+    ).relationsLayerGroup;
+    const hit = group.getLayers().find((l) => l.options.className === 'relational-arc-hit');
+    expect(hit).toBeTruthy();
+    hit!.fire('click', { originalEvent: {} });
+
+    expect(emitted).toEqual([
+      {
+        sourceCountry: 'CN',
+        targetCountry: 'IT',
+        category: 'Infrastrutture',
+      },
+    ]);
   });
 });

@@ -121,7 +121,7 @@ Build FE Docker: `npm ci --legacy-peer-deps` (peer matrix Angular/PrimeNG).
 |---|-----------|-----------|
 | 01 | [docs/01_getting_started.md](docs/01_getting_started.md) | Installazione, `.env`, Docker, health, Miniflux |
 | 02 | [docs/02_architecture_and_backend.md](docs/02_architecture_and_backend.md) | Worker, migrazioni, API, quote, outbox |
-| 03 | [docs/03_frontend_and_ui.md](docs/03_frontend_and_ui.md) | Mappa, map-summary, `MOCK_MODE`, stato UI |
+| 03 | [docs/03_frontend_and_ui.md](docs/03_frontend_and_ui.md) | Mappa, map-summary, archi relazioni (hover/click bilaterale), `MOCK_MODE`, stato UI |
 | 04 | [docs/04_ecc_framework.md](docs/04_ecc_framework.md) | Harness ECC: `.agents` + `.ecc` + wiring Cursor |
 
 **Percorso per ruolo (non è una sequenza unica 01→04):** day-1 ops → `docs/01` + [ops](radar/ops/README.md) + [runbook](radar/docs/runbook.md); backend/API → `docs/02`; FE prodotto → `docs/03` + [frontend README](radar/frontend/README.md); agenti Cursor → `docs/04` + AGENTS/CLAUDE.
@@ -143,7 +143,7 @@ Build FE Docker: `npm ci --legacy-peer-deps` (peer matrix Angular/PrimeNG).
 | [STATUS.md](plan-audit/STATUS.md) | **Quadro** fatto vs residui post-gate |
 | [plan_release_final_gate.md](plan-audit/complete/plan_release_final_gate.md) | Piano Final Release (**F1–F4 PASS**; PR + Fase 5 deferred — **≠** Phase 6 GATE) |
 | [sot_llm_multi_model_fallback.md](plan-audit/complete/sot_llm_multi_model_fallback.md) | SoT LLM multi-provider + Profili A–E |
-| [complete/](plan-audit/complete/) | Phase 0–6, playbook, ticket status, checklist docs (**chiusi**) |
+| [complete/](plan-audit/complete/) | Phase 0–6, Fase B/H, archi UI, playbook, ticket status, checklist docs (**chiusi**) |
 | [remediation/](plan-audit/remediation/) | Report ticket + Final Release F1–F4 |
 
 ### Governance agenti (ECC)
@@ -186,8 +186,13 @@ Restore SHA sotto (Phase 0–6). Il branch di lavoro corrente può differire —
 | Phase 4 | `de9bd2f` | `MOCK_MODE`, XSS-safe markers, read-unread senza rebuild cluster |
 | Phase 5 | `1dfdf60` | map-summary + articles cursor; nation markers; spiderfy categoria |
 | Phase 6 | `56c2eff` | GATE VERDE: docs, GeoJSON fetch+verify, CI, runbook, hooks |
+| Phase B | `885628f` | Real-time webhook + SSE soft-refresh (GATE VERDE) |
+| Fase H | `d9508a5` | Grafo geospaziale: `related_countries`, `/api/map-relations`, archi + chip |
+| Archi UI | `ac17c40` (`feature/upgrades`) | Multicolore &lt;5, tratteggio geometrico ≥5, `relationsPane`, click → sidebar bilaterale — **restore point** |
 
-Esempio: `git checkout 56c2eff` (tip Phase 6 / GATE VERDE; tip successivo = ECC remediation). Dettaglio gate: [plan_impl_phase_0_6_execution.md](plan-audit/complete/plan_impl_phase_0_6_execution.md).
+Esempio restore tip archi UI: `git checkout ac17c40` (branch `feature/upgrades`). Dettaglio: [plan_archi_hatching_multicolor.md](plan-audit/complete/plan_archi_hatching_multicolor.md) + [STATUS.md](plan-audit/STATUS.md).
+
+Esempio Phase 6: `git checkout 56c2eff`. Dettaglio gate Phase 0–6: [plan_impl_phase_0_6_execution.md](plan-audit/complete/plan_impl_phase_0_6_execution.md).
 
 ---
 
@@ -201,12 +206,12 @@ Esempio: `git checkout 56c2eff` (tip Phase 6 / GATE VERDE; tip successivo = ECC 
 | Cooldown modelli | `radar/backend/app/classification/cooldown.py` |
 | Requeue ops | `radar/backend/app/scripts/requeue_articles.py` |
 | API FastAPI (no ingest) | `radar/backend/app/main.py` |
-| Migrazioni / outbox | `radar/backend/migrations/` (001–010), `radar/backend/app/core/migrations.py`, `radar/backend/app/commit/outbox.py` |
-| Query articles / map-summary / saved | `radar/backend/app/api/articles_query.py` |
+| Migrazioni / outbox | `radar/backend/migrations/` (001–011), `radar/backend/app/core/migrations.py`, `radar/backend/app/commit/outbox.py` |
+| Query articles / map-summary / map-relations / saved | `radar/backend/app/api/articles_query.py` |
 | Compose + overlay | `radar/docker-compose.yml`, `radar/docker-compose.hardened.yml`, `radar/docker-compose.lan.yml` |
 | Ops backup/restore | `radar/ops/` |
 | Runbook | `radar/docs/runbook.md` |
-| Mappa / state / read-unread | `radar/frontend/src/app/components/radar-map/`, `radar/frontend/src/app/services/state.service.ts` |
+| Mappa / state / read-unread / archi | `radar/frontend/src/app/components/radar-map/`, `radar/frontend/src/app/services/state.service.ts` (`loadRelationArticles`) |
 | `MOCK_MODE` | `radar/frontend/src/app/services/mock-mode.token.ts` |
 | GeoJSON pin / verify | `radar/frontend/src/assets/data/ASSET_LICENSE.md`, `radar/frontend/scripts/verify-geojson.mjs` |
 | Sidebar (**frozen**) | `radar/frontend/src/app/components/radar-sidebar/` |
@@ -226,7 +231,7 @@ Esempio: `git checkout 56c2eff` (tip Phase 6 / GATE VERDE; tip successivo = ECC 
 | GET | `/health` (host `:80`) | Healthcheck **Nginx FE** — risposta statica `ok`; **non** è l’API |
 | GET | `/api/articles` | Envelope `{items,next_cursor,total}` — `date` obbligatorio salvo `saved=true` (cross-day), `limit` ≤ 100 |
 | GET | `/api/map-summary` | Righe `country_code × primary_category` + count/lat/lon (day) |
-| GET | `/api/map-relations` | Righe undirected `source_country ↔ target_country` per categoria + volume |
+| GET | `/api/map-relations` | Righe undirected `source_country ↔ target_country` per categoria + volume. FE: archi Leaflet; click → carosello bilaterale |
 | GET | `/api/saved-summary` | Stessa shape; solo `is_saved`; **senza date** |
 | GET | `/api/countries` | Rollup paese (compat) |
 | PATCH | `/api/articles/{id}/read_status` | Body `{is_read}`; unread ⇒ `is_saved=false` |

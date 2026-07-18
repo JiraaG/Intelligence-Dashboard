@@ -187,6 +187,19 @@ export interface LeafletStubApi {
     clearLayers(): unknown;
     getLayers(): unknown[];
   };
+  polyline: (
+    latlngs: Array<StubLatLng | [number, number]>,
+    options?: Record<string, unknown>,
+  ) => {
+    options: Record<string, unknown>;
+    getLatLngs(): StubLatLng[];
+    setStyle(style: Record<string, unknown>): unknown;
+    bindTooltip(text: string, opts?: unknown): unknown;
+    bringToFront(): unknown;
+    on(event: string, handler: StubEventHandler): unknown;
+    fire(event: string, payload?: unknown): void;
+    addTo(map: StubMap | { addLayer?(layer: unknown): unknown }): unknown;
+  };
   canvas: (options?: Record<string, unknown>) => { _stubCanvas: true };
   geoJSON: (
     feature: unknown,
@@ -450,6 +463,48 @@ function createLayerGroup() {
   return group;
 }
 
+function createPolyline(
+  latlngs: Array<StubLatLng | [number, number]>,
+  options: Record<string, unknown> = {},
+) {
+  const events = createEventTarget();
+  const path = new StubPath();
+  path.options = { ...options };
+  const resolved = latlngs.map((p) => resolveLatLng(p as StubLatLng | [number, number]));
+  const layer = {
+    options: path.options,
+    _latlngs: resolved,
+    getLatLngs() {
+      return resolved;
+    },
+    setStyle(style: Record<string, unknown>) {
+      path.setStyle(style);
+      layer.options = path.options;
+      return layer;
+    },
+    bindTooltip(_text: string, _opts?: unknown) {
+      return layer;
+    },
+    bringToFront() {
+      return layer;
+    },
+    on(event: string, handler: StubEventHandler) {
+      events.on(event, handler);
+      return layer;
+    },
+    fire(event: string, payload?: unknown) {
+      events.fire(event, payload);
+    },
+    addTo(map: StubMap | { addLayer?(l: unknown): unknown }) {
+      if ('addLayer' in map && typeof map.addLayer === 'function') {
+        map.addLayer(layer);
+      }
+      return layer;
+    },
+  };
+  return layer;
+}
+
 function createTileLayer(url: string, options: Record<string, unknown> = {}) {
   const layer = {
     url,
@@ -489,6 +544,7 @@ export const LeafletStub: LeafletStubApi = {
   markerClusterGroup: createClusterGroup,
   tileLayer: createTileLayer,
   layerGroup: createLayerGroup,
+  polyline: createPolyline,
   canvas: (_options?: Record<string, unknown>) => ({ _stubCanvas: true }),
   geoJSON: createGeoJson,
   divIcon: (options: Record<string, unknown> = {}) => ({ ...options, _stub: true }),

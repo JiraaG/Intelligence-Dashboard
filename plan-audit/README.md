@@ -6,7 +6,7 @@ Cartella di audit, prompt orchestratore e SoT del modulo Radar.
 **Quadro fatto vs da fare:** [`STATUS.md`](STATUS.md)  
 **Product docs:** root [`README.md`](../README.md) + [`docs/01–04`](../docs/).
 
-**Anti-drift:** autorità runtime = product docs + Compose (`80:8080`, migrazioni `001–010`) + SoT LLM. Claim storici nei piani in `complete/` possono essere datati.
+**Anti-drift:** autorità runtime = product docs + Compose (`80:8080`, migrazioni `001–011`) + SoT LLM. Claim storici nei piani in `complete/` possono essere datati.
 
 ## `active/` — vivi
 
@@ -14,7 +14,7 @@ Cartella di audit, prompt orchestratore e SoT del modulo Radar.
 
 ## `complete/` — chiusi
 
-Vedi [`complete/README.md`](complete/README.md) per l'elenco dei piani completati (inclusi Phase 0-6, LLM multi-model fallback, commenti di codice, notizie salvate, Final Release Gate, playbook, ticket status, monorepo check e Fase H Grafo Geospaziale).
+Vedi [`complete/README.md`](complete/README.md) per l'elenco dei piani completati (inclusi Phase 0-6, LLM multi-model fallback, commenti di codice, notizie salvate, Final Release Gate, playbook, ticket status, monorepo check, Fase H Grafo Geospaziale, archi multicolore + click bilaterale).
 
 ## Layout
 
