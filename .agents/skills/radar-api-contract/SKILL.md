@@ -24,7 +24,7 @@ Lavori su FastAPI REST, query articoli, o servizi Angular che chiamano l’API.
 | Vista | Endpoint | Shape |
 |-------|----------|--------|
 | Day (mappa) | `GET /api/map-summary?date=` | Righe `country_code × primary_category` (+ count/read, lat/lon finite) |
-| Relations | `GET /api/map-relations?date=` | Righe undirected `source_country ↔ target_country` per categoria (+ volume). FE: archi Leaflet (`relationsPane`); click → `loadRelationArticles` bilaterale |
+| Relations | `GET /api/map-relations?date=` | Righe undirected star `primary↔each related` (`LEAST/GREATEST` × categoria; non clique). FE: archi Leaflet (`relationsPane`); click → `loadRelationArticles` bilaterale |
 | Saved vault | `GET /api/saved-summary` | Stessa shape di map-summary; filtro `is_saved=true`; **senza date** |
 | Nation open | `GET /api/articles?date=&country=` | Envelope `{ items, next_cursor, total }` — page ≤ 100; FE concatena |
 | Saved open | `GET /api/articles?saved=true&country=` | Stesso envelope; **ignora date**; solo `is_saved` |

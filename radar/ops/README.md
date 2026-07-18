@@ -14,7 +14,9 @@ Open **http://localhost/** (host port **80** → FE container **8080**).
 
 LLM knobs / Profili A–E: [`.env.example`](../.env.example) + SoT [`sot_llm_multi_model_fallback.md`](../../plan-audit/complete/sot_llm_multi_model_fallback.md).  
 
-Requeue / incident: [`docs/runbook.md`](../docs/runbook.md) (`python -m app.scripts.requeue_articles`).
+Requeue / incident: [`docs/runbook.md`](../docs/runbook.md) (`python -m app.scripts.requeue_articles`; `--purge-all` = wipe vault + all articles).
+
+Few articles on the map? Check Miniflux feed count first (catalog: [`RSS.txt`](../../RSS.txt)) — ingest volume tracks subscribed feeds, not FE filters.
 
 Remote / internet exposure: put a TLS reverse proxy with auth and ACLs in front — do not publish `:80` raw to the public internet.
 

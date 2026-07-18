@@ -141,6 +141,8 @@ GeoJSON locale: `assets/data/countries.geo.json` (no CDN in produzione; pin in `
 
 Per collegare le notizie multilaterali, la mappa disegna archi curvi bidirezionali (mediante interpolazione di punti tramite `L.polyline`) tra i centroidi dei paesi.
 
+**Semantica v1 (star, non clique):** ogni articolo con `country_code` primario e `related_countries` genera archi **solo** primary↔ciascun related (undirected `LEAST/GREATEST`). Un accordo USA–Italia–Francia (`US` + `IT,FR`) produce gli archi US–IT e US–FR, **non** IT–FR, a meno che un altro articolo non colleghi direttamente IT e FR. Il click su un arco apre il carosello bilaterale della sola coppia cliccata.
+
 1. **Gestione dello Stato**: `StateService` espone `mapRelationsResource` sincronizzato con la data attiva e i filtri della toolbar. Al riceversi del segnale SSE `article_processed`, viene scatenato il reload atomico sia per il summary che per le relazioni.
 2. **Visualizzazione e Zoom**:
    - Gli archi vengono disegnati in un `relationsLayerGroup` dedicato sul pane Leaflet **`relationsPane`** (z-index **550**: sopra confini GeoJSON e label tile z 450, sotto i marker z 600), così hover/click non sono rubati dai poligoni nazione né coperti dai nomi CartoDB.

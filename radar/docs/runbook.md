@@ -90,20 +90,27 @@ docker compose exec radar-db psql -U radar_user -d radar_db \
 
 ## Requeue articoli (ops / E2E)
 
-**Distruttivo / re-ingest:** marca unread le ultime N entry *già lette* in Miniflux, cancella le righe `articles` / `article_outbox` e i markdown vault corrispondenti (hash URL), e svuota `llm_model_cooldown`. Non è un reconcile outbox “gentile”.
+**Distruttivo / re-ingest:** marca unread le ultime N entry *già lette* in Miniflux (API paginata: Miniflux restituisce ≤50 entry/pagina), cancella le righe `articles` / `article_outbox` e i markdown vault corrispondenti (hash URL), e svuota `llm_model_cooldown`. Non è un reconcile outbox “gentile”.
 
 **Prerequisiti:** stack up (`radar-worker` healthy-enough), `MINIFLUX_API_KEY` valida, vault montato sul worker.
 
 ```bash
 # Preview only (nessuna mutazione Miniflux/DB/vault)
-docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20 --dry-run
+docker compose exec -T radar-worker python -m app.scripts.requeue_articles 50 --dry-run
 
-# Re-ingest reale
-docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20
+# Re-ingest reale (ultime N read)
+docker compose exec -T radar-worker python -m app.scripts.requeue_articles 50
 docker compose restart radar-worker   # ciclo immediato (poll tipico 900s)
+
+# Prova da zero (48h / full reset locale): wipe TUTTI i .md vault + DELETE tutte le articles
+docker compose exec -T radar-worker python -m app.scripts.requeue_articles 100 --purge-all --dry-run
+docker compose exec -T radar-worker python -m app.scripts.requeue_articles 100 --purge-all
+docker compose restart radar-worker
 ```
 
-Poi nei log: `route lane=SIMPLE … effort=none` e/o `COMPLEX|BORDERLINE … effort=high`.
+Il worker fetch unread filtra già `published_after` ≈ 48h (`MINIFLUX` client). Entry unread più vecchie restano in coda Miniflux ma non entrano nel ciclo finché non rientrano nella finestra.
+
+Poi nei log: `route lane=SIMPLE … effort=none` e/o `COMPLEX|BORDERLINE … effort=high`; gate: `Ciclo … 0 errori`.
 
 ---
 

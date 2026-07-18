@@ -51,40 +51,274 @@ _OFFTOPIC_GEOPOLITICA_HINT = re.compile(
     r"no\s+geopolitical\s+(content|information|relevance)",
     re.IGNORECASE,
 )
+# Se il pezzo ha segnali politici forti, non applicare soft-remap off-topic
+# (evita false positive tipo "filosofia politica" / ministro + filosofia).
+_POLITICAL_CONTENT_HINT = re.compile(
+    r"\b(elezion\w*|parlamento|ministro|ministero|governo|scandalo|"
+    r"surrogacy|surrogazione|legislativ\w*|senato|camera\s+dei\s+deputati|"
+    r"president\w*|diplomazi\w*|sanzion\w*)\b",
+    re.IGNORECASE,
+)
+# Soft remap inverso: sport/cronaca giudiziaria non devono restare in Tecnologia.
+_SPORT_LEGAL_HINT = re.compile(
+    r"\b(ciclist\w*|olimpic\w*|atleta|atlet\w*|patente|squalifica|"
+    r"colpevole|guida\s+durante|processo\s+penale|omicidio|"
+    r"sportiv\w*|calciator\w*|tennis|formula\s*1)\b",
+    re.IGNORECASE,
+)
 
 # ISO 3166-1 alpha-2 (~249) + sentinel XX per geografia indeterminata.
 ISO_ALPHA2_CODES: frozenset[str] = frozenset(
     {
-        "AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR", "AS", "AT", "AU", "AW", "AX", "AZ",
-        "BA", "BB", "BD", "BE", "BF", "BG", "BH", "BI", "BJ", "BL", "BM", "BN", "BO", "BQ", "BR", "BS",
-        "BT", "BV", "BW", "BY", "BZ",
-        "CA", "CC", "CD", "CF", "CG", "CH", "CI", "CK", "CL", "CM", "CN", "CO", "CR", "CU", "CV", "CW",
-        "CX", "CY", "CZ",
-        "DE", "DJ", "DK", "DM", "DO", "DZ",
-        "EC", "EE", "EG", "EH", "ER", "ES", "ET",
-        "FI", "FJ", "FK", "FM", "FO", "FR",
-        "GA", "GB", "GD", "GE", "GF", "GG", "GH", "GI", "GL", "GM", "GN", "GP", "GQ", "GR", "GS", "GT",
-        "GU", "GW", "GY",
-        "HK", "HM", "HN", "HR", "HT", "HU",
-        "ID", "IE", "IL", "IM", "IN", "IO", "IQ", "IR", "IS", "IT",
-        "JE", "JM", "JO", "JP",
-        "KE", "KG", "KH", "KI", "KM", "KN", "KP", "KR", "KW", "KY", "KZ",
-        "LA", "LB", "LC", "LI", "LK", "LR", "LS", "LT", "LU", "LV", "LY",
-        "MA", "MC", "MD", "ME", "MF", "MG", "MH", "MK", "ML", "MM", "MN", "MO", "MP", "MQ", "MR", "MS",
-        "MT", "MU", "MV", "MW", "MX", "MY", "MZ",
-        "NA", "NC", "NE", "NF", "NG", "NI", "NL", "NO", "NP", "NR", "NU", "NZ",
+        "AD",
+        "AE",
+        "AF",
+        "AG",
+        "AI",
+        "AL",
+        "AM",
+        "AO",
+        "AQ",
+        "AR",
+        "AS",
+        "AT",
+        "AU",
+        "AW",
+        "AX",
+        "AZ",
+        "BA",
+        "BB",
+        "BD",
+        "BE",
+        "BF",
+        "BG",
+        "BH",
+        "BI",
+        "BJ",
+        "BL",
+        "BM",
+        "BN",
+        "BO",
+        "BQ",
+        "BR",
+        "BS",
+        "BT",
+        "BV",
+        "BW",
+        "BY",
+        "BZ",
+        "CA",
+        "CC",
+        "CD",
+        "CF",
+        "CG",
+        "CH",
+        "CI",
+        "CK",
+        "CL",
+        "CM",
+        "CN",
+        "CO",
+        "CR",
+        "CU",
+        "CV",
+        "CW",
+        "CX",
+        "CY",
+        "CZ",
+        "DE",
+        "DJ",
+        "DK",
+        "DM",
+        "DO",
+        "DZ",
+        "EC",
+        "EE",
+        "EG",
+        "EH",
+        "ER",
+        "ES",
+        "ET",
+        "FI",
+        "FJ",
+        "FK",
+        "FM",
+        "FO",
+        "FR",
+        "GA",
+        "GB",
+        "GD",
+        "GE",
+        "GF",
+        "GG",
+        "GH",
+        "GI",
+        "GL",
+        "GM",
+        "GN",
+        "GP",
+        "GQ",
+        "GR",
+        "GS",
+        "GT",
+        "GU",
+        "GW",
+        "GY",
+        "HK",
+        "HM",
+        "HN",
+        "HR",
+        "HT",
+        "HU",
+        "ID",
+        "IE",
+        "IL",
+        "IM",
+        "IN",
+        "IO",
+        "IQ",
+        "IR",
+        "IS",
+        "IT",
+        "JE",
+        "JM",
+        "JO",
+        "JP",
+        "KE",
+        "KG",
+        "KH",
+        "KI",
+        "KM",
+        "KN",
+        "KP",
+        "KR",
+        "KW",
+        "KY",
+        "KZ",
+        "LA",
+        "LB",
+        "LC",
+        "LI",
+        "LK",
+        "LR",
+        "LS",
+        "LT",
+        "LU",
+        "LV",
+        "LY",
+        "MA",
+        "MC",
+        "MD",
+        "ME",
+        "MF",
+        "MG",
+        "MH",
+        "MK",
+        "ML",
+        "MM",
+        "MN",
+        "MO",
+        "MP",
+        "MQ",
+        "MR",
+        "MS",
+        "MT",
+        "MU",
+        "MV",
+        "MW",
+        "MX",
+        "MY",
+        "MZ",
+        "NA",
+        "NC",
+        "NE",
+        "NF",
+        "NG",
+        "NI",
+        "NL",
+        "NO",
+        "NP",
+        "NR",
+        "NU",
+        "NZ",
         "OM",
-        "PA", "PE", "PF", "PG", "PH", "PK", "PL", "PM", "PN", "PR", "PS", "PT", "PW", "PY",
+        "PA",
+        "PE",
+        "PF",
+        "PG",
+        "PH",
+        "PK",
+        "PL",
+        "PM",
+        "PN",
+        "PR",
+        "PS",
+        "PT",
+        "PW",
+        "PY",
         "QA",
-        "RE", "RO", "RS", "RU", "RW",
-        "SA", "SB", "SC", "SD", "SE", "SG", "SH", "SI", "SJ", "SK", "SL", "SM", "SN", "SO", "SR", "SS",
-        "ST", "SV", "SX", "SY", "SZ",
-        "TC", "TD", "TF", "TG", "TH", "TJ", "TK", "TL", "TM", "TN", "TO", "TR", "TT", "TV", "TW", "TZ",
-        "UA", "UG", "UM", "US", "UY", "UZ",
-        "VA", "VC", "VE", "VG", "VI", "VN", "VU",
-        "WF", "WS",
-        "YE", "YT",
-        "ZA", "ZM", "ZW",
+        "RE",
+        "RO",
+        "RS",
+        "RU",
+        "RW",
+        "SA",
+        "SB",
+        "SC",
+        "SD",
+        "SE",
+        "SG",
+        "SH",
+        "SI",
+        "SJ",
+        "SK",
+        "SL",
+        "SM",
+        "SN",
+        "SO",
+        "SR",
+        "SS",
+        "ST",
+        "SV",
+        "SX",
+        "SY",
+        "SZ",
+        "TC",
+        "TD",
+        "TF",
+        "TG",
+        "TH",
+        "TJ",
+        "TK",
+        "TL",
+        "TM",
+        "TN",
+        "TO",
+        "TR",
+        "TT",
+        "TV",
+        "TW",
+        "TZ",
+        "UA",
+        "UG",
+        "UM",
+        "US",
+        "UY",
+        "UZ",
+        "VA",
+        "VC",
+        "VE",
+        "VG",
+        "VI",
+        "VN",
+        "VU",
+        "WF",
+        "WS",
+        "YE",
+        "YT",
+        "ZA",
+        "ZM",
+        "ZW",
         "XX",
     }
 )
@@ -193,10 +427,14 @@ class GeopoliticalArticleSchema(BaseModel):
         if value == "XX":
             return "XX"
         if len(value) != 2 or not value.isalpha():
-            raise ValueError("country_code deve essere un codice ISO Alpha-2 valido o 'XX'")
+            raise ValueError(
+                "country_code deve essere un codice ISO Alpha-2 valido o 'XX'"
+            )
         normalized = value.upper()
         if normalized not in ISO_ALPHA2_CODES:
-            raise ValueError(f"country_code '{value}' non è un codice ISO Alpha-2 riconosciuto")
+            raise ValueError(
+                f"country_code '{value}' non è un codice ISO Alpha-2 riconosciuto"
+            )
         return normalized
 
     @field_validator("latitude")
@@ -234,7 +472,7 @@ class GeopoliticalArticleSchema(BaseModel):
     @model_validator(mode="after")
     def first_tag_matches_primary(self) -> Self:
         """Invariante schema: primo CSV tag == ``primary_category`` (non Nessuno)."""
-        first = (self.tags.split(",")[0].strip() if self.tags else "")
+        first = self.tags.split(",")[0].strip() if self.tags else ""
         if first.lower() in {"nessuno", "nessuna", "none", ""}:
             raise ValueError("tags deve iniziare con primary_category")
         if first != self.primary_category:
@@ -252,9 +490,13 @@ class GeopoliticalArticleSchema(BaseModel):
         seen = set()
         for c in related_list:
             if c == "XX":
-                raise ValueError("related_countries non deve contenere il codice di fallback 'XX'")
+                raise ValueError(
+                    "related_countries non deve contenere il codice di fallback 'XX'"
+                )
             if c == primary:
-                raise ValueError(f"related_countries non deve contenere il paese primario '{primary}'")
+                raise ValueError(
+                    f"related_countries non deve contenere il paese primario '{primary}'"
+                )
             if c not in ISO_ALPHA2_CODES:
                 raise ValueError(f"related_countries contiene codice non ISO '{c}'")
             if c in seen:
@@ -352,16 +594,34 @@ def normalize_llm_json_dict(data: dict[str, Any]) -> dict[str, Any]:
             out[key] = val[:limit]
 
     # Soft remap: game/software e filosofia off-topic non restano in Geopolitica/…
+    # Non inventare country_code qui. Non rimappare pezzi politici (anti false-positive).
     pc = out.get("primary_category")
     if isinstance(pc, str) and pc in ("Geopolitica", "Sicurezza", "Infrastrutture"):
         hint_blob = " ".join(
             str(out.get(k) or "")
+            for k in (
+                "title",
+                "summary",
+                "tags",
+                "companies_involved",
+                "infrastructural_entities",
+            )
+        )
+        is_game = bool(_GAME_REVIEW_HINT.search(hint_blob))
+        is_offtopic = bool(_OFFTOPIC_GEOPOLITICA_HINT.search(hint_blob))
+        is_political = bool(_POLITICAL_CONTENT_HINT.search(hint_blob))
+        if is_game or (is_offtopic and not is_political):
+            out["primary_category"] = "Tecnologia"
+
+    # Soft remap inverso: sport/cronaca giudiziaria non restano in Tecnologia.
+    pc = out.get("primary_category")
+    if isinstance(pc, str) and pc == "Tecnologia":
+        hint_blob = " ".join(
+            str(out.get(k) or "")
             for k in ("title", "summary", "tags", "companies_involved", "infrastructural_entities")
         )
-        if _GAME_REVIEW_HINT.search(hint_blob) or _OFFTOPIC_GEOPOLITICA_HINT.search(
-            hint_blob
-        ):
-            out["primary_category"] = "Tecnologia"
+        if _SPORT_LEGAL_HINT.search(hint_blob) and not _GAME_REVIEW_HINT.search(hint_blob):
+            out["primary_category"] = "Geopolitica"
 
     # Regola schema: primo tag CSV = primary_category.
     pc = out.get("primary_category")
@@ -493,14 +753,20 @@ def _normalize_fallback_date(published_at: str) -> str:
     return published_at
 
 
-def get_fallback_article(title: str, source_url: str, published_at: str) -> GeopoliticalArticleSchema:
+def get_fallback_article(
+    title: str, source_url: str, published_at: str
+) -> GeopoliticalArticleSchema:
     """Articolo neutro di emergenza quando l'API LLM è irrecuperabile.
 
     Evita crash della pipeline: XX / 0,0 / Infrastrutture / relevance 1.
     Side-effects: nessuno verso rete/DB — solo costruzione in-memory.
     """
     clean_date = _normalize_fallback_date(published_at)
-    safe_url = source_url if SOURCE_URL_PATTERN.match(source_url or "") else "https://example.com/unknown"
+    safe_url = (
+        source_url
+        if SOURCE_URL_PATTERN.match(source_url or "")
+        else "https://example.com/unknown"
+    )
 
     return GeopoliticalArticleSchema(
         title=(title or "Articolo sconosciuto")[:120],

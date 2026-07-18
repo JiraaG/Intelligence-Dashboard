@@ -24,6 +24,12 @@ Devi far riprocessare gli ultimi N entry Miniflux già *read* (dopo fix prompt/s
    ```bash
    docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20
    ```
+2b. **Prova da zero** (wipe vault + DELETE tutte le `articles` + unread ultime N):
+   ```bash
+   docker compose exec -T radar-worker python -m app.scripts.requeue_articles 100 --purge-all --dry-run
+   docker compose exec -T radar-worker python -m app.scripts.requeue_articles 100 --purge-all
+   ```
+   Lo script pagina Miniflux (≤50 entry/pagina). Il worker processa solo unread entro ~48h.
 3. Forza un ciclo immediato (poll tipico 900s):
    ```bash
    docker compose restart radar-worker

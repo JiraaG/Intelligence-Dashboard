@@ -52,6 +52,7 @@ Moduli sotto `radar/backend/app/`:
 - Nessun campo `reasoning` / Chain-of-Thought
 - `build_gemini_response_schema()` sanitizza lo schema per l’API Google
 - 10 categorie: Nucleare, Energia, Infrastrutture, Geopolitica, Economia, Tecnologia, Spazio, Ambiente, Salute, Sicurezza
+- Prompt SoT: `classification/prompts.py` — fallback `Tecnologia`+`XX` **ristretto** (solo assenza di fatti geo/industriali/politici); albero decisionale anti-`XX`; multilaterali = 1 primary + `related_countries` CSV
 - Fallback geografico su fallimento irreversibile: paese `XX`, categoria `Infrastrutture` (vedi `validator.py`)
 - Provider: `gemini` \| `deepseek` \| `openai` \| `glm` \| `grok` \| `claude` (**stub**; Messages API non implementata)
 - Dialect OpenAI-compat: deepseek=`thinking`; openai/glm/grok=`stock`; via httpx (**no** package `openai`)
@@ -118,7 +119,7 @@ CORS: middleware solo se `CORS_ALLOW_ORIGINS` non vuoto; metodi `GET`, `PATCH`, 
 |--------|----------|-----------|----------|
 | GET | `/api/articles` | `date` (obbl. salvo `saved=true`), `country`, `category`, `sentiment`, `relevance_level`, `cursor`, `limit` ≤ 100, `saved?` | `{ items, next_cursor, total }` — con `saved=true` ignora `date`, filtra `is_saved` |
 | GET | `/api/map-summary` | `date`, `sentiment?`, `relevance_level?` | Array `country_code × primary_category` + count/read + lat/lon finite |
-| GET | `/api/map-relations` | `date`, `sentiment?`, `relevance_level?` | Righe undirected `source_country ↔ target_country` per categoria (+ volume) |
+| GET | `/api/map-relations` | `date`, `sentiment?`, `relevance_level?` | Righe undirected `source_country ↔ target_country` per categoria (+ volume). Semantica **star** v1: un arco per ogni coppia `(country_code, related)` via `LEAST/GREATEST` — **non** clique tra soli `related_countries` (es. US+IT+FR → US–IT e US–FR, non IT–FR). `XX` escluso. |
 | GET | `/api/saved-summary` | `sentiment?`, `relevance_level?` | Stessa shape di map-summary; solo `is_saved=true`; **senza date** |
 | GET | `/api/countries` | `date`, filtri opzionali | Rollup paese (`categories`, `article_count`) |
 | PATCH | `/api/articles/{id}/read_status` | `{ "is_read": bool }` | `{ "status", "is_read", "is_saved"? }` — unread ⇒ `is_saved=false` |

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import asyncpg
@@ -32,7 +31,7 @@ def _restore_pool():
 def test_build_map_relations_query_basic() -> None:
     pub_date = date(2026, 7, 15)
     sql, params = build_map_relations_query(pub_date)
-    
+
     assert "LEAST(a.country_code, r.related)" in sql
     assert "GREATEST(a.country_code, r.related)" in sql
     assert "unnest(a.related_countries)" in sql
@@ -49,7 +48,7 @@ def test_build_map_relations_query_with_filters() -> None:
         sentiment=["Positivo", "Negativo"],
         relevance_level=4,
     )
-    
+
     assert "a.sentiment = ANY($2::text[])" in sql
     assert "a.relevance_level = $3" in sql
     assert params == [pub_date, ["Positivo", "Negativo"], 4]
@@ -58,7 +57,7 @@ def test_build_map_relations_query_with_filters() -> None:
 def test_get_map_relations_api_success() -> None:
     mock_pool, mock_conn = _mock_pool()
     state.db_pool = mock_pool
-    
+
     db_rows = [
         {
             "source_country": "IT",
@@ -71,13 +70,13 @@ def test_get_map_relations_api_success() -> None:
             "target_country": "DE",
             "primary_category": "Energia",
             "volume": 1,
-        }
+        },
     ]
     mock_conn.fetch = AsyncMock(return_value=db_rows)
-    
+
     client = TestClient(app)
     response = client.get("/api/map-relations?date=2026-07-15")
-    
+
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 2
@@ -97,3 +96,26 @@ def test_get_map_relations_invalid_date() -> None:
     response = client.get("/api/map-relations?date=2026-13-45")
     assert response.status_code == 400
     assert "ISO YYYY-MM-DD" in response.json()["detail"]
+
+
+def test_trilaterale_star_pairs_not_clique() -> None:
+    """primary=US related=IT,FR → archi star US-IT + US-FR (N-1), non IT-FR.
+
+    La query unnest produce una riga per ciascun related; LEAST/GREATEST
+    normalizza la coppia undirected. Il clique tra related non esiste in v1.
+    """
+    sql, _params = build_map_relations_query(date(2026, 7, 18))
+    assert "CROSS JOIN LATERAL unnest(a.related_countries)" in sql
+    assert "LEAST(a.country_code, r.related)" in sql
+    assert "GREATEST(a.country_code, r.related)" in sql
+    # Nessun self-join related×related (clique).
+    assert "related_countries" in sql
+    assert sql.count("unnest(a.related_countries)") == 1
+
+    # Semantica attesa post-aggregazione (simula 1 articolo Economia US+[IT,FR]).
+    primary = "US"
+    related = ["IT", "FR"]
+    pairs = {(min(primary, r), max(primary, r), "Economia") for r in related}
+    assert pairs == {("IT", "US", "Economia"), ("FR", "US", "Economia")}
+    assert ("FR", "IT", "Economia") not in pairs
+    assert len(pairs) == len(related)  # N-1 rispetto a primary+related

@@ -125,18 +125,18 @@ docker compose exec radar-db psql -U radar_user -d radar_db -c "\dt"
 1. Pubblica Miniflux (lan/hardened) e apri l’UI admin.
 2. **Settings → API Keys → Create** → copia in `.env` come `MINIFLUX_API_KEY`.
 3. `docker compose up -d` (rispetta `depends_on` healthy) per rileggere l’env. Evitare `docker compose restart` su tutti i servizi insieme: Postgres può essere ancora in recovery mentre backend/worker aprono il pool (`CannotConnectNowError`). Preferire `up -d` o restart ordinato (`radar-db` → wait healthy → resto); `init_pool` ritenta errori transienti di startup.
-4. Aggiungi feed (catalogo: [RSS.txt](../RSS.txt)).
+4. Aggiungi feed (catalogo: [RSS.txt](../RSS.txt)). **Il volume mappa dipende dai feed sottoscritti in Miniflux**, non dal solo worker: con 1–2 feed (es. BBC World + NASA) tipicamente ~40–60 articoli/48h; per ~centinaia di notizie/giorno servono le fonti del catalogo (Guardian, BBC sezioni, NPR, DW, CNBC, …).
 
 Con unread Miniflux alti, tenere `MINIFLUX_LIMIT` ≤ ~50 sotto il cap `MAX_MINIFLUX_RESPONSE_BYTES` (5MB). Se un modello Gemini/Gemma restituisce HTTP 500 in classificazione (tipico Profilo A), impostare in `.env` `LLM_SIMPLE_MODEL` / `LLM_COMPLEX_MODEL` (o legacy `GEMINI_MODEL`, es. `gemini-3.1-flash-lite`) e riavviare solo `radar-worker` — **non** commitare `.env`.
 
 **Ciclo reale (worker, non API):**
 
 - Servizio `radar-worker` (`python -m app.worker`), leadership via advisory lock
-- Polling `WORKER_POLL_INTERVAL_SECONDS` (default **900** = 15 min)
-- Entry **unread** ultime ~48h, dedup URL in PostgreSQL
+- Polling `WORKER_POLL_INTERVAL_SECONDS` (default **900** = 15 min); all’avvio forza `PUT /v1/feeds/refresh`
+- Entry **unread** ultime ~48h (`published_after`), dedup URL in PostgreSQL; Miniflux ricontrolla i feed tipicamente ~ogni ora
 - Complexity v2.2 → QuotaLedger reserve → classificazione multi-provider (lane SIMPLE / COMPLEX) → eventuale cooldown modello → commit DB + outbox → vault atomico → mark-read Miniflux solo se completed
 - Quote durable per lane: `llm_request_ledger` (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`; soft-trim = `LLM_SIMPLE.rpd` se >0; RPM/TPM=attesa stessa lane; RPD/cooldown=`QuotaDailyExceeded` → residual altra lane; free=RPM/RPD(+TPM), paid=budget)
-- Requeue ops (re-ingest distruttivo: unread Miniflux + purge articoli/vault/outbox + clear cooldown): comando canonico nel [runbook](../radar/docs/runbook.md) — preview `docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20 --dry-run`; reale senza `--dry-run` poi `docker compose restart radar-worker`
+- Requeue ops (re-ingest distruttivo): [runbook](../radar/docs/runbook.md) — preview `… requeue_articles 50 --dry-run`; reale senza `--dry-run`; **prova da zero** `… requeue_articles 100 --purge-all` (wipe vault + DELETE tutte le `articles`) poi `docker compose restart radar-worker`
 
 Riavviare solo `radar-backend` **non** riavvia l’ingest: serve `radar-worker`.
 
@@ -151,10 +151,12 @@ Riavviare solo `radar-backend` **non** riavvia l’ingest: serve `radar-worker`.
 | `/health/ready` 503 | Normale finché il worker non scrive heartbeat (~30–90s) |
 | 429 / rate limit LLM | Ledger + Retry-After; quote lane (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`); Studio / dashboard provider |
 | Auth / key LLM | Key lane o legacy (`GEMINI_*` / `DEEPSEEK_*` / `OPENAI_*`) allineate al `PROVIDER` della lane |
-| Articoli bloccati / requeue | [runbook](../radar/docs/runbook.md) — `--dry-run` poi `requeue_articles 20` (+ restart worker) |
+| Articoli bloccati / requeue | [runbook](../radar/docs/runbook.md) — `--dry-run` poi `requeue_articles`; prova da zero `--purge-all` |
+| Poche notizie in mappa (~decine vs ~centinaia) | Contare i feed in Miniflux UI (`GET /v1/feeds`); aggiungere fonti da [RSS.txt](../RSS.txt). Non è un bug FE se Miniflux ha solo 1–2 feed |
 | Mappa senza confini | Manca o SHA errato su `countries.geo.json` → `npm run verify-geojson:fetch` |
-| Nessun articolo nuovo | `MINIFLUX_API_KEY`, log `radar-worker`, quote lane (`LLM_SIMPLE_RPD` / budget), cooldown |
+| Nessun articolo nuovo | `MINIFLUX_API_KEY`, log `radar-worker`, quote lane (`LLM_SIMPLE_RPD` / budget), cooldown; attendere poll 15 min + refresh feed ~1h |
 | Payload Miniflux troppo grande / log 5MB | Abbassare `MINIFLUX_LIMIT` (tipico 50); non alzare cieco il cap |
 | Classificazione → fallback / HTTP 500 modello | Verificare `LLM_*_MODEL` / legacy `GEMINI_MODEL` in `.env`; riavviare `radar-worker` — **non** commitare `.env` |
+| Soft-news → `Tecnologia`/`XX` eccessivo | Prompt + soft-remap in `classification/` (anti-XX, sport→Geopolitica); requeue mirato |
 
 Backup/restore: [radar/ops/README.md](../radar/ops/README.md) (`radar/ops/backup-postgres.sh`, `restore-postgres.sh`). Persistenza: `radar/data/postgres/`, `radar/vault/`.
