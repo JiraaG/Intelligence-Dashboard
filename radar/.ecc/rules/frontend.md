@@ -262,7 +262,7 @@ Il componente `p-sidebar` di PrimeNG può essere usato come wrapper UI.
 
 ## Regola 7: Clustering per categoria + map-summary (Phase 5+)
 
-**Day open (Phase 5):** la mappa si dipinge da `GET /api/map-summary` (righe `country_code × primary_category` + count/read + lat/lon finite). Niente `Article[]` globale del giorno. Hatching da categorie aggregate per paese (zoom &lt; 5). A zoom ≥ 5: **un pin nazione** (conteggio + anello conic categorie) — non pallini numerati per-categoria. Click pin → fetch nazione + sidebar (`preserveZoom: true`, niente dezoom). Click poligono/toolbar → nation open + `fitBounds` (`maxZoom: 4`).
+**Day open (Phase 5):** la mappa si dipinge da `GET /api/map-summary` (righe `country_code × primary_category` + count/read + lat/lon finite). Niente `Article[]` globale del giorno. Hatching da categorie aggregate per paese (zoom &lt; 5). A zoom ≥ 5: **un pin nazione** (conteggio + anello conic categorie) — non pallini numerati per-categoria. Click pin → fetch nazione + sidebar (`preserveZoom: true`, niente dezoom). Click hatching (zoom &lt; 5) → map-click + `pickCountryCodeAt` (canvas `relationsPane` ruba i hit SVG) → stesso path toolbar. Click poligono/toolbar → nation open + `fitBounds` (`maxZoom: 4`). Hub/pin/spider e archi: anchor = `getCountryCentroid` (US/RU mainland), **non** media lat/lng articolo.
 
 **Saved vault:** `GET /api/saved-summary` (no date) alimenta `NOTIZIE SALVATE` + tooltip nazioni; click → `loadSavedCountryArticles` + carosello multi-day con `sidebarMode='saved'`; **stesso path mappa di LETTE/TROVATE** (`fitBounds` + `flyTo` zoom 6 + spiderfy categoria + highlight). Card **Salva notizia** / **Rimuovi dai salvati**; save ⇒ read; unread ⇒ unsave.
 
@@ -295,7 +295,7 @@ Non reintrodurre raggio 200, `spiderfyOnMaxZoom: true`, o `disableClusteringAtZo
 - `maxClusterRadius`: **40px** (allineato a `radar-map.component.ts` post-restore)
 - `spiderfyOnMaxZoom`: **false** (espansione custom, non spiderfy automatico)
 - Spiderfy fan: **tutte** le icone della categoria attiva (niente hard cap 24 / niente `SPIDERFY_MAX_ICONS`); distanza/size adattivi (`spiderfyDistanceForCount` / `spiderfyIconSizeForCount`); restore hub nazione se spiderfy fallisce
-- **Focus:** pin summary = preserveZoom; poligono/toolbar = `fitBounds` maxZoom 4; US/RU bounds hardcoded
+- **Focus:** pin summary = preserveZoom; poligono/toolbar = `fitBounds` maxZoom 4; US/RU bounds hardcoded; hub/pin/spider = `getCountryCentroid` (no avg article coords); hatching click = `pickCountryCodeAt`
 - **Sidebar close**: `App.closeSidebar()` → `mapComponent.collapseAllGraphs()` (senza editare file sidebar)
 - **Read/unread**: fingerprint + `syncMarkerReadState` — no `clearLayers` su solo `is_read`
 

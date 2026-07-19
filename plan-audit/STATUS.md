@@ -1,6 +1,6 @@
 # plan-audit — STATUS (fatto vs da fare)
 
-Quadro operativo aggiornato **2026-07-18** (sera: classification/geo/arcs refine + prova da zero).  
+Quadro operativo aggiornato **2026-07-19** (map anchors + summary densi; click nazione zoom&lt;5; Fase A prompt ACTIVE).  
 Indice cartelle: [`README.md`](README.md).  
 Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`](remediation/audit_remediation_final_release_handoff.md).
 
@@ -10,7 +10,8 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 
 | Area | Dove | Note |
 |------|------|------|
-| Nessuno | — | Tutti i piani approvati sono stati implementati e validati. |
+| Fase A — LLM locale AMD/Ollama | [`prompts/active/plan_prompt_fase_A_local_amd_ollama.md`](prompts/active/plan_prompt_fase_A_local_amd_ollama.md) | **ACTIVE** — prompt analisi/piano pronto; blueprint overview §3.A; host Navi22+ROCm+Ollama verificati empiricamente |
+| ECC manual / expansion | [`prompts/active/plan_prompt_ecc_manual_and_expansion.md`](prompts/active/plan_prompt_ecc_manual_and_expansion.md) | **ACTIVE (non eseguito)** — resta finché non si produce un piano deliverable |
 
 ---
 
@@ -18,7 +19,9 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 
 | Area | Dove | Note |
 |------|------|------|
-| Affinamento classificazione (tipologia / anti-XX / archi star) | [`prompts/done/plan_prompt_classification_geo_arcs_refine.md`](prompts/done/plan_prompt_classification_geo_arcs_refine.md) | **DONE** 2026-07-18 — prompt + soft-remap sport; `requeue --purge-all`; docs star; prova da zero 48 elab / 0 err; %XX ~4.5. **Restore point:** `f7cf83d` su `feature/upgrades`. |
+| Map nation anchors + summary densi | codice FE `radar-map` + `classification/prompts.py` | **DONE** 2026-07-19 — hub/spider/pin sul centroide nazione (US/RU mainland); summary LLM briefing denso 220–420 char. **Restore point:** `a240b3c` su `feature/upgrades`. |
+| Click nazione hatching (zoom &lt; 5) | `radar-map` map-click + `pickCountryCodeAt` | **DONE** 2026-07-19 — bypass canvas `relationsPane`; parity LETTE/TROVATE. Commit `911463a`. |
+| Affinamento classificazione (tipologia / anti-XX / archi star) | [`prompts/done/plan_prompt_classification_geo_arcs_refine.md`](prompts/done/plan_prompt_classification_geo_arcs_refine.md) | **DONE** 2026-07-18 — prompt + soft-remap sport; `requeue --purge-all`; docs star; prova da zero. **Restore point:** `f7cf83d` su `feature/upgrades`. |
 | Notizie Salvate (`is_saved`) | [`complete/note_notizie_salvate.md`](complete/note_notizie_salvate.md) | Migration `010`; vault cross-day; save⇒read / unread⇒unsave; spiderfy parity LETTE/TROVATE (2026-07-17) |
 | Phase 0–6 GATE VERDE | [`complete/plan_impl_phase_0_6.md`](complete/plan_impl_phase_0_6.md) + [`_execution`](complete/plan_impl_phase_0_6_execution.md) | Restore SHA; non backlog |
 | Ticket remediation P0–P2 | [`complete/plan_docs_audit_ticket_status.md`](complete/plan_docs_audit_ticket_status.md) | **0 OPEN** |
@@ -45,17 +48,18 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 | Fase 0 — PR `refactor/testing` → `develop` | **DONE** | [PR #1](https://github.com/JiraaG/Dashboard-finance/pull/1) merged 2026-07-17; tip `develop` include Notizie Salvate (`b08fd7e`) oltre al branch |
 | Fase 5 — digest pin + drop `--legacy-peer-deps` | **DEFERRED ACCETTATO** | Hardening opzionale; **non** da fare per release. Vedi piano §7 |
 | Commenti codice P1/P2 | **Chiuso (P2-01)** | Altri P2 in inventario senza `batch_id` — solo se emerge gap reale |
-| Fase C — Dedup semantica `pgvector` | **BACKLOG** | Vedi `radar_overview_and_upgrades.md` §C; non iniziata; indipendente da H |
+| Fase C — Dedup semantica `pgvector` | **BACKLOG** | Vedi `radar_overview_and_upgrades.md` §C; non iniziata; indipendente da H / A |
+| Fase A — LLM locale AMD/Ollama | **ACTIVE (prompt)** | [`prompts/active/plan_prompt_fase_A_local_amd_ollama.md`](prompts/active/plan_prompt_fase_A_local_amd_ollama.md) — piano da produrre in Plan mode; non implementare senza approvazione |
 | Fase H — Grafo geospaziale | **DONE** | related_countries + GET /api/map-relations + archi mappa + chip carosello (2026-07-18). |
 | Archi UI (multicolore + click) | **DONE** | Piano [`complete/plan_archi_hatching_multicolor.md`](complete/plan_archi_hatching_multicolor.md). Residuo **opzionale**: multicolore aggregato anche a zoom ≥ 5. |
 
-**Nessun residuo operativo obbligatorio sulla Fase B / H / archi UI / classification refine.** Branch di riferimento feature: `feature/upgrades`.
+**Nessun residuo operativo obbligatorio sulla Fase B / H / archi UI / classification refine / map anchors.** Branch di riferimento feature: `feature/upgrades`.
 
-**Restore point (classification/geo/arcs + purge-all):** `f7cf83d` su `feature/upgrades` — checkpoint per `git checkout f7cf83d` / revert se regressioni prompt/validator/requeue. Precedente restore archi UI: `5c74e57`.
+**Restore point (map anchors + summary densi):** `a240b3c` su `feature/upgrades` — checkpoint FE centroide nazione + prompt summary. Precedenti: click hatching `911463a`; classification/geo `f7cf83d`; archi UI `5c74e57`.
 
 Prompt Final Release: [`prompts/done/audit_prompt_final_release_gate.md`](prompts/done/audit_prompt_final_release_gate.md) — **non rieseguire** (F0–F4 chiusi).
 
-**Fuori scope:** nuove feature; refactor/restyle di `radar-sidebar/**` al di fuori delle eccezioni mirate (toggle Salva e chip `related_countries`); riaprire ticket CLOSED; rieseguire P0 commenti senza richiesta; attivare Fase 5 senza decisione esplicita.
+**Fuori scope:** nuove feature; refactor/restyle di `radar-sidebar/**` al di fuori delle eccezioni mirate (toggle Salva e chip `related_countries`); riaprire ticket CLOSED; rieseguire P0 commenti senza richiesta; attivare Fase 5 senza decisione esplicita; implementare Fase A senza piano approvato.
 
 ---
 
@@ -66,7 +70,7 @@ plan-audit/
   STATUS.md          ← questo file (quadro fatto / residui)
   active/            ← Piani in corso (vuoto)
   complete/          ← Piani COMPLETATI (incl. Phase 0–6, Fase B, Fase H, archi UI)
-  prompts/active/    ← solo prompt non eseguiti (ECC manual/expansion)
+  prompts/active/    ← prompt non eseguiti (Fase A Ollama; ECC manual/expansion)
   prompts/done/      ← storico (incl. Fase H wave 1–3, Final Release Gate + audit commenti)
   remediation/       ← report DONE (incl. F1–F4)
   archive/           ← SUPERSEDED / scratch / ECC early

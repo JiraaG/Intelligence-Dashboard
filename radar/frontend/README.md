@@ -37,7 +37,7 @@ npm ci --legacy-peer-deps
 - Mock solo con token `MOCK_MODE` (`useValue: true`) — mai fallback silenzioso su errore API
 - Cluster: `maxClusterRadius: 40`, `spiderfyOnMaxZoom: false`
 - Nation spiderfy: hub disco compatto (`radar-spider-root`); **tutte** le icone della categoria attiva (niente hard cap 24); size+distanza adattivi
-- Focus: pin summary = `preserveZoom`; poligono/toolbar = `fitBounds` (`maxZoom: 4`); `refocusCountry` se stesso codice
+- Focus: pin summary = `preserveZoom`; poligono/toolbar = `fitBounds` (`maxZoom: 4`); `refocusCountry` se stesso codice; hub/pin/spider = `getCountryCentroid` (US/RU mainland); hatching zoom &lt; 5 = `pickCountryCodeAt`
 - **Archi relazioni (Fase H + UI):** zoom &lt; 5 multicolore; zoom ≥ 5 per-categoria + tratteggio geometrico; pane `relationsPane` z 550; click → `relationClicked` / `loadRelationArticles` (bilaterale)
 - **Notizie Salvate:** contatore toolbar date-agnostic + tooltip nazioni; open = stesso zoom/spiderfy di LETTE/TROVATE; save⇒read, unread⇒unsave
 
