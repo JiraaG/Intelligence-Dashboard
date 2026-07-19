@@ -33,7 +33,7 @@ LLM_SIMPLE_MODEL=gemini-3.1-flash-lite
 LLM_SIMPLE_RPM=12          # Studio 15 — cap ops ≤12
 LLM_SIMPLE_TPM=250000      # Studio 250K
 LLM_SIMPLE_RPD=500         # Studio 500
-LLM_SIMPLE_FALLBACKS=      # VUOTO — residual = COMPLEX
+LLM_SIMPLE_FALLBACKS=      # VUOTO — L1 off; sostituto cross-provider = residual L2 COMPLEX
 # BORDERLINE + COMPLEX + escalate (paid)
 LLM_COMPLEX_PROVIDER=deepseek
 LLM_COMPLEX_MODEL=deepseek-v4-flash
@@ -422,7 +422,7 @@ Commentato in `.env.example`. Scenario 2 / Fase A: lane SIMPLE verso Ollama sull
 - Package / SDK `ollama` e chiamate `ollama.chat` **vietati**.
 - Overlay Compose: `docker-compose.ollama-host.yml` (`extra_hosts: host.docker.internal:host-gateway` su `radar-worker`).
 - Modello ops tipico: **`gemma4-radar`** (Modelfile `FROM gemma4:12b` + `PARAMETER num_ctx 8192`) oppure base `gemma4:12b`; **`LLM_SIMPLE_REASONING_EFFORT=high`**; API key dummy non vuota (es. `ollama`); RPM/TPM/RPD SIMPLE = `0`.
-- **Escalate:** SIMPLE Ollama **non** scala a DeepSeek su ValidationError; solo correction locale. COMPLEX/BORDERLINE restano DeepSeek; residual cloud se Ollama down.
+- **Escalate / residual:** SIMPLE Ollama-think **non** scala a DeepSeek su ValidationError e **non** ha residual L2 verso cloud (`_simple_chain` + `uses_ollama_think_protocol`, `54c8038`). Solo correction locale; se Ollama down su articoli SIMPLE → fallback article. COMPLEX/BORDERLINE restano DeepSeek.
 - Pre-validate: `normalize_llm_json_dict` (liste→CSV, alias categoria/sentiment, protagonista paese, coerenza tag/aziende/relevance).
 - Host Ollama: preferire **`OLLAMA_NUM_PARALLEL=1`**; worker `WORKER_*_CONCURRENCY=1` consigliato su 12 GB VRAM.
 - **VRAM lifecycle:** `OLLAMA_AUTO_UNLOAD` + `keep_alive` busy su `/v1` (best-effort); unload idle via `POST /api/generate` `keep_alive=0` (`classification/ollama_lifecycle.py`); debounce `OLLAMA_UNLOAD_DEBOUNCE_SECONDS`; ops `ops/verify-ollama-vram.sh`.
@@ -649,7 +649,7 @@ for ref in filter_cooldown(chain):
 - Default codice: `LLM_ROUTING_SHADOW=true` / `MODE=off` finché mix calibrato; ops live può forzare `SHADOW=false`.  
 - Swap COMPLEX→Google: solo `LLM_COMPLEX_PROVIDER=gemini` + `LLM_COMPLEX_MODEL=…`.  
 - Swap OpenAI/GLM/Grok: `PROVIDER` + `MODEL` + `API_KEY` + `BASE_URL` + budget; ricette Profili C/D/E in `.env.example`.  
-- Local-Hybrid (Profilo F): `PROVIDER=openai` + Ollama `BASE_URL=…/v1` + overlay `docker-compose.ollama-host.yml`; VRAM unload (`ollama_lifecycle` / `OLLAMA_*` / `ops/verify-ollama-vram.sh`); **vietato** `ollama.chat` / package `ollama`.  
+- Local-Hybrid (Profilo F): `PROVIDER=openai` + Ollama `BASE_URL=…/v1` + overlay `docker-compose.ollama-host.yml`; VRAM unload (`ollama_lifecycle` / `OLLAMA_*` / `ops/verify-ollama-vram.sh`); **vietato** `ollama.chat` / package `ollama`; **no** residual/escalate SIMPLE Ollama-think → cloud.  
 - `claude` nativo = fuori scope; usare gateway OpenAI-compat se serve.
 
 ---

@@ -1,6 +1,6 @@
 # plan-audit — STATUS (fatto vs da fare)
 
-Quadro operativo aggiornato **2026-07-19** (Profilo F Local-Hybrid `54c8038` + **VRAM unload shipped**; map anchors; Fase A ACTIVE solo per scorecard fixture opz.).  
+Quadro operativo aggiornato **2026-07-19** (Profilo F Local-Hybrid `54c8038` + **VRAM unload shipped**; **audit LLM env topology** docs; map anchors; Fase A ACTIVE solo per scorecard fixture opz.).  
 Indice cartelle: [`README.md`](README.md).  
 Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`](remediation/audit_remediation_final_release_handoff.md).
 
@@ -10,7 +10,8 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 
 | Area | Dove | Note |
 |------|------|------|
-| Fase A — LLM locale AMD/Ollama | [`active/plan_impl_fase_A_local_amd_ollama.md`](active/plan_impl_fase_A_local_amd_ollama.md) | **ACTIVE (follow-up opz.)** — W1–W4 + VRAM unload **DONE** (core `54c8038` + `ollama_lifecycle`/`OLLAMA_*`). Overlay host, Profilo F, `openai_compat_*`, think Gemma, `normalize_llm_json_dict`, **no SIMPLE Ollama→DeepSeek escalate**, requeue 48h OK. Ops tag tipico **`gemma4-radar`**. Residuo: scorecard fixture formale (opz.). Prompt in [`prompts/done/`](prompts/done/plan_prompt_fase_A_local_amd_ollama.md). |
+| Audit LLM env topology | [`active/audit_llm_lane_env_generalization.md`](active/audit_llm_lane_env_generalization.md) | **ACTIVE (docs shipped)** — S3 failover documentato; ricette 1–8 in `.env.example` + runbook; SoT/overview allineati (no residual Ollama-think). W2 codice residual Ollama **cancelled**. |
+| Fase A — LLM locale AMD/Ollama | [`active/plan_impl_fase_A_local_amd_ollama.md`](active/plan_impl_fase_A_local_amd_ollama.md) | **ACTIVE (follow-up opz.)** — W1–W4 + VRAM unload **DONE** (core `54c8038` + `ollama_lifecycle`/`OLLAMA_*`). Overlay host, Profilo F, `openai_compat_*`, think Gemma, `normalize_llm_json_dict`, **no SIMPLE Ollama→DeepSeek escalate/residual**, requeue 48h OK. Ops tag tipico **`gemma4-radar`**. Residuo: scorecard fixture formale (opz.). Prompt in [`prompts/done/`](prompts/done/plan_prompt_fase_A_local_amd_ollama.md). |
 | ECC manual / expansion | [`prompts/active/plan_prompt_ecc_manual_and_expansion.md`](prompts/active/plan_prompt_ecc_manual_and_expansion.md) | **ACTIVE (non eseguito)** — resta finché non si produce un piano deliverable |
 
 ---

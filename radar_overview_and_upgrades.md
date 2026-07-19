@@ -245,7 +245,7 @@ LLM_COMPLEX_REASONING_EFFORT=high
 ```
 
 ##### Scenario 2: Local SIMPLE + Cloud COMPLEX (Local-Hybrid — DEFAULT / Profilo F)
-Bulk a costo zero su GPU; multilaterali / schema-risky su DeepSeek (o Gemini). Residual cloud se Ollama down (identity lane diversa).
+Bulk a costo zero su GPU; multilaterali / schema-risky su DeepSeek (o Gemini). **Nessun residual/escalate** SIMPLE Ollama-think → cloud (`54c8038`): se Ollama down sugli articoli SIMPLE → fallback article; BORDERLINE/COMPLEX restano sulla lane cloud.
 
 ```text
 LLM_ROUTING_MODE=complexity

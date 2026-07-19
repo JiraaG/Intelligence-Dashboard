@@ -62,19 +62,22 @@ Sintomi: log worker con wait/`429`/`Retry-After`; pochi articoli nuovi; ready pu
 
 - Ledger durable per **lane** (`classify:simple` / `classify:complex`): limiti da `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (RPM/TPM/RPD/budget; `0` = unmanaged); `PROVIDER` = gemini|deepseek|openai|glm|grok|claude; legacy `GEMINI_*`/`DEEPSEEK_*`/`LLM_RPM` = fill-gap (non tetto globale)
 - Soft-trim worker: solo `LLM_SIMPLE.rpd` se `> 0`. Free tier → RPM/RPD `> 0`; paid → RPM/RPD `= 0` + `*_BUDGET_USD_DAY` / 402
-- Cascata Gemini (lane SIMPLE se provider=gemini): `LLM_SIMPLE_MODEL` + `GEMINI_MODEL_FALLBACKS` (CSV)
+- Failover S3: L1 `LLM_*_FALLBACKS` (CSV **stesso** provider) → L2 residual cross-lane → L3 fallback article. `*_FALLBACKS=` vuoto = nessun L1 (sostituto cross-provider = residual, non CSV).
+- Cascata Gemini same-provider (opz.): `LLM_SIMPLE_FALLBACKS` o legacy `GEMINI_MODEL_FALLBACKS` solo se chiave lane assente
 - Cooldown 24h hard-fail: tabella `llm_model_cooldown` (`LLM_MODEL_COOLDOWN_HOURS`) — **non** per 429 brevi con Retry-After
 - Routing: `LLM_ROUTING_MODE=complexity` + lane env:
   - `LLM_SIMPLE_PROVIDER` / `LLM_SIMPLE_MODEL` (lane SIMPLE only — effort tipico `none`)
   - `LLM_COMPLEX_PROVIDER` / `LLM_COMPLEX_MODEL` (BORDERLINE + COMPLEX + escalate — effort tipico `high`)
-  - Residual SIMPLE↔COMPLEX se identity diversa
+  - Residual SIMPLE↔COMPLEX se identity diversa (**eccezione:** SIMPLE Ollama-think → **niente** residual/escalate verso cloud)
   - Complessità = rischio estrazione schema (G/E/X); **L sola → SIMPLE** (non eleva)
-  - Swap provider: cambiare `PROVIDER`+`MODEL`+`API_KEY`+`BASE_URL`+limiti/budget; restart `radar-worker`
-  - Esempio COMPLEX → Google: `LLM_COMPLEX_PROVIDER=gemini` + `LLM_COMPLEX_MODEL=gemini-3.5-flash`
-  - OpenAI/GLM/Grok: dialect `openai` (niente `thinking` DeepSeek); ricette in `.env.example` Profili C/D/E
+  - Swap provider: cambiare `PROVIDER`+`MODEL`+`API_KEY`+`BASE_URL`+limiti/budget; restart `radar-worker`; **un solo** blocco profilo attivo
+  - Target hybrid (Profilo A): Gemini Flash Lite SIMPLE + DeepSeek COMPLEX; `*_FALLBACKS=`
+  - OpenAI/GLM/Grok: dialect `openai` (niente `thinking` DeepSeek); ricette in `.env.example` Profili C/D/E + topologia 1–8
   - Local-Hybrid (Profilo F): Ollama host via `PROVIDER=openai` + `BASE_URL=http://host.docker.internal:11434/v1` — vedi sezione sotto; **vietato** SDK `ollama` / `ollama.chat`
+  - Cloud-only: Profilo A/B; F commentato; compose **senza** `-f docker-compose.ollama-host.yml`
   - `claude` = stub (Messages API non implementata)
   - `LLM_ROUTING_SHADOW=true` = solo log lane (usa sempre SIMPLE)
+  - Audit: [`audit_llm_lane_env_generalization.md`](../../plan-audit/active/audit_llm_lane_env_generalization.md)
 - OpenAI-compat via httpx (`deepseek`/`openai`/`glm`/`grok`); effort: `*_REASONING_EFFORT` (DeepSeek dialect usa `thinking`)
 - Periodicità ciclo: `WORKER_POLL_INTERVAL_SECONDS` (default 900)
 - Senza `GEMINI_API_KEY`: API/FE avviano; worker degradato se tutte le lane richiedono Gemini
@@ -120,6 +123,21 @@ Poi nei log: `route lane=SIMPLE … effort=none` e/o `COMPLEX|BORDERLINE … eff
 
 Scenario ops: SIMPLE su **Ollama host** + COMPLEX cloud (tipico DeepSeek). Path HTTP OpenAI-compat già nel client (`PROVIDER=openai` + httpx) — **nessun** package/SDK `ollama`, **vietato** `ollama.chat`. Core shipped `54c8038`.
 
+### Ricette profili (solo `.env` + overlay)
+
+| # | Topologia | Blocco `.env.example` | Overlay ollama-host? |
+|---|-----------|----------------------|----------------------|
+| 1 | Gemini Lite + DeepSeek (TARGET) | Profilo A | No |
+| 2 | Paid same/mix | B / C / D / E | No |
+| 3 | SIMPLE locale + COMPLEX cloud | Profilo F | **Sì** |
+| 4 | Dual-local | entrambe `openai` + BASE_URL host | **Sì** |
+| 5 | SIMPLE cloud + COMPLEX locale | gemini + openai COMPLEX | **Sì** |
+| 6 | Una lane effettiva | COMPLEX ≡ SIMPLE | No |
+| 7 | L1 same-provider CSV | `LLM_*_FALLBACKS=model2` | — |
+| 8 | Cloud-only | A o B; F commentato | **No** |
+
+Dettaglio: [`audit_llm_lane_env_generalization.md`](../../plan-audit/active/audit_llm_lane_env_generalization.md).
+
 **Prerequisiti**
 
 1. Ollama in esecuzione sull’host (es. `127.0.0.1:11434`).
@@ -147,7 +165,7 @@ docker compose -f docker-compose.yml -f docker-compose.ollama-host.yml up -d rad
 
 - `LLM_SIMPLE_API_KEY` dummy non vuota (es. `ollama`); RPM/TPM/RPD SIMPLE = `0` (unmanaged).
 - `LLM_SIMPLE_REASONING_EFFORT=high` — su `gemma4*` / reasoner Ollama il client abilita **`think=true`**, `num_ctx`/`num_predict=8192`, estrae JSON da `content` o `reasoning` (`openai_compat_*`). Schema Radar senza campo CoT.
-- **Nessun escalate** SIMPLE Ollama → DeepSeek: solo correction locale (`_MAX_ATTEMPTS_LOCAL=6`). BORDERLINE/COMPLEX → DeepSeek.
+- **Nessun escalate** e **nessun residual** SIMPLE Ollama-think → DeepSeek/cloud: solo correction locale (`_MAX_ATTEMPTS_LOCAL=6`). Se Ollama è down sugli articoli SIMPLE → fallback article (non cloud). BORDERLINE/COMPLEX → DeepSeek.
 - Pre-validate: `normalize_llm_json_dict` (liste→CSV, alias, coerenza geo/categoria/tag).
 - Host: **`OLLAMA_NUM_PARALLEL=1`**; worker tipico `WORKER_ENTRY_CONCURRENCY=1`, `WORKER_DB_CONCURRENCY=1`, `WORKER_GEMINI_CONCURRENCY=1`.
 - `LLM_SIMPLE_TIMEOUT`: `180` default esempio; `600` se load/think lenti.
