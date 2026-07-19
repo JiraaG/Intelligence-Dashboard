@@ -6,7 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Article, CountrySummary } from '../../models/article.model';
 import { RadarMapComponent } from './radar-map.component';
-import { installLeafletStub, type StubClusterGroup, type StubMap } from '../../testing/leaflet.stub';
+import {
+  installLeafletStub,
+  type StubClusterGroup,
+  type StubMap,
+} from '../../testing/leaflet.stub';
 
 const FIXTURE_DATE = '2026-07-14';
 
@@ -133,7 +137,9 @@ describe('RadarMapComponent (Phase 4)', () => {
     geoReqs.forEach((req) => req.flush(EMPTY_GEOJSON));
   }
 
-  function getMapCmp(fixture: { debugElement: { children: { componentInstance: unknown }[] } }): RadarMapComponent {
+  function getMapCmp(fixture: {
+    debugElement: { children: { componentInstance: unknown }[] };
+  }): RadarMapComponent {
     return fixture.debugElement.children[0].componentInstance as RadarMapComponent;
   }
 
@@ -215,9 +221,8 @@ describe('RadarMapComponent (Phase 4)', () => {
       }
     ).updateMapData(arts, countries, []);
 
-    const groups = (
-      mapCmp as unknown as { categoryClusterGroups: Map<string, StubClusterGroup> }
-    ).categoryClusterGroups;
+    const groups = (mapCmp as unknown as { categoryClusterGroups: Map<string, StubClusterGroup> })
+      .categoryClusterGroups;
     const energia = groups.get('Energia')!;
     const clearSpy = vi.spyOn(energia, 'clearLayers');
 
@@ -231,19 +236,17 @@ describe('RadarMapComponent (Phase 4)', () => {
     await fixture.whenStable();
 
     // Drive the same fingerprint path explicitly
-    (
-      mapCmp as unknown as { syncMarkerReadState: (a: Article[]) => void }
-    ).syncMarkerReadState(arts);
+    (mapCmp as unknown as { syncMarkerReadState: (a: Article[]) => void }).syncMarkerReadState(
+      arts,
+    );
 
     expect(clearSpy).not.toHaveBeenCalled();
     expect(energia._spiderfied).toBeTruthy();
 
-    const marker = energia
-      .getLayers()
-      .find((m) => {
-        const mm = m as { articleData?: Article; isDummy?: boolean };
-        return mm.articleData?.id === 1;
-      }) as { _icon: HTMLElement; articleData: Article };
+    const marker = energia.getLayers().find((m) => {
+      const mm = m as { articleData?: Article; isDummy?: boolean };
+      return mm.articleData?.id === 1;
+    }) as { _icon: HTMLElement; articleData: Article };
 
     expect(marker.articleData.is_read).toBe(true);
     expect(marker._icon.classList.contains('marker-read')).toBe(true);
@@ -316,11 +319,7 @@ describe('RadarMapComponent (Phase 4)', () => {
     const mapCmp = getMapCmp(fixture);
     const applySpy = vi.spyOn(
       mapCmp as unknown as {
-        applyGeometryInputs: (
-          a: Article[],
-          c: CountrySummary[],
-          s: unknown[],
-        ) => void;
+        applyGeometryInputs: (a: Article[], c: CountrySummary[], s: unknown[]) => void;
       },
       'applyGeometryInputs',
     );
@@ -328,14 +327,12 @@ describe('RadarMapComponent (Phase 4)', () => {
     (mapCmp as unknown as { isNavigating: boolean }).isNavigating = true;
     (mapCmp as unknown as { pendingGeometryRefresh: boolean }).pendingGeometryRefresh = true;
 
-    (
-      mapCmp as unknown as { finishNavigating: () => void }
-    ).finishNavigating();
+    (mapCmp as unknown as { finishNavigating: () => void }).finishNavigating();
 
     expect((mapCmp as unknown as { isNavigating: boolean }).isNavigating).toBe(false);
-    expect(
-      (mapCmp as unknown as { pendingGeometryRefresh: boolean }).pendingGeometryRefresh,
-    ).toBe(false);
+    expect((mapCmp as unknown as { pendingGeometryRefresh: boolean }).pendingGeometryRefresh).toBe(
+      false,
+    );
     expect(applySpy).toHaveBeenCalledTimes(1);
   });
 
@@ -363,9 +360,9 @@ describe('RadarMapComponent (Phase 4)', () => {
       }
     ).updateMapData(arts, countries, []);
 
-    expect((mapCmp as unknown as { spiderfyGeneration: number }).spiderfyGeneration).toBeGreaterThan(
-      beforeGen,
-    );
+    expect(
+      (mapCmp as unknown as { spiderfyGeneration: number }).spiderfyGeneration,
+    ).toBeGreaterThan(beforeGen);
     expect(refreshSpy).toHaveBeenCalled();
     expect(energia.getLayers().length).toBeGreaterThan(0);
   });
@@ -442,12 +439,10 @@ describe('RadarMapComponent (Phase 4)', () => {
     const energia = (
       mapCmp as unknown as { categoryClusterGroups: Map<string, { getLayers: () => unknown[] }> }
     ).categoryClusterGroups.get('Energia')!;
-    const real = energia
-      .getLayers()
-      .filter((m) => {
-        const am = m as { isDummy?: boolean; articleData?: Article };
-        return !am.isDummy && !!am.articleData;
-      });
+    const real = energia.getLayers().filter((m) => {
+      const am = m as { isDummy?: boolean; articleData?: Article };
+      return !am.isDummy && !!am.articleData;
+    });
     expect(real.length).toBe(30);
 
     const roots = (mapCmp as unknown as { activeRootMarkers: unknown[] }).activeRootMarkers;
@@ -531,9 +526,8 @@ describe('RadarMapComponent (Phase 4)', () => {
       }
     ).updateMapData([], [], summary);
 
-    const group = (
-      mapCmp as unknown as { summaryMarkerGroup: { getLayers(): unknown[] } }
-    ).summaryMarkerGroup;
+    const group = (mapCmp as unknown as { summaryMarkerGroup: { getLayers(): unknown[] } })
+      .summaryMarkerGroup;
     expect(group.getLayers().length).toBe(2);
   });
 
@@ -554,15 +548,15 @@ describe('RadarMapComponent (Phase 4)', () => {
         read_count: 0,
         latitude: 41.87,
         longitude: 12.56,
-      }
+      },
     ];
     const relations = [
       {
         source_country: 'DE',
         target_country: 'IT',
         primary_category: 'Energia' as const,
-        volume: 1
-      }
+        volume: 1,
+      },
     ];
 
     const fixture = TestBed.createComponent(MapHostComponent);
@@ -579,9 +573,8 @@ describe('RadarMapComponent (Phase 4)', () => {
       }
     ).updateMapData([], [], summary, relations);
 
-    const group = (
-      mapCmp as unknown as { relationsLayerGroup: { getLayers(): unknown[] } }
-    ).relationsLayerGroup;
+    const group = (mapCmp as unknown as { relationsLayerGroup: { getLayers(): unknown[] } })
+      .relationsLayerGroup;
     // Tratteggio geometrico: più segmenti solidi per un solo arco
     expect(group.getLayers().length).toBeGreaterThanOrEqual(1);
   });
@@ -603,21 +596,21 @@ describe('RadarMapComponent (Phase 4)', () => {
         read_count: 0,
         latitude: 41.87,
         longitude: 12.56,
-      }
+      },
     ];
     const relations = [
       {
         source_country: 'DE',
         target_country: 'IT',
         primary_category: 'Energia' as const,
-        volume: 2
+        volume: 2,
       },
       {
         source_country: 'DE',
         target_country: 'IT',
         primary_category: 'Tecnologia' as const,
-        volume: 3
-      }
+        volume: 3,
+      },
     ];
 
     const fixture = TestBed.createComponent(MapHostComponent);
@@ -638,12 +631,18 @@ describe('RadarMapComponent (Phase 4)', () => {
     ).updateMapData([], [], summary, relations);
 
     const group = (
-      mapCmp as unknown as { relationsLayerGroup: { getLayers(): { options: { color: string, className: string } }[] } }
+      mapCmp as unknown as {
+        relationsLayerGroup: { getLayers(): { options: { color: string; className: string } }[] };
+      }
     ).relationsLayerGroup;
-    
+
     expect(group.getLayers().length).toBe(3);
-    expect(group.getLayers().filter((l) => l.options.className === 'relational-arc-flow--macro').length).toBe(2);
-    expect(group.getLayers().filter((l) => l.options.className === 'relational-arc-hit').length).toBe(1);
+    expect(
+      group.getLayers().filter((l) => l.options.className === 'relational-arc-flow--macro').length,
+    ).toBe(2);
+    expect(
+      group.getLayers().filter((l) => l.options.className === 'relational-arc-hit').length,
+    ).toBe(1);
   });
 
   it('draws parallel per-category arcs at pin zoom when pair has multiple categories', async () => {
@@ -788,9 +787,7 @@ describe('RadarMapComponent (Phase 4)', () => {
     expect(hit).toBeTruthy();
     hit!.fire('click', { originalEvent: {} });
 
-    expect(emitted).toEqual([
-      { sourceCountry: 'DE', targetCountry: 'IT' },
-    ]);
+    expect(emitted).toEqual([{ sourceCountry: 'DE', targetCountry: 'IT' }]);
   });
 
   it('emits relationClicked with category on pin-zoom arc hit click', async () => {
@@ -859,5 +856,59 @@ describe('RadarMapComponent (Phase 4)', () => {
         category: 'Infrastrutture',
       },
     ]);
+  });
+
+  it('emits countryClicked on map click at zoom < 5 over a hatched nation (canvas bypass)', async () => {
+    const countries: CountrySummary[] = [
+      { country_code: 'DE', categories: ['Energia'], article_count: 2 },
+    ];
+
+    const fixture = TestBed.createComponent(MapHostComponent);
+    fixture.componentInstance.countries = countries;
+    fixture.detectChanges();
+    flushGeoJson();
+    await fixture.whenStable();
+
+    const mapCmp = getMapCmp(fixture);
+    const mapInstance = (mapCmp as unknown as { map: StubMap }).map;
+    mapInstance.setView([50.5, 10.5], 3);
+    mapInstance.fire('zoomend');
+
+    const emitted: unknown[] = [];
+    mapCmp.countryClicked.subscribe((v) => emitted.push(v));
+
+    mapInstance.fire('click', {
+      latlng: { lat: 50.5, lng: 10.5 },
+      originalEvent: {},
+    });
+
+    expect(emitted).toEqual([{ countryCode: 'DE' }]);
+  });
+
+  it('does not emit countryClicked on map click at zoom >= 5 over a nation', async () => {
+    const countries: CountrySummary[] = [
+      { country_code: 'DE', categories: ['Energia'], article_count: 2 },
+    ];
+
+    const fixture = TestBed.createComponent(MapHostComponent);
+    fixture.componentInstance.countries = countries;
+    fixture.detectChanges();
+    flushGeoJson();
+    await fixture.whenStable();
+
+    const mapCmp = getMapCmp(fixture);
+    const mapInstance = (mapCmp as unknown as { map: StubMap }).map;
+    mapInstance.setView([50.5, 10.5], 6);
+    mapInstance.fire('zoomend');
+
+    const emitted: unknown[] = [];
+    mapCmp.countryClicked.subscribe((v) => emitted.push(v));
+
+    mapInstance.fire('click', {
+      latlng: { lat: 50.5, lng: 10.5 },
+      originalEvent: {},
+    });
+
+    expect(emitted).toEqual([]);
   });
 });

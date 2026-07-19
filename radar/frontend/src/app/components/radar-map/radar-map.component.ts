@@ -361,7 +361,12 @@ export class RadarMapComponent implements AfterViewInit {
       return;
     }
     this.pendingGeometryRefresh = false;
-    this.applyGeometryInputs(this.articles(), this.countries(), this.mapSummary(), this.mapRelations());
+    this.applyGeometryInputs(
+      this.articles(),
+      this.countries(),
+      this.mapSummary(),
+      this.mapRelations(),
+    );
   }
 
   /** MarkerCluster può tenere layer ma non disegnare dopo race clearLayers/setView. */
@@ -464,9 +469,7 @@ export class RadarMapComponent implements AfterViewInit {
     const relationsPane = this.map.createPane('relationsPane');
     relationsPane.style.zIndex = '550';
     this.relationsRenderer =
-      typeof L.canvas === 'function'
-        ? L.canvas({ padding: 0.5, pane: 'relationsPane' })
-        : null;
+      typeof L.canvas === 'function' ? L.canvas({ padding: 0.5, pane: 'relationsPane' }) : null;
     this.detailHubGroup = L.layerGroup().addTo(this.map);
 
     this.map.on('click', (e: Leaflet.LeafletMouseEvent) => {
@@ -474,6 +477,21 @@ export class RadarMapComponent implements AfterViewInit {
       if (original?._radarHandled) return;
       // Nation detail open: keep spiderfy as-is (no collapse-to-hub on hinterland clicks).
       if (this.focusCountryCode() && this.articles().length > 0) return;
+
+      // relationsPane canvas (z550) sta sopra i poligoni GeoJSON e ruba i DOM hit:
+      // in zoom-out (hatching) ripristina il click-nazione via point-in-polygon,
+      // stesso path di toolbar LETTE/TROVATE (fitBounds + spiderfy via App).
+      if (this.currentZoomLevel() < 5) {
+        const code = this.pickCountryCodeAt(e.latlng);
+        if (code) {
+          if (original) {
+            original._radarHandled = true;
+          }
+          this.countryClicked.emit({ countryCode: code });
+          return;
+        }
+      }
+
       this.collapseAllGraphs(true);
     });
 
@@ -618,7 +636,9 @@ export class RadarMapComponent implements AfterViewInit {
       this.syncSummaryMarkerVisibility();
 
       const isLegacyZoom = zoom >= 5;
-      const relationsChangedZoom = this.lastRelationsZoomWasLegacy !== null && isLegacyZoom !== this.lastRelationsZoomWasLegacy;
+      const relationsChangedZoom =
+        this.lastRelationsZoomWasLegacy !== null &&
+        isLegacyZoom !== this.lastRelationsZoomWasLegacy;
 
       this.syncRelationsVisibility();
 
@@ -1058,6 +1078,53 @@ export class RadarMapComponent implements AfterViewInit {
   }
 
   /**
+   * Hit-test nazione sotto ``latlng`` (path GeoJSON).
+   * Preferisce paesi con notizie in ``countries()`` quando i bounds si sovrappongono.
+   * Usato dal map-click in zoom &lt; 5 perché il canvas relazioni blocca i click SVG.
+   */
+  private pickCountryCodeAt(latlng: Leaflet.LatLng): string | null {
+    if (!this.map || !latlng) return null;
+
+    const point =
+      typeof this.map.latLngToLayerPoint === 'function'
+        ? this.map.latLngToLayerPoint(latlng)
+        : null;
+    const hits: string[] = [];
+
+    this.countryLayersMap.forEach((layers, code) => {
+      for (const layer of layers) {
+        const path = layer as Leaflet.Path & {
+          _containsPoint?: (p: Leaflet.Point) => boolean;
+          getBounds?: () => Leaflet.LatLngBounds;
+        };
+        let hit = false;
+        if (point && typeof path._containsPoint === 'function') {
+          try {
+            hit = path._containsPoint(point);
+          } catch {
+            hit = false;
+          }
+        } else if (typeof path.getBounds === 'function') {
+          const bounds = path.getBounds();
+          hit = typeof bounds?.contains === 'function' ? bounds.contains(latlng) : false;
+        }
+        if (hit) {
+          hits.push(code);
+          break;
+        }
+      }
+    });
+
+    if (hits.length === 0) return null;
+
+    const withNews = hits.find((code) =>
+      this.countries().some((c) => c.country_code === code && (c.categories?.length ?? 0) > 0),
+    );
+    // Parity toolbar: apri solo nazioni con notizie nel giorno corrente.
+    return withNews ?? null;
+  }
+
+  /**
    * FitBounds su nazione (US/RU bounds hard-coded; altri da GeoJSON).
    * Con ``skipNextCountryFit`` (path pin summary) non muove la camera.
    */
@@ -1358,7 +1425,9 @@ export class RadarMapComponent implements AfterViewInit {
     const curvatureStep = 0.07;
 
     for (const group of byPair.values()) {
-      group.sort((a, b) => b.volume - a.volume || a.primary_category.localeCompare(b.primary_category));
+      group.sort(
+        (a, b) => b.volume - a.volume || a.primary_category.localeCompare(b.primary_category),
+      );
       const n = group.length;
 
       for (let idx = 0; idx < n; idx++) {
@@ -1397,18 +1466,15 @@ export class RadarMapComponent implements AfterViewInit {
 
         // Tratteggio geometrico (segmenti lat/lng): evita lo sfasamento del dashArray
         // a ogni moveend quando Leaflet ridisegna Canvas/SVG.
-        const visualLayers = this.addGeometricDashedPolyline(
-          points,
-          {
-            color,
-            weight,
-            opacity: baseOpacity,
-            className: 'relational-arc-flow',
-            interactive: false,
-            pane: 'relationsPane',
-            ...(this.relationsRenderer ? { renderer: this.relationsRenderer } : {}),
-          },
-        );
+        const visualLayers = this.addGeometricDashedPolyline(points, {
+          color,
+          weight,
+          opacity: baseOpacity,
+          className: 'relational-arc-flow',
+          interactive: false,
+          pane: 'relationsPane',
+          ...(this.relationsRenderer ? { renderer: this.relationsRenderer } : {}),
+        });
 
         this.bindRelationInteraction({
           points,
@@ -1505,6 +1571,9 @@ export class RadarMapComponent implements AfterViewInit {
 
     hit.on('click', (e: Leaflet.LeafletMouseEvent) => {
       this.L?.DomEvent.stopPropagation(e);
+      if (e.originalEvent) {
+        (e.originalEvent as Event & { _radarHandled?: boolean })._radarHandled = true;
+      }
       this.relationClicked.emit({
         sourceCountry: opts.sourceCountry,
         targetCountry: opts.targetCountry,
@@ -1554,7 +1623,7 @@ export class RadarMapComponent implements AfterViewInit {
 
       // Costruiamo anche il tooltip breakdown
       // "IT ↔ CN · Sicurezza 5 · Economia 2 · n=7" (breakdown + totale)
-      const breakdownText = agg.breakdown.map(b => `${b.category} ${b.volume}`).join(' · ');
+      const breakdownText = agg.breakdown.map((b) => `${b.category} ${b.volume}`).join(' · ');
       const tooltipText = `${agg.source_country} ↔ ${agg.target_country} · ${breakdownText} · n=${agg.totalVolume}`;
       const weight = Math.min(3, 1 + agg.totalVolume * 0.3); // weight soft, min(3, ...)
       const opacity = 0.45; // opacity ~0.4-0.5
@@ -1564,10 +1633,10 @@ export class RadarMapComponent implements AfterViewInit {
 
       for (let idx = 0; idx < agg.breakdown.length; idx++) {
         const item = agg.breakdown[idx];
-        
+
         // Calcola quanti passi appartengono a questa categoria
         let itemSteps = Math.round((item.volume / agg.totalVolume) * steps);
-        
+
         // Assicurati che l'ultimo prenda tutto il residuo per evitare buchi
         if (idx === agg.breakdown.length - 1) {
           itemSteps = steps - currentStep;
@@ -1580,7 +1649,7 @@ export class RadarMapComponent implements AfterViewInit {
 
         const startIdx = currentStep;
         const endIdx = Math.min(steps, currentStep + itemSteps);
-        
+
         if (startIdx >= endIdx) continue;
 
         const slicePoints = points.slice(startIdx, endIdx + 1);
@@ -1625,12 +1694,15 @@ export class RadarMapComponent implements AfterViewInit {
     totalVolume: number;
     breakdown: { category: string; volume: number }[];
   }[] {
-    const map = new Map<string, {
-      source_country: string;
-      target_country: string;
-      totalVolume: number;
-      breakdown: { category: string; volume: number }[];
-    }>();
+    const map = new Map<
+      string,
+      {
+        source_country: string;
+        target_country: string;
+        totalVolume: number;
+        breakdown: { category: string; volume: number }[];
+      }
+    >();
 
     for (const r of relations) {
       const key = `${r.source_country}|${r.target_country}`;
@@ -1640,7 +1712,7 @@ export class RadarMapComponent implements AfterViewInit {
           source_country: r.source_country,
           target_country: r.target_country,
           totalVolume: 0,
-          breakdown: []
+          breakdown: [],
         };
         map.set(key, agg);
       }

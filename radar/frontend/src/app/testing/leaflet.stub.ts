@@ -12,6 +12,7 @@ export interface StubLatLng {
 export interface StubLatLngBounds {
   extend(latlng: StubLatLng | StubLatLngBounds): StubLatLngBounds;
   isValid(): boolean;
+  contains(latlng: StubLatLng): boolean;
   getSouthWest(): StubLatLng;
   getNorthEast(): StubLatLng;
 }
@@ -64,6 +65,18 @@ function createLatLngBounds(
     },
     isValid(): boolean {
       return points.length > 0;
+    },
+    contains(latlng: StubLatLng): boolean {
+      if (points.length === 0) return false;
+      const lats = points.map((p) => p.lat);
+      const lngs = points.map((p) => p.lng);
+      const minLat = Math.min(...lats);
+      const maxLat = Math.max(...lats);
+      const minLng = Math.min(...lngs);
+      const maxLng = Math.max(...lngs);
+      return (
+        latlng.lat >= minLat && latlng.lat <= maxLat && latlng.lng >= minLng && latlng.lng <= maxLng
+      );
     },
     getSouthWest(): StubLatLng {
       return points[0] ?? createLatLng(0, 0);
@@ -134,6 +147,7 @@ export interface StubMap {
   setView(latlng: StubLatLng | [number, number], zoom: number, _opts?: unknown): StubMap;
   flyTo(latlng: StubLatLng | [number, number], zoom: number, _opts?: unknown): StubMap;
   fitBounds(_bounds: StubLatLngBounds, _opts?: unknown): StubMap;
+  latLngToLayerPoint(latlng: StubLatLng): { x: number; y: number };
   invalidateSize(_opts?: unknown): StubMap;
   remove(): void;
 }
@@ -320,6 +334,10 @@ function createMap(id: string | HTMLElement, options: Record<string, unknown> = 
     },
     fitBounds(_bounds, _opts) {
       return mapObj;
+    },
+    latLngToLayerPoint(latlng) {
+      const resolved = resolveLatLng(latlng);
+      return { x: resolved.lng, y: resolved.lat };
     },
     invalidateSize(_opts?: Record<string, unknown>) {
       return mapObj;
@@ -520,6 +538,20 @@ function createTileLayer(url: string, options: Record<string, unknown> = {}) {
 function createGeoJson(feature: unknown, options: Record<string, unknown> = {}) {
   const events = createEventTarget();
   const path = new StubPath();
+  // Bounds grezzi dal GeoJSON di test (Polygon) per hit-test map-click.
+  const feat = feature as {
+    geometry?: { type?: string; coordinates?: number[][][] };
+  };
+  if (feat?.geometry?.type === 'Polygon' && Array.isArray(feat.geometry.coordinates?.[0])) {
+    const ring = feat.geometry.coordinates[0];
+    const b = createLatLngBounds();
+    for (const coord of ring) {
+      if (Array.isArray(coord) && coord.length >= 2) {
+        b.extend(createLatLng(coord[1], coord[0]));
+      }
+    }
+    path.getBounds = () => b;
+  }
   const layer = {
     options,
     feature,
