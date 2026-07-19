@@ -8,7 +8,7 @@ Companion operativo a [`../ops/README.md`](../ops/README.md). Usa ops per overla
 
 ```bash
 cd radar
-cp .env.example .env   # POSTGRES_PASSWORD, LLM lane keys (Profili A–E), MINIFLUX_*
+cp .env.example .env   # POSTGRES_PASSWORD, LLM lane keys (Profili A–F), MINIFLUX_*
 docker compose up -d --build
 ```
 
@@ -16,6 +16,7 @@ docker compose up -d --build
 - Non pubblicare `:80` grezzo su Internet — TLS reverse proxy + auth/ACL.
 - Miniflux **senza** porte host di default (hardened / lan / exec: vedi ops README).
 - Hardened: `docker compose -f docker-compose.yml -f docker-compose.hardened.yml up -d`
+- Local-Hybrid (Profilo F): overlay `docker-compose.ollama-host.yml` — vedi sezione sotto.
 
 API (`radar-backend`) ≠ ingest (`radar-worker`). Riavviare solo il backend **non** riparte il polling.
 
@@ -71,6 +72,7 @@ Sintomi: log worker con wait/`429`/`Retry-After`; pochi articoli nuovi; ready pu
   - Swap provider: cambiare `PROVIDER`+`MODEL`+`API_KEY`+`BASE_URL`+limiti/budget; restart `radar-worker`
   - Esempio COMPLEX → Google: `LLM_COMPLEX_PROVIDER=gemini` + `LLM_COMPLEX_MODEL=gemini-3.5-flash`
   - OpenAI/GLM/Grok: dialect `openai` (niente `thinking` DeepSeek); ricette in `.env.example` Profili C/D/E
+  - Local-Hybrid (Profilo F): Ollama host via `PROVIDER=openai` + `BASE_URL=http://host.docker.internal:11434/v1` — vedi sezione sotto; **vietato** SDK `ollama` / `ollama.chat`
   - `claude` = stub (Messages API non implementata)
   - `LLM_ROUTING_SHADOW=true` = solo log lane (usa sempre SIMPLE)
 - OpenAI-compat via httpx (`deepseek`/`openai`/`glm`/`grok`); effort: `*_REASONING_EFFORT` (DeepSeek dialect usa `thinking`)
@@ -111,6 +113,46 @@ docker compose restart radar-worker
 Il worker fetch unread filtra già `published_after` ≈ 48h (`MINIFLUX` client). Entry unread più vecchie restano in coda Miniflux ma non entrano nel ciclo finché non rientrano nella finestra.
 
 Poi nei log: `route lane=SIMPLE … effort=none` e/o `COMPLEX|BORDERLINE … effort=high`; gate: `Ciclo … 0 errori`.
+
+---
+
+## Local-Hybrid (Fase A / Profilo F)
+
+Scenario ops: SIMPLE su **Ollama host** + COMPLEX cloud (tipico DeepSeek). Path HTTP OpenAI-compat già nel client (`PROVIDER=openai` + httpx) — **nessun** package/SDK `ollama`, **vietato** `ollama.chat`.
+
+**Prerequisiti**
+
+1. Ollama in esecuzione sull’host (es. `127.0.0.1:11434`), modello pullato: ops default **`gemma4:12b`**.
+2. In `.env` (non commit): attivare il blocco **Profilo F** da [`.env.example`](../.env.example) — spegnere A/B se confliggono.
+3. Overlay Compose per risolvere `host.docker.internal` dal worker:
+
+```bash
+cd radar
+docker compose -f docker-compose.yml -f docker-compose.ollama-host.yml up -d radar-worker
+```
+
+**Lane tipiche (Profilo F)**
+
+| Lane | Provider | Model | `BASE_URL` |
+|------|----------|-------|------------|
+| SIMPLE | `openai` | `gemma4:12b` | `http://host.docker.internal:11434/v1` |
+| COMPLEX | `deepseek` | `deepseek-v4-flash` | `https://api.deepseek.com` |
+
+- `LLM_SIMPLE_API_KEY` dummy non vuota (es. `ollama`); RPM/TPM/RPD SIMPLE = `0` (unmanaged).
+- `LLM_SIMPLE_REASONING_EFFORT=high` — su `gemma4*` / reasoner Ollama il client abilita **`think=true`** (thinking locale) e estrae il JSON da `content` o `reasoning` (`openai_compat_*`). Lo schema Radar resta senza campo CoT.
+- Host: **`OLLAMA_NUM_PARALLEL=1`** consigliato (con parallel=2 lo slot contesto può scendere ~4096 e riempire solo il thought).
+- Non pubblicare host `:11434` su LAN di default; non combinare con un container ROCm Ollama sulla stessa GPU.
+
+**Verifica / gate 48h**
+
+Dopo smoke, re-ingest nella finestra worker ≈ 48h con lo script ufficiale (dry-run prima): sezione **Requeue articoli** sopra (`requeue_articles` / `--purge-all` + `restart radar-worker`). Log attesi: `route lane=SIMPLE … openai / gemma4:12b` e COMPLEX DeepSeek.
+
+**Rollback → Profilo B**
+
+1. Ripristinare in `.env` il blocco **Profilo B** (DeepSeek-only).
+2. `docker compose up -d radar-worker` **senza** `-f docker-compose.ollama-host.yml`.
+
+Piano: [`plan_impl_fase_A_local_amd_ollama.md`](../../plan-audit/active/plan_impl_fase_A_local_amd_ollama.md). SoT lane: [`sot_llm_multi_model_fallback.md`](../../plan-audit/complete/sot_llm_multi_model_fallback.md).
 
 ---
 

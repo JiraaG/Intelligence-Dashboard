@@ -33,11 +33,14 @@ def test_system_prompt_category_disambiguation_and_tiebreak() -> None:
 
 
 def test_system_prompt_geo_decision_tree_anti_xx() -> None:
+    assert "protagonista/attore del pezzo" in SYSTEM_PROMPT
     assert "teatro/luogo del fatto" in SYSTEM_PROMPT
     assert "affiliation autori" in SYSTEM_PROMPT
     assert "NATO HQ" in SYSTEM_PROMPT
     assert "Non inventare codici ISO finti" in SYSTEM_PROMPT
     assert "SOLO se nessuno dei precedenti è supportato → 'XX'" in SYSTEM_PROMPT
+    assert "attacchi reciproci USA–Iran" in SYSTEM_PROMPT
+    assert "country_code US, related_countries IR,JO,KW" in SYSTEM_PROMPT
 
 
 def test_system_prompt_related_multilateral_star_semantics() -> None:

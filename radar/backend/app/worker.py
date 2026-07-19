@@ -284,7 +284,14 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
             async with state.db_pool.acquire() as conn:
                 try:
                     # Lock per-URL bloccante (2-arg): serializza TOCTOU dedup/commit sullo stesso URL.
-                    await conn.execute("SELECT pg_advisory_lock($1, $2)", lock_ns, lock_key)
+                    # timeout lungo: con LLM locale la sessione che detiene il lock resta occupata
+                    # minuti; il default pool command_timeout=60s faceva crashare i waiter.
+                    await conn.execute(
+                        "SELECT pg_advisory_lock($1, $2)",
+                        lock_ns,
+                        lock_key,
+                        timeout=900.0,
+                    )
                     lock_acquired = True
 
                     is_dup = await is_article_duplicate(conn, source_url)

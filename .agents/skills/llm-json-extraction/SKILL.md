@@ -12,9 +12,9 @@ when_to_use:
   - Aggiornamento dello schema Pydantic GeopoliticalArticleSchema
   - Debug di errori di parsing JSON dalla risposta LLM
   - Cascata modelli, routing complexity, dialect, cooldown 24h
-  - Swap provider via LLM_SIMPLE_* / LLM_COMPLEX_* (Profili A–E)
+  - Swap provider via LLM_SIMPLE_* / LLM_COMPLEX_* (Profili A–F)
   - Aggiunta di nuovi campi al contratto di estrazione
-version: 1.7.0
+version: 1.8.0
 ---
 
 ## Quando Usare Questa Skill
@@ -74,9 +74,14 @@ LLM_COMPLEX_RPM=0
 LLM_COMPLEX_RPD=0
 # Soft-trim worker = LLM_SIMPLE.rpd se > 0; free=RPM/RPD>0; paid=0+BUDGET
 # PROVIDER ∈ {gemini, deepseek, openai, glm, grok, claude}
-# OpenAI-compat dialect: deepseek → thinking; openai|glm|grok → stock (no thinking)
+# OpenAI-compat dialect: deepseek → thinking; openai|glm|grok → stock
+#   (reasoner Ollama gemma4/qwen3/…: think=true via openai_compat_payload)
 # Swap COMPLEX → Google: LLM_COMPLEX_PROVIDER=gemini + LLM_COMPLEX_MODEL=…
 # Profili A/C/D/E (hybrid / OpenAI / GLM / Grok) in .env.example
+# Profilo F Local-Hybrid: PROVIDER=openai + BASE_URL host Ollama /v1
+#   REASONING_EFFORT=high (thinking locale); VIETATO package/SDK ollama
+#   Overlay: docker-compose.ollama-host.yml — vedi runbook § Local-Hybrid
+#   Moduli: openai_compat_payload.py / openai_compat_response.py (+ deepseek.py client)
 ```
 
 SoT: `plan-audit/complete/sot_llm_multi_model_fallback.md` §5–§6.
@@ -193,19 +198,22 @@ Segui tassativamente le seguenti regole operative per l'estrazione:
 
 2. REQUISITI GEOGRAFICI:
    - country_code: codice ISO Alpha-2 (2 lettere maiuscole) della nazione primaria. Deduzione in ordine (usa il primo livello supportato dal testo):
-     (1) teatro/luogo del fatto; (2) attore primario (governo, persona, azienda operativa) → nazionalità/HQ operativo;
+     (1) protagonista/attore del pezzo (governo o forza che agisce nel lead, nazionalità delle vittime del fatto principale, soggetto del titolo) → nazionalità/HQ operativo;
+     (2) teatro/luogo del fatto SOLO se manca un attore nazionale chiaro in (1);
      (3) sede istituzione (NATO HQ → BE; ONU New York → US; UE focus istituzionale Bruxelles → BE);
      (4) affiliation autori/istituti (MIT → US; Oxford → GB) per paper/scienza;
      (5) paese operazione se il fatto è sull'impianto/deal locale, altrimenti HQ corporate se il pezzo è governance/earnings HQ-centric;
      (6) SOLO se nessuno dei precedenti è supportato → 'XX' con latitude 0.0 e longitude 0.0.
      Non inventare codici ISO finti per organizzazioni (niente 'EU'/'UN'/'NATO' come country_code): mappa a sede/focus nazionale; altri stati nominati vanno in related_countries.
-     Esempi: caso giudiziario noto (es. Epstein) → US; paper con autori MIT/Oxford → US o GB; policy UE su emissioni con focus istituzionale → BE (membri nominati in related).
+     Vietato scegliere come primary il solo bersaglio/teatro se l'attore è chiaro (es. raid US su sito in Iran → US primary, IR in related).
+     Esempi: caso giudiziario noto (es. Epstein) → US; paper con autori MIT/Oxford → US o GB; policy UE su emissioni con focus istituzionale → BE (membri nominati in related);
+     attacchi reciproci USA–Iran dopo soldati americani uccisi in Giordania → country_code US, related_countries IR,JO,KW (non IR né JO come primary).
    - coordinate (latitude, longitude): float finiti dell'evento. Se country_code è 'XX' → 0.0, 0.0.
      Se manca una città precisa, usa il centroide nazionale (es. IT -> lat 41.87, lon 12.57; US -> lat 37.09, lon -95.71; UA -> lat 48.38, lon 31.17).
    - related_countries: CSV ISO Alpha-2 delle nazioni secondarie esplicitamente o fortemente implicate (partner, firmatari, teatri), max 5.
-     Priorità: controparte dell'accordo → altri firmatari → altri teatri menzionati.
+     Priorità: controparte del conflitto/accordo → altri firmatari → altri teatri menzionati.
      Non inserire il paese primario (country_code) né 'XX'. Se assenti → esattamente 'Nessuno'.
-     Accordi multilaterali (es. USA–Italia–Francia): una sola country_code primaria (protagonista del pezzo) + le altre in related_countries (es. country_code US, related_countries IT,FR). Gli archi mappa sono star primary↔ciascun related (non triangolo completo tra related).
+     Accordi multilaterali (es. USA–Italia–Francia): una sola country_code primaria (protagonista del pezzo, non il primo nome citato né il solo bersaglio) + le altre in related_countries (es. country_code US, related_countries IT,FR). Gli archi mappa sono star primary↔ciascun related (non triangolo completo tra related).
 
 3. SINTESI E RIGORE (LINGUA E FORMATO):
    - LINGUA OBBLIGATORIA: Tutti i campi di testo ('title', 'summary', 'tags', 'companies_involved', 'infrastructural_entities') DEVONO essere in ITALIANO.
@@ -222,6 +230,13 @@ Segui tassativamente le seguenti regole operative per l'estrazione:
    - source_url: URL http/https originale, invariato.
    - sentiment: esclusivamente 'Positivo', 'Neutrale' o 'Negativo'.
    - relevance_level: intero da 1 (rilevanza locale/marginale) a 5 (rilevanza geopolitica globale o critica).
+     Calibrazione: soft-news/sport/cronaca locale → 1–2; tensione bilaterale o asset critico → 3–4; guerra/crisi sistemica → 5.
+   - COERENZA CAMPI (obbligatoria, anti-incongruenze tipiche dei modelli deboli):
+     * tags: il PRIMO tag = primary_category; altri tag = temi reali (max ~6); non ripetere paesi come se fossero tag generici senza contesto.
+     * companies_involved: SOLO aziende/organizzazioni nominate nel testo (nomi propri). Mai stati, città o categorie. Se assenti → 'Nessuno'.
+     * infrastructural_entities: SOLO asset fisici nominati (centrale, porto, impianto). Se assenti → 'Nessuno'.
+     * primary_category coerente col fatto: attacco/missile/soldati → 'Sicurezza'; naufragio/porto/traghetto → 'Infrastrutture'; disastro naturale/incendio → 'Ambiente'; sport puro senza politica → 'Geopolitica' con relevance ≤2 (non 'Tecnologia').
+     * country_code e related_countries non contraddicono title/summary (protagonista vs teatro come sopra).
 """
 ```
 

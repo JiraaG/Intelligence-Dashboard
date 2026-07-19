@@ -6,13 +6,14 @@
 
 ```bash
 cd radar
-cp .env.example .env   # POSTGRES_PASSWORD, LLM lane keys (Profili A–E), MINIFLUX_*
+cp .env.example .env   # POSTGRES_PASSWORD, LLM lane keys (Profili A–F), MINIFLUX_*
 docker compose up -d --build
 ```
 
 Open **http://localhost/** (host port **80** → FE container **8080**).
 
-LLM knobs / Profili A–E: [`.env.example`](../.env.example) + SoT [`sot_llm_multi_model_fallback.md`](../../plan-audit/complete/sot_llm_multi_model_fallback.md).  
+LLM knobs / Profili A–F: [`.env.example`](../.env.example) + SoT [`sot_llm_multi_model_fallback.md`](../../plan-audit/complete/sot_llm_multi_model_fallback.md).  
+**Profilo F (Local-Hybrid):** Ollama host + overlay [`docker-compose.ollama-host.yml`](../docker-compose.ollama-host.yml) — procedura in [`docs/runbook.md`](../docs/runbook.md) § Local-Hybrid.
 
 Requeue / incident: [`docs/runbook.md`](../docs/runbook.md) (`python -m app.scripts.requeue_articles`; `--purge-all` = wipe vault + all articles).
 

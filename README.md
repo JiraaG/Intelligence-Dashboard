@@ -16,14 +16,15 @@
 
 ```bash
 cd radar
-cp .env.example .env   # lane keys LLM (Profili A–E) + password DB/Miniflux (no `$` nelle password)
+cp .env.example .env   # lane keys LLM (Profili A–F) + password DB/Miniflux (no `$` nelle password)
 docker compose up --build -d
 ```
 
-Apri **http://localhost/**. Knobs LLM / Profili A–E: [`radar/.env.example`](radar/.env.example) + SoT [`sot_llm_multi_model_fallback.md`](plan-audit/complete/sot_llm_multi_model_fallback.md).  
+Apri **http://localhost/**. Knobs LLM / Profili A–F: [`radar/.env.example`](radar/.env.example) + SoT [`sot_llm_multi_model_fallback.md`](plan-audit/complete/sot_llm_multi_model_fallback.md).  
+**Profilo F (Local-Hybrid):** Ollama host + overlay [`radar/docker-compose.ollama-host.yml`](radar/docker-compose.ollama-host.yml) — runbook [`radar/docs/runbook.md`](radar/docs/runbook.md) § Local-Hybrid.  
 **Limiti lane:** RPM/TPM pieni → attesa stessa lane; RPD/cooldown → residual cross-lane (es. Flash Lite → DeepSeek). Dettaglio: SoT §0 + skill `radar-quota-ledger`.
 
-**Routing LLM:** `.env.example` ops tipico = **Profilo B** + `LLM_ROUTING_MODE=complexity`. Default codice boot-safe (senza env) = `LLM_ROUTING_MODE=off` + `LLM_ROUTING_SHADOW=true` — non confondere i due.
+**Routing LLM:** `.env.example` ops tipico = **Profilo B** + `LLM_ROUTING_MODE=complexity`. Default codice boot-safe (senza env) = `LLM_ROUTING_MODE=off` + `LLM_ROUTING_SHADOW=true` — non confondere i due. Local-Hybrid = **Profilo F** (SIMPLE Ollama / COMPLEX cloud).
 
 Dettagli env, health e Miniflux: [docs/01_getting_started.md](docs/01_getting_started.md) e [radar/ops/README.md](radar/ops/README.md).  
 Requeue (re-ingest distruttivo): [radar/docs/runbook.md](radar/docs/runbook.md) — preview `… requeue_articles 50 --dry-run`; reale senza `--dry-run`; **prova da zero** `… --purge-all` poi `docker compose restart radar-worker`.  
@@ -81,7 +82,7 @@ flowchart LR
   MF -->|webhook POST| API
 ```
 
-LLM (API esterna, non un servizio Compose): `gemini` (`google-genai`) e/o OpenAI-compat httpx (`deepseek`/`openai`/`glm`/`grok`); `claude` = stub. Ops tipico: Profilo B in `.env.example` (`complexity`); default codice senza env = `off` / shadow.
+LLM (API esterna, non un servizio Compose): `gemini` (`google-genai`) e/o OpenAI-compat httpx (`deepseek`/`openai`/`glm`/`grok`); `claude` = stub. Ops tipico: Profilo B in `.env.example` (`complexity`); Local-Hybrid = Profilo F (Ollama host via `BASE_URL` + overlay `ollama-host`); default codice senza env = `off` / shadow.
 
 | Servizio | Ruolo | Porta host (base) |
 |----------|--------|-------------------|
@@ -143,7 +144,7 @@ Build FE Docker: `npm ci --legacy-peer-deps` (peer matrix Angular/PrimeNG).
 |-----------|--------|
 | [STATUS.md](plan-audit/STATUS.md) | **Quadro** fatto vs residui post-gate |
 | [plan_release_final_gate.md](plan-audit/complete/plan_release_final_gate.md) | Piano Final Release (**F1–F4 PASS**; PR + Fase 5 deferred — **≠** Phase 6 GATE) |
-| [sot_llm_multi_model_fallback.md](plan-audit/complete/sot_llm_multi_model_fallback.md) | SoT LLM multi-provider + Profili A–E |
+| [sot_llm_multi_model_fallback.md](plan-audit/complete/sot_llm_multi_model_fallback.md) | SoT LLM multi-provider + Profili A–F |
 | [complete/](plan-audit/complete/) | Phase 0–6, Fase B/H, archi UI, playbook, ticket status, checklist docs (**chiusi**) |
 | [remediation/](plan-audit/remediation/) | Report ticket + Final Release F1–F4 |
 

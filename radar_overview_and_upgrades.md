@@ -146,13 +146,25 @@ Di seguito vengono definiti i piani operativi per l'estensione del sistema. Ogni
 
 ### A. Configurazione Locale AMD GPU (Radeon RX 6750 XT 12GB) + LLM Lanes
 
-L'obiettivo è abilitare l'elaborazione locale a costo zero sfruttando l'hardware a disposizione (GPU AMD Radeon RX 6750 XT 12GB su sistema Linux). Il modello di riferimento locale per questa configurazione è **Gemma 4 14B** (es. `gemma4:14b-instruct-q4_K_M` in Ollama). Un modello da 14B in quantizzazione 4-bit occupa circa 9.0–9.5 GB di VRAM, inserendosi perfettamente nel buffer di 12 GB della Radeon RX 6750 XT e lasciando circa 2–3 GB per il sistema operativo ed il contesto di elaborazione.
+L'obiettivo è abilitare l'elaborazione locale a costo zero sulla GPU AMD Radeon RX 6750 XT (Navi 22 / **gfx1030**, 12 GB VRAM).
 
-L'operatore può scegliere liberamente la topologia di deployment del modello locale e del routing delle chiamate LLM. Di seguito vengono analizzate le casistiche generali di configurazione.
+**Modello di riferimento (tag Ollama reali):** `gemma4:12b` (~7.6 GB) — lascia headroom VRAM su 12 GB.  
+**Nota naming:** non esiste un tag Ollama `gemma4:14b` / `gemma4:14b-instruct-q4_K_M`; le workstation tag pubbliche sono `gemma4:12b`, `gemma4:26b` (~18 GB, troppo grande per full-GPU su 12 GB), `gemma4:31b`. Alternative ≤12 GB: `qwen3:14b` (~9.3 GB).
 
-#### 1. Architettura dei Canali e Servizio Locale
+**Integrazione vincolante:** nessun SDK `ollama` / `ollama.chat`. Il worker parla a Ollama solo via **HTTP OpenAI-compat** già nel client (`PROVIDER=openai` + `BASE_URL=…/v1` via httpx; dialect stock; package `openai` vietato). Piano esecutivo: [`plan-audit/active/plan_impl_fase_A_local_amd_ollama.md`](plan-audit/active/plan_impl_fase_A_local_amd_ollama.md) (**Profilo F** Local-Hybrid).
 
-Ollama viene containerizzato con supporto ROCm nativo per l'accelerazione GPU AMD e configurato nella rete `radar-data` per dialogare con il worker. La flessibilità architetturale permette di distribuire il carico su quattro scenari principali:
+**Portabilità OS:** il contratto è lo stesso su **Linux, Windows e macOS** — installare Ollama, fare `ollama pull` del modello desiderato, puntare `LLM_SIMPLE_BASE_URL` (o COMPLEX) a `http://host.docker.internal:11434/v1` (o DNS container se usi `radar-ollama`). L’accelerazione GPU è responsabilità di Ollama sull’host (ROCm su Linux AMD, Metal su Apple Silicon, CUDA/altrove dove supportato; altrimenti CPU). **iOS/iPadOS non sono un host** per lo stack Docker Radar + Ollama server.
+
+#### 1. Path primario (questa macchina): Ollama host + bridge Docker
+
+Su host con Ollama già installato, modello pullato e override GPU/ROCm già validati:
+
+1. Ollama ascolta su `127.0.0.1:11434` (non esporre su LAN di default).
+2. Overlay Compose `docker-compose.ollama-host.yml` aggiunge a `radar-worker`:
+   `extra_hosts: ["host.docker.internal:host-gateway"]`.
+3. Lane SIMPLE: `BASE_URL=http://host.docker.internal:11434/v1`, `MODEL=gemma4:12b`, API key dummy non vuota (es. `ollama`).
+4. FE **non** vede Ollama (solo `radar-data` / host-gateway dal worker).
+5. `OLLAMA_NUM_PARALLEL=1` consigliato su 12 GB; un solo consumatore GPU (non avviare in parallelo un container `ollama:rocm`).
 
 ```mermaid
 flowchart TD
@@ -160,8 +172,8 @@ flowchart TD
     Art[Articolo] --> Route{Routing}
   end
 
-  subgraph Local [Servizio Locale Ollama]
-    Ollama[Ollama GPU ROCm] --> Model[Gemma 4 14B Q4_K_M]
+  subgraph Local [Ollama host GPU]
+    Ollama[Ollama :11434] --> Model[gemma4:12b]
   end
 
   subgraph Cloud [Servizi Cloud]
@@ -170,19 +182,21 @@ flowchart TD
   end
 
   Route -->|Scenario 1: Full Local| Local
-  Route -->|Scenario 2: Simple Local / Complex Cloud| Local
-  Route -->|Scenario 2: Simple Local / Complex Cloud| Cloud
+  Route -->|Scenario 2: Simple Local / Complex Cloud DEFAULT| Local
+  Route -->|Scenario 2: Simple Local / Complex Cloud DEFAULT| Cloud
   Route -->|Scenario 3: Simple Cloud / Complex Local| Cloud
   Route -->|Scenario 3: Simple Cloud / Complex Local| Local
 ```
 
-#### 2. Modifiche a `docker-compose.yml`
+#### 2. Path portabile (opzionale): container `radar-ollama` ROCm
 
-Aggiungere il servizio `radar-ollama` integrando i driver video dell'host:
+Per macchine senza Ollama host, o per stack riproducibile in `radar-data`, si può aggiungere un overlay/servizio `radar-ollama` con image **pinnata** (es. `ollama/ollama:0.32.1-rocm`, mai solo `latest` / floating `rocm` senza pin), devices `/dev/kfd`+`/dev/dri`, `HCC_AMDGPU_TARGET=gfx1030`, volume `./data/ollama`, **senza** pubblicare `11434` sull’host, DNS `http://radar-ollama:11434/v1`. Su questa macchina il path host resta il default: non far girare host Ollama e container ROCm insieme sulla stessa GPU.
+
+Esempio servizio (appendice — non default ops):
 
 ```yaml
   radar-ollama:
-    image: ollama/ollama:rocm
+    image: ollama/ollama:0.32.1-rocm  # pin versionato; VERIFY-ON-HOST
     container_name: radar-ollama
     volumes:
       - ./data/ollama:/root/.ollama
@@ -190,64 +204,63 @@ Aggiungere il servizio `radar-ollama` integrando i driver video dell'host:
       - "/dev/kfd:/dev/kfd"
       - "/dev/dri:/dev/dri"
     environment:
-      - HCC_AMDGPU_TARGET=gfx1030  # Architettura RDNA2 (RX 6700/6750 XT)
-      - OLLAMA_NUM_PARALLEL=2
+      - HCC_AMDGPU_TARGET=gfx1030
+      - OLLAMA_NUM_PARALLEL=1
     networks:
       - radar-data
     restart: unless-stopped
+    # no ports: — solo rete interna
 ```
 
-#### 3. Generalizzazione Scenari di Deployment & Configurazione `.env`
+#### 3. Scenari di deployment & configurazione `.env`
 
-Di seguito sono riportati i quattro profili operativi configurabili tramite il file `.env`.
+Quattro topologie; **default ops su questa macchina = Scenario 2 (Profilo F)**. URL sotto = path host; per path container sostituire con `http://radar-ollama:11434/v1`.
 
-##### Scenario 1: Modello Locale Unico per Entrambe le Lane (Full Local)
-Ottimale per ambienti completamente isolati (*air-gapped*) o per azzerare i costi API cloud. Gemma 4 14B viene interrogato sia per gli articoli semplici che complessi. Il differenziale di accuratezza viene gestito tramite il payload o istruzioni differenziate (ad esempio, con la lane `COMPLEX` che può sfruttare temperature inferiori o vincoli di contesto più ampi).
-* *Nota sulla VRAM:* Essendo caricato un solo modello, la VRAM occupata è stabile a ~9.5 GB.
+##### Scenario 1: Full Local (entrambe le lane)
+Air-gap / costo cloud zero. Stesso modello locale su SIMPLE e COMPLEX (effort `none` vs `high`). Residual cross-lane debole se Ollama è down (stesso endpoint).
 
 ```text
 LLM_ROUTING_MODE=complexity
 LLM_ROUTING_SHADOW=false
 
-# SIMPLE Lane (Gemma 4 14B locale)
 LLM_SIMPLE_PROVIDER=openai
-LLM_SIMPLE_MODEL=gemma4:14b-instruct-q4_K_M
-LLM_SIMPLE_API_KEY=local_dummy_key
-LLM_SIMPLE_BASE_URL=http://radar-ollama:11434/v1
+LLM_SIMPLE_MODEL=gemma4:12b
+LLM_SIMPLE_API_KEY=ollama
+LLM_SIMPLE_BASE_URL=http://host.docker.internal:11434/v1
 LLM_SIMPLE_RPM=0
 LLM_SIMPLE_TPM=0
 LLM_SIMPLE_RPD=0
-LLM_SIMPLE_TIMEOUT=90
+LLM_SIMPLE_TIMEOUT=180
 LLM_SIMPLE_REASONING_EFFORT=none
 
-# COMPLEX Lane (Stesso modello Gemma 4 14B locale)
 LLM_COMPLEX_PROVIDER=openai
-LLM_COMPLEX_MODEL=gemma4:14b-instruct-q4_K_M
-LLM_COMPLEX_API_KEY=local_dummy_key
-LLM_COMPLEX_BASE_URL=http://radar-ollama:11434/v1
+LLM_COMPLEX_MODEL=gemma4:12b
+LLM_COMPLEX_API_KEY=ollama
+LLM_COMPLEX_BASE_URL=http://host.docker.internal:11434/v1
 LLM_COMPLEX_RPM=0
 LLM_COMPLEX_TPM=0
 LLM_COMPLEX_RPD=0
-LLM_COMPLEX_TIMEOUT=120
+LLM_COMPLEX_TIMEOUT=180
 LLM_COMPLEX_REASONING_EFFORT=high
 ```
 
-##### Scenario 2: Modello Locale per SIMPLE + Cloud per COMPLEX (Local-Hybrid Primary)
-Configurazione standard consigliata. Il modello locale gestisce il bulk del traffico a costo zero (SIMPLE lane), mentre gli articoli che presentano rischi di estrazione dello schema (multi-paese, multi-entità) vengono scalati alle API Cloud (DeepSeek/Gemini) per garantire la massima fedeltà del JSON strict.
+##### Scenario 2: Local SIMPLE + Cloud COMPLEX (Local-Hybrid — DEFAULT / Profilo F)
+Bulk a costo zero su GPU; multilaterali / schema-risky su DeepSeek (o Gemini). Residual cloud se Ollama down (identity lane diversa).
 
 ```text
 LLM_ROUTING_MODE=complexity
 LLM_ROUTING_SHADOW=false
 
-# SIMPLE Lane (Gemma 4 14B locale)
 LLM_SIMPLE_PROVIDER=openai
-LLM_SIMPLE_MODEL=gemma4:14b-instruct-q4_K_M
-LLM_SIMPLE_API_KEY=local_dummy_key
-LLM_SIMPLE_BASE_URL=http://radar-ollama:11434/v1
+LLM_SIMPLE_MODEL=gemma4:12b
+LLM_SIMPLE_API_KEY=ollama
+LLM_SIMPLE_BASE_URL=http://host.docker.internal:11434/v1
 LLM_SIMPLE_RPM=0
-LLM_SIMPLE_TIMEOUT=90
+LLM_SIMPLE_TPM=0
+LLM_SIMPLE_RPD=0
+LLM_SIMPLE_TIMEOUT=180
+LLM_SIMPLE_REASONING_EFFORT=none
 
-# COMPLEX Lane (Cloud DeepSeek / Gemini)
 LLM_COMPLEX_PROVIDER=deepseek
 LLM_COMPLEX_MODEL=deepseek-v4-flash
 LLM_COMPLEX_API_KEY=TUA_DEEPSEEK_API_KEY
@@ -255,53 +268,48 @@ LLM_COMPLEX_BASE_URL=https://api.deepseek.com
 LLM_COMPLEX_REASONING_EFFORT=high
 ```
 
-##### Scenario 3: Cloud per SIMPLE + Modello Locale per COMPLEX (Cloud-Hybrid Secondary)
-Utile quando si vuole sfruttare la rapidità e il tier gratuito di Gemini (es. `gemini-3.1-flash-lite`) per il filtraggio e l'estrazione veloce di notizie generiche, riservando la GPU locale a modelli complessi ad alta densità per elaborazioni batch isolate sulla lane `COMPLEX`, preservando i budget delle API a consumo su testi pesanti.
+##### Scenario 3: Cloud SIMPLE + Local COMPLEX
+Gemini Flash Lite (o equivalente) sul bulk; GPU riservata ai pezzi COMPLEX.
 
 ```text
 LLM_ROUTING_MODE=complexity
 LLM_ROUTING_SHADOW=false
 
-# SIMPLE Lane (Gemini Studio Free Tier)
 LLM_SIMPLE_PROVIDER=gemini
 LLM_SIMPLE_MODEL=gemini-3.1-flash-lite
 LLM_SIMPLE_API_KEY=TUA_GEMINI_API_KEY
 LLM_SIMPLE_RPM=10
 LLM_SIMPLE_RPD=1000
 
-# COMPLEX Lane (Gemma 4 14B locale)
 LLM_COMPLEX_PROVIDER=openai
-LLM_COMPLEX_MODEL=gemma4:14b-instruct-q4_K_M
-LLM_COMPLEX_API_KEY=local_dummy_key
-LLM_COMPLEX_BASE_URL=http://radar-ollama:11434/v1
+LLM_COMPLEX_MODEL=gemma4:12b
+LLM_COMPLEX_API_KEY=ollama
+LLM_COMPLEX_BASE_URL=http://host.docker.internal:11434/v1
 LLM_COMPLEX_RPM=0
-LLM_COMPLEX_TIMEOUT=120
+LLM_COMPLEX_TIMEOUT=180
 LLM_COMPLEX_REASONING_EFFORT=high
 ```
 
-##### Scenario 4: Modelli Locali Distinti per Lane (Dual Local Models)
-L'operatore carica due modelli separati su Ollama (es. `qwen2.5:3b-instruct` per la lane SIMPLE e `gemma4:14b-instruct-q4_K_M` per la lane COMPLEX).
-* *⚠️ Attenzione critica sulla VRAM:* L'esecuzione simultanea di due modelli supera facilmente la soglia fisica di 12 GB. Quando la GPU si satura, Ollama esegue un fallback parziale sulla RAM dell'host (*CPU offloading*), rallentando drasticamente la velocità di generazione dei token (da ~40 token/s a <5 token/s). Per evitare questo comportamento degradato, si suggerisce di impostare i tempi di timeout a livello di container ed evitare l'uso di questo scenario su GPU con meno di 16–24 GB di VRAM.
+##### Scenario 4: Dual local (due modelli) — non default su 12 GB
+Es. piccolo modello SIMPLE + `gemma4:12b` COMPLEX. Rischio VRAM / CPU offload (latenza &lt;5 tok/s). Evitare come default sotto 16–24 GB VRAM.
 
 ```text
 LLM_ROUTING_MODE=complexity
 LLM_ROUTING_SHADOW=false
 
-# SIMPLE Lane (Modello leggero locale 3B)
 LLM_SIMPLE_PROVIDER=openai
 LLM_SIMPLE_MODEL=qwen2.5:3b-instruct
-LLM_SIMPLE_API_KEY=local_dummy_key
-LLM_SIMPLE_BASE_URL=http://radar-ollama:11434/v1
+LLM_SIMPLE_API_KEY=ollama
+LLM_SIMPLE_BASE_URL=http://host.docker.internal:11434/v1
 LLM_SIMPLE_RPM=0
 LLM_SIMPLE_TIMEOUT=45
 
-# COMPLEX Lane (Gemma 4 14B locale)
 LLM_COMPLEX_PROVIDER=openai
-LLM_COMPLEX_MODEL=gemma4:14b-instruct-q4_K_M
-LLM_COMPLEX_API_KEY=local_dummy_key
-LLM_COMPLEX_BASE_URL=http://radar-ollama:11434/v1
+LLM_COMPLEX_MODEL=gemma4:12b
+LLM_COMPLEX_API_KEY=ollama
+LLM_COMPLEX_BASE_URL=http://host.docker.internal:11434/v1
 LLM_COMPLEX_RPM=0
-LLM_COMPLEX_TIMEOUT=120
+LLM_COMPLEX_TIMEOUT=180
 ```
 
 ---

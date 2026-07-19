@@ -27,6 +27,7 @@ from pydantic import ValidationError
 from app.classification.complexity import Lane, score_complexity
 from app.classification.cooldown import ModelCooldownStore
 from app.classification.deepseek import DeepSeekClient, DeepSeekError
+from app.classification.openai_compat_payload import uses_ollama_think_protocol
 from app.classification.prompts import SYSTEM_PROMPT, build_user_prompt
 from app.classification.quota import QuotaBudgetExceeded, QuotaDailyExceeded, QuotaLedger
 from app.classification.validator import GeopoliticalArticleSchema, get_fallback_article, parse_llm_article_json
@@ -54,6 +55,7 @@ from app.core.llm_lanes import (
 logger = logging.getLogger("radar.classification.client")
 
 _MAX_ATTEMPTS = 4
+_MAX_ATTEMPTS_LOCAL = 6  # Ollama think: più correction, niente escalate early
 _RETRY_AFTER_MAX_SECONDS = 300.0
 _PROVIDER_GEMINI = "gemini"
 _PROVIDER_DEEPSEEK = "deepseek"
@@ -541,12 +543,15 @@ class ClassificationClient:
         ]
 
     def _simple_chain(self) -> list[_ModelRef]:
-        """Catena lane SIMPLE: primary ``LLM_SIMPLE.models`` + residual COMPLEX.
+        """Catena lane SIMPLE: primary ``LLM_SIMPLE.models`` (+ residual COMPLEX).
 
         Residual solo se mode=complexity, COMPLEX disponibile e identity diversa.
-        Catena = ``cfg.models`` della lane (C-03: non rilegge ``GEMINI_MODEL_FALLBACKS``).
+        Profilo F (Ollama think su SIMPLE): **niente residual** — il locale deve
+        completare con correction, non scaricare su DeepSeek.
         """
         primary = self._provider_refs(self._simple)
+        if uses_ollama_think_protocol(self._simple.model):
+            return primary
         simple_id = (
             self._simple.provider,
             self._simple.model,
@@ -758,7 +763,10 @@ class ClassificationClient:
             Ledger reserve/complete/fail/release; eventuale ``set_cooldown``;
             sleep Retry-After o backoff.
         """
-        attempts = max_attempts if max_attempts is not None else _MAX_ATTEMPTS
+        is_local_ollama = uses_ollama_think_protocol(ref.model)
+        attempts = max_attempts if max_attempts is not None else (
+            _MAX_ATTEMPTS_LOCAL if is_local_ollama else _MAX_ATTEMPTS
+        )
         user_message = build_user_prompt(
             title=title,
             url=url,
@@ -831,14 +839,23 @@ class ClassificationClient:
                 provider_started = True
                 if ref.provider in OPENAI_COMPAT_PROVIDERS:
                     compat = self._compat_client(ref.quota_lane)
-                    response_text, tokens = await compat.classify_json(
-                        title=title,
-                        content=content,
-                        url=url,
-                        date=date,
-                        correction=correction,
-                        model=ref.model,
-                    )
+
+                    async def _compat_call() -> tuple[str, int | None]:
+                        return await compat.classify_json(
+                            title=title,
+                            content=content,
+                            url=url,
+                            date=date,
+                            correction=correction,
+                            model=ref.model,
+                        )
+
+                    # Stesso sem di Gemini: serializza Ollama locale (Profilo F).
+                    if self._gemini_sem is not None:
+                        async with self._gemini_sem:
+                            response_text, tokens = await _compat_call()
+                    else:
+                        response_text, tokens = await _compat_call()
                     actual = tokens if tokens is not None else self._estimated_tokens
                     await self.quota.complete(reservation_id, actual)
                     reservation_id = -1  # già chiusa: evita double fail
@@ -846,6 +863,7 @@ class ClassificationClient:
                         response_text,
                         source_url=url,
                         published_at=date,
+                        title=title,
                     )
                     return extracted, "ok"
 
@@ -865,6 +883,7 @@ class ClassificationClient:
                     response_text,
                     source_url=url,
                     published_at=date,
+                    title=title,
                 )
                 if attempt > 0:
                     logger.info(
@@ -913,11 +932,20 @@ class ClassificationClient:
                     response_text = _extract_gemini_text(response)
 
                 # BORDERLINE: escalate dopo la prima correction fallita (validation_fails≥2).
+                # SIMPLE Ollama: NESSUN escalate early — correction fino a esaurimento tentativi.
                 if (
-                    lane == Lane.BORDERLINE
-                    and self._escalate
+                    self._escalate
                     and validation_fails >= 2
+                    and lane == Lane.BORDERLINE
+                    and not uses_ollama_think_protocol(ref.model)
                 ):
+                    logger.warning(
+                        "Escalate early lane=%s after %d validation fails %s/%s",
+                        lane.value,
+                        validation_fails,
+                        ref.provider,
+                        ref.model,
+                    )
                     return None, "escalate"
 
                 if (
@@ -934,7 +962,9 @@ class ClassificationClient:
                 correction = (
                     f"L'output precedente ha fallito con errore di validazione:\n{error_msg[:300]}\n"
                     "Correggi l'output e restituisci SOLO un JSON valido secondo lo schema "
-                    "(senza campo reasoning)."
+                    "(senza campo reasoning). "
+                    "CSV fields MUST be strings not arrays; primary_category MUST be one of "
+                    "the 10 Italian names; sentiment MUST be Positivo|Neutrale|Negativo."
                 )
                 if ref.provider == _PROVIDER_GEMINI:
                     history.append(
@@ -977,6 +1007,40 @@ class ClassificationClient:
                             ref.model,
                         )
                     return None, "hard_cooldown"
+
+                # Locale SIMPLE: retry/correzione, mai escalate early verso DeepSeek.
+                is_local_simple = (
+                    lane == Lane.SIMPLE
+                    and uses_ollama_think_protocol(ref.model)
+                    and ref.quota_lane == LANE_SIMPLE
+                )
+                if is_local_simple and isinstance(e, DeepSeekError):
+                    validation_fails += 1
+                    logger.warning(
+                        "Local SIMPLE retry %d/%d %s/%s: %s",
+                        attempt + 1,
+                        attempts,
+                        ref.provider,
+                        ref.model,
+                        _exc_msg(e, 120),
+                    )
+                    correction = (
+                        "Previous output was empty or not valid JSON. "
+                        "Return ONLY one JSON object starting with '{' with all required "
+                        "schema keys. CSV fields as strings (not arrays). "
+                        "Italian primary_category and sentiment (Positivo|Neutrale|Negativo)."
+                    )
+                    if attempt < attempts - 1:
+                        await asyncio.sleep(2.0)
+                        continue
+                    logger.error(
+                        "Esauriti tentativi locali %s/%s per '%s': %s",
+                        ref.provider,
+                        ref.model,
+                        title[:50],
+                        _exc_msg(e),
+                    )
+                    break
 
                 retry_after = extract_retry_after_seconds(e)
                 is_429 = (
@@ -1025,12 +1089,14 @@ class ClassificationClient:
                         _exc_msg(e),
                     )
 
-        # Validation esaurita sulla primary SIMPLE → escalate una volta a COMPLEX.
+        # Validation esaurita sulla primary SIMPLE → escalate una volta a COMPLEX
+        # (solo se NON è Ollama locale: Profilo F deve restare sul modello locale).
         if (
             lane == Lane.SIMPLE
             and self._escalate
             and validation_fails > 0
             and ref.quota_lane == LANE_SIMPLE
+            and not uses_ollama_think_protocol(ref.model)
         ):
             return None, "escalate"
         return None, "exhausted"

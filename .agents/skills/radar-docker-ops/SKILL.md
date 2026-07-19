@@ -6,7 +6,7 @@ description: >
 when_to_use:
   - docker-compose.yml, Dockerfile, nginx.conf, runbook ops
   - Healthcheck, reti, rebuild frontend, GeoJSON in build
-version: 1.0.0
+version: 1.1.0
 ---
 
 ## Quando attivare
@@ -23,6 +23,7 @@ Modifiche a containerizzazione, reti, health, o build FE in Docker.
 6. No tag `latest` su immagini base; versioni pinnate.
 7. Nginx: resolver `127.0.0.11` + variabile per `proxy_pass` (anti-502).
 8. Frontend runs as unprivileged nginx user listening on port 8080 (host mapped 80:8080).
+9. **Profilo F / Ollama host:** overlay `docker-compose.ollama-host.yml` aggiunge `extra_hosts: host.docker.internal:host-gateway` su `radar-worker` — non inventare un servizio `radar-ollama` ROCm di default.
 
 ## Deferred (non inventare come fatto; non trattare come backlog obbligatorio)
 
@@ -42,6 +43,8 @@ Backup/restore su host Windows: seguire `radar/ops/README.md` §Windows (Git Bas
 # compose restart non ri-applica depends_on → race CannotConnectNowError su DB starting up.
 docker compose up -d
 docker compose up --build -d radar-frontend
+# Local-Hybrid (Profilo F): bridge host Ollama
+# docker compose -f docker-compose.yml -f docker-compose.ollama-host.yml up -d radar-worker
 # Restart ordinato se necessario: radar-db → wait healthy → altri
 # da radar/: verificare GeoJSON
 node frontend/scripts/verify-geojson.mjs
@@ -51,7 +54,8 @@ node frontend/scripts/verify-geojson.mjs
 
 - `MINIFLUX_LIMIT`: default/tipico **50** (`.env.example`). Con molti unread, `100` può superare `MAX_MINIFLUX_RESPONSE_BYTES=5MB`.
 - `GEMINI_MODEL`: default `gemma-4-31b-it`; se il provider risponde HTTP 500, fallback ops in `.env` (es. `gemini-3.1-flash-lite`) + restart `radar-worker`. Non commitare `.env`.
+- Profilo F: `LLM_SIMPLE_BASE_URL=http://host.docker.internal:11434/v1` + modello host (es. `gemma4:12b`); runbook § Local-Hybrid.
 
 ## SoT
 
-Dettaglio: `radar/.ecc/rules/docker.md` (Regola 4: restart vs `up -d`) + runbook `radar/docs/runbook.md`.
+Dettaglio: `radar/.ecc/rules/docker.md` (Regola 4: restart vs `up -d`; overlay `ollama-host`) + runbook `radar/docs/runbook.md`.

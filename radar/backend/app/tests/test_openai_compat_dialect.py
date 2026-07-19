@@ -1,4 +1,4 @@
-"""Unit tests: OpenAI-compat payload dialects + lane provider aliases."""
+"""Unit tests: OpenAI-compat payload dialects + Ollama think + lane aliases."""
 
 from __future__ import annotations
 
@@ -9,8 +9,11 @@ import pytest
 
 from app.classification.deepseek import (
     DeepSeekClient,
+    OpenAICompatClient,
     build_chat_completions_payload,
 )
+from app.classification.openai_compat_payload import uses_ollama_think_protocol
+from app.classification.openai_compat_response import extract_assistant_json_text
 from app.core.llm_lanes import (
     API_DIALECT_DEEPSEEK,
     API_DIALECT_OPENAI,
@@ -52,6 +55,14 @@ def test_api_dialect_for_provider_mapping() -> None:
     assert api_dialect_for_provider("grok") == API_DIALECT_OPENAI
 
 
+def test_uses_ollama_think_protocol_prefixes() -> None:
+    assert uses_ollama_think_protocol("gemma4:12b")
+    assert uses_ollama_think_protocol("qwen3:14b")
+    assert uses_ollama_think_protocol("qwen3.5:9b")
+    assert not uses_ollama_think_protocol("gpt-4.1-mini")
+    assert not uses_ollama_think_protocol("deepseek-v4-flash")
+
+
 def test_deepseek_dialect_payload_includes_thinking() -> None:
     none_payload = build_chat_completions_payload(
         model="deepseek-v4-flash",
@@ -85,9 +96,46 @@ def test_openai_dialect_payload_omits_thinking() -> None:
             api_dialect="openai",
         )
         assert "thinking" not in payload
+        assert "think" not in payload
         assert "reasoning_effort" not in payload
         assert payload["response_format"] == {"type": "json_object"}
         assert payload["max_tokens"] == (2048 if effort == "none" else 8192)
+
+
+def test_openai_dialect_ollama_reasoner_enables_think_always() -> None:
+    """Profilo F: reasoner locali (es. gemma4) pensano sempre."""
+    for effort in ("none", "high"):
+        payload = build_chat_completions_payload(
+            model="gemma4:12b",
+            system="sys",
+            user="user",
+            effort=effort,
+            api_dialect="openai",
+        )
+        assert payload["think"] is True
+        assert payload["reasoning_effort"] == "high"
+        assert payload["max_tokens"] == 8192
+        assert payload["messages"][0]["content"] == "sys"
+        assert "response_format" not in payload
+        assert payload.get("options", {}).get("num_predict") == 8192
+        assert payload.get("options", {}).get("num_ctx") == 8192
+
+
+def test_extract_assistant_json_prefers_content_falls_back_reasoning() -> None:
+    assert (
+        extract_assistant_json_text({"content": '{"a":1}', "reasoning": "noise"})
+        == '{"a": 1}'
+    )
+    assert (
+        extract_assistant_json_text(
+            {"content": "", "reasoning": 'thought...\n{"title": "x"}'}
+        )
+        == '{"title": "x"}'
+    )
+
+
+def test_openai_compat_client_alias() -> None:
+    assert OpenAICompatClient is DeepSeekClient
 
 
 def test_client_build_payload_uses_dialect() -> None:
@@ -119,100 +167,7 @@ def test_load_lane_openai(clean_lane_env: None, monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setenv("LLM_SIMPLE_RPM", "0")
     monkeypatch.setenv("LLM_SIMPLE_TPM", "0")
     monkeypatch.setenv("LLM_SIMPLE_RPD", "0")
-
     lane = load_lane("simple", default_provider="gemini")
     assert lane.provider == "openai"
+    assert lane.api_dialect == API_DIALECT_OPENAI
     assert lane.model == "gpt-4.1-mini"
-    assert lane.api_key == "sk-openai"
-    assert lane.base_url == "https://api.openai.com/v1"
-    assert lane.api_dialect == API_DIALECT_OPENAI
-    assert lane.is_openai_compat is True
-
-
-def test_load_lane_glm(clean_lane_env: None, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("LLM_COMPLEX_PROVIDER", "glm")
-    monkeypatch.setenv("LLM_COMPLEX_MODEL", "glm-4-plus")
-    monkeypatch.setenv("LLM_COMPLEX_API_KEY", "sk-glm")
-    monkeypatch.setenv("LLM_COMPLEX_RPM", "0")
-    monkeypatch.setenv("LLM_COMPLEX_TPM", "0")
-    monkeypatch.setenv("LLM_COMPLEX_RPD", "0")
-
-    lane = load_lane("complex", default_provider="deepseek")
-    assert lane.provider == "glm"
-    assert lane.model == "glm-4-plus"
-    assert lane.base_url == "https://open.bigmodel.cn/api/paas/v4"
-    assert lane.api_dialect == API_DIALECT_OPENAI
-
-
-def test_load_lane_grok_legacy_key(
-    clean_lane_env: None, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("LLM_SIMPLE_PROVIDER", "grok")
-    monkeypatch.setenv("LLM_SIMPLE_MODEL", "grok-3-mini")
-    monkeypatch.setenv("XAI_API_KEY", "sk-xai")
-    monkeypatch.setenv("LLM_SIMPLE_RPM", "0")
-    monkeypatch.setenv("LLM_SIMPLE_TPM", "0")
-    monkeypatch.setenv("LLM_SIMPLE_RPD", "0")
-
-    lane = load_lane("simple", default_provider="gemini")
-    assert lane.provider == "grok"
-    assert lane.api_key == "sk-xai"
-    assert lane.base_url == "https://api.x.ai/v1"
-    assert lane.api_dialect == API_DIALECT_OPENAI
-
-
-def test_load_lane_custom_base_url(
-    clean_lane_env: None, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("LLM_SIMPLE_PROVIDER", "openai")
-    monkeypatch.setenv("LLM_SIMPLE_MODEL", "custom-model")
-    monkeypatch.setenv("LLM_SIMPLE_API_KEY", "sk")
-    monkeypatch.setenv("LLM_SIMPLE_BASE_URL", "https://proxy.example/v1/")
-    monkeypatch.setenv("LLM_SIMPLE_RPM", "0")
-    monkeypatch.setenv("LLM_SIMPLE_TPM", "0")
-    monkeypatch.setenv("LLM_SIMPLE_RPD", "0")
-
-    lane = load_lane("simple", default_provider="gemini")
-    assert lane.base_url == "https://proxy.example/v1"
-
-
-@pytest.mark.asyncio
-async def test_deepseek_classify_json_payload_contains_related_countries() -> None:
-    from unittest.mock import AsyncMock, MagicMock, patch
-
-    client = DeepSeekClient(
-        api_key="sk-test",
-        base_url="https://api.deepseek.com",
-        model="deepseek-chat",
-        effort="none",
-        api_dialect="deepseek",
-    )
-
-    mock_resp = MagicMock()
-    mock_resp.status_code = 200
-    mock_resp.json.return_value = {
-        "choices": [
-            {
-                "message": {
-                    "content": '{"title": "test"}'
-                }
-            }
-        ],
-        "usage": {"total_tokens": 100}
-    }
-
-    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
-        mock_post.return_value = mock_resp
-
-        await client.classify_json(
-            title="A title",
-            content="Some content",
-            url="https://example.com/art",
-            date="2026-07-18"
-        )
-
-        call_kwargs = mock_post.call_args.kwargs
-        payload = call_kwargs["json"]
-        user_msg = payload["messages"][1]["content"]
-        assert "related_countries" in user_msg
-

@@ -410,6 +410,39 @@ LLM_SIMPLE_BASE_URL=https://api.x.ai/v1
 # key: LLM_*_API_KEY o GROK_API_KEY / XAI_API_KEY
 ```
 
+### Profilo F — Local-Hybrid (Ollama host SIMPLE + DeepSeek COMPLEX)
+
+Commentato in `.env.example`. Scenario 2 / Fase A: lane SIMPLE verso Ollama sull’**host** via OpenAI-compat httpx; COMPLEX tipico DeepSeek cloud.
+
+**Invarianti**
+
+- `PROVIDER=openai` + `BASE_URL=http://host.docker.internal:11434/v1`.
+- Dialect lane = **openai** (stock vs DeepSeek). Su tag reasoner locali (`gemma4*`, `qwen3*`, …) il payload abilita comunque **`think=true`** + `options.num_ctx/num_predict` (moduli `openai_compat_payload` / `openai_compat_response`; client storico `deepseek.py` / alias `OpenAICompatClient`).
+- Package / SDK `ollama` e chiamate `ollama.chat` **vietati**.
+- Overlay Compose: `docker-compose.ollama-host.yml` (`extra_hosts: host.docker.internal:host-gateway` su `radar-worker`).
+- Modello ops tipico: `gemma4:12b` con **`LLM_SIMPLE_REASONING_EFFORT=high`** (thinking locale sempre); API key dummy non vuota (es. `ollama`); RPM/TPM/RPD SIMPLE = `0`.
+- Host Ollama: preferire **`OLLAMA_NUM_PARALLEL=1`** su 12 GB VRAM (con parallel=2 lo slot ctx può dimezzarsi ~4096 e saturare il thought senza JSON in `content`).
+
+```text
+# F — Local-Hybrid (prereq: Ollama host + overlay ollama-host)
+LLM_SIMPLE_PROVIDER=openai
+LLM_SIMPLE_MODEL=gemma4:12b
+LLM_SIMPLE_API_KEY=ollama
+LLM_SIMPLE_BASE_URL=http://host.docker.internal:11434/v1
+LLM_SIMPLE_RPM=0
+LLM_SIMPLE_TPM=0
+LLM_SIMPLE_RPD=0
+LLM_SIMPLE_TIMEOUT=180
+LLM_SIMPLE_REASONING_EFFORT=high
+LLM_COMPLEX_PROVIDER=deepseek
+LLM_COMPLEX_MODEL=deepseek-v4-flash
+LLM_COMPLEX_REASONING_EFFORT=high
+# COMPLEX key: LLM_COMPLEX_API_KEY o DEEPSEEK_API_KEY
+```
+
+Ops: `docker compose -f docker-compose.yml -f docker-compose.ollama-host.yml up -d radar-worker`.  
+Runbook: `radar/docs/runbook.md` § Local-Hybrid. Rollback → Profilo B senza overlay.
+
 Legacy opzionale (solo fill-gap): `GEMINI_*`, `LLM_RPM`/`LLM_TPM`/`LLM_RPD`, `DEEPSEEK_*`, `OPENAI_API_KEY`, `GLM_API_KEY`/`ZHIPU_API_KEY`, `GROK_API_KEY`/`XAI_API_KEY`.  
 `off` / `shadow` = solo catena SIMPLE.  
 Default codice senza env: `LLM_ROUTING_MODE=off`, `LLM_ROUTING_SHADOW=true` (boot sicuro).  
@@ -607,6 +640,7 @@ for ref in filter_cooldown(chain):
 - Default codice: `LLM_ROUTING_SHADOW=true` / `MODE=off` finché mix calibrato; ops live può forzare `SHADOW=false`.  
 - Swap COMPLEX→Google: solo `LLM_COMPLEX_PROVIDER=gemini` + `LLM_COMPLEX_MODEL=…`.  
 - Swap OpenAI/GLM/Grok: `PROVIDER` + `MODEL` + `API_KEY` + `BASE_URL` + budget; ricette Profili C/D/E in `.env.example`.  
+- Local-Hybrid (Profilo F): `PROVIDER=openai` + Ollama `BASE_URL=…/v1` + overlay `docker-compose.ollama-host.yml`; **vietato** `ollama.chat` / package `ollama`.  
 - `claude` nativo = fuori scope; usare gateway OpenAI-compat se serve.
 
 ---

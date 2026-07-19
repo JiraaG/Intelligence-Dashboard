@@ -4,7 +4,11 @@ Questa directory contiene i piani di progettazione e di implementazione attualme
 
 ## Stato
 
-**Attivo:** nessuno.
+**Attivo**
+
+- **Fase A — LLM locale AMD / Ollama** — [`plan_impl_fase_A_local_amd_ollama.md`](plan_impl_fase_A_local_amd_ollama.md)  
+  Host-Ollama `gemma4:12b` via OpenAI-compat httpx; Profilo F (Scenario 2); wave W1–W4.  
+  Blueprint: `radar_overview_and_upgrades.md` §3.A. Prompt: [`../prompts/active/plan_prompt_fase_A_local_amd_ollama.md`](../prompts/active/plan_prompt_fase_A_local_amd_ollama.md).
 
 **Completati di recente (riferimento)**
 

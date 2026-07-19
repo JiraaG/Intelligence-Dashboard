@@ -12,9 +12,9 @@ when_to_use:
   - Aggiornamento dello schema Pydantic GeopoliticalArticleSchema
   - Debug di errori di parsing JSON dalla risposta LLM
   - Cascata modelli, routing complexity, dialect, cooldown 24h
-  - Swap provider via LLM_SIMPLE_* / LLM_COMPLEX_* (Profili A–E)
+  - Swap provider via LLM_SIMPLE_* / LLM_COMPLEX_* (Profili A–F)
   - Aggiunta di nuovi campi al contratto di estrazione
-version: 1.7.0
+version: 1.8.0
 ---
 
 ## Quando Usare Questa Skill
@@ -74,9 +74,14 @@ LLM_COMPLEX_RPM=0
 LLM_COMPLEX_RPD=0
 # Soft-trim worker = LLM_SIMPLE.rpd se > 0; free=RPM/RPD>0; paid=0+BUDGET
 # PROVIDER ∈ {gemini, deepseek, openai, glm, grok, claude}
-# OpenAI-compat dialect: deepseek → thinking; openai|glm|grok → stock (no thinking)
+# OpenAI-compat dialect: deepseek → thinking; openai|glm|grok → stock
+#   (reasoner Ollama gemma4/qwen3/…: think=true via openai_compat_payload)
 # Swap COMPLEX → Google: LLM_COMPLEX_PROVIDER=gemini + LLM_COMPLEX_MODEL=…
 # Profili A/C/D/E (hybrid / OpenAI / GLM / Grok) in .env.example
+# Profilo F Local-Hybrid: PROVIDER=openai + BASE_URL host Ollama /v1
+#   REASONING_EFFORT=high (thinking locale); VIETATO package/SDK ollama
+#   Overlay: docker-compose.ollama-host.yml — vedi runbook § Local-Hybrid
+#   Moduli: openai_compat_payload.py / openai_compat_response.py (+ deepseek.py client)
 ```
 
 SoT: `plan-audit/complete/sot_llm_multi_model_fallback.md` §5–§6.

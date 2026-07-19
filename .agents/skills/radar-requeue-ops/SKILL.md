@@ -6,12 +6,14 @@ description: >
 when_to_use:
   - Incident re-classify / re-classify after prompt or schema change
   - Runbook "requeue" / app.scripts.requeue_articles
-version: 1.0.0
+version: 1.1.0
 ---
 
 ## Quando attivare
 
 Devi far riprocessare gli ultimi N entry Miniflux già *read* (dopo fix prompt/schema/quota), senza inventare un altro path di ingest.
+
+**Profilo F / Fase A:** stesso protocollo per il gate qualità 48h (Local-Hybrid Ollama host + COMPLEX cloud) — dry-run → requeue / `--purge-all` → restart worker; log attesi `route lane=SIMPLE … openai` + COMPLEX. Vedi runbook § Local-Hybrid.
 
 ## Protocollo obbligatorio
 
@@ -36,7 +38,7 @@ Devi far riprocessare gli ultimi N entry Miniflux già *read* (dopo fix prompt/s
    ```
 4. Verifica log worker: route lane SIMPLE/COMPLEX e assenza di errori vault/Miniflux.
 
-N tipico: **20** (range script 1–500). Preferire N piccolo in produzione.
+- Requeue 48h / `--purge-all` dopo Profilo F: dry-run → write → `restart radar-worker` (skill `radar-requeue-ops`); host `OLLAMA_NUM_PARALLEL=1` consigliato.
 
 ## Cosa fa lo script (non reinventare)
 
@@ -58,5 +60,5 @@ SoT: `radar/backend/app/scripts/requeue_articles.py` + runbook `radar/docs/runbo
 ## SoT
 
 - Script: `radar/backend/app/scripts/requeue_articles.py`
-- Runbook: `radar/docs/runbook.md` (sezione requeue)
+- Runbook: `radar/docs/runbook.md` (sezione requeue + Local-Hybrid / Profilo F)
 - Ops compose: skill `radar-docker-ops`

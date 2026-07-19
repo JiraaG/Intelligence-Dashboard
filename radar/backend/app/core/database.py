@@ -42,7 +42,8 @@ async def init_pool(db_url: str | None = None) -> asyncpg.Pool:
     Crea e restituisce il pool asyncpg (Lifespan FastAPI / worker).
 
     Retry brevi su race di startup Postgres; errori non transienti falliscono subito.
-    ``min_size=2`` / ``max_size=10``; ``command_timeout=60``.
+    ``min_size=2`` / ``max_size=10``; ``command_timeout=300`` (LLM locale tiene
+    connessioni/lock per minuti; 60s causava TimeoutError su advisory_lock).
     """
     url = db_url or DATABASE_URL
     logger.info("Inizializzazione del pool database PostgreSQL...")
@@ -54,7 +55,7 @@ async def init_pool(db_url: str | None = None) -> asyncpg.Pool:
                 url,
                 min_size=2,
                 max_size=10,
-                command_timeout=60.0,
+                command_timeout=300.0,
             )
             if pool is None:
                 raise RuntimeError("Impossibile creare il pool asyncpg (restituito None)")

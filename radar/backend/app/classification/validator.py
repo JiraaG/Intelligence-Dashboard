@@ -32,6 +32,45 @@ PRIMARY_CATEGORIES = (
 
 SENTIMENT_VALUES = ("Positivo", "Neutrale", "Negativo")
 
+# Alias comuni da modelli locali EN / varianti → contratto italiano Radar.
+_CATEGORY_ALIASES: dict[str, str] = {
+    "science & technology": "Tecnologia",
+    "science and technology": "Tecnologia",
+    "tech": "Tecnologia",
+    "technology": "Tecnologia",
+    "tecnologia": "Tecnologia",
+    "space": "Spazio",
+    "spazio": "Spazio",
+    "health": "Salute",
+    "salute": "Salute",
+    "security": "Sicurezza",
+    "sicurezza": "Sicurezza",
+    "environment": "Ambiente",
+    "ambiente": "Ambiente",
+    "economy": "Economia",
+    "economia": "Economia",
+    "geopolitics": "Geopolitica",
+    "geopolitica": "Geopolitica",
+    "politics": "Geopolitica",
+    "nuclear": "Nucleare",
+    "nucleare": "Nucleare",
+    "energy": "Energia",
+    "energia": "Energia",
+    "infrastructure": "Infrastrutture",
+    "infrastructures": "Infrastrutture",
+    "infrastrutture": "Infrastrutture",
+}
+
+_SENTIMENT_ALIASES: dict[str, str] = {
+    "positive": "Positivo",
+    "positivo": "Positivo",
+    "negative": "Negativo",
+    "negativo": "Negativo",
+    "neutral": "Neutrale",
+    "neutrale": "Neutrale",
+    "neutro": "Neutrale",
+}
+
 ISO_DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 SOURCE_URL_PATTERN = re.compile(r"^https?://", re.IGNORECASE)
 # Soft remap: recensioni game/entertainment spesso etichettate Geopolitica/Infrastrutture.
@@ -66,6 +105,51 @@ _SPORT_LEGAL_HINT = re.compile(
     r"sportiv\w*|calciator\w*|tennis|formula\s*1)\b",
     re.IGNORECASE,
 )
+# Soft remap: disastri/incendi con luogo non devono restare in Tecnologia.
+_DISASTER_HINT = re.compile(
+    r"\b(incend\w*|alluvion\w*|terremot\w*|uragan\w*|tifone|inondaz\w*|"
+    r"disastro\s+natural|flood|wildfire|earthquake)\b",
+    re.IGNORECASE,
+)
+# Sport/evento senza politica forte (Gemma → Geopolitica ★ alti).
+_SPORT_EVENT_HINT = re.compile(
+    r"\b(maraton\w*|corridor\w*|world\s*cup|mondiali|half[\s-]?time|"
+    r"partita\s+di\s+calcio|olimpiadi|sportiv\w*)\b",
+    re.IGNORECASE,
+)
+# Fatto cinetico → Sicurezza, non Geopolitica.
+_KINETIC_SECURITY_HINT = re.compile(
+    r"\b(attacc\w*\s+(missil|aere|drone|milit)|bombard\w*|raid\s+(aere|us|usa|israel)|"
+    r"soldat\w*.{0,30}(uccis|mort|kill)|missile|sparator\w*|drone\s+strike|"
+    r"attacchi?\s+reciproc)\b",
+    re.IGNORECASE | re.DOTALL,
+)
+_MARITIME_HINT = re.compile(
+    r"\b(traghetto|ferry|naufrag\w*|affonda|capovol\w*|passeggeri.{0,20}mare)\b",
+    re.IGNORECASE | re.DOTALL,
+)
+# Protagonista US in conflitti bilaterali (Gemma spesso mette IR/JO come primary).
+_US_ACTOR_VICTIM_HINT = re.compile(
+    r"(soldat[ei].{0,60}(american|statunitens)|"
+    r"(american|statunitens)\w*.{0,40}soldat|"
+    r"american\s+soldiers|u\.?s\.?\s+soldiers|"
+    r"attacchi?\s+reciproc\w*.{0,40}(stati\s+uniti|usa|u\.?s\.?)|"
+    r"(stati\s+uniti|usa).{0,40}(iran|attacc))",
+    re.IGNORECASE | re.DOTALL,
+)
+_IRAN_MENTION_HINT = re.compile(r"\b(iran|teheran|tehran)\b", re.IGNORECASE)
+
+# Centroidi nazionali usati solo su swap soft di country_code (prompt SoT).
+_COUNTRY_CENTROIDS: dict[str, tuple[float, float]] = {
+    "US": (37.09, -95.71),
+    "IR": (32.43, 53.69),
+    "JO": (30.59, 36.24),
+    "KW": (29.31, 47.48),
+    "IT": (41.87, 12.57),
+    "GB": (55.38, -3.44),
+    "DE": (51.17, 10.45),
+    "UA": (48.38, 31.17),
+}
 
 # ISO 3166-1 alpha-2 (~249) + sentinel XX per geografia indeterminata.
 ISO_ALPHA2_CODES: frozenset[str] = frozenset(
@@ -550,8 +634,47 @@ def normalize_llm_json_dict(data: dict[str, Any]) -> dict[str, Any]:
         out.pop("category", None)
         out.pop("categoria", None)
 
-    for junk in ("reasoning", "reasoning_content", "confidence", "sources", "analysis"):
+    # Gemma/locali: CSV attesi come str, ma spesso arrivano come list.
+    for csv_key in (
+        "companies_involved",
+        "tags",
+        "infrastructural_entities",
+        "related_countries",
+    ):
+        val = out.get(csv_key)
+        if isinstance(val, list):
+            joined = ", ".join(str(x).strip() for x in val if str(x).strip())
+            out[csv_key] = joined if joined else "Nessuno"
+
+    pc_raw = out.get("primary_category")
+    if isinstance(pc_raw, str):
+        mapped = _CATEGORY_ALIASES.get(pc_raw.strip().lower())
+        if mapped:
+            out["primary_category"] = mapped
+
+    sent_raw = out.get("sentiment")
+    if isinstance(sent_raw, str):
+        mapped_s = _SENTIMENT_ALIASES.get(sent_raw.strip().lower())
+        if mapped_s:
+            out["sentiment"] = mapped_s
+
+    for junk in (
+        "reasoning",
+        "reasoning_content",
+        "confidence",
+        "sources",
+        "sources_count",
+        "analysis",
+        "thought",
+        "thinking",
+    ):
         out.pop(junk, None)
+
+    # Locale / modelli verbosi: drop chiavi fuori schema (extra=forbid).
+    allowed = set(GeopoliticalArticleSchema.model_fields)
+    for key in list(out):
+        if key not in allowed:
+            out.pop(key, None)
 
     for key in ("latitude", "longitude"):
         val = out.get(key)
@@ -616,7 +739,7 @@ def normalize_llm_json_dict(data: dict[str, Any]) -> dict[str, Any]:
         if is_game or (is_offtopic and not is_political):
             out["primary_category"] = "Tecnologia"
 
-    # Soft remap inverso: sport/cronaca giudiziaria non restano in Tecnologia.
+    # Soft remap inverso: sport/cronaca giudiziaria / disastri non restano in Tecnologia.
     pc = out.get("primary_category")
     if isinstance(pc, str) and pc == "Tecnologia":
         hint_blob = " ".join(
@@ -625,18 +748,152 @@ def normalize_llm_json_dict(data: dict[str, Any]) -> dict[str, Any]:
         )
         if _SPORT_LEGAL_HINT.search(hint_blob) and not _GAME_REVIEW_HINT.search(hint_blob):
             out["primary_category"] = "Geopolitica"
+        elif _DISASTER_HINT.search(hint_blob) and not _GAME_REVIEW_HINT.search(hint_blob):
+            out["primary_category"] = "Ambiente"
+        elif _MARITIME_HINT.search(hint_blob):
+            out["primary_category"] = "Infrastrutture"
+        elif _KINETIC_SECURITY_HINT.search(hint_blob):
+            out["primary_category"] = "Sicurezza"
 
-    # Regola schema: primo tag CSV = primary_category.
+    # Geopolitica troppo larga: cinetico → Sicurezza; sport puro → clamp relevance.
+    pc = out.get("primary_category")
+    hint_blob = " ".join(
+        str(out.get(k) or "")
+        for k in ("title", "summary", "tags", "companies_involved", "infrastructural_entities")
+    )
+    if isinstance(pc, str) and pc == "Geopolitica":
+        if _KINETIC_SECURITY_HINT.search(hint_blob):
+            out["primary_category"] = "Sicurezza"
+        elif _SPORT_EVENT_HINT.search(hint_blob) and not _POLITICAL_CONTENT_HINT.search(
+            hint_blob
+        ):
+            rel_now = out.get("relevance_level")
+            if isinstance(rel_now, int) and rel_now > 2:
+                out["relevance_level"] = 2
+            elif isinstance(rel_now, str) and rel_now.strip().isdigit():
+                out["relevance_level"] = min(2, int(rel_now.strip()))
+    if isinstance(out.get("primary_category"), str) and out["primary_category"] == "Infrastrutture":
+        if _MARITIME_HINT.search(hint_blob) and not out.get("infrastructural_entities"):
+            pass  # leave entities to model; no invent
+    # Soft-news / XX: non gonfiare relevance.
+    if str(out.get("country_code") or "").upper() == "XX":
+        rel_now = out.get("relevance_level")
+        if isinstance(rel_now, int) and rel_now > 2:
+            out["relevance_level"] = 2
+
+    # companies_involved: niente stati/ISO scambiati per aziende; vuoto → Nessuno.
+    co = out.get("companies_involved")
+    if isinstance(co, str):
+        parts = [x.strip() for x in co.split(",") if x.strip()]
+        cleaned_co: list[str] = []
+        for p in parts:
+            up = p.upper()
+            if up in {"NESSUNO", "NONE", "N/A"}:
+                continue
+            if len(up) == 2 and up in ISO_ALPHA2_CODES:
+                continue
+            if up in {
+                "USA",
+                "US",
+                "UK",
+                "UE",
+                "EU",
+                "ONU",
+                "NATO",
+                "IRAN",
+                "RUSSIA",
+                "CINA",
+                "CHINA",
+            }:
+                continue
+            cleaned_co.append(p)
+        out["companies_involved"] = ", ".join(cleaned_co) if cleaned_co else "Nessuno"
+    elif co is None:
+        out["companies_involved"] = "Nessuno"
+
+    # Soft fix country: conflitti US–Iran con vittime/attore US → primary US
+    # (Gemma spesso ancora su IR/JO teatro o bersaglio).
+    hint_geo = " ".join(
+        str(out.get(k) or "")
+        for k in ("title", "summary", "tags", "infrastructural_entities")
+    )
+    primary = str(out.get("country_code") or "").strip().upper()
+    rc_raw = out.get("related_countries")
+    if isinstance(rc_raw, list):
+        related_set = {
+            str(x).strip().upper()
+            for x in rc_raw
+            if str(x).strip() and str(x).strip().upper() in ISO_ALPHA2_CODES
+        }
+    elif isinstance(rc_raw, str):
+        related_set = {
+            x.strip().upper()
+            for x in rc_raw.split(",")
+            if x.strip() and x.strip().upper() in ISO_ALPHA2_CODES
+        }
+    else:
+        related_set = set()
+    if (
+        _US_ACTOR_VICTIM_HINT.search(hint_geo)
+        and _IRAN_MENTION_HINT.search(hint_geo)
+        and primary in {"IR", "JO", "KW"}
+        and ("US" in related_set or bool(re.search(r"\b(usa|u\.?s\.?a?|stati\s+uniti)\b", hint_geo, re.I)))
+    ):
+        old_primary = primary
+        out["country_code"] = "US"
+        related_set.discard("US")
+        related_set.add(old_primary)
+        # Controparte/teatro prima; ordine stabile senza sort alfabetico puro.
+        ordered = [c for c in (old_primary, "IR", "JO", "KW") if c in related_set]
+        ordered.extend(c for c in related_set if c not in ordered)
+        out["related_countries"] = ", ".join(ordered[:5])
+        lat_lon = _COUNTRY_CENTROIDS.get("US")
+        if lat_lon is not None:
+            out["latitude"], out["longitude"] = lat_lon
+
+    # Regola schema: primo tag CSV = primary_category; dedupe e max 6 tag utili.
     pc = out.get("primary_category")
     tags = out.get("tags")
     if isinstance(pc, str) and pc in PRIMARY_CATEGORIES:
-        if not isinstance(tags, str) or not tags.strip():
-            out["tags"] = pc
-        else:
+        parts: list[str] = []
+        if isinstance(tags, str) and tags.strip():
             parts = [x.strip() for x in tags.split(",") if x.strip()]
-            if not parts or parts[0] != pc:
-                rest = [p for p in parts if p != pc]
-                out["tags"] = ", ".join([pc, *rest]) if rest else pc
+        # Rimuovi vecchia categoria in testa/duplicati; ISO2 e nomi-paese ridondanti.
+        _COUNTRY_TAG_NOISE = {
+            "usa",
+            "u.s.",
+            "u.s.a.",
+            "stati uniti",
+            "iran",
+            "russia",
+            "ucraina",
+            "cina",
+            "china",
+            "giordania",
+            "kuwait",
+            "cuba",
+            "guyana",
+            "argentina",
+            "unione europea",
+            "ue",
+            "eu",
+        }
+        filtered: list[str] = []
+        seen_tags: set[str] = set()
+        for p in parts:
+            if p == pc:
+                continue
+            up = p.upper()
+            if len(up) == 2 and up in ISO_ALPHA2_CODES:
+                continue
+            if p.casefold() in _COUNTRY_TAG_NOISE:
+                continue
+            key = p.casefold()
+            if key in seen_tags:
+                continue
+            seen_tags.add(key)
+            filtered.append(p)
+        out["tags"] = ", ".join([pc, *filtered[:5]])
 
     # Normalizza related_countries
     rc = out.get("related_countries")
@@ -667,11 +924,13 @@ def parse_llm_article_json(
     *,
     source_url: str | None = None,
     published_at: str | None = None,
+    title: str | None = None,
 ) -> GeopoliticalArticleSchema:
     """Parse JSON modello → normalize quirks → validate strict.
 
-    Opzionali ``source_url`` / ``published_at`` sovrascrivono con ground truth
-    Miniflux prima del validate (Gemma tronca date / inventa URL).
+    Opzionali ``source_url`` / ``published_at`` / ``title`` sovrascrivono o
+    riempiono con ground truth Miniflux prima del validate (Gemma tronca date /
+    inventa URL / omette title nei frammenti thinking).
 
     Raises:
         pydantic.ValidationError (anche su JSON vuoto/illeggibile) — il client
@@ -733,6 +992,11 @@ def parse_llm_article_json(
         pub = (published_at or "").strip()
         if len(pub) >= 10 and ISO_DATE_PATTERN.match(pub[:10]):
             raw["published_at"] = pub[:10]
+        # Gemma a volte omette title nei frammenti: ground truth Miniflux.
+        if (not isinstance(raw.get("title"), str) or not str(raw.get("title")).strip()) and (
+            isinstance(title, str) and title.strip()
+        ):
+            raw["title"] = title.strip()[:120]
     return GeopoliticalArticleSchema.model_validate(raw)
 
 

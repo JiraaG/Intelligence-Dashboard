@@ -41,7 +41,7 @@ async def test_init_pool() -> None:
             "postgresql://mock-host:5432/mock-db",
             min_size=2,
             max_size=10,
-            command_timeout=60.0
+            command_timeout=300.0
         )
         assert pool == mock_pool
 
