@@ -77,7 +77,7 @@ Sintomi: log worker con wait/`429`/`Retry-After`; pochi articoli nuovi; ready pu
   - Cloud-only: Profilo A/B; F commentato; compose **senza** `-f docker-compose.ollama-host.yml`
   - `claude` = stub (Messages API non implementata)
   - `LLM_ROUTING_SHADOW=true` = solo log lane (usa sempre SIMPLE)
-  - Audit: [`audit_llm_lane_env_generalization.md`](../../plan-audit/active/audit_llm_lane_env_generalization.md)
+  - Audit: [`audit_llm_lane_env_generalization.md`](../../plan-audit/complete/audit_llm_lane_env_generalization.md)
 - OpenAI-compat via httpx (`deepseek`/`openai`/`glm`/`grok`); effort: `*_REASONING_EFFORT` (DeepSeek dialect usa `thinking`)
 - Periodicità ciclo: `WORKER_POLL_INTERVAL_SECONDS` (default 900)
 - Senza `GEMINI_API_KEY`: API/FE avviano; worker degradato se tutte le lane richiedono Gemini
@@ -136,7 +136,7 @@ Scenario ops: SIMPLE su **Ollama host** + COMPLEX cloud (tipico DeepSeek). Path 
 | 7 | L1 same-provider CSV | `LLM_*_FALLBACKS=model2` | — |
 | 8 | Cloud-only | A o B; F commentato | **No** |
 
-Dettaglio: [`audit_llm_lane_env_generalization.md`](../../plan-audit/active/audit_llm_lane_env_generalization.md).
+Dettaglio: [`audit_llm_lane_env_generalization.md`](../../plan-audit/complete/audit_llm_lane_env_generalization.md).
 
 **Prerequisiti**
 

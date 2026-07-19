@@ -1,7 +1,7 @@
 # Master Plan di Implementazione — Fase B: Ingestione Real-Time e Soft Refresh (SSE / Webhooks)
 
 **Progetto:** Radar Informativo Globale (Intelligence Dashboard)  
-**Documento:** `plan-audit/active/master_plan_impl_phase_B.md`  
+**Documento:** `plan-audit/complete/master_plan_impl_phase_B.md`  
 **Stato:** Definitivo — blueprint esecutivo completo (nessun placeholder)  
 **Fonti consolidate:** `implementation_plan_phase_B.md`, `analisi_dettagliata_fase_B.md`, `radar_overview_and_upgrades.md` §B, ispezione codice AS-IS (2026-07-18)
 

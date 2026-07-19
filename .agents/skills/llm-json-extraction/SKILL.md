@@ -89,7 +89,7 @@ LLM_COMPLEX_RPD=0
 #   Overlay: docker-compose.ollama-host.yml — vedi runbook § Local-Hybrid
 #   Moduli: openai_compat_payload.py / openai_compat_response.py (+ deepseek.py client)
 #   VRAM: keep_alive busy + unload nativo keep_alive=0 (ollama_lifecycle; OLLAMA_* env)
-# Audit topologie: plan-audit/active/audit_llm_lane_env_generalization.md
+# Audit topologie: plan-audit/complete/audit_llm_lane_env_generalization.md
 ```
 
 SoT: `plan-audit/complete/sot_llm_multi_model_fallback.md` §5–§6.

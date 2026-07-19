@@ -1,6 +1,6 @@
 # plan-audit — STATUS (fatto vs da fare)
 
-Quadro operativo aggiornato **2026-07-19** (Profilo F Local-Hybrid `54c8038` + **VRAM unload shipped**; **audit LLM env topology** docs; map anchors; Fase A ACTIVE solo per scorecard fixture opz.).  
+Quadro operativo aggiornato **2026-07-20** (audit LLM env topology **DONE** `c9ef842` in `complete/`; Profilo F `54c8038` + VRAM `2996625`; Fase A ACTIVE solo scorecard opz.).  
 Indice cartelle: [`README.md`](README.md).  
 Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`](remediation/audit_remediation_final_release_handoff.md).
 
@@ -10,7 +10,6 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 
 | Area | Dove | Note |
 |------|------|------|
-| Audit LLM env topology | [`active/audit_llm_lane_env_generalization.md`](active/audit_llm_lane_env_generalization.md) | **ACTIVE (docs shipped)** — S3 failover documentato; ricette 1–8 in `.env.example` + runbook; SoT/overview allineati (no residual Ollama-think). W2 codice residual Ollama **cancelled**. |
 | Fase A — LLM locale AMD/Ollama | [`active/plan_impl_fase_A_local_amd_ollama.md`](active/plan_impl_fase_A_local_amd_ollama.md) | **ACTIVE (follow-up opz.)** — W1–W4 + VRAM unload **DONE** (core `54c8038` + `ollama_lifecycle`/`OLLAMA_*`). Overlay host, Profilo F, `openai_compat_*`, think Gemma, `normalize_llm_json_dict`, **no SIMPLE Ollama→DeepSeek escalate/residual**, requeue 48h OK. Ops tag tipico **`gemma4-radar`**. Residuo: scorecard fixture formale (opz.). Prompt in [`prompts/done/`](prompts/done/plan_prompt_fase_A_local_amd_ollama.md). |
 | ECC manual / expansion | [`prompts/active/plan_prompt_ecc_manual_and_expansion.md`](prompts/active/plan_prompt_ecc_manual_and_expansion.md) | **ACTIVE (non eseguito)** — resta finché non si produce un piano deliverable |
 
@@ -20,6 +19,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 
 | Area | Dove | Note |
 |------|------|------|
+| Audit LLM env topology | [`complete/audit_llm_lane_env_generalization.md`](complete/audit_llm_lane_env_generalization.md) | **DONE** 2026-07-20 — S3 failover, ricette 1–8, no residual Ollama-think; W2 codice cancelled. Restore docs: **`c9ef842`**. |
 | Profilo F Local-Hybrid (impl) | codice + overlay + docs | **DONE** 2026-07-19 — commit **`54c8038`** su `feature/upgrades`. |
 | Map nation anchors + summary densi | codice FE `radar-map` + `classification/prompts.py` | **DONE** 2026-07-19 — hub/spider/pin sul centroide nazione (US/RU mainland); summary LLM briefing denso 220–420 char. **Restore point:** `a240b3c` su `feature/upgrades`. |
 | Click nazione hatching (zoom &lt; 5) | `radar-map` map-click + `pickCountryCodeAt` | **DONE** 2026-07-19 — bypass canvas `relationsPane`; parity LETTE/TROVATE. Commit `911463a`. |
@@ -58,7 +58,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 
 **Nessun residuo operativo obbligatorio sulla Fase B / H / archi UI / classification refine / map anchors / Profilo F core.** Branch di riferimento feature: `feature/upgrades`.
 
-**Restore point (Profilo F + VRAM unload):** `2996625` su `feature/upgrades`. Core Local-Hybrid: `54c8038`. Precedenti: map anchors `a240b3c`; click hatching `911463a`; classification/geo `f7cf83d`; archi UI `5c74e57`.
+**Restore point (docs LLM env topology):** `c9ef842`. **Profilo F + VRAM unload:** `2996625`. Core Local-Hybrid: `54c8038`. Precedenti: map anchors `a240b3c`; click hatching `911463a`; classification/geo `f7cf83d`; archi UI `5c74e57`.
 
 Prompt Final Release: [`prompts/done/audit_prompt_final_release_gate.md`](prompts/done/audit_prompt_final_release_gate.md) — **non rieseguire** (F0–F4 chiusi).
 
@@ -71,8 +71,8 @@ Prompt Final Release: [`prompts/done/audit_prompt_final_release_gate.md`](prompt
 ```text
 plan-audit/
   STATUS.md          ← questo file (quadro fatto / residui)
-  active/            ← Piani in corso (Fase A follow-up / ECC prompt)
-  complete/          ← Piani COMPLETATI (incl. Phase 0–6, Fase B, Fase H, archi UI)
+  active/            ← Piani in corso (Fase A follow-up; prompt ECC in prompts/active)
+  complete/          ← Piani COMPLETATI (incl. audit LLM env, Phase 0–6, Fase B/H, archi UI)
   prompts/active/    ← prompt non eseguiti (ECC manual/expansion)
   prompts/done/      ← storico (incl. Fase A Ollama, Fase H wave 1–3, Final Release Gate)
   remediation/       ← report DONE (incl. F1–F4)

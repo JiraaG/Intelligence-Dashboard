@@ -1,6 +1,6 @@
 # Audit — LLM env: locale/cloud + SIMPLE/COMPLEX + sostituti
 
-**Stato:** ACTIVE (docs shipped)  
+**Stato:** COMPLETE (docs shipped `c9ef842`)  
 **Data:** 2026-07-19  
 **Ruolo:** analyst + architect pipeline LLM  
 **SoT lane:** [`../complete/sot_llm_multi_model_fallback.md`](../complete/sot_llm_multi_model_fallback.md)  
@@ -181,7 +181,7 @@ flowchart TD
 
 **Accettazione:**
 
-- [x] Audit in `plan-audit/active/`  
+- [x] Audit in `plan-audit/complete/`  
 - [x] Docs senza “residual cloud se Ollama down” contraddittorio  
 - [x] Ops può realizzare target A solo editando `.env`  
 - [x] W2 codice non aperto  

@@ -1,7 +1,7 @@
 # Master Plan di Implementazione — Fase H: Grafo Geospaziale e Coerenza Relazioni
 
 **Progetto:** Radar Informativo Globale (Intelligence Dashboard)  
-**Documento:** `plan-audit/active/master_plan_impl_phase_H_geospatial_graph.md`  
+**Documento:** `plan-audit/complete/master_plan_impl_phase_H_geospatial_graph.md`  
 **Stato:** Definitivo — blueprint esecutivo (piano only; **nessuna implementazione codice finché non esplicitamente richiesta**)  
 **Data:** 2026-07-18  
 **Fonti:** `radar_overview_and_upgrades.md` §H (+ §G), Phase B soft-refresh, ispezione codice AS-IS, skills `radar-api-contract` / `llm-json-extraction` / `radar-sidebar-freeze` / `spatial-data-mocking`, ECC `angular-map-expert` / rules / agents
