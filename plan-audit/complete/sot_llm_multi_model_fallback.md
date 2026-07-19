@@ -250,7 +250,7 @@ else:
 
 | Lane | Catena (via env) | Escalation validation |
 |------|------------------|------------------------|
-| **SIMPLE** | `LLM_SIMPLE_*` (tipico `effort=none`) | Dopo `_MAX_ATTEMPTS` → **1×** `LLM_COMPLEX_*` |
+| **SIMPLE** | `LLM_SIMPLE_*` (tipico `effort=none`; **Profilo F** = think/`high`) | Cloud/Gemini: dopo `_MAX_ATTEMPTS` → **1×** `LLM_COMPLEX_*`. **Ollama think** (`uses_ollama_think_protocol`): correction fino a `_MAX_ATTEMPTS_LOCAL` (6); **nessun** escalate a COMPLEX |
 | **BORDERLINE** | **`LLM_COMPLEX_*`** (tipico `effort=high`) — v2.2 | Dopo **1 correction fallita** resta su COMPLEX (già high); escalate legacy se identity diversa |
 | **COMPLEX** | `LLM_COMPLEX_*` → residuale SIMPLE | Se COMPLEX down / no key → SIMPLE; poi fallback article |
 
@@ -412,21 +412,24 @@ LLM_SIMPLE_BASE_URL=https://api.x.ai/v1
 
 ### Profilo F — Local-Hybrid (Ollama host SIMPLE + DeepSeek COMPLEX)
 
-Commentato in `.env.example`. Scenario 2 / Fase A: lane SIMPLE verso Ollama sull’**host** via OpenAI-compat httpx; COMPLEX tipico DeepSeek cloud.
+Commentato in `.env.example`. Scenario 2 / Fase A: lane SIMPLE verso Ollama sull’**host** via OpenAI-compat httpx; COMPLEX tipico DeepSeek cloud. **Shipped** `54c8038`.
 
 **Invarianti**
 
 - `PROVIDER=openai` + `BASE_URL=http://host.docker.internal:11434/v1`.
-- Dialect lane = **openai** (stock vs DeepSeek). Su tag reasoner locali (`gemma4*`, `qwen3*`, …) il payload abilita comunque **`think=true`** + `options.num_ctx/num_predict` (moduli `openai_compat_payload` / `openai_compat_response`; client storico `deepseek.py` / alias `OpenAICompatClient`).
+- Dialect lane = **openai** (stock vs DeepSeek). Su tag reasoner locali (`gemma4*`, `qwen3*`, …) il payload abilita comunque **`think=true`** + `options.num_ctx/num_predict=8192` (moduli `openai_compat_payload` / `openai_compat_response`; client storico `deepseek.py` / alias `OpenAICompatClient`). Nessun `response_format=json_object` su Ollama think.
 - Package / SDK `ollama` e chiamate `ollama.chat` **vietati**.
 - Overlay Compose: `docker-compose.ollama-host.yml` (`extra_hosts: host.docker.internal:host-gateway` su `radar-worker`).
-- Modello ops tipico: `gemma4:12b` con **`LLM_SIMPLE_REASONING_EFFORT=high`** (thinking locale sempre); API key dummy non vuota (es. `ollama`); RPM/TPM/RPD SIMPLE = `0`.
-- Host Ollama: preferire **`OLLAMA_NUM_PARALLEL=1`** su 12 GB VRAM (con parallel=2 lo slot ctx può dimezzarsi ~4096 e saturare il thought senza JSON in `content`).
+- Modello ops tipico: **`gemma4-radar`** (Modelfile `FROM gemma4:12b` + `PARAMETER num_ctx 8192`) oppure base `gemma4:12b`; **`LLM_SIMPLE_REASONING_EFFORT=high`**; API key dummy non vuota (es. `ollama`); RPM/TPM/RPD SIMPLE = `0`.
+- **Escalate:** SIMPLE Ollama **non** scala a DeepSeek su ValidationError; solo correction locale. COMPLEX/BORDERLINE restano DeepSeek; residual cloud se Ollama down.
+- Pre-validate: `normalize_llm_json_dict` (liste→CSV, alias categoria/sentiment, protagonista paese, coerenza tag/aziende/relevance).
+- Host Ollama: preferire **`OLLAMA_NUM_PARALLEL=1`**; worker `WORKER_*_CONCURRENCY=1` consigliato su 12 GB VRAM.
+- **Future:** unload VRAM / `keep_alive=0` a fine ciclo idle (non ancora in codice).
 
 ```text
 # F — Local-Hybrid (prereq: Ollama host + overlay ollama-host)
 LLM_SIMPLE_PROVIDER=openai
-LLM_SIMPLE_MODEL=gemma4:12b
+LLM_SIMPLE_MODEL=gemma4-radar
 LLM_SIMPLE_API_KEY=ollama
 LLM_SIMPLE_BASE_URL=http://host.docker.internal:11434/v1
 LLM_SIMPLE_RPM=0
@@ -438,6 +441,7 @@ LLM_COMPLEX_PROVIDER=deepseek
 LLM_COMPLEX_MODEL=deepseek-v4-flash
 LLM_COMPLEX_REASONING_EFFORT=high
 # COMPLEX key: LLM_COMPLEX_API_KEY o DEEPSEEK_API_KEY
+# Ops tip: WORKER_ENTRY_CONCURRENCY=1 WORKER_DB_CONCURRENCY=1 WORKER_GEMINI_CONCURRENCY=1
 ```
 
 Ops: `docker compose -f docker-compose.yml -f docker-compose.ollama-host.yml up -d radar-worker`.  
@@ -504,7 +508,7 @@ Ops: edit `.env` → `docker compose up -d --build radar-worker` (o restart) →
 - geo_marker su body corto (&lt;1500) → **non** G  
 - titolo mono + body multi → G dal body  
 - `_chain_for(BORDERLINE)` → refs `LLM_COMPLEX` effort high  
-- BORDERLINE/SIMPLE escalate rules; SIMPLE dopo N validation fail  
+- BORDERLINE escalate rules; SIMPLE cloud escalate dopo N fail; **Ollama think: no escalate**  
 - `complexity` + no key → off+WARN o fail se strict  
 - 402 → cooldown; 429 short → no cooldown  
 - Shadow: lane loggata, catena sempre SIMPLE  

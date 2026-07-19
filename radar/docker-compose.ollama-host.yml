@@ -3,8 +3,8 @@
 #   docker compose -f docker-compose.yml -f docker-compose.ollama-host.yml up -d radar-worker
 #
 # Prereq: Ollama running on the host (e.g. 127.0.0.1:11434) with the model pulled
-# (default ops: gemma4:12b). Set LLM_SIMPLE_* in .env to PROVIDER=openai and
-# BASE_URL=http://host.docker.internal:11434/v1 — see .env.example Profilo F.
+# (ops default: gemma4-radar FROM gemma4:12b + num_ctx 8192). Set LLM_SIMPLE_* in .env to
+# PROVIDER=openai and BASE_URL=http://host.docker.internal:11434/v1 — see .env.example Profilo F.
 #
 # Do NOT combine with a containerized ollama/ollama:rocm on the same GPU.
 # Do NOT publish host :11434 on LAN by default.

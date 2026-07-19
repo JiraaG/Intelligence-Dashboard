@@ -54,7 +54,7 @@ node frontend/scripts/verify-geojson.mjs
 
 - `MINIFLUX_LIMIT`: default/tipico **50** (`.env.example`). Con molti unread, `100` può superare `MAX_MINIFLUX_RESPONSE_BYTES=5MB`.
 - `GEMINI_MODEL`: default `gemma-4-31b-it`; se il provider risponde HTTP 500, fallback ops in `.env` (es. `gemini-3.1-flash-lite`) + restart `radar-worker`. Non commitare `.env`.
-- Profilo F: `LLM_SIMPLE_BASE_URL=http://host.docker.internal:11434/v1` + modello host (es. `gemma4:12b`); runbook § Local-Hybrid.
+- Profilo F: `LLM_SIMPLE_BASE_URL=http://host.docker.internal:11434/v1` + modello host tipico `gemma4-radar` (base `gemma4:12b`); runbook § Local-Hybrid; `WORKER_*_CONCURRENCY=1` + `OLLAMA_NUM_PARALLEL=1` consigliati.
 
 ## SoT
 

@@ -75,13 +75,17 @@ LLM_COMPLEX_RPD=0
 # Soft-trim worker = LLM_SIMPLE.rpd se > 0; free=RPM/RPD>0; paid=0+BUDGET
 # PROVIDER ∈ {gemini, deepseek, openai, glm, grok, claude}
 # OpenAI-compat dialect: deepseek → thinking; openai|glm|grok → stock
-#   (reasoner Ollama gemma4/qwen3/…: think=true via openai_compat_payload)
+#   (reasoner Ollama gemma4/qwen3/…: think=true via openai_compat_payload;
+#    num_ctx/num_predict=8192; no response_format; normalize_llm_json_dict)
 # Swap COMPLEX → Google: LLM_COMPLEX_PROVIDER=gemini + LLM_COMPLEX_MODEL=…
 # Profili A/C/D/E (hybrid / OpenAI / GLM / Grok) in .env.example
 # Profilo F Local-Hybrid: PROVIDER=openai + BASE_URL host Ollama /v1
-#   REASONING_EFFORT=high (thinking locale); VIETATO package/SDK ollama
+#   Tag ops tipico: gemma4-radar (FROM gemma4:12b + num_ctx 8192)
+#   REASONING_EFFORT=high; VIETATO package/SDK ollama / ollama.chat
+#   NO escalate SIMPLE Ollama → DeepSeek (solo correction locale)
 #   Overlay: docker-compose.ollama-host.yml — vedi runbook § Local-Hybrid
 #   Moduli: openai_compat_payload.py / openai_compat_response.py (+ deepseek.py client)
+#   Future: keep_alive / unload VRAM a fine ciclo idle
 ```
 
 SoT: `plan-audit/complete/sot_llm_multi_model_fallback.md` §5–§6.

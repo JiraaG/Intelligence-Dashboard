@@ -96,7 +96,7 @@ radar/
 │       │   ├── cooldown.py        # llm_model_cooldown durable (migrazione 009)
 │       │   ├── quota.py           # QuotaLedger per-lane RPM/TPM/RPD (+ budget)
 │       │   ├── prompts.py         # System prompt (no CoT) + build_user_prompt(<untrusted_article>)
-│       │   └── validator.py       # GeopoliticalArticleSchema strict, extra=forbid, no reasoning
+│       │   └── validator.py       # schema strict + normalize_llm_json_dict (Profilo F)
 │       ├── commit/                # Layer K: DB commit + outbox + Vault Obsidian
 │       │   ├── db_commit.py       # commit atomico articles + outbox
 │       │   ├── outbox.py          # Reconcile vault; mark-read Miniflux solo se completed

@@ -24,7 +24,7 @@ plan-audit/
   README.md                 ← questo indice
   active/                   Piani in corso (vuoto)
   complete/                 Tutti i piani e checklist COMPLETATI (spostati qui)
-  prompts/active/           Prompt non ancora eseguiti (ECC manual/expansion)
+  prompts/active/           Prompt non ancora eseguiti (solo ECC manual/expansion; Fase A Ollama in done/)
   prompts/done/             Prompt eseguiti (storico, incl. Fase H wave 1–3, Final Release Gate)
   remediation/              Report ticket DONE (non cancellare)
   archive/plans|ecc|llm-stubs|scratch/

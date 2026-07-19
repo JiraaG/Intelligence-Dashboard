@@ -1,6 +1,6 @@
 # plan-audit — STATUS (fatto vs da fare)
 
-Quadro operativo aggiornato **2026-07-19** (map anchors + summary densi; click nazione zoom&lt;5; Fase A **piano ACTIVE** host-Ollama).  
+Quadro operativo aggiornato **2026-07-19** (Profilo F Local-Hybrid shipped `54c8038`; map anchors; Fase A piano ACTIVE per gate/unload VRAM).  
 Indice cartelle: [`README.md`](README.md).  
 Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`](remediation/audit_remediation_final_release_handoff.md).
 
@@ -10,7 +10,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 
 | Area | Dove | Note |
 |------|------|------|
-| Fase A — LLM locale AMD/Ollama | [`active/plan_impl_fase_A_local_amd_ollama.md`](active/plan_impl_fase_A_local_amd_ollama.md) | **ACTIVE (impl)** — W1 overlay+Profilo F DONE; W3 docs/ECC DONE; rename `openai_compat_payload`/`_response` + think Gemma; W4 requeue eseguito (routing SIMPLE local + COMPLEX cloud OK). W2 qualità fixture locale **parziale** (thinking può truncare JSON → escalate/residual DeepSeek). Prompt resta in [`prompts/active/`](prompts/active/plan_prompt_fase_A_local_amd_ollama.md) fino a gate qualità accettabile. |
+| Fase A — LLM locale AMD/Ollama | [`active/plan_impl_fase_A_local_amd_ollama.md`](active/plan_impl_fase_A_local_amd_ollama.md) | **ACTIVE (gate / ops follow-up)** — W1–W4 codice/docs **DONE** (`54c8038`): overlay host, Profilo F, `openai_compat_*`, think Gemma, `normalize_llm_json_dict`, **no SIMPLE Ollama→DeepSeek escalate**, requeue 48h OK. Ops tag tipico **`gemma4-radar`** (`FROM gemma4:12b`, `num_ctx=8192`). Residui: scorecard fixture formale (opz.); **VRAM unload / `keep_alive`** (prossima chat). Prompt archiviato in [`prompts/done/`](prompts/done/plan_prompt_fase_A_local_amd_ollama.md). |
 | ECC manual / expansion | [`prompts/active/plan_prompt_ecc_manual_and_expansion.md`](prompts/active/plan_prompt_ecc_manual_and_expansion.md) | **ACTIVE (non eseguito)** — resta finché non si produce un piano deliverable |
 
 ---
@@ -19,6 +19,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 
 | Area | Dove | Note |
 |------|------|------|
+| Profilo F Local-Hybrid (impl) | codice + overlay + docs | **DONE** 2026-07-19 — commit **`54c8038`** su `feature/upgrades`. |
 | Map nation anchors + summary densi | codice FE `radar-map` + `classification/prompts.py` | **DONE** 2026-07-19 — hub/spider/pin sul centroide nazione (US/RU mainland); summary LLM briefing denso 220–420 char. **Restore point:** `a240b3c` su `feature/upgrades`. |
 | Click nazione hatching (zoom &lt; 5) | `radar-map` map-click + `pickCountryCodeAt` | **DONE** 2026-07-19 — bypass canvas `relationsPane`; parity LETTE/TROVATE. Commit `911463a`. |
 | Affinamento classificazione (tipologia / anti-XX / archi star) | [`prompts/done/plan_prompt_classification_geo_arcs_refine.md`](prompts/done/plan_prompt_classification_geo_arcs_refine.md) | **DONE** 2026-07-18 — prompt + soft-remap sport; `requeue --purge-all`; docs star; prova da zero. **Restore point:** `f7cf83d` su `feature/upgrades`. |
@@ -28,10 +29,11 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 | Playbook audit docs | [`complete/plan_docs_audit_playbook.md`](complete/plan_docs_audit_playbook.md) | CLOSED |
 | Allineamento product docs | [`complete/plan_docs_monorepo_source.md`](complete/plan_docs_monorepo_source.md) | ESEGUITO + coerenza porte/health/requeue |
 | Final Release F0–F4 | [`complete/plan_release_final_gate.md`](complete/plan_release_final_gate.md) + report `remediation/*_F*.md` | **PR #1 merged** 2026-07-17; backup, seed 10k, chaos C1–C3, security |
-| SoT LLM multi-provider | [`complete/sot_llm_multi_model_fallback.md`](complete/sot_llm_multi_model_fallback.md) | **Vivo** — §0 limiti/failover RPM·TPM vs RPD (2026-07-17) |
+| SoT LLM multi-provider | [`complete/sot_llm_multi_model_fallback.md`](complete/sot_llm_multi_model_fallback.md) | **Vivo** — Profilo F + no-escalate Ollama think (2026-07-19) |
 | Commenti codice P0–P2 | [`complete/plan_code_comments_beginner_audit.md`](complete/plan_code_comments_beginner_audit.md) | **P0–P1–P2-01 DONE**; altri P2 inventario restano fuori batch |
 | Prompt audit commenti | [`prompts/done/audit_prompt_code_comments_beginner_terra.md`](prompts/done/audit_prompt_code_comments_beginner_terra.md) | Pipeline Terra→Grok chiusa |
 | Prompt Final Release Gate | [`prompts/done/audit_prompt_final_release_gate.md`](prompts/done/audit_prompt_final_release_gate.md) | Archiviato 2026-07-18 — gate chiuso |
+| Prompt Fase A Ollama | [`prompts/done/plan_prompt_fase_A_local_amd_ollama.md`](prompts/done/plan_prompt_fase_A_local_amd_ollama.md) | Archiviato 2026-07-19 — impl shipped |
 | Report ticket singoli | [`remediation/`](remediation/) | Storico — non cancellare |
 | Prompt eseguiti | [`prompts/done/`](prompts/done/) | Storico |
 | Piani ECC / Limits / stub | [`archive/`](archive/) | SUPERSEDED / PRD |
@@ -49,17 +51,17 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 | Fase 5 — digest pin + drop `--legacy-peer-deps` | **DEFERRED ACCETTATO** | Hardening opzionale; **non** da fare per release. Vedi piano §7 |
 | Commenti codice P1/P2 | **Chiuso (P2-01)** | Altri P2 in inventario senza `batch_id` — solo se emerge gap reale |
 | Fase C — Dedup semantica `pgvector` | **BACKLOG** | Vedi `radar_overview_and_upgrades.md` §C; non iniziata; indipendente da H / A |
-| Fase A — LLM locale AMD/Ollama | **ACTIVE (piano)** | [`active/plan_impl_fase_A_local_amd_ollama.md`](active/plan_impl_fase_A_local_amd_ollama.md) — implementare solo su richiesta; non gate senza W1–W4 |
+| Fase A — LLM locale AMD/Ollama | **ACTIVE (follow-up)** | Impl Profilo F **DONE** (`54c8038`). Aperti: unload VRAM/`keep_alive`; scorecard fixture opz. Piano [`active/plan_impl_fase_A_local_amd_ollama.md`](active/plan_impl_fase_A_local_amd_ollama.md). |
 | Fase H — Grafo geospaziale | **DONE** | related_countries + GET /api/map-relations + archi mappa + chip carosello (2026-07-18). |
 | Archi UI (multicolore + click) | **DONE** | Piano [`complete/plan_archi_hatching_multicolor.md`](complete/plan_archi_hatching_multicolor.md). Residuo **opzionale**: multicolore aggregato anche a zoom ≥ 5. |
 
-**Nessun residuo operativo obbligatorio sulla Fase B / H / archi UI / classification refine / map anchors.** Branch di riferimento feature: `feature/upgrades`.
+**Nessun residuo operativo obbligatorio sulla Fase B / H / archi UI / classification refine / map anchors / Profilo F core.** Branch di riferimento feature: `feature/upgrades`.
 
-**Restore point (map anchors + summary densi):** `a240b3c` su `feature/upgrades` — checkpoint FE centroide nazione + prompt summary. Precedenti: click hatching `911463a`; classification/geo `f7cf83d`; archi UI `5c74e57`.
+**Restore point (Profilo F Local-Hybrid):** `54c8038` su `feature/upgrades`. Precedenti: map anchors `a240b3c`; click hatching `911463a`; classification/geo `f7cf83d`; archi UI `5c74e57`.
 
 Prompt Final Release: [`prompts/done/audit_prompt_final_release_gate.md`](prompts/done/audit_prompt_final_release_gate.md) — **non rieseguire** (F0–F4 chiusi).
 
-**Fuori scope:** nuove feature; refactor/restyle di `radar-sidebar/**` al di fuori delle eccezioni mirate (toggle Salva e chip `related_countries`); riaprire ticket CLOSED; rieseguire P0 commenti senza richiesta; attivare Fase 5 senza decisione esplicita; implementare Fase A oltre al piano [`active/plan_impl_fase_A_local_amd_ollama.md`](active/plan_impl_fase_A_local_amd_ollama.md) senza richiesta esplicita.
+**Fuori scope:** nuove feature oltre unload VRAM senza richiesta; refactor/restyle di `radar-sidebar/**` al di fuori delle eccezioni mirate; riaprire ticket CLOSED; rieseguire P0 commenti senza richiesta; attivare Fase 5 senza decisione esplicita.
 
 ---
 
@@ -68,10 +70,10 @@ Prompt Final Release: [`prompts/done/audit_prompt_final_release_gate.md`](prompt
 ```text
 plan-audit/
   STATUS.md          ← questo file (quadro fatto / residui)
-  active/            ← Piani in corso (Fase A Ollama)
+  active/            ← Piani in corso (Fase A follow-up / ECC prompt)
   complete/          ← Piani COMPLETATI (incl. Phase 0–6, Fase B, Fase H, archi UI)
-  prompts/active/    ← prompt non eseguiti (Fase A Ollama prompt; ECC manual/expansion)
-  prompts/done/      ← storico (incl. Fase H wave 1–3, Final Release Gate + audit commenti)
+  prompts/active/    ← prompt non eseguiti (ECC manual/expansion)
+  prompts/done/      ← storico (incl. Fase A Ollama, Fase H wave 1–3, Final Release Gate)
   remediation/       ← report DONE (incl. F1–F4)
   archive/           ← SUPERSEDED / scratch / ECC early
 ```

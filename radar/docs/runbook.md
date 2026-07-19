@@ -118,13 +118,20 @@ Poi nei log: `route lane=SIMPLE … effort=none` e/o `COMPLEX|BORDERLINE … eff
 
 ## Local-Hybrid (Fase A / Profilo F)
 
-Scenario ops: SIMPLE su **Ollama host** + COMPLEX cloud (tipico DeepSeek). Path HTTP OpenAI-compat già nel client (`PROVIDER=openai` + httpx) — **nessun** package/SDK `ollama`, **vietato** `ollama.chat`.
+Scenario ops: SIMPLE su **Ollama host** + COMPLEX cloud (tipico DeepSeek). Path HTTP OpenAI-compat già nel client (`PROVIDER=openai` + httpx) — **nessun** package/SDK `ollama`, **vietato** `ollama.chat`. Core shipped `54c8038`.
 
 **Prerequisiti**
 
-1. Ollama in esecuzione sull’host (es. `127.0.0.1:11434`), modello pullato: ops default **`gemma4:12b`**.
-2. In `.env` (non commit): attivare il blocco **Profilo F** da [`.env.example`](../.env.example) — spegnere A/B se confliggono.
-3. Overlay Compose per risolvere `host.docker.internal` dal worker:
+1. Ollama in esecuzione sull’host (es. `127.0.0.1:11434`).
+2. Modello: ops default **`gemma4-radar`** (Modelfile host, non in git):
+   ```text
+   FROM gemma4:12b
+   PARAMETER num_ctx 8192
+   PARAMETER temperature 0.1
+   ```
+   `ollama create gemma4-radar -f Modelfile` (base pull: `gemma4:12b`).
+3. In `.env` (non commit): attivare il blocco **Profilo F** da [`.env.example`](../.env.example) — spegnere A/B se confliggono.
+4. Overlay Compose per risolvere `host.docker.internal` dal worker:
 
 ```bash
 cd radar
@@ -135,17 +142,21 @@ docker compose -f docker-compose.yml -f docker-compose.ollama-host.yml up -d rad
 
 | Lane | Provider | Model | `BASE_URL` |
 |------|----------|-------|------------|
-| SIMPLE | `openai` | `gemma4:12b` | `http://host.docker.internal:11434/v1` |
+| SIMPLE | `openai` | `gemma4-radar` | `http://host.docker.internal:11434/v1` |
 | COMPLEX | `deepseek` | `deepseek-v4-flash` | `https://api.deepseek.com` |
 
 - `LLM_SIMPLE_API_KEY` dummy non vuota (es. `ollama`); RPM/TPM/RPD SIMPLE = `0` (unmanaged).
-- `LLM_SIMPLE_REASONING_EFFORT=high` — su `gemma4*` / reasoner Ollama il client abilita **`think=true`** (thinking locale) e estrae il JSON da `content` o `reasoning` (`openai_compat_*`). Lo schema Radar resta senza campo CoT.
-- Host: **`OLLAMA_NUM_PARALLEL=1`** consigliato (con parallel=2 lo slot contesto può scendere ~4096 e riempire solo il thought).
+- `LLM_SIMPLE_REASONING_EFFORT=high` — su `gemma4*` / reasoner Ollama il client abilita **`think=true`**, `num_ctx`/`num_predict=8192`, estrae JSON da `content` o `reasoning` (`openai_compat_*`). Schema Radar senza campo CoT.
+- **Nessun escalate** SIMPLE Ollama → DeepSeek: solo correction locale (`_MAX_ATTEMPTS_LOCAL=6`). BORDERLINE/COMPLEX → DeepSeek.
+- Pre-validate: `normalize_llm_json_dict` (liste→CSV, alias, coerenza geo/categoria/tag).
+- Host: **`OLLAMA_NUM_PARALLEL=1`**; worker tipico `WORKER_ENTRY_CONCURRENCY=1`, `WORKER_DB_CONCURRENCY=1`, `WORKER_GEMINI_CONCURRENCY=1`.
+- `LLM_SIMPLE_TIMEOUT`: `180` default esempio; `600` se load/think lenti.
 - Non pubblicare host `:11434` su LAN di default; non combinare con un container ROCm Ollama sulla stessa GPU.
+- **Future (non ancora in codice):** unload VRAM / `keep_alive=0` a fine ciclo idle — liberare GPU quando non ci sono articoli SIMPLE.
 
 **Verifica / gate 48h**
 
-Dopo smoke, re-ingest nella finestra worker ≈ 48h con lo script ufficiale (dry-run prima): sezione **Requeue articoli** sopra (`requeue_articles` / `--purge-all` + `restart radar-worker`). Log attesi: `route lane=SIMPLE … openai / gemma4:12b` e COMPLEX DeepSeek.
+Dopo smoke, re-ingest nella finestra worker ≈ 48h con lo script ufficiale (dry-run prima): sezione **Requeue articoli** sopra (`requeue_articles` / `--purge-all` + `restart radar-worker`). Log attesi: `route lane=SIMPLE … openai / gemma4-radar` e COMPLEX/BORDERLINE DeepSeek; `ollama ps` durante classify mostra il modello in GPU.
 
 **Rollback → Profilo B**
 

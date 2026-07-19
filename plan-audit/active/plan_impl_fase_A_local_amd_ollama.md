@@ -2,17 +2,33 @@
 
 **Progetto:** Radar Informativo Globale (Intelligence Dashboard)  
 **Documento:** `plan-audit/active/plan_impl_fase_A_local_amd_ollama.md`  
-**Stato:** ACTIVE — piano approvato (host-first); **implementazione codice solo su richiesta esplicita**  
+**Stato:** ACTIVE (follow-up) — **Profilo F core shipped** (`54c8038`, 2026-07-19); residui = gate qualità formale + **VRAM unload/`keep_alive`**  
 **Data:** 2026-07-19  
-**Prompt origine:** [`../prompts/active/plan_prompt_fase_A_local_amd_ollama.md`](../prompts/active/plan_prompt_fase_A_local_amd_ollama.md)  
+**Prompt origine:** [`../prompts/done/plan_prompt_fase_A_local_amd_ollama.md`](../prompts/done/plan_prompt_fase_A_local_amd_ollama.md)  
 **Blueprint:** [`../../radar_overview_and_upgrades.md`](../../radar_overview_and_upgrades.md) §3.A  
 **SoT lane:** [`../complete/sot_llm_multi_model_fallback.md`](../complete/sot_llm_multi_model_fallback.md)
 
 ---
 
+## Reality shipped (ops 2026-07-19)
+
+| Tema | Valore |
+|------|--------|
+| Overlay | `radar/docker-compose.ollama-host.yml` |
+| Tag ops | **`gemma4-radar`** — Modelfile host `FROM gemma4:12b` + `PARAMETER num_ctx 8192` (non in git) |
+| Base pull | `gemma4:12b` |
+| Payload | `think=true`; `options.num_ctx`/`num_predict` = **8192**; no `response_format` su Ollama think |
+| Escalate | **Nessun** SIMPLE Ollama → DeepSeek (correction fino a `_MAX_ATTEMPTS_LOCAL=6`) |
+| Qualità | `normalize_llm_json_dict` (CSV list, alias EN, protagonista US–Iran, coerenza categoria/tag/aziende/relevance) |
+| Concurrency tip | `WORKER_ENTRY/DB/GEMINI_CONCURRENCY=1`; host `OLLAMA_NUM_PARALLEL=1` |
+| Timeout tip | `LLM_SIMPLE_TIMEOUT=180` (o `600` se VRAM lenta) |
+| Aperto | Unload VRAM a fine ciclo (`keep_alive=0`) — non ancora implementato |
+
+---
+
 ## Decisioni vincolanti (confermate)
 
-1. **Runtime:** Ollama **host** già OK (`gemma4:12b` su GPU AMD, override ROCm già fatti). Niente container ROCm di default.
+1. **Runtime:** Ollama **host** già OK (`gemma4:12b` / `gemma4-radar` su GPU AMD, override ROCm già fatti). Niente container ROCm di default.
 2. **Integrazione:** solo **HTTP OpenAI-compat** (`PROVIDER=openai` + `BASE_URL=…/v1` via httpx). **Vietato** `ollama.chat` / package `ollama`.
 3. **Routing default:** Scenario 2 / **Profilo F Local-Hybrid** — SIMPLE locale + COMPLEX DeepSeek cloud.
 4. **Re-ingest verifica:** script ufficiale `radar/backend/app/scripts/requeue_articles.py` con `--purge-all` + restart worker (finestra ingest worker ≈ **48h**).
@@ -23,33 +39,33 @@ flowchart TB
   W1[W1 host bridge + Profilo F] --> W2[W2 qualità fixture]
   W2 --> W3[W3 docs ECC plan-audit]
   W3 --> W4[W4 pytest + purge-all 48h]
-  W4 --> Gate[Gate go / rollback B]
+  W4 --> Gate[Gate go / unload VRAM]
 ```
 
 ### Wave checklist
 
 | Wave | Contenuto | Stato |
 |------|-----------|-------|
-| W1 | Overlay `ollama-host` + Profilo F env + smoke | **done** (overlay + `.env.example` Profilo F; smoke ops locale) |
-| W2 | 10 fixture schema-valid + residual Ollama-down | pending |
-| W3 | Docs / SoT / STATUS / skills + ECC sync | **done** (2026-07-19) |
-| W4 | pytest + up ordinato + requeue `--purge-all` 48h | pending |
+| W1 | Overlay `ollama-host` + Profilo F env + smoke | **done** |
+| W2 | Qualità locale (normalize + no-escalate + think JSON) + residual Ollama-down | **done** (code); scorecard 9/10 fixture **opzionale** |
+| W3 | Docs / SoT / STATUS / skills + ECC sync | **done** (refresh docs 2026-07-19 post-ship) |
+| W4 | pytest + up ordinato + requeue `--purge-all` 48h | **done** |
+| Follow-up | `keep_alive` busy + unload VRAM fine-ciclo | **pending** |
 
 ---
 
 ## 1. Verdetto AS-IS
 
-**Già basta**
+**Già basta (shipped)**
 
-- Client OpenAI-compat stock (`radar/backend/app/classification/deepseek.py`); lane env; residual/cooldown/quota; schema post-`f7cf83d`.
-- Host: Ollama + `gemma4:12b` GPU.
-- Ops requeue già documentato: skill `radar-requeue-ops`, runbook, mirror ECC.
+- Client OpenAI-compat (`deepseek.py` + `openai_compat_payload` / `_response`); lane env; residual/cooldown/quota; schema + normalize post-`54c8038`.
+- Host: Ollama + `gemma4-radar` GPU; overlay Compose.
+- Ops requeue: skill `radar-requeue-ops`, runbook, mirror ECC.
 
-**Manca**
+**Manca (follow-up)**
 
-- Bridge Docker → host (`extra_hosts` + Profilo F).
-- Docs/SoT/ECC/README allineati a Local-Hybrid host-first.
-- Gate qualità locale + batch 48h misurato su Profilo F.
+- Lifecycle VRAM: modello caricato solo durante classify SIMPLE; unload a idle.
+- Scorecard fixture formale 9/10 (opzionale, non bloccante ops).
 
 ---
 
@@ -74,7 +90,7 @@ flowchart TB
 |------|--------|
 | BASE_URL | `http://host.docker.internal:11434/v1` |
 | Overlay | `radar/docker-compose.ollama-host.yml` — solo `extra_hosts` su `radar-worker` |
-| SIMPLE | `openai` / `gemma4:12b` / effort `none` / RPM·TPM·RPD=`0` / TIMEOUT=`180` / API_KEY=`ollama` |
+| SIMPLE | `openai` / `gemma4-radar` (o `gemma4:12b`) / effort `high` (think) / RPM·TPM·RPD=`0` / TIMEOUT=`180`–`600` / API_KEY=`ollama` |
 | COMPLEX | DeepSeek Profilo B (`deepseek-v4-flash`, effort `high`) |
 | SDK ollama | Vietato |
 | Soft-trim | Non attivo (SIMPLE.rpd=0); hibernation non da locale |

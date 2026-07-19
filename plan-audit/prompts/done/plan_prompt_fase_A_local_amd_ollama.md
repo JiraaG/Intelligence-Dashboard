@@ -1,10 +1,11 @@
 # Plan prompt — Fase A: LLM locale AMD (ROCm/Ollama) + lane SIMPLE/COMPLEX
 
-> **Stato: ACTIVE (non eseguito)** — analisi / piano; **nessuna implementazione** finché non richiesta.  
-> **Uso:** apri una chat in **Plan mode**, incolla il blocco sotto (da `## PROMPT` in poi).  
-> **Blueprint AS-IS:** [`radar_overview_and_upgrades.md`](../../../radar_overview_and_upgrades.md) §3.A (scenari 1–4 + compose Ollama ROCm).  
-> **Nota roadmap:** Fase **B** (SSE/webhook) e Fase **H** (archi) sono **DONE**; Fase **C** (`pgvector`) resta BACKLOG — **non** mescolare nel piano A.  
-> **Restore tip:** `a240b3c` (map anchors + summary densi) su `feature/upgrades`; precedenti utili `911463a` (click hatching), `f7cf83d` (classification/geo).  
+> **Stato: COMPLETE (analisi 2026-07-19; impl Profilo F shipped `54c8038`)** — prompt storico.  
+> **Uso:** non rieseguire come ACTIVE; rieseguire solo per delta (es. VRAM `keep_alive` unload).  
+> **Shipped:** host-Ollama Profilo F; tag ops `gemma4-radar` (FROM `gemma4:12b`, `num_ctx=8192`); `think=true`; **no SIMPLE→DeepSeek escalate**; `normalize_llm_json_dict`; overlay `docker-compose.ollama-host.yml`.  
+> **Piano vivo:** [`../../active/plan_impl_fase_A_local_amd_ollama.md`](../../active/plan_impl_fase_A_local_amd_ollama.md) (gate qualità / unload VRAM).  
+> **Blueprint:** [`radar_overview_and_upgrades.md`](../../../radar_overview_and_upgrades.md) §3.A.  
+> **Nota roadmap:** Fase B/H DONE; Fase C BACKLOG. Restore code: `54c8038` (Profilo F); map anchors `a240b3c`.  
 > **Contesto host empirico (2026-07-18/19):** GPU AMD Navi 22 (RX 6700/6750 XT class), ROCm rock 6.10.5 caricato, `/dev/kfd`+`/dev/dri` presenti, host Ollama `0.30.7` con modelli già pullati (`gemma4:12b`, `gemma4:26b`, `qwen3:14b`, `qwen2.5:14b`, …). RAM ~30 GiB.  
 > **Ops LLM attuale:** Profilo B DeepSeek-only tipico in `.env.example`; lane env `openai` = OpenAI-compat httpx (adatto a Ollama `/v1`). Package `openai` **vietato**.
 

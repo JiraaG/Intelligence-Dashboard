@@ -148,10 +148,10 @@ Di seguito vengono definiti i piani operativi per l'estensione del sistema. Ogni
 
 L'obiettivo è abilitare l'elaborazione locale a costo zero sulla GPU AMD Radeon RX 6750 XT (Navi 22 / **gfx1030**, 12 GB VRAM).
 
-**Modello di riferimento (tag Ollama reali):** `gemma4:12b` (~7.6 GB) — lascia headroom VRAM su 12 GB.  
+**Modello di riferimento (tag Ollama reali):** base `gemma4:12b` (~7.6 GB); **ops Profilo F tipico = `gemma4-radar`** (Modelfile `FROM gemma4:12b` + `PARAMETER num_ctx 8192`, lascia headroom VRAM su 12 GB).  
 **Nota naming:** non esiste un tag Ollama `gemma4:14b` / `gemma4:14b-instruct-q4_K_M`; le workstation tag pubbliche sono `gemma4:12b`, `gemma4:26b` (~18 GB, troppo grande per full-GPU su 12 GB), `gemma4:31b`. Alternative ≤12 GB: `qwen3:14b` (~9.3 GB).
 
-**Integrazione vincolante:** nessun SDK `ollama` / `ollama.chat`. Il worker parla a Ollama solo via **HTTP OpenAI-compat** già nel client (`PROVIDER=openai` + `BASE_URL=…/v1` via httpx; dialect stock; package `openai` vietato). Piano esecutivo: [`plan-audit/active/plan_impl_fase_A_local_amd_ollama.md`](plan-audit/active/plan_impl_fase_A_local_amd_ollama.md) (**Profilo F** Local-Hybrid).
+**Integrazione vincolante:** nessun SDK `ollama` / `ollama.chat`. Il worker parla a Ollama solo via **HTTP OpenAI-compat** già nel client (`PROVIDER=openai` + `BASE_URL=…/v1` via httpx; dialect stock; package `openai` vietato). Client: `think=true`, `num_ctx/num_predict=8192`, `normalize_llm_json_dict`, **no SIMPLE→DeepSeek escalate**. Piano esecutivo: [`plan-audit/active/plan_impl_fase_A_local_amd_ollama.md`](plan-audit/active/plan_impl_fase_A_local_amd_ollama.md) (**Profilo F** Local-Hybrid, shipped `54c8038`). Follow-up: unload VRAM / `keep_alive`.
 
 **Portabilità OS:** il contratto è lo stesso su **Linux, Windows e macOS** — installare Ollama, fare `ollama pull` del modello desiderato, puntare `LLM_SIMPLE_BASE_URL` (o COMPLEX) a `http://host.docker.internal:11434/v1` (o DNS container se usi `radar-ollama`). L’accelerazione GPU è responsabilità di Ollama sull’host (ROCm su Linux AMD, Metal su Apple Silicon, CUDA/altrove dove supportato; altrimenti CPU). **iOS/iPadOS non sono un host** per lo stack Docker Radar + Ollama server.
 
@@ -162,7 +162,7 @@ Su host con Ollama già installato, modello pullato e override GPU/ROCm già val
 1. Ollama ascolta su `127.0.0.1:11434` (non esporre su LAN di default).
 2. Overlay Compose `docker-compose.ollama-host.yml` aggiunge a `radar-worker`:
    `extra_hosts: ["host.docker.internal:host-gateway"]`.
-3. Lane SIMPLE: `BASE_URL=http://host.docker.internal:11434/v1`, `MODEL=gemma4:12b`, API key dummy non vuota (es. `ollama`).
+3. Lane SIMPLE: `BASE_URL=http://host.docker.internal:11434/v1`, `MODEL=gemma4-radar` (o `gemma4:12b`), API key dummy non vuota (es. `ollama`).
 4. FE **non** vede Ollama (solo `radar-data` / host-gateway dal worker).
 5. `OLLAMA_NUM_PARALLEL=1` consigliato su 12 GB; un solo consumatore GPU (non avviare in parallelo un container `ollama:rocm`).
 
@@ -173,7 +173,7 @@ flowchart TD
   end
 
   subgraph Local [Ollama host GPU]
-    Ollama[Ollama :11434] --> Model[gemma4:12b]
+    Ollama[Ollama :11434] --> Model[gemma4-radar]
   end
 
   subgraph Cloud [Servizi Cloud]
@@ -224,7 +224,7 @@ LLM_ROUTING_MODE=complexity
 LLM_ROUTING_SHADOW=false
 
 LLM_SIMPLE_PROVIDER=openai
-LLM_SIMPLE_MODEL=gemma4:12b
+LLM_SIMPLE_MODEL=gemma4-radar
 LLM_SIMPLE_API_KEY=ollama
 LLM_SIMPLE_BASE_URL=http://host.docker.internal:11434/v1
 LLM_SIMPLE_RPM=0
@@ -252,7 +252,7 @@ LLM_ROUTING_MODE=complexity
 LLM_ROUTING_SHADOW=false
 
 LLM_SIMPLE_PROVIDER=openai
-LLM_SIMPLE_MODEL=gemma4:12b
+LLM_SIMPLE_MODEL=gemma4-radar
 LLM_SIMPLE_API_KEY=ollama
 LLM_SIMPLE_BASE_URL=http://host.docker.internal:11434/v1
 LLM_SIMPLE_RPM=0
