@@ -57,7 +57,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 
 **Nessun residuo operativo obbligatorio sulla Fase B / H / archi UI / classification refine / map anchors / Profilo F core.** Branch di riferimento feature: `feature/upgrades`.
 
-**Restore point (Profilo F Local-Hybrid core):** `54c8038` su `feature/upgrades`. **VRAM unload** = follow-up sullo stesso branch (working tree / commit successivo a `54c8038`). Precedenti: map anchors `a240b3c`; click hatching `911463a`; classification/geo `f7cf83d`; archi UI `5c74e57`.
+**Restore point (Profilo F + VRAM unload):** `2996625` su `feature/upgrades`. Core Local-Hybrid: `54c8038`. Precedenti: map anchors `a240b3c`; click hatching `911463a`; classification/geo `f7cf83d`; archi UI `5c74e57`.
 
 Prompt Final Release: [`prompts/done/audit_prompt_final_release_gate.md`](prompts/done/audit_prompt_final_release_gate.md) — **non rieseguire** (F0–F4 chiusi).
 
