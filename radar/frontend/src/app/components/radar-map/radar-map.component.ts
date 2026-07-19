@@ -1311,29 +1311,30 @@ export class RadarMapComponent implements AfterViewInit {
   }
 
   /**
-   * Hub nazione (day→detail chiuso): disco compatto al centroide articoli.
-   * Visibile solo se non c'è spiderfy attivo.
+   * Hub nazione (day→detail chiuso): disco compatto sul centroide paese
+   * (stesso anchor degli archi). Non media le lat/lng articolo: un pezzo US
+   * con coordinate di teatro estero (es. Kuwait) sposterebbe l'hub in oceano.
    */
   private upsertDetailHubPin(L: LeafletGlobal, articles: Article[]): void {
     if (!this.detailHubGroup || !this.map) return;
     this.detailHubGroup.clearLayers();
     if (articles.length === 0) return;
 
-    let latSum = 0;
-    let lngSum = 0;
-    let n = 0;
-    for (const a of articles) {
-      if (!this.hasFiniteCoordinates(a.latitude, a.longitude)) continue;
-      if ((a.country_code || 'XX') === 'XX') continue;
-      latSum += a.latitude;
-      lngSum += a.longitude;
-      n++;
-    }
-    if (n === 0) return;
+    const focus = this.focusCountryCode();
+    const code =
+      (focus && focus !== 'XX' ? focus : null) ??
+      this.dominantArticleCountry(articles) ??
+      (articles[0]?.country_code && articles[0].country_code !== 'XX'
+        ? articles[0].country_code
+        : null);
+    if (!code) return;
+
+    const anchor = this.resolveCountryAnchorLatLng(code, articles);
+    if (!anchor) return;
 
     // Stesso disco compatto del root spiderfy — evita flash pin alto → disco piccolo.
     const icon = this.createSpiderfyRootIcon(L, articles);
-    const marker = L.marker([latSum / n, lngSum / n], {
+    const marker = L.marker([anchor.lat, anchor.lng], {
       icon,
       zIndexOffset: 500,
     }) as ArticleMarker;
@@ -1344,14 +1345,34 @@ export class RadarMapComponent implements AfterViewInit {
         L.DomEvent.stopPropagation(e.originalEvent);
         (e.originalEvent as Event & { _radarHandled?: boolean })._radarHandled = true;
       }
-      const code = articles[0]?.country_code;
-      const cat = articles[0]?.primary_category;
+      const cat =
+        articles.find((a) => a.country_code === code)?.primary_category ??
+        articles[0]?.primary_category;
       if (code && cat) {
         this.focusAndSpiderfyCategory(code, cat);
       }
     });
 
     this.detailHubGroup.addLayer(marker);
+  }
+
+  /** Paese con più articoli nel set (hub/relation con pezzi misti). */
+  private dominantArticleCountry(articles: Article[]): string | null {
+    const totals = new Map<string, number>();
+    for (const a of articles) {
+      const code = a.country_code || 'XX';
+      if (code === 'XX') continue;
+      totals.set(code, (totals.get(code) ?? 0) + 1);
+    }
+    let best: string | null = null;
+    let bestCount = 0;
+    totals.forEach((count, code) => {
+      if (count > bestCount) {
+        best = code;
+        bestCount = count;
+      }
+    });
+    return best;
   }
 
   /** Pin day-view solo a zoom ≥ 5 e senza nazione aperta. */
@@ -1731,7 +1752,10 @@ export class RadarMapComponent implements AfterViewInit {
    * Restituisce il centroide di una nazione con caching,
    * override manuali per US/RU e fallback summary.
    */
-  private getCountryCentroid(code: string): Leaflet.LatLng | null {
+  private getCountryCentroid(
+    code: string,
+    summaryOverride?: MapSummaryRow[],
+  ): Leaflet.LatLng | null {
     if (!this.L) return null;
     if (code === 'US') {
       return this.L.latLng(37.0902, -95.7129);
@@ -1764,8 +1788,8 @@ export class RadarMapComponent implements AfterViewInit {
       }
     }
 
-    // Fallback coordinate medie dal mapSummary
-    const rows = this.mapSummary().filter((r) => r.country_code === code);
+    // Fallback coordinate medie dal mapSummary (override = argomento di render in corso)
+    const rows = (summaryOverride ?? this.mapSummary()).filter((r) => r.country_code === code);
     if (rows.length > 0) {
       let latSum = 0;
       let lngSum = 0;
@@ -1784,6 +1808,33 @@ export class RadarMapComponent implements AfterViewInit {
       }
     }
     return null;
+  }
+
+  /**
+   * Anchor stabile per pin/hub/spider di una nazione: stesso punto degli archi.
+   * Preferisce centroide GeoJSON / override US·RU; media articoli/summary solo se manca geometria.
+   */
+  private resolveCountryAnchorLatLng(
+    code: string,
+    fallbackArticles?: Article[],
+    summaryOverride?: MapSummaryRow[],
+  ): Leaflet.LatLng | null {
+    const centroid = this.getCountryCentroid(code, summaryOverride);
+    if (centroid) return centroid;
+    if (!this.L || !fallbackArticles?.length) return null;
+
+    let latSum = 0;
+    let lngSum = 0;
+    let n = 0;
+    for (const a of fallbackArticles) {
+      if ((a.country_code || 'XX') !== code) continue;
+      if (!this.hasFiniteCoordinates(a.latitude, a.longitude)) continue;
+      latSum += a.latitude;
+      lngSum += a.longitude;
+      n++;
+    }
+    if (n === 0) return null;
+    return this.L.latLng(latSum / n, lngSum / n);
   }
 
   /**
@@ -1837,16 +1888,13 @@ export class RadarMapComponent implements AfterViewInit {
   }
 
   /**
-   * Day view: un pin per paese al centroide pesato.
+   * Day view: un pin per paese sul centroide nazione (parity archi / hub).
    * Mix categorie = anello conic — evita pallini per-categoria che driftano via iconAnchor.
    */
   private renderSummaryMarkers(L: LeafletGlobal, summary: MapSummaryRow[]): void {
     if (!this.summaryMarkerGroup) return;
 
     type Agg = {
-      latSum: number;
-      lngSum: number;
-      weight: number;
       total: number;
       categories: Map<string, number>;
     };
@@ -1856,19 +1904,11 @@ export class RadarMapComponent implements AfterViewInit {
       const code = row.country_code || 'XX';
       if (code === 'XX') continue;
       if (row.article_count <= 0) continue;
-      if (!this.hasFiniteCoordinates(row.latitude, row.longitude)) continue;
 
-      const w = Math.max(1, row.article_count);
       const cur = byCountry.get(code) ?? {
-        latSum: 0,
-        lngSum: 0,
-        weight: 0,
         total: 0,
         categories: new Map<string, number>(),
       };
-      cur.latSum += row.latitude * w;
-      cur.lngSum += row.longitude * w;
-      cur.weight += w;
       cur.total += row.article_count;
       cur.categories.set(
         row.primary_category,
@@ -1878,15 +1918,15 @@ export class RadarMapComponent implements AfterViewInit {
     }
 
     byCountry.forEach((agg, code) => {
-      if (agg.weight === 0 || agg.total <= 0) return;
-      const baseLat = agg.latSum / agg.weight;
-      const baseLng = agg.lngSum / agg.weight;
+      if (agg.total <= 0) return;
+      const anchor = this.resolveCountryAnchorLatLng(code, undefined, summary);
+      if (!anchor) return;
       const categoryCounts = Array.from(agg.categories.entries()).map(([category, count]) => ({
         category,
         count,
       }));
       const icon = this.createCountrySummaryPinIcon(L, agg.total, categoryCounts);
-      const marker = L.marker([baseLat, baseLng], { icon }) as ArticleMarker;
+      const marker = L.marker([anchor.lat, anchor.lng], { icon }) as ArticleMarker;
       marker.isSummary = true;
       marker.isDummy = false;
       marker.summaryCount = agg.total;
@@ -1910,39 +1950,34 @@ export class RadarMapComponent implements AfterViewInit {
   /**
    * Nation detail: marker reali per categoria + dummy invisibile per forzare
    * un parent cluster anche con un solo articolo (MC richiede ≥2 child).
+   * Tutti i marker di una nazione usano l'anchor paese (non la media lat/lng pezzo).
    */
   private renderDetailMarkers(L: LeafletGlobal, articles: Article[]): void {
-    const countryCenters = new Map<string, { latSum: number; lngSum: number; count: number }>();
-
-    for (const article of articles) {
-      if (this.hasFiniteCoordinates(article.latitude, article.longitude)) {
-        const code = article.country_code || 'XX';
-        if (code === 'XX') continue;
-        const current = countryCenters.get(code) || { latSum: 0, lngSum: 0, count: 0 };
-        current.latSum += article.latitude;
-        current.lngSum += article.longitude;
-        current.count++;
-        countryCenters.set(code, current);
-      }
-    }
-
     const populatedSpots = new Set<string>();
+    const anchorByCountry = new Map<string, Leaflet.LatLng>();
 
     for (const article of articles) {
       const code = article.country_code || 'XX';
       if (code === 'XX') continue;
-      const center = countryCenters.get(code);
-      if (!center) continue;
+      if (!anchorByCountry.has(code)) {
+        const anchor = this.resolveCountryAnchorLatLng(code, articles);
+        if (!anchor) continue;
+        anchorByCountry.set(code, anchor);
+      }
+    }
 
-      const baseLat = center.latSum / center.count;
-      const baseLng = center.lngSum / center.count;
-      const realLatLng = L.latLng(baseLat, baseLng);
+    for (const article of articles) {
+      const code = article.country_code || 'XX';
+      if (code === 'XX') continue;
+      const anchor = anchorByCountry.get(code);
+      if (!anchor) continue;
 
+      const realLatLng = L.latLng(anchor.lat, anchor.lng);
       const cat = article.primary_category;
       populatedSpots.add(`${code}_${cat}`);
 
       const icon = this.createSafeMarkerIcon(L, article);
-      const marker = L.marker([baseLat, baseLng], { icon }) as ArticleMarker;
+      const marker = L.marker([anchor.lat, anchor.lng], { icon }) as ArticleMarker;
       marker.articleData = article;
       marker.realLatLng = realLatLng;
       marker.isDummy = false;
@@ -1961,9 +1996,8 @@ export class RadarMapComponent implements AfterViewInit {
 
     populatedSpots.forEach((spot) => {
       const [code, cat] = spot.split('_');
-      const center = countryCenters.get(code)!;
-      const baseLat = center.latSum / center.count;
-      const baseLng = center.lngSum / center.count;
+      const anchor = anchorByCountry.get(code);
+      if (!anchor) return;
 
       const invisibleIcon = L.divIcon({
         html: '',
@@ -1972,7 +2006,7 @@ export class RadarMapComponent implements AfterViewInit {
         iconAnchor: [0, 0],
       });
 
-      const dummyMarker = L.marker([baseLat, baseLng], {
+      const dummyMarker = L.marker([anchor.lat, anchor.lng], {
         icon: invisibleIcon,
         interactive: false,
       }) as ArticleMarker;

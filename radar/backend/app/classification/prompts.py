@@ -59,7 +59,11 @@ Segui tassativamente le seguenti regole operative per l'estrazione:
    - LINGUA OBBLIGATORIA: Tutti i campi di testo ('title', 'summary', 'tags', 'companies_involved', 'infrastructural_entities') DEVONO essere in ITALIANO.
      Se l'articolo originale è in altra lingua, traduci in italiano formale e tecnico.
    - title: normalizzato in italiano, privo di clickbait. Massimo 120 caratteri.
-   - summary: sintesi breve e fattuale (massimo due frasi complete) in italiano. Solo fatti; nessun campo reasoning separato esiste nello schema.
+   - summary: briefing esecutivo DENSO in italiano, massimo DUE frasi complete (mira 220–420 caratteri; mai oltre ~500).
+     Non fare un riassunto generico/vago: a primo impatto devono risultare chiari i fatti principali supportati dal testo
+     (attori, azione, luogo/teatro, cifre/date/nomi propri rilevanti se presenti).
+     Struttura: 1ª frase = nucleo del fatto; 2ª frase = dettaglio critico (accuse specifiche, controparte, conseguenza, asset, numeri).
+     Solo fatti verificabili; vietato padding retorico, giudizi, o più di due frasi. Nessun campo reasoning nello schema.
    - VALORI MULTIPLI O VUOTI: I campi tags, companies_involved, infrastructural_entities e related_countries sono stringhe CSV.
      Più valori separati da virgola (es. 'Google, Microsoft' o 'FR, DE'). Se assenti, scrivi esattamente 'Nessuno'.
    - published_at: esattamente ISO YYYY-MM-DD.

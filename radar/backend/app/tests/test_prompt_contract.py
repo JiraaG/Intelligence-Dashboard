@@ -51,6 +51,14 @@ def test_system_prompt_related_multilateral_star_semantics() -> None:
     )
 
 
+def test_system_prompt_dense_summary_briefing() -> None:
+    assert "briefing esecutivo DENSO" in SYSTEM_PROMPT
+    assert "220–420" in SYSTEM_PROMPT
+    assert "attori, azione, luogo/teatro" in SYSTEM_PROMPT
+    assert "1ª frase = nucleo del fatto" in SYSTEM_PROMPT
+    assert "riassunto generico/vago" in SYSTEM_PROMPT
+
+
 def test_system_prompt_no_chain_of_thought_field() -> None:
     lower = SYSTEM_PROMPT.lower()
     assert "chain-of-thought" not in lower

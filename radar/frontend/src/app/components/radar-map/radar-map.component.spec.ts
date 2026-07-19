@@ -911,4 +911,66 @@ describe('RadarMapComponent (Phase 4)', () => {
 
     expect(emitted).toEqual([]);
   });
+
+  it('anchors US hub/spider at mainland centroid even if an article has overseas coords', async () => {
+    // Repro: media Tate (-95.71) + Iran/Kuwait teatro (47.98) → Atlantico (~-24).
+    const arts = [
+      makeArticle({
+        id: 1,
+        title: 'Tate',
+        primary_category: 'Geopolitica',
+        country_code: 'US',
+        latitude: 37.09,
+        longitude: -95.71,
+      }),
+      makeArticle({
+        id: 2,
+        title: 'Iran strikes',
+        primary_category: 'Sicurezza',
+        country_code: 'US',
+        latitude: 29.37,
+        longitude: 47.98,
+      }),
+    ];
+    const countries: CountrySummary[] = [
+      { country_code: 'US', categories: ['Geopolitica', 'Sicurezza'], article_count: 2 },
+    ];
+
+    const fixture = TestBed.createComponent(MapHostComponent);
+    fixture.componentInstance.articles = arts;
+    fixture.componentInstance.countries = countries;
+    fixture.componentInstance.focusCountryCode = 'US';
+    fixture.detectChanges();
+    flushGeoJson();
+    await fixture.whenStable();
+
+    const mapCmp = getMapCmp(fixture);
+    (
+      mapCmp as unknown as {
+        updateMapData: (a: Article[], c: CountrySummary[], s?: unknown[]) => void;
+      }
+    ).updateMapData(arts, countries, []);
+
+    const hub = (
+      mapCmp as unknown as {
+        detailHubGroup: { getLayers: () => { getLatLng: () => { lat: number; lng: number } }[] };
+      }
+    ).detailHubGroup;
+    const layers = hub.getLayers();
+    expect(layers.length).toBeGreaterThanOrEqual(1);
+    const ll = layers[0].getLatLng();
+    expect(ll.lat).toBeCloseTo(37.0902, 3);
+    expect(ll.lng).toBeCloseTo(-95.7129, 3);
+
+    const energia = (
+      mapCmp as unknown as { categoryClusterGroups: Map<string, StubClusterGroup> }
+    ).categoryClusterGroups.get('Sicurezza');
+    const real = energia!
+      .getLayers()
+      .find((m) => m && typeof m === 'object' && 'articleData' in (m as object)) as {
+      getLatLng: () => { lat: number; lng: number };
+    };
+    expect(real.getLatLng().lat).toBeCloseTo(37.0902, 3);
+    expect(real.getLatLng().lng).toBeCloseTo(-95.7129, 3);
+  });
 });

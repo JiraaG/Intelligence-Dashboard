@@ -339,7 +339,10 @@ class GeopoliticalArticleSchema(BaseModel):
     )
     summary: str = Field(
         max_length=2000,
-        description="Sintesi esecutiva densa di informazioni di massimo due frasi.",
+        description=(
+            "Briefing esecutivo denso (max due frasi; tipicamente 220–420 caratteri): "
+            "fatti principali (attori, azione, luogo, cifre/nomi rilevanti), non parafrasi vaga."
+        ),
     )
     published_at: str = Field(
         description="Data di pubblicazione dell'articolo in formato ISO YYYY-MM-DD.",
