@@ -8,7 +8,7 @@ Questa directory contiene i piani di progettazione e di implementazione attualme
 
 - **Fase A — LLM locale AMD / Ollama (follow-up)** — [`plan_impl_fase_A_local_amd_ollama.md`](plan_impl_fase_A_local_amd_ollama.md)  
   Profilo F **shipped** (`54c8038`): host-Ollama + DeepSeek COMPLEX; tag ops `gemma4-radar`; no SIMPLE→DeepSeek escalate.  
-  Aperti: unload VRAM / `keep_alive`; scorecard fixture opzionale.  
+  VRAM unload/`keep_alive` **shipped**. Aperto opz.: scorecard fixture.  
   Blueprint: `radar_overview_and_upgrades.md` §3.A. Prompt storico: [`../prompts/done/plan_prompt_fase_A_local_amd_ollama.md`](../prompts/done/plan_prompt_fase_A_local_amd_ollama.md).
 
 **Completati di recente (riferimento)**

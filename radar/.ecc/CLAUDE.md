@@ -31,7 +31,7 @@ in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categ
 | Layer       | Tecnologia                              | Note                                       |
 |-------------|------------------------------------------|---------------------------------------------|
 | Backend     | Python 3.12-slim (Docker) / 3.14 (locale) | Demone asincrono; poll `WORKER_POLL_INTERVAL_SECONDS` (default 900) |
-| LLM         | google-genai (Gemini) + httpx OpenAI-compat (`deepseek`/`openai`/`glm`/`grok`; no package `openai`) | Lane env: `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (limiti per-lane; `0`=unmanaged). Soft-trim = `LLM_SIMPLE.rpd` se >0 (bypass ibernazione se residual COMPLEX). RPM/TPM=attesa stessa lane; RPD/cooldown=`QuotaDailyExceeded`→cross-lane. Free=RPM/RPD(+TPM); paid=budget. Caps Flash Lite tipici: RPM≤12/TPM=250K/RPD=500. Dialect: deepseek=`thinking`; openai/glm/grok=stock. Complexity **v2.2**. Ops: Profili **A–F** in `.env.example` (F = Local-Hybrid Ollama host via `PROVIDER=openai` + `BASE_URL`; **vietato** `ollama.chat` / package `ollama`). Non hardcodare segreti. |
+| LLM         | google-genai (Gemini) + httpx OpenAI-compat (`deepseek`/`openai`/`glm`/`grok`; no package `openai`) | Lane env: `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (limiti per-lane; `0`=unmanaged). Soft-trim = `LLM_SIMPLE.rpd` se >0 (bypass ibernazione se residual COMPLEX). RPM/TPM=attesa stessa lane; RPD/cooldown=`QuotaDailyExceeded`→cross-lane. Free=RPM/RPD(+TPM); paid=budget. Caps Flash Lite tipici: RPM≤12/TPM=250K/RPD=500. Dialect: deepseek=`thinking`; openai/glm/grok=stock. Complexity **v2.2**. Ops: Profili **A–F** in `.env.example` (F = Local-Hybrid Ollama host via `PROVIDER=openai` + `BASE_URL`; VRAM unload `ollama_lifecycle`/`OLLAMA_*`; **vietato** `ollama.chat` / package `ollama`). Non hardcodare segreti. |
 | Database    | PostgreSQL 15                            | Tabelle articles, companies, tags + sentiment, relevance + indici |
 | Feed Source | Miniflux REST API                       | Articoli non letti, deduplica per URL       |
 | Frontend    | Angular 21 (Standalone Components)      | Signals, lazy loading                       |
@@ -91,6 +91,7 @@ radar/
 │       │   ├── client.py          # ClassificationClient — lanes, cascade, dialect; claude=stub
 │       │   ├── deepseek.py        # OpenAICompatClient (alias storico DeepSeekClient) httpx
 │       │   ├── openai_compat_payload.py  # dialect + think Ollama (uses_ollama_think_protocol)
+│       │   ├── ollama_lifecycle.py       # VRAM unload keep_alive=0 (Profilo F)
 │       │   ├── openai_compat_response.py # extract_assistant_json_text / strip think wrappers
 │       │   ├── complexity.py      # Heuristic v2.2 → lane SIMPLE/BORDERLINE/COMPLEX
 │       │   ├── cooldown.py        # llm_model_cooldown durable (migrazione 009)
@@ -116,7 +117,7 @@ radar/
 │   ├── proxy.conf.json            # Proxy dev → localhost:8000 (ng serve)
 │   ├── Dockerfile
 │   └── nginx.conf
-├── ops/                           # backup/restore Postgres + README
+├── ops/                           # backup/restore + verify-ollama-vram.sh + README
 ├── docker-compose.yml             # + hardened.yml / lan.yml / ollama-host.yml (Profilo F)
 ├── .env                           # NON committare — valori reali
 ├── .env.example                   # Template documentativo (Profili A–F; committato in Git)

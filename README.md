@@ -21,7 +21,7 @@ docker compose up --build -d
 ```
 
 Apri **http://localhost/**. Knobs LLM / Profili A–F: [`radar/.env.example`](radar/.env.example) + SoT [`sot_llm_multi_model_fallback.md`](plan-audit/complete/sot_llm_multi_model_fallback.md).  
-**Profilo F (Local-Hybrid):** Ollama host + overlay [`radar/docker-compose.ollama-host.yml`](radar/docker-compose.ollama-host.yml) — runbook [`radar/docs/runbook.md`](radar/docs/runbook.md) § Local-Hybrid.  
+**Profilo F (Local-Hybrid):** Ollama host + overlay [`radar/docker-compose.ollama-host.yml`](radar/docker-compose.ollama-host.yml) — runbook [`radar/docs/runbook.md`](radar/docs/runbook.md) § Local-Hybrid (VRAM: unload a idle via `OLLAMA_*` / `ops/verify-ollama-vram.sh`).  
 **Limiti lane:** RPM/TPM pieni → attesa stessa lane; RPD/cooldown → residual cross-lane (es. Flash Lite → DeepSeek). Dettaglio: SoT §0 + skill `radar-quota-ledger`.
 
 **Routing LLM:** `.env.example` ops tipico = **Profilo B** + `LLM_ROUTING_MODE=complexity`. Default codice boot-safe (senza env) = `LLM_ROUTING_MODE=off` + `LLM_ROUTING_SHADOW=true` — non confondere i due. Local-Hybrid = **Profilo F** (SIMPLE Ollama / COMPLEX cloud).

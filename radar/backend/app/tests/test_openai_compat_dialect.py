@@ -119,6 +119,35 @@ def test_openai_dialect_ollama_reasoner_enables_think_always() -> None:
         assert "response_format" not in payload
         assert payload.get("options", {}).get("num_predict") == 8192
         assert payload.get("options", {}).get("num_ctx") == 8192
+        assert payload.get("keep_alive") == "5m"
+
+
+def test_ollama_think_payload_keep_alive_override() -> None:
+    payload = build_chat_completions_payload(
+        model="gemma4-radar",
+        system="sys",
+        user="user",
+        effort="high",
+        api_dialect="openai",
+        keep_alive="10m",
+    )
+    assert payload["keep_alive"] == "10m"
+    assert payload["think"] is True
+
+
+def test_non_ollama_payload_omits_keep_alive() -> None:
+    for model, dialect in (
+        ("deepseek-v4-flash", "deepseek"),
+        ("gpt-4.1-mini", "openai"),
+    ):
+        payload = build_chat_completions_payload(
+            model=model,
+            system="sys",
+            user="user",
+            effort="high",
+            api_dialect=dialect,
+        )
+        assert "keep_alive" not in payload
 
 
 def test_extract_assistant_json_prefers_content_falls_back_reasoning() -> None:

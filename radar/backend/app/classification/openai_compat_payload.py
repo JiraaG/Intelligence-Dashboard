@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from app.core.config import OLLAMA_KEEP_ALIVE_BUSY
 from app.core.llm_lanes import API_DIALECT_DEEPSEEK, API_DIALECT_OPENAI
 
 logger = logging.getLogger("radar.classification.openai_compat_payload")
@@ -57,6 +58,7 @@ def build_chat_completions_payload(
     user: str,
     effort: str,
     api_dialect: str,
+    keep_alive: str | int | None = None,
 ) -> dict[str, Any]:
     """Costruisce il JSON POST ``/chat/completions`` per il dialect richiesto.
 
@@ -64,7 +66,8 @@ def build_chat_completions_payload(
     - Dialect ``deepseek``: campi ``thinking`` + ``reasoning_effort``.
     - Dialect ``openai`` stock: nessun campo DeepSeek-only.
     - Modelli ``uses_ollama_think_protocol``: ``think=true`` sempre + budget
-      ``options.num_predict/num_ctx`` (Profilo F / reasoner locali).
+      ``options.num_predict/num_ctx`` (Profilo F / reasoner locali) +
+      top-level ``keep_alive`` busy (best-effort su ``/v1``; unload idle via API nativa).
 
     SoT:
         SoT LLM §5; llm-json-extraction; plan Fase A Ollama.
@@ -109,6 +112,11 @@ def build_chat_completions_payload(
             "num_ctx": OLLAMA_THINK_NUM_CTX,
             "temperature": 0.1,
         }
+        # Best-effort: alcune build Ollama ignorano keep_alive su /v1.
+        # Unload idle resta su POST /api/generate keep_alive=0 (ollama_lifecycle).
+        payload["keep_alive"] = (
+            keep_alive if keep_alive is not None else OLLAMA_KEEP_ALIVE_BUSY
+        )
     elif effort != "none":
         logger.debug(
             "openai dialect ignores thinking fields (effort=%s model=%s)",

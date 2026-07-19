@@ -2,7 +2,7 @@
 
 **Progetto:** Radar Informativo Globale (Intelligence Dashboard)  
 **Documento:** `plan-audit/active/plan_impl_fase_A_local_amd_ollama.md`  
-**Stato:** ACTIVE (follow-up) — **Profilo F core shipped** (`54c8038`, 2026-07-19); residui = gate qualità formale + **VRAM unload/`keep_alive`**  
+**Stato:** ACTIVE (follow-up) — **Profilo F core + VRAM unload shipped**; residuo opz. = gate qualità / scorecard fixture formale  
 **Data:** 2026-07-19  
 **Prompt origine:** [`../prompts/done/plan_prompt_fase_A_local_amd_ollama.md`](../prompts/done/plan_prompt_fase_A_local_amd_ollama.md)  
 **Blueprint:** [`../../radar_overview_and_upgrades.md`](../../radar_overview_and_upgrades.md) §3.A  
@@ -22,7 +22,7 @@
 | Qualità | `normalize_llm_json_dict` (CSV list, alias EN, protagonista US–Iran, coerenza categoria/tag/aziende/relevance) |
 | Concurrency tip | `WORKER_ENTRY/DB/GEMINI_CONCURRENCY=1`; host `OLLAMA_NUM_PARALLEL=1` |
 | Timeout tip | `LLM_SIMPLE_TIMEOUT=180` (o `600` se VRAM lenta) |
-| Aperto | Unload VRAM a fine ciclo (`keep_alive=0`) — non ancora implementato |
+| VRAM | Unload fine-ciclo via `/api/generate` `keep_alive=0` + `OLLAMA_*` env — **shipped** |
 
 ---
 
@@ -39,7 +39,7 @@ flowchart TB
   W1[W1 host bridge + Profilo F] --> W2[W2 qualità fixture]
   W2 --> W3[W3 docs ECC plan-audit]
   W3 --> W4[W4 pytest + purge-all 48h]
-  W4 --> Gate[Gate go / unload VRAM]
+  W4 --> Gate[Gate go / scorecard opz]
 ```
 
 ### Wave checklist
@@ -50,7 +50,7 @@ flowchart TB
 | W2 | Qualità locale (normalize + no-escalate + think JSON) + residual Ollama-down | **done** (code); scorecard 9/10 fixture **opzionale** |
 | W3 | Docs / SoT / STATUS / skills + ECC sync | **done** (refresh docs 2026-07-19 post-ship) |
 | W4 | pytest + up ordinato + requeue `--purge-all` 48h | **done** |
-| Follow-up | `keep_alive` busy + unload VRAM fine-ciclo | **pending** |
+| Follow-up | `keep_alive` busy + unload VRAM fine-ciclo | **done** |
 
 ---
 
@@ -62,10 +62,10 @@ flowchart TB
 - Host: Ollama + `gemma4-radar` GPU; overlay Compose.
 - Ops requeue: skill `radar-requeue-ops`, runbook, mirror ECC.
 
-**Manca (follow-up)**
+**Manca (follow-up opzionale)**
 
-- Lifecycle VRAM: modello caricato solo durante classify SIMPLE; unload a idle.
 - Scorecard fixture formale 9/10 (opzionale, non bloccante ops).
+- Lifecycle VRAM / `keep_alive` unload: **shipped** (`ollama_lifecycle.py` + worker debounce + `ops/verify-ollama-vram.sh`).
 
 ---
 
@@ -254,28 +254,31 @@ docker compose exec -T radar-db psql -U radar_user -d radar_db -c \
 
 **Runtime / env**
 
-- `radar/docker-compose.ollama-host.yml` (nuovo)
-- `radar/.env` (locale ops, non commit) Profilo F
-- `radar/.env.example` Profilo F commentato
+- `radar/docker-compose.ollama-host.yml`
+- `radar/.env` (locale ops, non commit) Profilo F + `OLLAMA_*`
+- `radar/.env.example` Profilo F + knobs VRAM commentati
+- `radar/backend/app/classification/ollama_lifecycle.py` — unload nativo
+- `radar/backend/app/classification/openai_compat_payload.py` — `keep_alive` busy
+- `radar/backend/app/worker.py` — debounce unload fine-ciclo + shutdown
 
 **Docs / audit**
 
 - `radar_overview_and_upgrades.md` §3.A
-- `radar/docs/runbook.md`, `radar/ops/README.md`, README hub / `01`/`02` se applicabile
-- `plan-audit/complete/sot_llm_multi_model_fallback.md`
-- `plan-audit/STATUS.md` + move prompt Fase A `active` → `done` a gate
-- Opzionale: breve note in `plan-audit/complete/` o remediation post-gate
+- `radar/docs/runbook.md`, `radar/ops/README.md`, README hub / `docs/01`/`02`
+- `plan-audit/complete/sot_llm_multi_model_fallback.md` Profilo F + VRAM
+- `plan-audit/STATUS.md` (VRAM shipped; residuo scorecard opz.)
 
 **ECC**
 
 - SoT skills: `llm-json-extraction`, `radar-docker-ops`, `radar-requeue-ops`
-- Mirror via `sync_skills.py --write`
-- `radar/.ecc/CLAUDE.md` (+ `rules/docker.md` se serve nota host-gateway)
+- Mirror via `sync_skills.py --write` / `--check`
+- `radar/.ecc/CLAUDE.md` (tree `ollama_lifecycle.py`) + `rules/docker.md`
 
-**Test / ops (nessuno script ad-hoc nuovo se lo ufficiale basta)**
+**Test / ops**
 
-- Riuso `app.scripts.requeue_articles`
-- pytest esistenti (`test_openai_compat_dialect.py`, suite `not live`)
+- Riuso `app.scripts.requeue_articles` (gate 48h)
+- `radar/ops/verify-ollama-vram.sh` (checklist VRAM / log)
+- pytest: `test_openai_compat_dialect.py`, `test_ollama_lifecycle.py`, hook in `test_worker_shutdown.py`
 
 ---
 

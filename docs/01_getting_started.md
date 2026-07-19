@@ -10,7 +10,7 @@ Guida per portare su **Radar Informativo Globale** con Docker. Fonte knobs: [`ra
 - RAM consigliata ≥ 4 GB
 - Porte host (compose base): **80** (frontend). Backend, DB e Miniflux restano interni.
 - Accesso rete a: feed RSS, API LLM (Gemini e/o OpenAI-compat: DeepSeek / OpenAI / GLM / Grok), tile Carto
-- Ops tipico LLM: **Profilo B** in [`radar/.env.example`](../radar/.env.example) (DeepSeek-only) con `LLM_ROUTING_MODE=complexity` e `LLM_ROUTING_SHADOW=false`. **Profilo F (Local-Hybrid):** Ollama host + overlay `docker-compose.ollama-host.yml` — vedi [runbook § Local-Hybrid](../radar/docs/runbook.md). Default codice boot-safe **senza** `.env`: `LLM_ROUTING_MODE=off` + `LLM_ROUTING_SHADOW=true` — copiare `.env.example` attiva già il profilo ops, non il default codice.
+- Ops tipico LLM: **Profilo B** in [`radar/.env.example`](../radar/.env.example) (DeepSeek-only) con `LLM_ROUTING_MODE=complexity` e `LLM_ROUTING_SHADOW=false`. **Profilo F (Local-Hybrid):** Ollama host + overlay `docker-compose.ollama-host.yml` — vedi [runbook § Local-Hybrid](../radar/docs/runbook.md) (include lifecycle VRAM / `OLLAMA_*` + `ops/verify-ollama-vram.sh`). Default codice boot-safe **senza** `.env`: `LLM_ROUTING_MODE=off` + `LLM_ROUTING_SHADOW=true` — copiare `.env.example` attiva già il profilo ops, non il default codice.
 
 Miniflux UI su host solo con overlay:
 

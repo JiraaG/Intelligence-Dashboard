@@ -84,6 +84,7 @@ Alt Gemma 4 31B: `gemma-4-31b-it` RPM=30 TPM=16000 RPD=14400 (contesto stretto; 
 |------------|------|--------------------|
 | Config modello | `core/config.py` | **TO-BE fatto:** Gemini + DeepSeek + routing + `LLM_SIMPLE_*` / `LLM_COMPLEX_*` |
 | Client | `classification/client.py` | Lane chain + escalate; `content[:4000]`; `_MAX_ATTEMPTS=4`; QuotaLedger; fallback |
+| Ollama VRAM | `classification/ollama_lifecycle.py` | Unload nativo `keep_alive=0`; gate `OLLAMA_AUTO_UNLOAD` + think-protocol; debounce worker |
 | Parser | `extraction/parser.py` | Score complessità **dopo** `strip_html_tags` |
 | Schema | `validator.py` | `GeopoliticalArticleSchema` strict — **immutabile** |
 | Worker | `worker.py` | sanitize → classify → commit/outbox; soft-trim RPD |
@@ -424,7 +425,7 @@ Commentato in `.env.example`. Scenario 2 / Fase A: lane SIMPLE verso Ollama sull
 - **Escalate:** SIMPLE Ollama **non** scala a DeepSeek su ValidationError; solo correction locale. COMPLEX/BORDERLINE restano DeepSeek; residual cloud se Ollama down.
 - Pre-validate: `normalize_llm_json_dict` (liste→CSV, alias categoria/sentiment, protagonista paese, coerenza tag/aziende/relevance).
 - Host Ollama: preferire **`OLLAMA_NUM_PARALLEL=1`**; worker `WORKER_*_CONCURRENCY=1` consigliato su 12 GB VRAM.
-- **Future:** unload VRAM / `keep_alive=0` a fine ciclo idle (non ancora in codice).
+- **VRAM lifecycle:** `OLLAMA_AUTO_UNLOAD` + `keep_alive` busy su `/v1` (best-effort); unload idle via `POST /api/generate` `keep_alive=0` (`classification/ollama_lifecycle.py`); debounce `OLLAMA_UNLOAD_DEBOUNCE_SECONDS`; ops `ops/verify-ollama-vram.sh`.
 
 ```text
 # F — Local-Hybrid (prereq: Ollama host + overlay ollama-host)
@@ -437,6 +438,10 @@ LLM_SIMPLE_TPM=0
 LLM_SIMPLE_RPD=0
 LLM_SIMPLE_TIMEOUT=180
 LLM_SIMPLE_REASONING_EFFORT=high
+# OLLAMA_AUTO_UNLOAD=true
+# OLLAMA_KEEP_ALIVE_BUSY=5m
+# OLLAMA_KEEP_ALIVE_IDLE=0
+# OLLAMA_UNLOAD_DEBOUNCE_SECONDS=60
 LLM_COMPLEX_PROVIDER=deepseek
 LLM_COMPLEX_MODEL=deepseek-v4-flash
 LLM_COMPLEX_REASONING_EFFORT=high
@@ -644,7 +649,7 @@ for ref in filter_cooldown(chain):
 - Default codice: `LLM_ROUTING_SHADOW=true` / `MODE=off` finché mix calibrato; ops live può forzare `SHADOW=false`.  
 - Swap COMPLEX→Google: solo `LLM_COMPLEX_PROVIDER=gemini` + `LLM_COMPLEX_MODEL=…`.  
 - Swap OpenAI/GLM/Grok: `PROVIDER` + `MODEL` + `API_KEY` + `BASE_URL` + budget; ricette Profili C/D/E in `.env.example`.  
-- Local-Hybrid (Profilo F): `PROVIDER=openai` + Ollama `BASE_URL=…/v1` + overlay `docker-compose.ollama-host.yml`; **vietato** `ollama.chat` / package `ollama`.  
+- Local-Hybrid (Profilo F): `PROVIDER=openai` + Ollama `BASE_URL=…/v1` + overlay `docker-compose.ollama-host.yml`; VRAM unload (`ollama_lifecycle` / `OLLAMA_*` / `ops/verify-ollama-vram.sh`); **vietato** `ollama.chat` / package `ollama`.  
 - `claude` nativo = fuori scope; usare gateway OpenAI-compat se serve.
 
 ---

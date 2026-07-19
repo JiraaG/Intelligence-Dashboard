@@ -152,11 +152,27 @@ docker compose -f docker-compose.yml -f docker-compose.ollama-host.yml up -d rad
 - Host: **`OLLAMA_NUM_PARALLEL=1`**; worker tipico `WORKER_ENTRY_CONCURRENCY=1`, `WORKER_DB_CONCURRENCY=1`, `WORKER_GEMINI_CONCURRENCY=1`.
 - `LLM_SIMPLE_TIMEOUT`: `180` default esempio; `600` se load/think lenti.
 - Non pubblicare host `:11434` su LAN di default; non combinare con un container ROCm Ollama sulla stessa GPU.
-- **Future (non ancora in codice):** unload VRAM / `keep_alive=0` a fine ciclo idle — liberare GPU quando non ci sono articoli SIMPLE.
+- **VRAM lifecycle (shipped):** durante classify SIMPLE il modello resta caldo (`keep_alive` busy sulle request `/v1`, best-effort). A fine ciclo worker + debounce (`OLLAMA_UNLOAD_DEBOUNCE_SECONDS`, default 60) il worker chiama unload nativo `POST /api/generate` con `keep_alive=0` (log `ollama_unload`). Gate: `OLLAMA_AUTO_UNLOAD=true` + modello SIMPLE think-protocol. Wake NOTIFY durante debounce → skip unload. Shutdown worker → unload best-effort.
+- Env tipici (`.env.example`): `OLLAMA_AUTO_UNLOAD`, `OLLAMA_KEEP_ALIVE_BUSY=5m`, `OLLAMA_KEEP_ALIVE_IDLE=0`, `OLLAMA_UNLOAD_DEBOUNCE_SECONDS=60`.
+- Checklist: [`ops/verify-ollama-vram.sh`](../ops/verify-ollama-vram.sh) — `ollama ps` + log `ollama_unload` / route / health.
+
+**Verifica VRAM (ops)**
+
+```bash
+cd radar
+ollama ps                                          # idle: vuoto / senza gemma
+# … ciclo con unread SIMPLE …
+ollama ps                                          # durante classify: gemma4-radar in GPU
+# … fine ciclo + debounce …
+ollama ps                                          # idle di nuovo
+docker compose -f docker-compose.yml -f docker-compose.ollama-host.yml \
+  logs --since=15m radar-worker | grep ollama_unload
+./ops/verify-ollama-vram.sh
+```
 
 **Verifica / gate 48h**
 
-Dopo smoke, re-ingest nella finestra worker ≈ 48h con lo script ufficiale (dry-run prima): sezione **Requeue articoli** sopra (`requeue_articles` / `--purge-all` + `restart radar-worker`). Log attesi: `route lane=SIMPLE … openai / gemma4-radar` e COMPLEX/BORDERLINE DeepSeek; `ollama ps` durante classify mostra il modello in GPU.
+Dopo smoke, re-ingest nella finestra worker ≈ 48h con lo script ufficiale (dry-run prima): sezione **Requeue articoli** sopra (`requeue_articles` / `--purge-all` + `restart radar-worker`). Log attesi: `route lane=SIMPLE … openai / gemma4-radar` e COMPLEX/BORDERLINE DeepSeek; `ollama ps` durante classify mostra il modello in GPU; dopo idle+debounce `ollama_unload` e VRAM libera.
 
 **Rollback → Profilo B**
 

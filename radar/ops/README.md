@@ -17,6 +17,15 @@ LLM knobs / Profili A–F: [`.env.example`](../.env.example) + SoT [`sot_llm_mul
 
 Requeue / incident: [`docs/runbook.md`](../docs/runbook.md) (`python -m app.scripts.requeue_articles`; `--purge-all` = wipe vault + all articles).
 
+### VRAM checklist (Profilo F)
+
+```bash
+cd radar
+./ops/verify-ollama-vram.sh
+```
+
+Snapshot `ollama ps` + grep log worker (`ollama_unload`, route lane, errori). Dettaglio env unload: runbook § Local-Hybrid / `.env.example` (`OLLAMA_AUTO_UNLOAD`, `OLLAMA_KEEP_ALIVE_*`, debounce).
+
 Few articles on the map? Check Miniflux feed count first (catalog: [`RSS.txt`](../../RSS.txt)) — ingest volume tracks subscribed feeds, not FE filters.
 
 Remote / internet exposure: put a TLS reverse proxy with auth and ACLs in front — do not publish `:80` raw to the public internet.

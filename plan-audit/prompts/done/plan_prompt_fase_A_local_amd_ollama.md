@@ -1,9 +1,9 @@
 # Plan prompt — Fase A: LLM locale AMD (ROCm/Ollama) + lane SIMPLE/COMPLEX
 
-> **Stato: COMPLETE (analisi 2026-07-19; impl Profilo F shipped `54c8038`)** — prompt storico.  
-> **Uso:** non rieseguire come ACTIVE; rieseguire solo per delta (es. VRAM `keep_alive` unload).  
-> **Shipped:** host-Ollama Profilo F; tag ops `gemma4-radar` (FROM `gemma4:12b`, `num_ctx=8192`); `think=true`; **no SIMPLE→DeepSeek escalate**; `normalize_llm_json_dict`; overlay `docker-compose.ollama-host.yml`.  
-> **Piano vivo:** [`../../active/plan_impl_fase_A_local_amd_ollama.md`](../../active/plan_impl_fase_A_local_amd_ollama.md) (gate qualità / unload VRAM).  
+> **Stato: COMPLETE (analisi 2026-07-19; impl Profilo F `54c8038` + VRAM unload shipped)** — prompt storico.  
+> **Uso:** non rieseguire come ACTIVE; delta residuo opz. = scorecard fixture qualità.  
+> **Shipped:** host-Ollama Profilo F; tag ops `gemma4-radar` (FROM `gemma4:12b`, `num_ctx=8192`); `think=true`; **no SIMPLE→DeepSeek escalate**; `normalize_llm_json_dict`; overlay `docker-compose.ollama-host.yml`; **VRAM** `ollama_lifecycle` + `OLLAMA_*` + `ops/verify-ollama-vram.sh`.  
+> **Piano vivo:** [`../../active/plan_impl_fase_A_local_amd_ollama.md`](../../active/plan_impl_fase_A_local_amd_ollama.md) (residuo opz. scorecard).  
 > **Blueprint:** [`radar_overview_and_upgrades.md`](../../../radar_overview_and_upgrades.md) §3.A.  
 > **Nota roadmap:** Fase B/H DONE; Fase C BACKLOG. Restore code: `54c8038` (Profilo F); map anchors `a240b3c`.  
 > **Contesto host empirico (2026-07-18/19):** GPU AMD Navi 22 (RX 6700/6750 XT class), ROCm rock 6.10.5 caricato, `/dev/kfd`+`/dev/dri` presenti, host Ollama `0.30.7` con modelli già pullati (`gemma4:12b`, `gemma4:26b`, `qwen3:14b`, `qwen2.5:14b`, …). RAM ~30 GiB.  

@@ -17,6 +17,7 @@ import pytest
 from app.extraction.entry_validation import ValidatedMinifluxEntry
 from app.worker import (
     WorkerState,
+    maybe_unload_ollama_after_cycle,
     run_pipeline_cycle,
     run_pipeline_loop,
     shutdown_worker_resources,
@@ -70,6 +71,7 @@ async def test_cancel_during_poll_wait_completes_quickly() -> None:
         patch("app.worker.run_pipeline_cycle", new_callable=AsyncMock),
         patch("app.worker.WORKER_POLL_INTERVAL_SECONDS", 900),
         patch("app.worker._wait_interval", side_effect=fake_wait_interval),
+        patch("app.worker.maybe_unload_ollama_after_cycle", new_callable=AsyncMock),
     ):
         task = asyncio.create_task(run_pipeline_loop(state))
         await asyncio.wait_for(poll_entered.wait(), timeout=2.0)
@@ -94,6 +96,7 @@ async def test_cancel_while_processing_completes_quickly() -> None:
     with (
         patch("app.worker.run_pipeline_cycle", side_effect=blocking_cycle),
         patch("app.worker.WORKER_POLL_INTERVAL_SECONDS", 3600),
+        patch("app.worker.maybe_unload_ollama_after_cycle", new_callable=AsyncMock),
     ):
         task = asyncio.create_task(run_pipeline_loop(state))
         await asyncio.wait_for(processing.wait(), timeout=2.0)
@@ -127,6 +130,7 @@ async def test_cancel_when_idle_between_cycles() -> None:
         patch("app.worker.run_pipeline_cycle", side_effect=empty_cycle),
         patch("app.worker.WORKER_POLL_INTERVAL_SECONDS", 60),
         patch("app.worker._wait_interval", side_effect=fake_wait_interval),
+        patch("app.worker.maybe_unload_ollama_after_cycle", new_callable=AsyncMock),
     ):
         task = asyncio.create_task(run_pipeline_loop(state))
         await asyncio.wait_for(poll_entered.wait(), timeout=2.0)
@@ -148,10 +152,76 @@ async def test_cancelled_error_not_swallowed_by_cycle_handler() -> None:
     with (
         patch("app.worker.run_pipeline_cycle", side_effect=cancel_cycle),
         patch("app.worker.WORKER_POLL_INTERVAL_SECONDS", 60),
+        patch("app.worker.maybe_unload_ollama_after_cycle", new_callable=AsyncMock),
     ):
         task = asyncio.create_task(run_pipeline_loop(state))
         with pytest.raises(asyncio.CancelledError):
             await asyncio.wait_for(task, timeout=2.0)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_pipeline_loop_calls_unload_after_cycle() -> None:
+    """Dopo ogni ciclo (ok) chiama maybe_unload_ollama_after_cycle prima del poll."""
+    state = _make_state()
+    unload = AsyncMock()
+    poll_entered = asyncio.Event()
+
+    async def fake_wait_interval(_state: Any, _interval: float) -> None:
+        poll_entered.set()
+        await asyncio.Event().wait()
+
+    with (
+        patch("app.worker.run_pipeline_cycle", new_callable=AsyncMock),
+        patch("app.worker.WORKER_POLL_INTERVAL_SECONDS", 60),
+        patch("app.worker._wait_interval", side_effect=fake_wait_interval),
+        patch("app.worker.maybe_unload_ollama_after_cycle", unload),
+    ):
+        task = asyncio.create_task(run_pipeline_loop(state))
+        await asyncio.wait_for(poll_entered.wait(), timeout=2.0)
+        unload.assert_awaited()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(task, timeout=2.0)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_maybe_unload_after_cycle_skips_on_wake() -> None:
+    state = _make_state()
+    state.wake_event.set()
+    with (
+        patch("app.worker.should_manage_ollama_vram", return_value=True),
+        patch("app.worker.OLLAMA_UNLOAD_DEBOUNCE_SECONDS", 30),
+        patch("app.worker.maybe_unload_simple_ollama", new_callable=AsyncMock) as unload,
+    ):
+        await maybe_unload_ollama_after_cycle(state)
+        unload.assert_not_awaited()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_maybe_unload_after_cycle_unloads_after_debounce() -> None:
+    state = _make_state()
+    with (
+        patch("app.worker.should_manage_ollama_vram", return_value=True),
+        patch("app.worker.OLLAMA_UNLOAD_DEBOUNCE_SECONDS", 0),
+        patch("app.worker.maybe_unload_simple_ollama", new_callable=AsyncMock) as unload,
+    ):
+        await maybe_unload_ollama_after_cycle(state)
+        unload.assert_awaited_once_with(reason="end_of_cycle")
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_maybe_unload_after_cycle_noop_when_not_profilo_f() -> None:
+    state = _make_state()
+    with (
+        patch("app.worker.should_manage_ollama_vram", return_value=False),
+        patch("app.worker.maybe_unload_simple_ollama", new_callable=AsyncMock) as unload,
+    ):
+        await maybe_unload_ollama_after_cycle(state)
+        unload.assert_not_awaited()
 
 
 @pytest.mark.unit
@@ -177,12 +247,20 @@ async def test_shutdown_worker_resources_cancels_consumers_bounded() -> None:
     db_pool = state.db_pool
     lock_conn = state.lock_conn
 
-    started = time.monotonic()
-    await asyncio.wait_for(
-        shutdown_worker_resources(state, shutdown_timeout=1.0, lock_key=42),
-        timeout=3.0,
-    )
-    assert time.monotonic() - started < 3.0
+    with (
+        patch("app.worker.WORKER_SHUTDOWN_TIMEOUT", 1),
+        patch("app.worker.release_advisory_lock", new_callable=AsyncMock, return_value=True),
+        patch("app.worker.stop_postgres_trigger_listener", new_callable=AsyncMock),
+        patch("app.worker.maybe_unload_simple_ollama", new_callable=AsyncMock) as unload,
+    ):
+        started = time.monotonic()
+        await asyncio.wait_for(
+            shutdown_worker_resources(state, shutdown_timeout=1.0, lock_key=42),
+            timeout=3.0,
+        )
+        assert time.monotonic() - started < 3.0
+
+    unload.assert_awaited_once_with(reason="shutdown")
     assert state.consumer_tasks == []
     http_client.aclose.assert_awaited()
     db_pool.close.assert_awaited()

@@ -365,6 +365,20 @@ WORKER_HEARTBEAT_STALE_SECONDS = _env_int(
     max_value=600,
 )
 
+# ── Ollama VRAM lifecycle (Profilo F / reasoner locali) ───────────────────────
+# Attivi solo se SIMPLE usa protocollo think Ollama (gate in ollama_lifecycle).
+# Unload autoritativo via API nativa /api/generate keep_alive=0 (non /v1).
+OLLAMA_AUTO_UNLOAD = _env_bool("OLLAMA_AUTO_UNLOAD", True)
+OLLAMA_KEEP_ALIVE_BUSY = _env_str("OLLAMA_KEEP_ALIVE_BUSY", "5m") or "5m"
+# Idle unload: tipicamente 0 (libera VRAM subito). Accetta int o stringa Ollama.
+OLLAMA_KEEP_ALIVE_IDLE = _env_str("OLLAMA_KEEP_ALIVE_IDLE", "0") or "0"
+OLLAMA_UNLOAD_DEBOUNCE_SECONDS = _env_int(
+    "OLLAMA_UNLOAD_DEBOUNCE_SECONDS",
+    60,
+    min_value=0,
+    max_value=300,
+)
+
 # CSV allowlist per origini browser→API dirette. Vuoto = nessun middleware CORS
 # (Nginx same-origin). Mai "*". SoT: AGENTS §4.11.
 _raw_cors = _env_str("CORS_ALLOW_ORIGINS", "") or ""

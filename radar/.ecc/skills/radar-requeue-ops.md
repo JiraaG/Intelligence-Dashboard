@@ -38,7 +38,7 @@ Devi far riprocessare gli ultimi N entry Miniflux già *read* (dopo fix prompt/s
    ```
 4. Verifica log worker: route lane SIMPLE/COMPLEX e assenza di errori vault/Miniflux.
 
-- Requeue 48h / `--purge-all` dopo Profilo F: dry-run → write → `restart radar-worker` (skill `radar-requeue-ops`); host `OLLAMA_NUM_PARALLEL=1` consigliato.
+- Requeue 48h / `--purge-all` dopo Profilo F: dry-run → write → `restart radar-worker` (skill `radar-requeue-ops`); host `OLLAMA_NUM_PARALLEL=1` consigliato. Post-ciclo: verificare `ollama_unload` / `ops/verify-ollama-vram.sh`.
 
 ## Cosa fa lo script (non reinventare)
 

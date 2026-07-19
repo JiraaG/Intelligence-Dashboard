@@ -22,12 +22,16 @@ import logging
 import signal
 import struct
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 import asyncpg
 import httpx
 
 from app.classification.client import ClassificationClient
+from app.classification.ollama_lifecycle import (
+    maybe_unload_simple_ollama,
+    should_manage_ollama_vram,
+)
 from app.classification.quota import compute_day_window
 from app.commit.db_commit import commit_article_to_db
 from app.commit.factory import generate_markdown_content
@@ -46,6 +50,7 @@ from app.core.config import (
     MINIFLUX_LIMIT,
     MINIFLUX_READ_TIMEOUT,
     OBSIDIAN_VAULT_PATH,
+    OLLAMA_UNLOAD_DEBOUNCE_SECONDS,
     RADAR_TIME_ZONE,
     WORKER_ADVISORY_LOCK_BACKOFF_SECONDS,
     WORKER_ADVISORY_LOCK_KEY,
@@ -191,6 +196,12 @@ async def shutdown_worker_resources(
                 shutdown_timeout,
             )
         state.consumer_tasks = []
+
+    # Profilo F: best-effort unload VRAM (no debounce) prima di chiudere httpx.
+    try:
+        await maybe_unload_simple_ollama(reason="shutdown")
+    except Exception as unload_err:
+        logger.warning("ollama_unload shutdown failed: %s", unload_err)
 
     if state.http_client is not None:
         await state.http_client.aclose()
@@ -680,6 +691,31 @@ async def _wait_interval(state: WorkerState, interval: float) -> None:
         logger.info("Timeout poll di sicurezza: avvio ciclo periodico.")
 
 
+async def maybe_unload_ollama_after_cycle(state: WorkerState) -> None:
+    """Dopo un ciclo: debounce breve, poi unload VRAM se nessun wake (Profilo F).
+
+    Se ``wake_event`` scatta durante il debounce, salta l'unload per tenere il
+    modello caldo sul ciclo successivo. Non-F / auto-unload off → no-op.
+    """
+    if not should_manage_ollama_vram():
+        return
+    debounce = float(OLLAMA_UNLOAD_DEBOUNCE_SECONDS)
+    if debounce > 0:
+        logger.info(
+            "ollama_unload debounce %ss (skip se wake NOTIFY)...",
+            int(debounce),
+        )
+        try:
+            await asyncio.wait_for(state.wake_event.wait(), timeout=debounce)
+            logger.info(
+                "ollama_unload skipped: wake durante debounce (modello resta caldo)."
+            )
+            return
+        except asyncio.TimeoutError:
+            pass
+    await maybe_unload_simple_ollama(reason="end_of_cycle")
+
+
 async def run_pipeline_loop(state: WorkerState) -> None:
     """Loop demone: ciclo + sleep di poll **fuori** da qualsiasi ``finally`` di shutdown.
 
@@ -712,6 +748,13 @@ async def run_pipeline_loop(state: WorkerState) -> None:
             )
 
         state.wake_event.clear()
+        try:
+            await maybe_unload_ollama_after_cycle(state)
+        except asyncio.CancelledError:
+            raise
+        except Exception as unload_err:
+            logger.warning("ollama_unload end_of_cycle failed: %s", unload_err)
+
         logger.info(
             "Attesa wake NOTIFY o timeout poll (%ss)...",
             WORKER_POLL_INTERVAL_SECONDS,

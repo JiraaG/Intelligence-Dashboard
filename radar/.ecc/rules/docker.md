@@ -14,7 +14,7 @@ Miniflux **non** pubblica porte host di default (override `docker-compose.lan.ym
 `docker-compose.hardened.yml` per admin UI).
 **Profilo F (Local-Hybrid):** overlay opzionale `docker-compose.ollama-host.yml`
 (`extra_hosts` + `host-gateway` su `radar-worker`). BASE_URL verso Ollama sull'host:
-vedi `.env.example` Profilo F e runbook § Local-Hybrid. Non pubblicare la porta Ollama su LAN di default.
+vedi `.env.example` Profilo F e runbook § Local-Hybrid. VRAM: unload worker `OLLAMA_AUTO_UNLOAD` + `ops/verify-ollama-vram.sh`. Non pubblicare la porta Ollama su LAN di default.
 
 ```
 Internet/LAN → [Porta 80] → radar-frontend (Nginx) ──radar-edge──→ radar-backend

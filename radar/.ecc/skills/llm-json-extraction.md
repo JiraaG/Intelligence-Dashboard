@@ -13,19 +13,20 @@ when_to_use:
   - Debug di errori di parsing JSON dalla risposta LLM
   - Cascata modelli, routing complexity, dialect, cooldown 24h
   - Swap provider via LLM_SIMPLE_* / LLM_COMPLEX_* (Profili A–F)
+  - Lifecycle VRAM Ollama (ollama_lifecycle, OLLAMA_*, unload fine-ciclo)
   - Aggiunta di nuovi campi al contratto di estrazione
-version: 1.8.0
+version: 1.9.0
 ---
 
 ## Quando Usare Questa Skill
 
 Carica questa skill ogni volta che:
-- Modifichi `backend/app/worker.py` o `classification/` (client, prompts, validator, quota, complexity, cooldown, deepseek)
+- Modifichi `backend/app/worker.py` o `classification/` (client, prompts, validator, quota, complexity, cooldown, deepseek, `openai_compat_*`, `ollama_lifecycle`)
 - Ricevi errori del tipo `ValidationError` da Pydantic
 - Gemini/DeepSeek restituisce un JSON incompleto o con campi non presenti nello schema
 - Devi ottimizzare il System Prompt per ridurre le allucinazioni geografiche
 - Cambi `GEMINI_MODEL` / fallbacks / `DEEPSEEK_*` / `LLM_ROUTING_*` /
-  `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (incluso `REASONING_EFFORT`)
+  `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (incluso `REASONING_EFFORT`) o knobs `OLLAMA_*`
 
 ---
 
@@ -85,7 +86,7 @@ LLM_COMPLEX_RPD=0
 #   NO escalate SIMPLE Ollama → DeepSeek (solo correction locale)
 #   Overlay: docker-compose.ollama-host.yml — vedi runbook § Local-Hybrid
 #   Moduli: openai_compat_payload.py / openai_compat_response.py (+ deepseek.py client)
-#   Future: keep_alive / unload VRAM a fine ciclo idle
+#   VRAM: keep_alive busy + unload nativo keep_alive=0 (ollama_lifecycle; OLLAMA_* env)
 ```
 
 SoT: `plan-audit/complete/sot_llm_multi_model_fallback.md` §5–§6.

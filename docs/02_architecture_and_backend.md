@@ -38,7 +38,7 @@ Moduli sotto `radar/backend/app/`:
 
 1. **`core/`** — config bounded, pool asyncpg, `migrations.py`, logging, heartbeat, **`llm_lanes.py`** (provider/dialect/lane)
 2. **`extraction/`** — client Miniflux (httpx, byte limits, retry), parser HTML, dedup
-3. **`classification/`** — client Gemini (`google-genai`) + OpenAI-compat httpx (`deepseek`/`openai`/`glm`/`grok`; dialect); `claude` = stub; **`complexity.py`** v2.2; **`cooldown.py`**; `quota.py` per-lane; prompts (no CoT); validator Pydantic strict
+3. **`classification/`** — client Gemini (`google-genai`) + OpenAI-compat httpx (`deepseek`/`openai`/`glm`/`grok`; dialect); `claude` = stub; **`openai_compat_payload`/`_response`** (think Ollama); **`ollama_lifecycle`** (VRAM unload Profilo F); **`complexity.py`** v2.2; **`cooldown.py`**; `quota.py` per-lane; prompts (no CoT); validator Pydantic strict
 4. **`commit/`** — commit atomico, outbox, vault `yaml.safe_dump` + write atomica
 5. **`api/`** — query helpers Phase 5 (`articles_query.py`)
 6. **`scripts/`** — ops `requeue_articles.py` — dettaglio [runbook](../radar/docs/runbook.md)
@@ -55,10 +55,10 @@ Moduli sotto `radar/backend/app/`:
 - Prompt SoT: `classification/prompts.py` — fallback `Tecnologia`+`XX` **ristretto** (solo assenza di fatti geo/industriali/politici); albero decisionale anti-`XX`; multilaterali = 1 primary + `related_countries` CSV
 - Fallback geografico su fallimento irreversibile: paese `XX`, categoria `Infrastrutture` (vedi `validator.py`)
 - Provider: `gemini` \| `deepseek` \| `openai` \| `glm` \| `grok` \| `claude` (**stub**; Messages API non implementata)
-- Dialect OpenAI-compat: deepseek=`thinking`; openai/glm/grok=`stock`; via httpx (**no** package `openai`)
+- Dialect OpenAI-compat: deepseek=`thinking`; openai/glm/grok=`stock`; reasoner Ollama (`gemma4*`/…) → `think=true` via `openai_compat_*`; via httpx (**no** package `openai`)
 - Quote: `llm_request_ledger` via `QuotaLedger` — limiti **per lane** `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (`0` = unmanaged); soft-trim worker = `LLM_SIMPLE.rpd` se >0; free=RPM/RPD(+TPM), paid=BUDGET; legacy fill-gap — **non** `COUNT(*)` su `articles` per RPD
 - **Limiti e cambio modello (Profilo A hybrid):** RPM/TPM pieni → **attesa** sulla stessa lane (non si passa all’altro modello). **RPD esaurita** / cooldown / 429 daily → `QuotaDailyExceeded` + residual **cross-lane** (es. Gemini SIMPLE → DeepSeek COMPLEX e viceversa). Soft-trim: se RPD SIMPLE piena ma residual COMPLEX distinto, il ciclo **non** iberna (failover per-articolo). Caps Studio tipici Flash Lite: RPM≤12, TPM=250K, RPD=500 (VERIFY_IN_STUDIO).
-- Routing: SIMPLE → `LLM_SIMPLE_*`; BORDERLINE+COMPLEX → `LLM_COMPLEX_*`; residual SIMPLE↔COMPLEX se identity diversa; Profili A–F in `.env.example` + SoT (F = Local-Hybrid: `PROVIDER=openai` + Ollama `BASE_URL` host; no SDK `ollama`)
+- Routing: SIMPLE → `LLM_SIMPLE_*`; BORDERLINE+COMPLEX → `LLM_COMPLEX_*`; residual SIMPLE↔COMPLEX se identity diversa; Profili A–F in `.env.example` + SoT (F = Local-Hybrid: `PROVIDER=openai` + Ollama `BASE_URL` host; VRAM unload `ollama_lifecycle`/`OLLAMA_*`; no SDK `ollama`)
 - Periodicità ingest: `WORKER_POLL_INTERVAL_SECONDS` (default 900)
 
 ### Cooldown modelli

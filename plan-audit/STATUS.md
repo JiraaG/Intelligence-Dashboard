@@ -1,6 +1,6 @@
 # plan-audit — STATUS (fatto vs da fare)
 
-Quadro operativo aggiornato **2026-07-19** (Profilo F Local-Hybrid shipped `54c8038`; map anchors; Fase A piano ACTIVE per gate/unload VRAM).  
+Quadro operativo aggiornato **2026-07-19** (Profilo F Local-Hybrid `54c8038` + **VRAM unload shipped**; map anchors; Fase A ACTIVE solo per scorecard fixture opz.).  
 Indice cartelle: [`README.md`](README.md).  
 Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`](remediation/audit_remediation_final_release_handoff.md).
 
@@ -10,7 +10,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 
 | Area | Dove | Note |
 |------|------|------|
-| Fase A — LLM locale AMD/Ollama | [`active/plan_impl_fase_A_local_amd_ollama.md`](active/plan_impl_fase_A_local_amd_ollama.md) | **ACTIVE (gate / ops follow-up)** — W1–W4 codice/docs **DONE** (`54c8038`): overlay host, Profilo F, `openai_compat_*`, think Gemma, `normalize_llm_json_dict`, **no SIMPLE Ollama→DeepSeek escalate**, requeue 48h OK. Ops tag tipico **`gemma4-radar`** (`FROM gemma4:12b`, `num_ctx=8192`). Residui: scorecard fixture formale (opz.); **VRAM unload / `keep_alive`** (prossima chat). Prompt archiviato in [`prompts/done/`](prompts/done/plan_prompt_fase_A_local_amd_ollama.md). |
+| Fase A — LLM locale AMD/Ollama | [`active/plan_impl_fase_A_local_amd_ollama.md`](active/plan_impl_fase_A_local_amd_ollama.md) | **ACTIVE (follow-up opz.)** — W1–W4 + VRAM unload **DONE** (core `54c8038` + `ollama_lifecycle`/`OLLAMA_*`). Overlay host, Profilo F, `openai_compat_*`, think Gemma, `normalize_llm_json_dict`, **no SIMPLE Ollama→DeepSeek escalate**, requeue 48h OK. Ops tag tipico **`gemma4-radar`**. Residuo: scorecard fixture formale (opz.). Prompt in [`prompts/done/`](prompts/done/plan_prompt_fase_A_local_amd_ollama.md). |
 | ECC manual / expansion | [`prompts/active/plan_prompt_ecc_manual_and_expansion.md`](prompts/active/plan_prompt_ecc_manual_and_expansion.md) | **ACTIVE (non eseguito)** — resta finché non si produce un piano deliverable |
 
 ---
@@ -51,17 +51,17 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 | Fase 5 — digest pin + drop `--legacy-peer-deps` | **DEFERRED ACCETTATO** | Hardening opzionale; **non** da fare per release. Vedi piano §7 |
 | Commenti codice P1/P2 | **Chiuso (P2-01)** | Altri P2 in inventario senza `batch_id` — solo se emerge gap reale |
 | Fase C — Dedup semantica `pgvector` | **BACKLOG** | Vedi `radar_overview_and_upgrades.md` §C; non iniziata; indipendente da H / A |
-| Fase A — LLM locale AMD/Ollama | **ACTIVE (follow-up)** | Impl Profilo F **DONE** (`54c8038`). Aperti: unload VRAM/`keep_alive`; scorecard fixture opz. Piano [`active/plan_impl_fase_A_local_amd_ollama.md`](active/plan_impl_fase_A_local_amd_ollama.md). |
+| Fase A — LLM locale AMD/Ollama | **ACTIVE (follow-up)** | Impl Profilo F **DONE** (`54c8038`) + **VRAM unload shipped**. Aperto opz.: scorecard fixture. Piano [`active/plan_impl_fase_A_local_amd_ollama.md`](active/plan_impl_fase_A_local_amd_ollama.md). |
 | Fase H — Grafo geospaziale | **DONE** | related_countries + GET /api/map-relations + archi mappa + chip carosello (2026-07-18). |
 | Archi UI (multicolore + click) | **DONE** | Piano [`complete/plan_archi_hatching_multicolor.md`](complete/plan_archi_hatching_multicolor.md). Residuo **opzionale**: multicolore aggregato anche a zoom ≥ 5. |
 
 **Nessun residuo operativo obbligatorio sulla Fase B / H / archi UI / classification refine / map anchors / Profilo F core.** Branch di riferimento feature: `feature/upgrades`.
 
-**Restore point (Profilo F Local-Hybrid):** `54c8038` su `feature/upgrades`. Precedenti: map anchors `a240b3c`; click hatching `911463a`; classification/geo `f7cf83d`; archi UI `5c74e57`.
+**Restore point (Profilo F Local-Hybrid core):** `54c8038` su `feature/upgrades`. **VRAM unload** = follow-up sullo stesso branch (working tree / commit successivo a `54c8038`). Precedenti: map anchors `a240b3c`; click hatching `911463a`; classification/geo `f7cf83d`; archi UI `5c74e57`.
 
 Prompt Final Release: [`prompts/done/audit_prompt_final_release_gate.md`](prompts/done/audit_prompt_final_release_gate.md) — **non rieseguire** (F0–F4 chiusi).
 
-**Fuori scope:** nuove feature oltre unload VRAM senza richiesta; refactor/restyle di `radar-sidebar/**` al di fuori delle eccezioni mirate; riaprire ticket CLOSED; rieseguire P0 commenti senza richiesta; attivare Fase 5 senza decisione esplicita.
+**Fuori scope:** nuove feature Fase A oltre scorecard opz. senza richiesta; refactor/restyle di `radar-sidebar/**` al di fuori delle eccezioni mirate; riaprire ticket CLOSED; rieseguire P0 commenti senza richiesta; attivare Fase 5 senza decisione esplicita.
 
 ---
 
