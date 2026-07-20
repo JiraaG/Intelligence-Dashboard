@@ -717,8 +717,8 @@ L'endpoint `GET /api/map-relations?date=YYYY-MM-DD` restituisce un payload JSON 
 
 Il frontend recupera le relazioni tramite `ArticleService` → `StateService.mapRelationsResource` (+ soft-refresh SSE). Disegno:
 
-- **Zoom &lt; 5 (hatching):** una Bézier / great-circle **multicolore** aggregata per coppia (`aggregateRelations` + segmenti ∝ volume).
-- **Zoom ≥ 5 (pin):** **MapLibre** = stessa macro multicolore **continua** (no fan/dash). **Leaflet legacy** = una linea **per categoria**, tratteggio **geometrico** (`addGeometricDashedPolyline`, no `dashArray`), fan parallelo se multi-categoria.
+- **Zoom latch hatching (enter/exit via soglia 4 + isteresi 0.4):** una Bézier / great-circle **multicolore** aggregata per coppia (`aggregateRelations` + segmenti ∝ volume).
+- **Zoom latch pin:** **MapLibre** = stessa macro multicolore **continua** (no fan/dash). **Leaflet legacy** = una linea **per categoria**, tratteggio **geometrico** (`addGeometricDashedPolyline`, no `dashArray`), fan parallelo se multi-categoria.
 - **Pane (Leaflet):** `relationsPane` z **550** (canvas renderer) sopra confini/label (`labelsPane` z 450, `pointer-events: none`), sotto i marker (600).
 - **Hover/click:** hit-area → emit `relationClicked` → `loadRelationArticles(A,B,category?)` apre sidebar/carosello bilaterale (MapLibre/macro: tutte le cat.; pin Leaflet: sola tipologia; entrambi i versi via `related_countries`). Camera preservata.
 - **Nation open:** layer relazioni nascosto.
@@ -777,7 +777,7 @@ radar-map/
 
 - `MAP_RENDERER=maplibre|leaflet` (default maplibre; leaflet = ops/rollback/futuro switch)
 - `radar.mapProjection=globe|mercator`
-- Soglia zoom hatch↔pin (equivalente 5)
+- Soglia zoom hatch↔pin: `MAP_ZOOM_PIN_THRESHOLD=4` + `MAP_ZOOM_PIN_HYSTERESIS=0.4` (`resolvePinMode` / `pinModeActive` — anti-flicker pan globo)
 - `npm run verify-map-renderer`
 
 #### Riferimento futuro obbligatorio

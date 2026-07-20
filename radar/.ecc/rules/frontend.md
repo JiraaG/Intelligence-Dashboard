@@ -114,7 +114,7 @@ isSidebarOpen = signal<boolean>(false);
 currentZoomLevel = signal<number>(3);
 
 // Computed derivati
-isZoomedOut = computed(() => this.currentZoomLevel() < 5);
+isZoomedOut = computed(() => !this.pinModeActive()); // latch via resolvePinMode()
 articlesByCountry = computed(() => groupArticlesByCountry(this.articles()));
 ```
 
@@ -207,29 +207,27 @@ Usare sempre le CSS Custom Properties definite in `styles.scss`.
 
 ### Soglia di Zoom
 
-- **Zoom < 5**: Modalità macro — mostra hatching SVG sulle nazioni, nascondi marker / pin summary
-- **Zoom >= 5**: Modalità dettaglio — nascondi hatching (opacity 0), mostra marker/pin
+- Costante FE: `MAP_ZOOM_PIN_THRESHOLD` (= **4**) in `maplibre/great-circle.ts` (usata anche dal path Leaflet legacy).
+- **Isteresi** `MAP_ZOOM_PIN_HYSTERESIS` (= **0.4**) + `resolvePinMode()`: entra in pin a zoom ≥ 4; esce solo sotto **3.6**. Evita flicker pin↔hatching quando il globo MapLibre aggiusta `getZoom()` in pan (latitudine).
+- **Zoom / latch hatching**: Modalità macro — mostra hatching SVG sulle nazioni, nascondi marker / pin summary
+- **Zoom / latch pin**: Modalità dettaglio — nascondi hatching (opacity 0), mostra marker/pin
 
 ```typescript
-// Nel componente mappa — listener sull'evento zoom di Leaflet
-this.map.on('zoomend', () => {
-  const zoom = this.map.getZoom();
-  this.currentZoomLevel.set(zoom);
-
-  if (zoom < 5) {
-    this.activateHatchingMode();
-  } else {
-    this.activateMarkerMode();
-  }
-});
+// Latch con isteresi (MapLibre + Leaflet)
+this.pinModeActive.set(resolvePinMode(this.map.getZoom(), this.pinModeActive()));
+if (this.pinModeActive()) {
+  this.activateMarkerMode();
+} else {
+  this.activateHatchingMode();
+}
 ```
 
 ### Nation open + spiderfy vs dezoom (obbligatorio)
 
 Con nazione aperta e fan spiderfy attivo:
 
-- **Zoom ≥ 5** (nessun hatching): lo spider **resta aperto**. MarkerCluster **non** deve auto-unspiderfy su wheel/zoom (`disableMarkerClusterMapClickUnspiderfy` rimuove anche `zoomstart` / `zoomanim` / `_noanimationUnspiderfy`). Su `zoomend`, re-spiderfy deferito (`lastSpiderfyCountry` + `lastSpiderfyCategory`) per riallineare le gambe.
-- **Zoom < 5** (hatching / barre colorate): chiudere fan **e** sidebar via `collapseAllGraphs(true)` → `clusterClicked([])`. Guard: solo se `lastSpiderfyCategory` è settato (evita race `fitBounds(maxZoom:4)` all’open nazione).
+- **Zoom ≥ 4** (nessun hatching): lo spider **resta aperto**. MarkerCluster **non** deve auto-unspiderfy su wheel/zoom (`disableMarkerClusterMapClickUnspiderfy` rimuove anche `zoomstart` / `zoomanim` / `_noanimationUnspiderfy`). Su `zoomend`, re-spiderfy deferito (`lastSpiderfyCountry` + `lastSpiderfyCategory`) per riallineare le gambe.
+- **Zoom < 4** (hatching / barre colorate): chiudere fan **e** sidebar via `collapseAllGraphs(true)` → `clusterClicked([])`. Guard: solo se `lastSpiderfyCategory` è settato (evita race `fitBounds(maxZoom:4)` all’open nazione).
 - `emitClose` su `collapseAllGraphs` azzera `lastSpiderfyCountry` / `lastSpiderfyCategory`.
 
 ### Transizione CSS Obbligatoria
@@ -263,7 +261,7 @@ Il componente `p-sidebar` di PrimeNG può essere usato come wrapper UI.
 
 ## Regola 7: Clustering per categoria + map-summary (Phase 5+)
 
-**Day open (Phase 5):** la mappa si dipinge da `GET /api/map-summary` (righe `country_code × primary_category` + count/read + lat/lon finite). Niente `Article[]` globale del giorno. Hatching zoom &lt; 5: **MapLibre** = fasce soft O→E (1 colore × tipologia da `map-summary`; mainland US/RU); **Leaflet** legacy = SVG combo. A zoom ≥ 5: **un pin nazione** (conteggio + anello conic categorie) — non pallini numerati per-categoria. Click pin → fetch nazione + sidebar (`preserveZoom: true`, niente dezoom). Click hatching (zoom &lt; 5) → map-click + `pickCountryCodeAt` (canvas `relationsPane` ruba i hit SVG) → stesso path toolbar. Click poligono/toolbar → nation open + `fitBounds` (`maxZoom: 4`). Hub/pin/spider e archi: anchor = `getCountryCentroid` (US/RU mainland), **non** media lat/lng articolo.
+**Day open (Phase 5):** la mappa si dipinge da `GET /api/map-summary` (righe `country_code × primary_category` + count/read + lat/lon finite). Niente `Article[]` globale del giorno. Hatching zoom &lt; `MAP_ZOOM_PIN_THRESHOLD` (4): **MapLibre** = fasce soft O→E (1 colore × tipologia da `map-summary`; mainland US/RU); **Leaflet** legacy = SVG combo. A zoom ≥ 4: **un pin nazione** (conteggio + anello conic categorie) — non pallini numerati per-categoria. Click pin → fetch nazione + sidebar (`preserveZoom: true`, niente dezoom). Click hatching (zoom &lt; 4) → map-click + `pickCountryCodeAt` (canvas `relationsPane` ruba i hit SVG) → stesso path toolbar. Click poligono/toolbar → nation open + `fitBounds` (`maxZoom: 4`). Hub/pin/spider e archi: anchor = `getCountryCentroid` (US/RU mainland), **non** media lat/lng articolo.
 
 **Saved vault:** `GET /api/saved-summary` (no date) alimenta `NOTIZIE SALVATE` + tooltip nazioni; click → `loadSavedCountryArticles` + carosello multi-day con `sidebarMode='saved'`; **stesso path mappa di LETTE/TROVATE** (`fitBounds` + `flyTo` zoom 6 + spiderfy categoria + highlight). Card **Salva notizia** / **Rimuovi dai salvati**; save ⇒ read; unread ⇒ unsave.
 
@@ -273,7 +271,7 @@ Il componente `p-sidebar` di PrimeNG può essere usato come wrapper UI.
 
 **Hub root lifecycle:** su cambio categoria, `collapseAllGraphs(false, false)` setta `restoreDetailHubOnUnspiderfy = false`. Il handler `unspiderfied` **non** deve `clearRootMarkers` / ripristinare hub in quel caso (altrimenti l’`unspiderfy` asincrono del fan precedente cancella il nuovo root). Solo chiusura reale (`restoreHub: true`) ripristina l’hub.
 
-**Zoom / wheel con spider aperto:** disabilitare auto-unspiderfy MarkerCluster su click **e** su zoom (`_unspiderfyWrapper`, `_unspiderfyZoomStart`, `_unspiderfyZoomAnim`, `_noanimationUnspiderfy`). Tenere il fan finché zoom ≥ 5; a zoom &lt; 5 (hatching) → `collapseAllGraphs(true)` (sidebar + spider). Tracciare `lastSpiderfyCountry` / `lastSpiderfyCategory`; su `zoomend` ≥ 5 re-spiderfy deferito (~50ms) per refresh posizioni.
+**Zoom / wheel con spider aperto:** disabilitare auto-unspiderfy MarkerCluster su click **e** su zoom (`_unspiderfyWrapper`, `_unspiderfyZoomStart`, `_unspiderfyZoomAnim`, `_noanimationUnspiderfy`). Tenere il fan finché **`pinModeActive`** (latch isteresi, non raw `getZoom()`); a latch hatching → `collapseAllGraphs(true)` (sidebar + spider). Tracciare `lastSpiderfyCountry` / `lastSpiderfyCategory`; su `zoomend` in pin mode re-spiderfy deferito (~50ms) per refresh posizioni.
 
 **Focus camera:** `armSkipCountryFit` **solo** con `preserveZoom` (pin summary). Poligono/toolbar: `fitBounds`. Stesso `focusCountryCode` di nuovo → `refocusCountry(code)` (il signal non ri-triggera).
 
@@ -422,14 +420,14 @@ const L = (window as any).L as typeof import('leaflet');
 3. **Visibilità e Sincronizzazione**:
    - La visibilità del layer relazioni deve essere sincronizzata con la modalità Day View (`articles().length === 0`).
    - Gli archi devono essere nascosti automaticamente solo se una nazione è aperta (nation detail view).
-   - **MapLibre:** stile archi indipendente dallo zoom (sempre macro multicolore solida) — niente ridisegno al crossing zoom 5. Filtro nazioni Wave 1 **non** cambia paint/hover/draw.
-   - **Leaflet legacy:** su `zoomend` / attraversamento della soglia zoom 5, ridisegnare gli archi passando da mode pin (zoom >= 5, dash+fan) a mode macro (zoom < 5) e viceversa.
+   - **MapLibre:** stile archi indipendente dallo zoom (sempre macro multicolore solida) — niente ridisegno al crossing `MAP_ZOOM_PIN_THRESHOLD`. Filtro nazioni Wave 1 **non** cambia paint/hover/draw.
+   - **Leaflet legacy:** su `zoomend` / attraversamento di `MAP_ZOOM_PIN_THRESHOLD` (4), ridisegnare gli archi passando da mode pin (zoom >= 4, dash+fan) a mode macro (zoom < 4) e viceversa.
 4. **Fingerprint Geometria Mappa**:
    - Per ottimizzare le prestazioni, il ricalcolo degli elementi della mappa (inclusi gli archi) deve basarsi su un fingerprint che include lo stato delle relazioni, per evitare di ridisegnare la mappa inutilmente se non ci sono cambiamenti strutturali.
 5. **Drawing degli Archi**:
    - **MapLibre (default):** una sola curva aggregata per coppia di nazioni, segmenti colore ∝ volume per categoria (`CATEGORY_CSS_VARS`), linea **continua** (no geometric dash, no fan parallelo), opacity ~0.45 — **a tutti i livelli di zoom**.
-   - **Leaflet legacy — Zoom ≥ 5:** una curva per-categoria (`CATEGORY_CSS_VARS`), spessore `Math.min(6, 1 + volume * 0.5)`, opacity 0.8, tratteggio **geometric dash** (segmenti lat/lng + gap — **vietato** affidarsi a `line-dasharray` / CSS dash come unico tratteggio: scorre al pan). Multi-cat → fan parallelo.
-   - **Leaflet legacy — Zoom < 5:** macro aggregata multicolore, spessore soft, opacity ~0.45.
+   - **Leaflet legacy — Zoom ≥ 4:** una curva per-categoria (`CATEGORY_CSS_VARS`), spessore `Math.min(6, 1 + volume * 0.5)`, opacity 0.8, tratteggio **geometric dash** (segmenti lat/lng + gap — **vietato** affidarsi a `line-dasharray` / CSS dash come unico tratteggio: scorre al pan). Multi-cat → fan parallelo.
+   - **Leaflet legacy — Zoom < 4:** macro aggregata multicolore, spessore soft, opacity ~0.45.
    - Hover/click → `relationClicked` → `loadRelationArticles` (bilaterale A↔B).
    - **Fuori scope Wave 1 (chiuso):** soft-restyle archi / nation-hover preview. **Wave 2 (active):** archi elevati 3D — `plan-audit/active/plan_impl_map_relations_arcs_3d.md`.
 
@@ -460,4 +458,4 @@ const L = (window as any).L as typeof import('leaflet');
 | `maxBounds` su MapLibre **globe** | Clampa rotate → freeze percepito / click → fitBounds |
 | Legenda con `flex-wrap: wrap` senza nowrap/scroll     | Rischia di spezzarsi verticalmente su schermi piccoli|
 | Utilizzo di `leaflet-curve` o nuove dipendenze npm per archi Leaflet | Vietato sul path legacy; MapLibre usa LineString / style nativo |
-| Archi relazioni visibili in nation detail o non aggiornati al cambio zoom | Vietato; devono essere nascosti in nation detail e ridisegnati tra macro/pin crossing zoom 5 |
+| Archi relazioni visibili in nation detail o non aggiornati al cambio zoom | Vietato; devono essere nascosti in nation detail e ridisegnati tra macro/pin crossing `MAP_ZOOM_PIN_THRESHOLD` (4) |

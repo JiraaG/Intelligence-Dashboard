@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { greatCircle, MAP_ZOOM_PIN_THRESHOLD } from './great-circle';
+import {
+  greatCircle,
+  MAP_ZOOM_PIN_HYSTERESIS,
+  MAP_ZOOM_PIN_THRESHOLD,
+  resolvePinMode,
+} from './great-circle';
 
 describe('greatCircle helper', () => {
   it('returns n+1 coordinate pairs from A to B', () => {
@@ -20,9 +25,23 @@ describe('greatCircle helper', () => {
 });
 
 describe('MAP_ZOOM_PIN_THRESHOLD', () => {
-  it('matches day-view pin/hatch threshold of 5', () => {
-    expect(MAP_ZOOM_PIN_THRESHOLD).toBe(5);
-    expect(3 < MAP_ZOOM_PIN_THRESHOLD).toBe(true);
-    expect(5 < MAP_ZOOM_PIN_THRESHOLD).toBe(false);
+  it('matches day-view pin enter threshold of 4', () => {
+    expect(MAP_ZOOM_PIN_THRESHOLD).toBe(4);
+    expect(MAP_ZOOM_PIN_HYSTERESIS).toBe(0.4);
+  });
+});
+
+describe('resolvePinMode', () => {
+  it('enters pin mode only at or above threshold when currently hatching', () => {
+    expect(resolvePinMode(3.9, false)).toBe(false);
+    expect(resolvePinMode(4, false)).toBe(true);
+    expect(resolvePinMode(4.2, false)).toBe(true);
+  });
+
+  it('stays in pin mode through globe pan jitter below threshold until hysteresis floor', () => {
+    const exitBelow = MAP_ZOOM_PIN_THRESHOLD - MAP_ZOOM_PIN_HYSTERESIS;
+    expect(resolvePinMode(3.9, true)).toBe(true);
+    expect(resolvePinMode(exitBelow, true)).toBe(true);
+    expect(resolvePinMode(exitBelow - 0.01, true)).toBe(false);
   });
 });

@@ -306,7 +306,7 @@ con i dati mockati prima di connettere il backend reale.
 
 > **MapLibre parity (Phase I):** i Test 1–7 sotto devono passare sul renderer **default MapLibre** con la **stessa UX** del path Leaflet legacy (hatching, pin, spiderfy, overlay, salvati, archi). Forzare Leaflet solo per regressione ops: `localStorage.setItem('radar.mapRenderer','leaflet')` + reload.
 
-### ✅ Test 1: Hatching SVG in Zoom-Out (livello < 5)
+### ✅ Test 1: Hatching SVG in Zoom-Out (livello < 4)
 
 - [ ] La Germania mostra due colori di hatching (Tecnologia + Energia)
 - [ ] L'Ucraina mostra due colori di hatching (Nucleare + Ambiente)
@@ -317,13 +317,14 @@ con i dati mockati prima di connettere il backend reale.
 - [ ] **Cliccando su Germania in hatching**: sidebar apre (nation load via `getArticlesPage` / envelope)
 - [ ] **Cliccando su Ucraina in hatching**: sidebar apre con articoli Nucleare + Ambiente
 
-### ✅ Test 2: Dissolvenza e Marker in Zoom-In (livello >= 5)
+### ✅ Test 2: Dissolvenza e Marker in Zoom-In (livello >= 4 / latch pin)
 
 - [ ] L'hatching SVG sfuma gradualmente con CSS transition opacity a 0
 - [ ] I marker puntuali compaiono con icona tematica (categorie 10: es. ☢️ Nucleare, ⚡ Energia, 💻 Tecnologia, 🌿 Ambiente)
 - [ ] I due marker tedeschi (Dresda Tecnologia e Monaco Energia) sono separati e cliccabili
 - [ ] I due marker ucraini (Zaporizhzhia Nucleare e Kakhovka Ambiente) **NON** formano un cluster unico — ciascuno appartiene al proprio gruppo di categoria (MapLibre: hub/fan custom; Leaflet legacy: cluster group)
-- [ ] A zoom intermedio (5-9), i marker della stessa categoria in aree vicine si raggruppano per categoria (parity UX)
+- [ ] A zoom intermedio (4–9), i marker della stessa categoria in aree vicine si raggruppano per categoria (parity UX)
+- [ ] **Isteresi globo:** a zoom ~4, pan N/S **senza wheel** non deve sfarfallare pin↔hatching (`resolvePinMode` / exit solo &lt; 3.6)
 
 ### ✅ Test 3: Cluster / spiderfy per Categoria e Carosello PrimeNG
 
@@ -358,17 +359,17 @@ con i dati mockati prima di connettere il backend reale.
 
 ### ✅ Test 7: Relazioni Geospaziali (Fase H + archi UI)
 
-- [ ] Day view zoom **&lt; 5**: archi **multicolore** aggregati visibili sopra hatching (non nascosti) — MapLibre e Leaflet — **solo se** almeno una nazione è flaggata nel pannello Relazioni (default: nessuna → **0 archi**)
-- [ ] Day view zoom **≥ 5**: **MapLibre** = stessa macro multicolore **continua** (no fan/dash); **Leaflet legacy** = archi **per-categoria** con geometric dash + fan parallelo multi-cat
+- [ ] Day view zoom **&lt; 4**: archi **multicolore** aggregati visibili sopra hatching (non nascosti) — MapLibre e Leaflet — **solo se** almeno una nazione è flaggata nel pannello Relazioni (default: nessuna → **0 archi**)
+- [ ] Day view zoom **≥ 4**: **MapLibre** = stessa macro multicolore **continua** (no fan/dash); **Leaflet legacy** = archi **per-categoria** con geometric dash + fan parallelo multi-cat
 - [ ] Toolbar unificata: **Sentiment**, **Tipologia**, **RELAZIONI ATTIVE** — stesso tooltip (titolo mono, un bottone Seleziona↔Deseleziona tutto, filtro testo, toggle iOS a destra); Relazioni: semantica OR (USA on + Cina off → arco USA↔Cina sì); filtro nazione anche su Nazioni Coinvolte / Nazioni Salvate
 - [ ] Tipologia toolbar filtra categorie **prima** del filtro nazioni
 - [ ] Hover arco: tooltip + highlight (anche in Europa densa) — invariato rispetto a pre-filtro
 - [ ] Click arco MapLibre / macro Leaflet: sidebar/carosello con notizie bilaterali A↔B **tutte** le categorie (entrambi i versi)
-- [ ] Click arco pin Leaflet (≥5): stessa cosa filtrata per la **tipologia** dell’arco
+- [ ] Click arco pin Leaflet (≥4): stessa cosa filtrata per la **tipologia** dell’arco
 - [ ] Nation-open: archi nascosti (no interferenza spiderfy)
 - [ ] Card: sezione "Paesi correlati" con chip se `related_countries` non vuoto
-- [ ] Zoom &lt; 5: hatching **multi-colore** — MapLibre: N fasce soft = N tipologie da `map-summary` (mainland; ordine legenda); Leaflet: SVG combo pattern — non fill solido di una sola categoria; non barcode `fill-pattern` su MapLibre
-- [ ] Path MapLibre: great-circle / LineString macro multicolore solida (tutti gli zoom) + hover thicken/tooltip; path Leaflet legacy: `relationsPane` + geometric dash ≥5
+- [ ] Zoom &lt; 4: hatching **multi-colore** — MapLibre: N fasce soft = N tipologie da `map-summary` (mainland; ordine legenda); Leaflet: SVG combo pattern — non fill solido di una sola categoria; non barcode `fill-pattern` su MapLibre
+- [ ] Path MapLibre: great-circle / LineString macro multicolore solida (tutti gli zoom) + hover thicken/tooltip; path Leaflet legacy: `relationsPane` + geometric dash ≥4
 
 ---
 

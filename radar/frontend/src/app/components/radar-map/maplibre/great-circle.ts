@@ -36,5 +36,24 @@ export function greatCircle(
   return coords;
 }
 
-/** Soglia zoom day-view: hatching/fill sotto; pin/archi legacy sopra. */
-export const MAP_ZOOM_PIN_THRESHOLD = 5;
+/** Soglia zoom day-view: entra in pin mode a zoom ≥ questo valore. */
+export const MAP_ZOOM_PIN_THRESHOLD = 4;
+
+/**
+ * Deadband sotto la soglia pin. Sul globo MapLibre `getZoom()` oscilla in pan
+ * (aggiustamento automatico per latitudine) — senza isteresi pin↔hatching sfarfalla.
+ * Esci da pin solo sotto `MAP_ZOOM_PIN_THRESHOLD - MAP_ZOOM_PIN_HYSTERESIS`.
+ */
+export const MAP_ZOOM_PIN_HYSTERESIS = 0.4;
+
+/**
+ * Decide se restare/entrare in modalità pin con isteresi.
+ * @param zoom Zoom corrente (`map.getZoom()`)
+ * @param currentlyPinMode Stato latched precedente
+ */
+export function resolvePinMode(zoom: number, currentlyPinMode: boolean): boolean {
+  if (currentlyPinMode) {
+    return zoom >= MAP_ZOOM_PIN_THRESHOLD - MAP_ZOOM_PIN_HYSTERESIS;
+  }
+  return zoom >= MAP_ZOOM_PIN_THRESHOLD;
+}

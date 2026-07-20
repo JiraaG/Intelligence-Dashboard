@@ -48,7 +48,7 @@ Hatching: owner nel host attivo (`maplibre/` = fasce soft per tipologia; `leafle
 
 **Day open**
 
-1. `GET /api/map-summary?date=…` → hatching per paese + a zoom ≥ 5 **un pin grande per nazione** (conteggio + anello conic colori categorie)
+1. `GET /api/map-summary?date=…` → hatching per paese + a zoom ≥ `MAP_ZOOM_PIN_THRESHOLD` (4) **un pin grande per nazione** (conteggio + anello conic colori categorie)
 2. Niente `Article[]` globale del giorno in memoria mappa
 
 **Nation open (day)**
@@ -58,7 +58,7 @@ Hatching: owner nel host attivo (`maplibre/` = fasce soft per tipologia; `leafle
 3. Marker: **hub compatto** (`radar-spider-root`, stesso stile del root spiderfy — non il pin alto day-view) + spiderfy a **icone emoji** della sola categoria attiva
 4. Fan spiderfy: **tutte** le icone della categoria (niente hard cap 24 / park extras); dimensione icone e `spiderfyDistanceMultiplier` **adattivi** al conteggio; se spiderfy fallisce → restore hub nazione
 5. Spiderfy allineato alla **categoria attiva** (pill / slide carosello). Stessa categoria allo scroll → solo highlight (`lastSpiderfyKey`). Cambio categoria: non cancellare il root su `unspiderfied` asincrono (`restoreDetailHubOnUnspiderfy === false` → no-op)
-6. **Dezoom:** spider + sidebar restano aperti a zoom ≥ 5; a zoom &lt; 5 (hatching) → collapse spiderfy / chiusura grafo dettaglio
+6. **Dezoom:** spider + sidebar restano aperti finché **`pinModeActive`** (enter zoom ≥ 4, exit &lt; 3.6 via isteresi `resolvePinMode` — evita flicker pan globo); latch hatching → collapse spiderfy / chiusura grafo dettaglio
 7. Focus camera: pin summary → `preserveZoom` + `armSkipCountryFit`; poligono/toolbar → `fitBounds` (`maxZoom: 4`); ri-click stessa nazione → `refocusCountry`
 
 **Saved vault (Notizie Salvate)**
@@ -112,7 +112,7 @@ Offline: `{ provide: MOCK_MODE, useValue: true }`. Errori API restano visibili �
 
 ## Clustering / spiderfy
 
-**MapLibre (default):** nessun MarkerCluster — hub nazione + fan emoji custom per categoria attiva (stessa UX: keep zoom ≥ 5, collapse &lt; 5).
+**MapLibre (default):** nessun MarkerCluster — hub nazione + fan emoji custom per categoria attiva (stessa UX: keep su latch pin / collapse su latch hatching; soglia enter 4 + isteresi 0.4).
 
 **Leaflet legacy:** un `markerClusterGroup` **per ciascuna delle 10 categorie** (nation detail):
 
@@ -165,8 +165,8 @@ Per collegare le notizie multilaterali, la mappa disegna archi curvi bidireziona
 1. **Gestione dello Stato**: `StateService` espone `mapRelationsResource` sincronizzato con la data attiva e i filtri della toolbar. Pipeline FE: `filteredMapRelations` (Tipologia) → `visibleMapRelations` (filtro nazioni OR, default enabled vuoto → 0 archi) → binding mappa. UI toolbar: **Sentiment**, **Tipologia** e **RELAZIONI ATTIVE** condividono lo stesso tooltip (titolo mono uppercase, un bottone Seleziona/Deseleziona tutto, filtro testo, toggle iOS a destra; niente `p-multiSelect`). Filtro nazione anche su Nazioni Coinvolte / Salvate. Piano W1: [`plan-audit/complete/plan_impl_map_relations_nation_filter.md`](../plan-audit/complete/plan_impl_map_relations_nation_filter.md). Al riceversi del segnale SSE `article_processed`, viene scatenato il reload atomico sia per il summary che per le relazioni.
 2. **Visualizzazione e Zoom**:
    - **MapLibre (default, tutti gli zoom):** una sola linea aggregata per coppia di paesi, **multicolore continua** (segmenti proporzionali al volume per categoria, ordinati per volume decrescente). Stile soft (`Math.min(3, 1 + totalVolume * 0.3)`, opacity ~0.45); tooltip con breakdown (es. `Sicurezza 5 · Economia 2 · n=7`). **Niente** fan per-categoria né geometric dash.
-   - **Leaflet legacy — Zoom ≥ 5 (vista pin):** archi divisi per categoria (1 linea per categoria per coppia), spessore `Math.min(6, 1 + volume * 0.5)`, opacity 0.8, tratteggio **geometric dash** (segmenti lat/lng + gap — **non** `line-dasharray` / CSS `stroke-dasharray`). Multi-cat → **offset di curvatura** (fan parallelo).
-   - **Leaflet legacy — Zoom < 5 (vista hatching):** stessa macro multicolore aggregata di MapLibre (stile soft).
+   - **Leaflet legacy — Zoom ≥ 4 (vista pin):** archi divisi per categoria (1 linea per categoria per coppia), spessore `Math.min(6, 1 + volume * 0.5)`, opacity 0.8, tratteggio **geometric dash** (segmenti lat/lng + gap — **non** `line-dasharray` / CSS `stroke-dasharray`). Multi-cat → **offset di curvatura** (fan parallelo).
+   - **Leaflet legacy — Zoom < 4 (vista hatching):** stessa macro multicolore aggregata di MapLibre (stile soft).
    - Vengono nascosti se viene aperta la vista di dettaglio di una specifica nazione (per evitare sovrapposizioni visive con il ventaglio di spiderfy).
 3. **Calcolo Centroidi**:
    - I centroidi vengono estratti dinamicamente dai confini GeoJSON caricati in cache.
@@ -174,7 +174,7 @@ Per collegare le notizie multilaterali, la mappa disegna archi curvi bidireziona
 4. **Stile Visivo**:
    - Colore dell'arco allineato alle variabili di stile della categoria geopolitica (`CATEGORY_CSS_VARS`).
    - Spessore proporzionale al volume aggregato di notizie.
-   - **MapLibre:** sempre linea continua soft aggregata. **Leaflet:** zoom ≥ 5 tratteggio denso per-cat; zoom &lt; 5 linea continua soft.
+   - **MapLibre:** sempre linea continua soft aggregata. **Leaflet:** zoom ≥ 4 tratteggio denso per-cat; zoom &lt; 4 linea continua soft.
 5. **Hover / click**: hit-area affidabile anche in Europa densa; click emette `relationClicked` → `StateService.loadRelationArticles` apre il carosello con le notizie bilaterali A↔B (MapLibre e macro Leaflet: tutte le categorie; pin Leaflet: sola tipologia dell’arco; entrambi i versi via `related_countries`).
 
 Dettaglio ops FE: [`radar/frontend/README.md`](../radar/frontend/README.md).

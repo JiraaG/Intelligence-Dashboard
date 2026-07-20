@@ -25,7 +25,7 @@ import { Article, CountrySummary, PrimaryCategory } from '../../../models/articl
 import { MapSummaryRow } from '../../../models/map-summary.model';
 import { MapRelationRow } from '../../../models/map-relation.model';
 import { CountryOpenRequest, RelationOpenRequest } from '../radar-map.types';
-import { greatCircle, MAP_ZOOM_PIN_THRESHOLD } from './great-circle';
+import { greatCircle, resolvePinMode } from './great-circle';
 import { splitCountryByCategories } from './country-category-fills';
 
 interface LatLng {
@@ -69,7 +69,12 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
   relationClicked = output<RelationOpenRequest>();
 
   currentZoomLevel = signal<number>(3);
-  isZoomedOut = computed(() => this.currentZoomLevel() < MAP_ZOOM_PIN_THRESHOLD);
+  /**
+   * Modalità pin latched (isteresi): evita flicker pin↔hatching quando il globo
+   * aggiusta `getZoom()` in pan senza wheel dell'utente.
+   */
+  private readonly pinModeActive = signal(false);
+  isZoomedOut = computed(() => !this.pinModeActive());
   isParsingGeoJson = signal<boolean>(true);
   mapUnavailable = signal<boolean>(false);
   projectionMode = signal<'globe' | 'mercator'>('globe');
@@ -247,11 +252,10 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
       return;
     }
 
-    const currentZoom = this.map.getZoom();
     const targetZoom = 6;
     const gen = ++this.spiderfyGeneration;
 
-    if (currentZoom >= MAP_ZOOM_PIN_THRESHOLD) {
+    if (this.pinModeActive()) {
       if (!this.spiderfyAndCreateRoot(arts, anchor, gen, countryCode, category)) {
         this.restoreNationHubPin();
       }
@@ -439,6 +443,7 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
     });
 
     this.map.on('zoomend', () => this.onZoomEnd());
+    this.map.on('moveend', () => this.onMoveEndLatch());
     this.map.on('mousedown', (e) => {
       this.pointerDownPoint = { x: e.point.x, y: e.point.y };
       this.suppressNextMapClick = false;
@@ -559,25 +564,18 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
 
   private onZoomEnd(): void {
     if (this.destroyed || !this.map) return;
-    const zoom = this.map.getZoom();
-    this.currentZoomLevel.set(zoom);
-    this.refreshHatchingStyles();
-    this.syncSummaryMarkerVisibility();
+    this.applyPinModeLatch();
 
     this.syncRelationsVisibility();
 
     const nationOpen = this.articles().length > 0 || !!this.focusCountryCode();
-    if (
-      !this.isNavigating &&
-      nationOpen &&
-      zoom < MAP_ZOOM_PIN_THRESHOLD &&
-      !!this.lastSpiderfyCategory
-    ) {
+    const pinMode = this.pinModeActive();
+    if (!this.isNavigating && nationOpen && !pinMode && !!this.lastSpiderfyCategory) {
       this.collapseAllGraphs(true);
     } else if (
       !this.isNavigating &&
       nationOpen &&
-      zoom >= MAP_ZOOM_PIN_THRESHOLD &&
+      pinMode &&
       this.lastSpiderfyCountry &&
       this.lastSpiderfyCategory
     ) {
@@ -585,12 +583,37 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
       const category = this.lastSpiderfyCategory;
       this.scheduleTimeout(() => {
         if (this.destroyed || !this.map) return;
-        if (this.map.getZoom() < MAP_ZOOM_PIN_THRESHOLD) return;
+        if (!this.pinModeActive()) return;
         this.focusAndSpiderfyCategory(country, category);
       }, 50);
-    } else if (zoom < MAP_ZOOM_PIN_THRESHOLD && !this.isNavigating && !nationOpen) {
+    } else if (!pinMode && !this.isNavigating && !nationOpen) {
       this.collapseAllGraphs(true);
     }
+  }
+
+  /**
+   * Globe pan può variare `getZoom()` senza wheel: riallinea il latch pin/hatch
+   * (senza policy spider — quella resta su zoomend).
+   */
+  private onMoveEndLatch(): void {
+    if (this.destroyed || !this.map || this.isNavigating) return;
+    this.applyPinModeLatch();
+  }
+
+  /** Aggiorna zoom + modalità pin con isteresi; refresh hatch/pin solo se cambia mode. */
+  private applyPinModeLatch(): void {
+    if (!this.map) return;
+    const zoom = this.map.getZoom();
+    this.currentZoomLevel.set(zoom);
+    const prev = this.pinModeActive();
+    const next = resolvePinMode(zoom, prev);
+    if (next === prev) {
+      // Zoom drift senza cambio mode: niente ridisegno hatch/pin.
+      return;
+    }
+    this.pinModeActive.set(next);
+    this.refreshHatchingStyles();
+    this.syncSummaryMarkerVisibility();
   }
 
   private onMapClick(e: maplibregl.MapMouseEvent): void {
@@ -600,7 +623,7 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
     if (original?._radarHandled) return;
     if (this.focusCountryCode() && this.articles().length > 0) return;
 
-    if (this.currentZoomLevel() < MAP_ZOOM_PIN_THRESHOLD) {
+    if (this.isZoomedOut()) {
       const code = this.pickCountryCodeAt(e.point);
       if (code) {
         if (original) original._radarHandled = true;
@@ -700,7 +723,7 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
       this.map.on('click', this.COUNTRIES_FILL, (e: MapLayerMouseEvent) => {
         if (this.shouldIgnoreCountryClick()) return;
         // Solo fill zoom-out + nazioni con notizie.
-        if (this.currentZoomLevel() >= MAP_ZOOM_PIN_THRESHOLD) return;
+        if (this.pinModeActive()) return;
         const feat = e.features?.[0];
         const code = String(feat?.properties?.['ISO3166-1-Alpha-2'] ?? '');
         if (!code || code === 'XX') return;
@@ -991,7 +1014,7 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
     if (!this.map || !this.countriesGeoJson) return;
     this.ensureCountryCategoryFillLayers();
     this.silenceLegacyCategoryFillLayers();
-    const zoomedOut = this.currentZoomLevel() < MAP_ZOOM_PIN_THRESHOLD;
+    const zoomedOut = this.isZoomedOut();
     const docStyle = getComputedStyle(document.documentElement);
     const strokeActive =
       docStyle.getPropertyValue('--color-map-stroke-active').trim() || 'rgba(0, 212, 255, 0.25)';
@@ -1366,7 +1389,7 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
 
   private syncSummaryMarkerVisibility(): void {
     if (!this.map) return;
-    const show = this.map.getZoom() >= MAP_ZOOM_PIN_THRESHOLD && this.articles().length === 0;
+    const show = this.pinModeActive() && this.articles().length === 0;
     for (const m of this.summaryMarkers) {
       const el = m.getElement();
       el.style.display = show ? '' : 'none';

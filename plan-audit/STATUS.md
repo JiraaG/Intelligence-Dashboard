@@ -59,12 +59,13 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 | Fase C — Dedup semantica `pgvector` | **BACKLOG** | Vedi `radar_overview_and_upgrades.md` §3.C; non iniziata; indipendente da H / A |
 | Fase A — LLM locale AMD/Ollama | **COMPLETE** | Impl + VRAM **DONE**. Scorecard fixture = opz. Piano [`complete/plan_impl_fase_A_local_amd_ollama.md`](complete/plan_impl_fase_A_local_amd_ollama.md). |
 | Fase H — Grafo geospaziale | **DONE** | related_countries + GET /api/map-relations + archi mappa + chip carosello (2026-07-18). |
-| Archi UI (multicolore + click) | **DONE** | Piano [`complete/plan_archi_hatching_multicolor.md`](complete/plan_archi_hatching_multicolor.md). **MapLibre:** residuo opzionale “multicolore anche ≥5” **chiuso** (`0d942ed`). Leaflet legacy: dash+fan ≥5 invariato. |
+| Archi UI (multicolore + click) | **DONE** | Piano [`complete/plan_archi_hatching_multicolor.md`](complete/plan_archi_hatching_multicolor.md). **MapLibre:** residuo opzionale “multicolore anche ≥5” **chiuso** (`0d942ed`). Leaflet legacy: dash+fan su latch pin (`MAP_ZOOM_PIN_THRESHOLD=4` + isteresi). |
 | Relazioni filtro nazioni (Wave 1) | **DONE** | [`complete/plan_impl_map_relations_nation_filter.md`](complete/plan_impl_map_relations_nation_filter.md). Prossimo: spike Wave 2 elevate. |
+| Pin zoom soglia + isteresi globo | **DONE** | `MAP_ZOOM_PIN_THRESHOLD=4`, `MAP_ZOOM_PIN_HYSTERESIS=0.4`, `resolvePinMode` / `pinModeActive` — anti-flicker pan MapLibre globe. |
 
 **Nessun residuo operativo obbligatorio sulla Fase A / B / H / archi UI / W1 filtri / classification refine / map anchors / Profilo F core / audit env.** Branch di riferimento feature: `feature/upgrades`. Candidata immediata relazioni: **Wave 2 archi elevati**. Blueprint parallelo: **§3.C pgvector**.
 
-**Restore points (catena `feature/upgrades`):** W1 filtri nazioni **`ec771b1`**; archi MapLibre solidi `0d942ed`; docs LLM env `c9ef842`; Profilo F + VRAM `2996625`; Local-Hybrid `54c8038`; map anchors `a240b3c`; click hatching `911463a`; classification/geo `f7cf83d`; archi UI Leaflet `5c74e57`.
+**Restore points (catena `feature/upgrades`):** pin threshold+hysteresis **`8086d15`**; toolbar unify Sentiment/Tipologia `33c348e`; W1 filtri nazioni **`ec771b1`**; archi MapLibre solidi `0d942ed`; docs LLM env `c9ef842`; Profilo F + VRAM `2996625`; Local-Hybrid `54c8038`; map anchors `a240b3c`; click hatching `911463a`; classification/geo `f7cf83d`; archi UI Leaflet `5c74e57`.
 
 Prompt Final Release: [`prompts/done/audit_prompt_final_release_gate.md`](prompts/done/audit_prompt_final_release_gate.md) — **non rieseguire** (F0–F4 chiusi).
 

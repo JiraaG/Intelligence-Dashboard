@@ -858,7 +858,7 @@ describe('RadarMapLeafletComponent (Phase 4)', () => {
     ]);
   });
 
-  it('emits countryClicked on map click at zoom < 5 over a hatched nation (canvas bypass)', async () => {
+  it('emits countryClicked on map click at zoom < MAP_ZOOM_PIN_THRESHOLD over a hatched nation (canvas bypass)', async () => {
     const countries: CountrySummary[] = [
       { country_code: 'DE', categories: ['Energia'], article_count: 2 },
     ];
@@ -885,7 +885,7 @@ describe('RadarMapLeafletComponent (Phase 4)', () => {
     expect(emitted).toEqual([{ countryCode: 'DE' }]);
   });
 
-  it('does not emit countryClicked on map click at zoom >= 5 over a nation', async () => {
+  it('does not emit countryClicked on map click at zoom >= MAP_ZOOM_PIN_THRESHOLD over a nation', async () => {
     const countries: CountrySummary[] = [
       { country_code: 'DE', categories: ['Energia'], article_count: 2 },
     ];

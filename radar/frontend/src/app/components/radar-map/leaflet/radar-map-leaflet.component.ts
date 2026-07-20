@@ -18,6 +18,7 @@ import { Article, CountrySummary, PrimaryCategory } from '../../../models/articl
 import { MapSummaryRow } from '../../../models/map-summary.model';
 import { MapRelationRow } from '../../../models/map-relation.model';
 import { CountryOpenRequest, RelationOpenRequest } from '../radar-map.types';
+import { resolvePinMode } from '../maplibre/great-circle';
 
 export type { CountryOpenRequest, RelationOpenRequest } from '../radar-map.types';
 
@@ -77,7 +78,7 @@ function getLeaflet(): LeafletGlobal | null {
 }
 
 /**
- * Mappa Leaflet Radar: hatching GeoJSON (zoom &lt; 5), pin day-view da map-summary,
+ * Mappa Leaflet Radar: hatching GeoJSON (zoom &lt; MAP_ZOOM_PIN_THRESHOLD), pin day-view da map-summary,
  * cluster per-categoria in nation detail con spiderfy custom (hub + fan emoji).
  *
  * Runtime sempre via ``window.L``. Read/unread: fingerprint geometria + sync DOM
@@ -116,10 +117,22 @@ export class RadarMapLeafletComponent implements AfterViewInit {
   relationClicked = output<RelationOpenRequest>();
 
   currentZoomLevel = signal<number>(3);
-  /** True se zoom &lt; 5 (macro: hatching, pin summary nascosti). */
-  isZoomedOut = computed(() => this.currentZoomLevel() < 5);
+  /** Pin mode latched (isteresi — parity MapLibre globe zoom drift). */
+  private readonly pinModeActive = signal(false);
+  /** True in modalità hatching (pin summary nascosti). */
+  isZoomedOut = computed(() => !this.pinModeActive());
   isParsingGeoJson = signal<boolean>(true);
   mapUnavailable = signal<boolean>(false);
+
+  /** Riallinea il latch pin da `map.getZoom()` (isteresi) e restituisce lo stato. */
+  private readPinMode(): boolean {
+    if (!this.map) return this.pinModeActive();
+    const zoom = this.map.getZoom();
+    this.currentZoomLevel.set(zoom);
+    const next = resolvePinMode(zoom, this.pinModeActive());
+    this.pinModeActive.set(next);
+    return next;
+  }
 
   private readonly CATEGORY_ICONS: Record<string, string> = {
     Nucleare: '☢️',
@@ -472,7 +485,7 @@ export class RadarMapLeafletComponent implements AfterViewInit {
       // relationsPane canvas (z550) sta sopra i poligoni GeoJSON e ruba i DOM hit:
       // in zoom-out (hatching) ripristina il click-nazione via point-in-polygon,
       // stesso path di toolbar LETTE/TROVATE (fitBounds + spiderfy via App).
-      if (this.currentZoomLevel() < 5) {
+      if (!this.readPinMode()) {
         const code = this.pickCountryCodeAt(e.latlng);
         if (code) {
           if (original) {
@@ -579,7 +592,7 @@ export class RadarMapLeafletComponent implements AfterViewInit {
         if (arts.length > 0) this.clusterClicked.emit(arts);
 
         const currentZoom = this.map.getZoom();
-        // Nota: qui soglia in-place = 6; focusAndSpiderfyCategory usa ≥5 (drift interno).
+        // Nota: qui soglia in-place = 6; focusAndSpiderfyCategory usa ≥ MAP_ZOOM_PIN_THRESHOLD (drift interno).
         const targetZoom = 6;
         const gen = ++this.spiderfyGeneration;
 
@@ -621,12 +634,11 @@ export class RadarMapLeafletComponent implements AfterViewInit {
 
     this.map.on('zoomend', () => {
       if (this.destroyed || !this.map) return;
-      const zoom = this.map.getZoom();
-      this.currentZoomLevel.set(zoom);
+      const pinMode = this.readPinMode();
       this.refreshHatchingStyles();
       this.syncSummaryMarkerVisibility();
 
-      const isLegacyZoom = zoom >= 5;
+      const isLegacyZoom = pinMode;
       const relationsChangedZoom =
         this.lastRelationsZoomWasLegacy !== null &&
         isLegacyZoom !== this.lastRelationsZoomWasLegacy;
@@ -637,16 +649,16 @@ export class RadarMapLeafletComponent implements AfterViewInit {
         this.drawGeospatialRelations(this.mapRelations());
       }
 
-      // Nation open: tieni spider fino a hatching (zoom < 5); sotto chiudi anche sidebar.
+      // Nation open: tieni spider in pin mode; sotto hatching chiudi anche sidebar.
       // MC zoom-unspiderfy disabilitato; ri-spiderfy dopo zoom per riposizionare le gambe.
       const nationOpen = this.articles().length > 0 || !!this.focusCountryCode();
-      // Serve lastSpiderfy: evita che fitBounds(maxZoom:4) chiuda la sidebar in race.
-      if (!this.isNavigating && nationOpen && zoom < 5 && !!this.lastSpiderfyCategory) {
+      // Serve lastSpiderfy: evita race fitBounds(maxZoom:4) vs chiusura sidebar.
+      if (!this.isNavigating && nationOpen && !pinMode && !!this.lastSpiderfyCategory) {
         this.collapseAllGraphs(true);
       } else if (
         !this.isNavigating &&
         nationOpen &&
-        zoom >= 5 &&
+        pinMode &&
         this.lastSpiderfyCountry &&
         this.lastSpiderfyCategory
       ) {
@@ -655,10 +667,10 @@ export class RadarMapLeafletComponent implements AfterViewInit {
         // Defer: lascia finire il bookkeeping zoom di MarkerCluster.
         this.scheduleTimeout(() => {
           if (this.destroyed || !this.map) return;
-          if (this.map.getZoom() < 5) return;
+          if (!this.pinModeActive()) return;
           this.focusAndSpiderfyCategory(country, category);
         }, 50);
-      } else if (zoom < 5 && !this.isNavigating && !nationOpen) {
+      } else if (!pinMode && !this.isNavigating && !nationOpen) {
         this.collapseAllGraphs(true);
       }
     });
@@ -804,7 +816,7 @@ export class RadarMapLeafletComponent implements AfterViewInit {
 
   /**
    * MarkerCluster registra map click → unspiderfy e zoom* → auto-unspiderfy.
-   * Li rimuoviamo: unspiderfy esplicito via collapseAllGraphs / hub / zoom&lt;5.
+   * Li rimuoviamo: unspiderfy esplicito via collapseAllGraphs / hub / zoom&lt;MAP_ZOOM_PIN_THRESHOLD.
    */
   private disableMarkerClusterMapClickUnspiderfy(cg: MarkerClusterGroupLike): void {
     if (!this.map) return;
@@ -927,13 +939,14 @@ export class RadarMapLeafletComponent implements AfterViewInit {
   }
 
   /**
-   * Hatching SVG solo con zoom &lt; 5 e countries() con categorie;
+   * Hatching SVG solo con zoom &lt; MAP_ZOOM_PIN_THRESHOLD e countries() con categorie;
    * altrimenti fill trasparente. Classe ``zoom-out-mode`` sul container.
    */
   private refreshHatchingStyles(): void {
     if (!this.map) return;
     const ctrs = this.countries();
-    const zoomedOut = this.currentZoomLevel() < 5;
+    this.readPinMode();
+    const zoomedOut = !this.pinModeActive();
 
     const svg = this.map.getContainer().querySelector('.leaflet-overlay-pane svg');
     let defs: SVGDefsElement | null = null;
@@ -1071,7 +1084,7 @@ export class RadarMapLeafletComponent implements AfterViewInit {
   /**
    * Hit-test nazione sotto ``latlng`` (path GeoJSON).
    * Preferisce paesi con notizie in ``countries()`` quando i bounds si sovrappongono.
-   * Usato dal map-click in zoom &lt; 5 perché il canvas relazioni blocca i click SVG.
+   * Usato dal map-click in zoom &lt; MAP_ZOOM_PIN_THRESHOLD perché il canvas relazioni blocca i click SVG.
    */
   private pickCountryCodeAt(latlng: Leaflet.LatLng): string | null {
     if (!this.map || !latlng) return null;
@@ -1366,10 +1379,10 @@ export class RadarMapLeafletComponent implements AfterViewInit {
     return best;
   }
 
-  /** Pin day-view solo a zoom ≥ 5 e senza nazione aperta. */
+  /** Pin day-view solo in pin mode (isteresi) e senza nazione aperta. */
   private syncSummaryMarkerVisibility(): void {
     if (!this.map || !this.summaryMarkerGroup) return;
-    const show = this.map.getZoom() >= 5 && this.articles().length === 0;
+    const show = this.readPinMode() && this.articles().length === 0;
     const onMap = this.map.hasLayer(this.summaryMarkerGroup);
     if (show && !onMap) {
       this.map.addLayer(this.summaryMarkerGroup);
@@ -1392,8 +1405,8 @@ export class RadarMapLeafletComponent implements AfterViewInit {
 
   /**
    * Disegna gli archi curvi di relazione geopolitica bilaterale.
-   * Se zoom >= 5 disegna in modalità legacy (per categoria, invariato).
-   * Se zoom < 5 disegna in modalità macro (linea singola multicolore).
+   * Se zoom >= MAP_ZOOM_PIN_THRESHOLD disegna in modalità legacy (per categoria, invariato).
+   * Se zoom < MAP_ZOOM_PIN_THRESHOLD disegna in modalità macro (linea singola multicolore).
    */
   private drawGeospatialRelations(relations: MapRelationRow[]): void {
     if (!this.relationsLayerGroup || !this.L || !this.map) return;
@@ -1404,7 +1417,7 @@ export class RadarMapLeafletComponent implements AfterViewInit {
       return;
     }
 
-    const isLegacyZoom = this.map.getZoom() >= 5;
+    const isLegacyZoom = this.readPinMode();
     this.lastRelationsZoomWasLegacy = isLegacyZoom;
 
     if (isLegacyZoom) {
@@ -2043,7 +2056,7 @@ export class RadarMapLeafletComponent implements AfterViewInit {
 
   /**
    * Apre spiderfy per una categoria nella nazione (carousel / hub click).
-   * In-place se zoom ≥ 5; altrimenti flyTo 6. Nota: clusterclick usa soglia 6.
+   * In-place se zoom ≥ MAP_ZOOM_PIN_THRESHOLD; altrimenti flyTo 6. Nota: clusterclick usa soglia 6.
    */
   public focusAndSpiderfyCategory(countryCode: string, category: string, attempt = 0): void {
     if (!this.map || this.destroyed) return;
@@ -2081,7 +2094,6 @@ export class RadarMapLeafletComponent implements AfterViewInit {
       }
     }
 
-    const currentZoom = this.map.getZoom();
     const targetZoom = 6;
     const visibleParent = cg.getVisibleParent(firstMarker) ?? firstMarker;
     const latLng =
@@ -2091,7 +2103,7 @@ export class RadarMapLeafletComponent implements AfterViewInit {
     const gen = ++this.spiderfyGeneration;
 
     // Zoom detail già ok: spiderfy in place — mai fitBounds/dezoom.
-    if (currentZoom >= 5) {
+    if (this.readPinMode()) {
       if (!this.spiderfyAndCreateRoot(cg, countryMarkers, gen)) {
         this.restoreNationHubPin();
       }
