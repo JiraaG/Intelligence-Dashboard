@@ -262,7 +262,8 @@ server {
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    # CSP: Angular + Carto tiles + Google Fonts (vedi nginx.conf reale)
+    # CSP SoT: radar/frontend/nginx.conf — apex Carto host AND wildcard subdomains required
+    # (wildcard-only breaks MapLibre style.json); also blob worker/child-src + Google Fonts.
 
     # Cache assets statici
     location ~* \.(js|css|png|jpg|ico|svg|woff2)$ {

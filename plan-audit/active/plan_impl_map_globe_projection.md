@@ -1,22 +1,22 @@
-# plan_impl_map_globe_projection — Fase J (upgrade globo vero)
+# plan_impl_map_globe_projection — Fase J (raffinamento globo)
 
-> **Stato:** Futuro / BACKLOG (non aprire finché Fase I non è GATE VERDE, salvo raffinamento globe già scelto in W1)  
+> **Stato:** Futuro / BACKLOG (non aprire finché non richiesto; Fase I già ha globe default)  
 > **Data:** 2026-07-20  
-> **Prerequisito:** [`plan_impl_map_3d_globe.md`](plan_impl_map_3d_globe.md) (Fase I) GATE VERDE  
+> **Prerequisito:** [`plan_impl_map_3d_globe.md`](plan_impl_map_3d_globe.md) (Fase I) codice shipped / GATE formale  
 > **Overview:** `radar_overview_and_upgrades.md` §3.J  
 
-Questo documento è il **dettaglio operativo** dell’ampliamento da mappa MapLibre in **2.5D** (mercator + pitch/bearing) al **globo vero** (`projection: globe`). Il piano base I **cita sempre** questo follow-up.
+Questo documento è il **dettaglio operativo** del **raffinamento** della proiezione globe MapLibre (performance / visuale / regressione parity). **Non** è più “abilitare globe da zero”: W1 ha già scelto `projection=globe` come default; `mercator+pitch` resta **contingency / rollback** (`localStorage radar.mapProjection=mercator`).
 
 ---
 
 ## 1. Contesto
 
-Fase I consegna MapLibre come renderer primario con **parity grafica** day-view / archi H / spider / saved / sidebar. Lo spike W1 può chiudere con:
+Fase I consegna MapLibre come renderer primario con **parity grafica** day-view / archi H / spider / saved / sidebar e **globe default**.
 
-| Esito W1 | Ruolo di questa Fase J |
+| Esito W1 (AS-IS) | Ruolo di questa Fase J |
 |----------|-------------------------|
-| `projection=globe` già ok | Raffinamento performance / visuale (opzionale) |
-| `projection=mercator+pitch` (2.5D) | **Obiettivo principale:** abilitare globe senza regressione parity |
+| `projection=globe` default | **Obiettivo:** raffinare perf/visuale + checklist regressione parity |
+| Ops incident / hardware debole | Rollback temporaneo a `radar.mapProjection=mercator` (2.5D) senza aprire J |
 
 Leaflet resta dormiente (`MAP_RENDERER=leaflet`); J **non** tocca il path 2D.
 
@@ -35,9 +35,9 @@ Leaflet resta dormiente (`MAP_RENDERER=leaflet`); J **non** tocca il path 2D.
 
 **Obiettivi**
 
-- Abilitare / stabilizzare `map.setProjection({ type: 'globe' })` (o API equivalente della major pinnata in I).
-- Conservare parity Tests 1–7 (spatial-mocking adattato): hatching, pin HTML, archi great-circle, hub/spider, saved, sidebar.
-- Flag runtime `MAP_PROJECTION=mercator|globe` (default: `mercator` finché J non verde; poi `globe` se budget ok).
+- Stabilizzare / raffinare `map.setProjection({ type: 'globe' })` (perf, clipping, marker anchoring) sulla major pinnata in I.
+- Conservare parity Tests 1–7 (spatial-mocking): hatching, pin HTML, archi great-circle, hub/spider, saved, sidebar.
+- Flag runtime `radar.mapProjection` = `globe`|`mercator` (**default AS-IS: `globe`**; mercator = contingency/ops).
 
 **Non obiettivi**
 
@@ -84,7 +84,9 @@ Su build I stabile, stesso dataset mock/prod:
 ## 7. Rollback
 
 ```text
-MAP_PROJECTION=mercator   # default se J non verde / ops incident
+MAP_PROJECTION / localStorage radar.mapProjection=globe   # default AS-IS (Fase I)
+# contingency ops:
+# localStorage.setItem('radar.mapProjection','mercator')
 MAP_PROJECTION=globe      # post GATE J
 ```
 

@@ -263,7 +263,7 @@ Il componente `p-sidebar` di PrimeNG può essere usato come wrapper UI.
 
 ## Regola 7: Clustering per categoria + map-summary (Phase 5+)
 
-**Day open (Phase 5):** la mappa si dipinge da `GET /api/map-summary` (righe `country_code × primary_category` + count/read + lat/lon finite). Niente `Article[]` globale del giorno. Hatching da categorie aggregate per paese (zoom &lt; 5). A zoom ≥ 5: **un pin nazione** (conteggio + anello conic categorie) — non pallini numerati per-categoria. Click pin → fetch nazione + sidebar (`preserveZoom: true`, niente dezoom). Click hatching (zoom &lt; 5) → map-click + `pickCountryCodeAt` (canvas `relationsPane` ruba i hit SVG) → stesso path toolbar. Click poligono/toolbar → nation open + `fitBounds` (`maxZoom: 4`). Hub/pin/spider e archi: anchor = `getCountryCentroid` (US/RU mainland), **non** media lat/lng articolo.
+**Day open (Phase 5):** la mappa si dipinge da `GET /api/map-summary` (righe `country_code × primary_category` + count/read + lat/lon finite). Niente `Article[]` globale del giorno. Hatching zoom &lt; 5: **MapLibre** = fasce soft O→E (1 colore × tipologia da `map-summary`; mainland US/RU); **Leaflet** legacy = SVG combo. A zoom ≥ 5: **un pin nazione** (conteggio + anello conic categorie) — non pallini numerati per-categoria. Click pin → fetch nazione + sidebar (`preserveZoom: true`, niente dezoom). Click hatching (zoom &lt; 5) → map-click + `pickCountryCodeAt` (canvas `relationsPane` ruba i hit SVG) → stesso path toolbar. Click poligono/toolbar → nation open + `fitBounds` (`maxZoom: 4`). Hub/pin/spider e archi: anchor = `getCountryCentroid` (US/RU mainland), **non** media lat/lng articolo.
 
 **Saved vault:** `GET /api/saved-summary` (no date) alimenta `NOTIZIE SALVATE` + tooltip nazioni; click → `loadSavedCountryArticles` + carosello multi-day con `sidebarMode='saved'`; **stesso path mappa di LETTE/TROVATE** (`fitBounds` + `flyTo` zoom 6 + spiderfy categoria + highlight). Card **Salva notizia** / **Rimuovi dai salvati**; save ⇒ read; unread ⇒ unsave.
 
@@ -367,6 +367,7 @@ npm ci
 > **Default:** MapLibre GL — host `components/radar-map/maplibre/`, facade `radar-map.component.ts`, token `MAP_RENDERER` (`services/map-renderer.token.ts`, default `maplibre`). Gate: `npm run verify-map-renderer`.
 > Proiezione: `localStorage` `radar.mapProjection` = `globe` \| `mercator`.
 > Spiderfy MapLibre: hub + fan HTML custom — **senza** MarkerCluster.
+> Hatching MapLibre: fasce soft O→E (`country-category-fills.ts`; 1 colore × tipologia da `map-summary`) — **non** `fill-pattern` barcode.
 > Resize overlay: `map.resize()` (non `invalidateSize`).
 
 ### Leaflet + ESBuild — solo host legacy (`MAP_RENDERER=leaflet`)

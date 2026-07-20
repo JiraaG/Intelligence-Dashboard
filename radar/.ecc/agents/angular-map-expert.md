@@ -129,7 +129,7 @@ this.http.get<GeoJSON.FeatureCollection>('assets/data/countries.geo.json')
 
 ### Configurazione (MapLibre default)
 
-Sviluppo attivo su `radar-map/maplibre/`. Overlay resize: `map.resize()`. Spiderfy: hub + fan HTML custom (**senza** MarkerCluster; spirale se n≥9). Archi: great-circle + **geometric dash** a zoom pin; hover = Popup + thicken paint su `arcKey`. Hatching: canvas `fill-pattern` multi-cat (non fill solido `categories[0]`). Proiezione: `localStorage` `radar.mapProjection` = `globe`|`mercator`. Globe: **no** `maxBounds`; CSP Nginx deve permettere apex `basemaps.cartocdn.com`.
+Sviluppo attivo su `radar-map/maplibre/`. Overlay resize: `map.resize()`. Spiderfy: hub + fan HTML custom (**senza** MarkerCluster; spirale se n≥9). Archi: great-circle + **geometric dash** a zoom pin; hover = Popup + thicken paint su `arcKey`. Hatching: fasce longitudinali soft (1 colore × tipologia da `map-summary`; mainland US/RU / largest-polygon; opacità ~0.34; `country-category-fills.ts`; **non** `fill-pattern` barcode; **non** fill solo `categories[0]`). Proiezione: `localStorage` `radar.mapProjection` = `globe`|`mercator`. Globe: **no** `maxBounds`; CSP Nginx deve permettere apex `basemaps.cartocdn.com`.
 
 ### Path Leaflet legacy (solo se `MAP_RENDERER=leaflet`)
 

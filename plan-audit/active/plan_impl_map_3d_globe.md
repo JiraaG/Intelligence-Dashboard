@@ -29,7 +29,7 @@
 
 | Feature AS-IS                                 | Gap 3D                                         | Mitigation                                                                                                                                     |
 | --------------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Day hatching zoom < 5 (SVG pattern multi-cat) | No SVG overlay Leaflet                         | Fill GeoJSON `fill-pattern` / canvas pattern in MapLibre style, o layer fill + hatch texture generata; soglia zoom equivalente (world→country) |
+| Day hatching zoom < 5 (SVG pattern multi-cat) | No SVG overlay Leaflet                         | **AS-IS MapLibre:** fasce soft O→E (1 colore × tipologia; mainland US/RU). Spike storico: `fill-pattern` / canvas — **superseded** post-ship (leggibilità globo). Leaflet legacy: SVG combo. Soglia zoom invariata |
 | Pin nazione conic-gradient (DivIcon)          | CSS conic non nativo WebGL                     | **HTML Marker** overlay (stesso DOM/CSS di oggi) ancorato al centroide                                                                         |
 | Hub `radar-spider-root` + spiderfy emoji MC   | `leaflet.markercluster` non esiste in MapLibre | Riscrittura fan custom (HTML markers su cerchio) + stessa policy zoom ≥5 keep / <5 collapse; **niente** MC                                     |
 | Dummy markers + `maxClusterRadius: 40`        | N/A in 3D                                      | Eliminare dummy; un hub per nazione + fan per categoria attiva                                                                                 |
@@ -42,7 +42,7 @@
 | Full-bleed + `invalidateSize`                 | `map.resize()`                                 | Chiamare su open/close sidebar / window resize                                                                                                 |
 | Saved parity fitBounds+flyTo6+spiderfy        | Camera 3D                                      | `fitBounds`/`flyTo` MapLibre + stesso path State                                                                                               |
 | Carto dark tiles                              | CDN vs air-gap                                 | Online: style URL Carto/MapLibre demotiles; offline: §3.D vector/raster via `/tiles/`                                                          |
-| `window.L` scripts[]                          | UMD MC                                         | Rimuovere Leaflet da `angular.json` post-GATE; MapLibre via **dynamic `import()`** lazy chunk (evitare ESM trap MarkerCluster)                 |
+| `window.L` scripts[]                          | UMD MC                                         | **Conservare** `angular.json` `scripts[]` per path Leaflet dormiente post-GATE; **non** rimuovere. Lazy dual-host = residual futuro (oggi facade eager-importa entrambi) |
 | GeoJSON ~14MB incremental rAF                 | Stesso asset                                   | Conservare parse batched; preferire source MapLibre nativo + simplify se spike lo richiede                                                     |
 
 
@@ -118,7 +118,7 @@ flowchart TD
 
 **Archi + pin per stack scelto:**
 
-- Archi: precompute great-circle (n punti) → GeoJSON MultiLineString; macro = segmenti colorati ∝ volume; pin-zoom = `line-dasharray` + fan offset; click su wide transparent hit layer.
+- Archi: precompute great-circle (n punti) → GeoJSON LineString; macro = segmenti colorati ∝ volume; pin-zoom = **geometric dash** (segmenti + gap; **non** `line-dasharray` pixel) + fan offset; click su hit layer largo + hover thicken/tooltip.
 - Pin/hub/spider: HTML overlay (riuso CSS conic in `[styles.scss](radar/frontend/src/styles.scss)`); fan emoji = markers su angoli equispaziati.
 
 **Air-gap (§3.D):** MapLibre **non** richiede terrain/imagery Cesium Ion. Fallback online→offline = cambio `style` URL a `/tiles/...` (aggiornare blueprint D: non solo PNG Leaflet). Terrain DEM = **out of scope** v1 (globe ellipsoid / flat-mercator+globe projection basta).
@@ -503,10 +503,10 @@ Correzioni dopo primo deploy Docker (non invalidano W1; aggiornano il SoT operat
 |------|----------------|
 | CSP Nginx | Apex `basemaps.cartocdn.com` **obbligatorio** oltre `*.basemaps…`; `blob:` worker/child |
 | Globe navigation | **Niente** `maxBounds` su globe; `clickTolerance: 12`; ignore click post drag/rotate/pitch |
-| Hatching | Canvas combo → `fill-pattern` (non fill solido `categories[0]`); `setData` paesi solo se fingerprint hatch cambia |
+| Hatching | Fasce soft O→E (1 colore × tipologia da `map-summary`; mainland US/RU / largest-polygon; helper `country-category-fills.ts`; **non** `fill-pattern` barcode; **non** fill solo `categories[0]`); fingerprint evita `setData` paesi inutili |
 | Archi ≥5 | **Geometric dash** (segmenti), non `line-dasharray` pixel; hover = paint `arcKey` + Popup |
 | Centroidi | Largest-polygon + hardcode US/RU/**NL** |
 | Spiderfy | Pixel layout; n≥9 **spirale** MC; **no** `clusterClicked.emit(arts)` in spiderfy |
 | Budget FE | `angular.json` warn 2MB / error 3MB + `allowedCommonJsDependencies: maplibre-gl` |
 
-**Residui accettati (non bloccanti GATE I):** mid-zoom category clusters Leaflet MC non replicati 1:1; hatch su globe può restare leggermente soft (limite `fill-pattern`); §3.J globo raffinato resta Futuro; STATUS.md non aggiornato finché non richiesto.
+**Residui accettati (non bloccanti GATE I):** mid-zoom category clusters Leaflet MC non replicati 1:1; §3.J globo raffinato resta Futuro; STATUS.md non aggiornato finché non richiesto.

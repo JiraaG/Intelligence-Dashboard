@@ -26,6 +26,7 @@ import { MapSummaryRow } from '../../../models/map-summary.model';
 import { MapRelationRow } from '../../../models/map-relation.model';
 import { CountryOpenRequest, RelationOpenRequest } from '../radar-map.types';
 import { greatCircle, MAP_ZOOM_PIN_THRESHOLD } from './great-circle';
+import { splitCountryByCategories } from './country-category-fills';
 
 interface LatLng {
   lat: number;
@@ -39,7 +40,7 @@ interface SpiderArticleMarker {
 }
 
 /**
- * Host MapLibre Radar: hatching GeoJSON (zoom &lt; 5), pin day-view, archi great-circle,
+ * Host MapLibre Radar: fasce soft per tipologia (zoom &lt; 5), pin day-view, archi great-circle,
  * hub + spiderfy emoji custom (no MarkerCluster).
  *
  * @see plan-audit/active/plan_impl_map_3d_globe.md
@@ -116,6 +117,8 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
   private readonly COUNTRIES_SOURCE = 'radar-countries';
   private readonly COUNTRIES_FILL = 'radar-countries-fill';
   private readonly COUNTRIES_LINE = 'radar-countries-line';
+  private readonly COUNTRY_CAT_SOURCE = 'radar-country-cat-fills';
+  private readonly COUNTRY_CAT_FILL = 'radar-country-cat-fill';
   private readonly RELATIONS_SOURCE = 'radar-relations';
   private readonly RELATIONS_LINE = 'radar-relations-line';
   private readonly RELATIONS_HIT = 'radar-relations-hit';
@@ -142,7 +145,6 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
   private detailArticlesByCategory = new Map<string, Article[]>();
   private highlightedEl: HTMLElement | null = null;
   private pendingHighlightArticle: Article | null = null;
-  private hatchImageIds = new Set<string>();
   private relationPopup: maplibregl.Popup | null = null;
   private hoveredArcKey: string | null = null;
   private lastHatchFingerprint = '';
@@ -151,10 +153,10 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
   private suppressNextMapClick = false;
   private suppressCountryClickUntil = 0;
   private readonly DRAG_CLICK_PX = 6;
-  private readonly HATCH_EMPTY_ID = 'hatch-empty';
-  /** Pattern più grandi + pixelRatio 2 → griglie meno sfocate su globe/mercator. */
-  private readonly HATCH_PATTERN_SIZE = 64;
-  private readonly HATCH_PIXEL_RATIO = 2;
+  /** Opacità soft ma leggibile (Infrastrutture grigio resta visibile). */
+  private readonly CATEGORY_FILL_OPACITY = 0.34;
+  /** Ordine legenda = ordine fasce O→E (stesso mentale della toolbar). */
+  private readonly CATEGORY_LEGEND_ORDER = Object.keys(this.CATEGORY_CSS_VARS);
 
   constructor() {
     effect(() => {
@@ -673,19 +675,21 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
         data: this.countriesGeoJson,
         promoteId: '_radarId',
       });
-      this.ensureHatchEmptyImage();
+      this.ensureCountryCategoryFillLayers();
+      this.silenceLegacyCategoryFillLayers();
+      // Hit-layer quasi invisibile: click zoom-out sulle nazioni con notizie.
       this.map.addLayer({
         id: this.COUNTRIES_FILL,
         type: 'fill',
         source: this.COUNTRIES_SOURCE,
         paint: {
-          'fill-pattern': [
+          'fill-color': '#ffffff',
+          'fill-opacity': [
             'case',
-            ['!=', ['coalesce', ['get', 'hatchId'], ''], ''],
-            ['get', 'hatchId'],
-            this.HATCH_EMPTY_ID,
+            ['==', ['to-number', ['coalesce', ['get', 'fillActive'], 0]], 1],
+            0.01,
+            0,
           ],
-          'fill-opacity': ['case', ['!=', ['coalesce', ['get', 'hatchId'], ''], ''], 0.35, 0],
         },
       });
       this.map.addLayer({
@@ -703,7 +707,7 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
 
       this.map.on('click', this.COUNTRIES_FILL, (e: MapLayerMouseEvent) => {
         if (this.shouldIgnoreCountryClick()) return;
-        // Solo hatching zoom-out + nazioni con notizie (fill trasparente a zoom ≥5 non deve rubare click).
+        // Solo fill zoom-out + nazioni con notizie.
         if (this.currentZoomLevel() >= MAP_ZOOM_PIN_THRESHOLD) return;
         const feat = e.features?.[0];
         const code = String(feat?.properties?.['ISO3166-1-Alpha-2'] ?? '');
@@ -927,99 +931,74 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
   }
 
   private resolveCategoryColor(category: string, docStyle: CSSStyleDeclaration): string {
+    // Infrastrutture (#9e9e9e) a bassa opacità sparisce sul basemap scuro — fill dedicato più chiaro.
+    if (category === 'Infrastrutture') return '#c5ccd6';
     const cssVar = this.CATEGORY_CSS_VARS[category] || '--color-text-accent';
     return docStyle.getPropertyValue(cssVar).trim() || '#58a6ff';
   }
 
-  private ensureHatchEmptyImage(): void {
-    if (!this.map || this.hatchImageIds.has(this.HATCH_EMPTY_ID)) return;
-    if (this.map.hasImage(this.HATCH_EMPTY_ID)) {
-      this.hatchImageIds.add(this.HATCH_EMPTY_ID);
-      return;
+  /** Categorie per nazione da map-summary (stessa SoT dei pin / carosello). */
+  private categoriesByCountryFromSummary(summary: MapSummaryRow[]): Map<string, string[]> {
+    const grouped = new Map<string, Set<string>>();
+    for (const row of summary) {
+      const code = row.country_code || '';
+      if (!code || code === 'XX' || row.article_count <= 0) continue;
+      const set = grouped.get(code) ?? new Set<string>();
+      set.add(row.primary_category);
+      grouped.set(code, set);
     }
-    const data = new Uint8Array(4); // transparent 1×1 RGBA
-    this.map.addImage(this.HATCH_EMPTY_ID, { width: 1, height: 1, data }, { pixelRatio: 1 });
-    this.hatchImageIds.add(this.HATCH_EMPTY_ID);
+    const out = new Map<string, string[]>();
+    grouped.forEach((set, code) => {
+      out.set(code, Array.from(set));
+    });
+    return out;
   }
 
-  /** Canvas hatch patterns matching Leaflet getOrCreateComboPattern line layout. */
-  private getOrCreateComboPatternImage(categories: string[]): string {
-    if (!this.map || categories.length === 0) return this.HATCH_EMPTY_ID;
-    const sortedCats = [...categories].sort();
-    const id = 'hatch-grid-' + sortedCats.map((c) => c.toLowerCase().replace(/ /g, '-')).join('-');
-    if (this.hatchImageIds.has(id) || this.map.hasImage(id)) {
-      this.hatchImageIds.add(id);
-      return id;
-    }
+  private categoryFillLayerId(category: string): string {
+    return `${this.COUNTRIES_FILL}-${category.toLowerCase().replace(/ /g, '-')}`;
+  }
 
-    const size = this.HATCH_PATTERN_SIZE;
-    const scale = size / 24; // layout pensato su tile 24×24 Leaflet
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return this.HATCH_EMPTY_ID;
-
-    const docStyle = getComputedStyle(document.documentElement);
-    const baseColor = this.resolveCategoryColor(sortedCats[0], docStyle);
-    ctx.fillStyle = baseColor;
-    ctx.globalAlpha = 0.08;
-    ctx.fillRect(0, 0, size, size);
-    ctx.globalAlpha = 1;
-
-    ctx.lineWidth = Math.max(2.5, 2.2 * scale);
-    ctx.lineCap = 'round';
-    ctx.globalAlpha = 0.9;
-
-    const stroke = (cat: string, x1: number, y1: number, x2: number, y2: number): void => {
-      ctx.strokeStyle = this.resolveCategoryColor(cat, docStyle);
-      ctx.beginPath();
-      ctx.moveTo(x1 * scale, y1 * scale);
-      ctx.lineTo(x2 * scale, y2 * scale);
-      ctx.stroke();
-    };
-
-    if (sortedCats.length === 1) {
-      stroke(sortedCats[0], 0, 24, 24, 0);
-      stroke(sortedCats[0], 0, 0, 24, 24);
-    } else {
-      for (let i = 0; i < sortedCats.length; i++) {
-        const cat = sortedCats[i];
-        if (i === 0) stroke(cat, 0, 24, 24, 0);
-        else if (i === 1) stroke(cat, 0, 0, 24, 24);
-        else if (i === 2) stroke(cat, 0, 12, 24, 12);
-        else if (i === 3) stroke(cat, 12, 0, 12, 24);
-        else if (i === 4) {
-          stroke(cat, 0, 12, 12, 0);
-          stroke(cat, 12, 24, 24, 12);
-        } else if (i === 5) {
-          stroke(cat, 12, 0, 24, 12);
-          stroke(cat, 0, 12, 12, 24);
-        } else if (i === 6) stroke(cat, 0, 6, 24, 6);
-        else if (i === 7) stroke(cat, 0, 18, 24, 18);
-        else if (i === 8) stroke(cat, 6, 0, 6, 24);
-        else stroke(cat, 18, 0, 18, 24);
+  /** Nasconde i fill solidi per-categoria della iterazione precedente (se presenti). */
+  private silenceLegacyCategoryFillLayers(): void {
+    if (!this.map) return;
+    for (const category of Object.keys(this.CATEGORY_CSS_VARS)) {
+      const layerId = this.categoryFillLayerId(category);
+      if (this.map.getLayer(layerId)) {
+        this.map.setPaintProperty(layerId, 'fill-opacity', 0);
       }
     }
+  }
 
-    const imageData = ctx.getImageData(0, 0, size, size);
-    this.map.addImage(
-      id,
+  /** Source + layer delle fasce tipologia (una fascia geografica per colore, no tile ripetuto). */
+  private ensureCountryCategoryFillLayers(): void {
+    if (!this.map) return;
+    if (!this.map.getSource(this.COUNTRY_CAT_SOURCE)) {
+      this.map.addSource(this.COUNTRY_CAT_SOURCE, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+    }
+    if (this.map.getLayer(this.COUNTRY_CAT_FILL)) return;
+    const beforeId = this.map.getLayer(this.COUNTRIES_FILL) ? this.COUNTRIES_FILL : undefined;
+    this.map.addLayer(
       {
-        width: size,
-        height: size,
-        data: new Uint8Array(imageData.data.buffer.slice(0)),
+        id: this.COUNTRY_CAT_FILL,
+        type: 'fill',
+        source: this.COUNTRY_CAT_SOURCE,
+        paint: {
+          'fill-color': ['coalesce', ['get', 'fillColor'], '#58a6ff'],
+          'fill-opacity': 0,
+          'fill-antialias': true,
+        },
       },
-      { pixelRatio: this.HATCH_PIXEL_RATIO },
+      beforeId,
     );
-    this.hatchImageIds.add(id);
-    return id;
   }
 
   private refreshHatchingStyles(): void {
     if (!this.map || !this.countriesGeoJson) return;
-    this.ensureHatchEmptyImage();
-    const ctrs = this.countries();
+    this.ensureCountryCategoryFillLayers();
+    this.silenceLegacyCategoryFillLayers();
     const zoomedOut = this.currentZoomLevel() < MAP_ZOOM_PIN_THRESHOLD;
     const docStyle = getComputedStyle(document.documentElement);
     const strokeActive =
@@ -1027,34 +1006,58 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
     const stroke =
       docStyle.getPropertyValue('--color-map-stroke').trim() || 'rgba(0, 212, 255, 0.15)';
 
-    const byCode = new Map(ctrs.map((c) => [c.country_code, c]));
+    // Stessa SoT dei pin: map-summary filtrato (non un rollup parallelo).
+    const catsByCode = this.categoriesByCountryFromSummary(this.mapSummary());
     const hatchAssignments: string[] = [];
-    const features = this.countriesGeoJson.features.map((feature) => {
+    const stripFeatures: GeoJSON.Feature[] = [];
+    const paintedCodes = new Set<string>();
+
+    const hitFeatures = this.countriesGeoJson.features.map((feature) => {
       const code = String(feature.properties?.['ISO3166-1-Alpha-2'] ?? '');
-      const summary = code ? byCode.get(code) : undefined;
-      let hatchId = '';
-      if (zoomedOut && summary?.categories?.length) {
-        hatchId = this.getOrCreateComboPatternImage(summary.categories);
+      const cats = zoomedOut && code ? (catsByCode.get(code) ?? []) : [];
+      const fillActive = cats.length > 0 ? 1 : 0;
+      hatchAssignments.push(`${code}:${[...cats].sort().join('+')}`);
+      // Una sola geometria per country_code (evita doppi set di fasce).
+      if (cats.length > 0 && !paintedCodes.has(code)) {
+        paintedCodes.add(code);
+        stripFeatures.push(
+          ...splitCountryByCategories(
+            feature,
+            cats,
+            (cat) => this.resolveCategoryColor(cat, docStyle),
+            this.CATEGORY_LEGEND_ORDER,
+          ),
+        );
       }
-      hatchAssignments.push(`${code}:${hatchId}`);
       return {
         ...feature,
         properties: {
           ...(feature.properties ?? {}),
-          hatchId,
+          fillActive,
         },
       };
     });
 
-    // Evita setData del GeoJSON paesi (~14MB) a ogni zoomend se nulla è cambiato (stutter pan/rotate).
     const fingerprint = `${zoomedOut ? 1 : 0}|${hatchAssignments.join(',')}`;
     if (fingerprint !== this.lastHatchFingerprint) {
       this.lastHatchFingerprint = fingerprint;
-      this.countriesGeoJson = { type: 'FeatureCollection', features };
-      const source = this.map.getSource(this.COUNTRIES_SOURCE) as GeoJSONSource | undefined;
-      if (source) {
-        source.setData(this.countriesGeoJson);
+      this.countriesGeoJson = { type: 'FeatureCollection', features: hitFeatures };
+      const countrySource = this.map.getSource(this.COUNTRIES_SOURCE) as GeoJSONSource | undefined;
+      if (countrySource) {
+        countrySource.setData(this.countriesGeoJson);
       }
+      const catSource = this.map.getSource(this.COUNTRY_CAT_SOURCE) as GeoJSONSource | undefined;
+      if (catSource) {
+        catSource.setData({ type: 'FeatureCollection', features: stripFeatures });
+      }
+    }
+
+    if (this.map.getLayer(this.COUNTRY_CAT_FILL)) {
+      this.map.setPaintProperty(
+        this.COUNTRY_CAT_FILL,
+        'fill-opacity',
+        zoomedOut ? this.CATEGORY_FILL_OPACITY : 0,
+      );
     }
 
     if (this.map.getLayer(this.COUNTRIES_LINE)) {

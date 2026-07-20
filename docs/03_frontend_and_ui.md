@@ -40,7 +40,7 @@ Servizi:
 └── ArticleMockService        # solo se MOCK_MODE=true
 ```
 
-Hatching SVG / fill-pattern: owner nel host attivo (`maplibre/` o `leaflet/`) — non una directive separata obbligatoria.
+Hatching: owner nel host attivo (`maplibre/` = fasce soft per tipologia; `leaflet/` = SVG combo pattern) — non una directive separata obbligatoria.
 
 ---
 
@@ -96,7 +96,7 @@ Offline: `{ provide: MOCK_MODE, useValue: true }`. Errori API restano visibili �
 
 **Default:** MapLibre GL via host `radar-map/maplibre/`. Token `MAP_RENDERER` in `services/map-renderer.token.ts` (override `window.__RADAR_MAP_RENDERER__` o `localStorage`; default `maplibre`). Gate CI: `npm run verify-map-renderer`.
 
-**Path 3D (MapLibre):** spiderfy hub+fan è **custom** (HTML markers) — **senza** `leaflet.markercluster`. Layout gambe: cerchio se n &lt; 9, **spirale MarkerCluster** se n ≥ 9 (raggio/leg in **pixel** via `project`/`unproject`, non gradi geografici). Overlay full-bleed: dopo open/close sidebar chiamare `map.resize()` (non `invalidateSize`). Hatching day-view: canvas → `map.addImage` → `fill-pattern` (multi-cat). Archi hover: tooltip sticky + thicken via paint `arcKey`. Globe: **niente** `maxBounds` (blocca rotate); `minZoom: 2.2`, `clickTolerance: 12`, ignore click dopo drag/rotate/pitch.
+**Path 3D (MapLibre):** spiderfy hub+fan è **custom** (HTML markers) — **senza** `leaflet.markercluster`. Layout gambe: cerchio se n &lt; 9, **spirale MarkerCluster** se n ≥ 9 (raggio/leg in **pixel** via `project`/`unproject`, non gradi geografici). Overlay full-bleed: dopo open/close sidebar chiamare `map.resize()` (non `invalidateSize`). Hatching day-view: fasce longitudinali soft (1 colore × tipologia da `map-summary`; mainland US/RU / largest-polygon; opacità ~0.34; helper `country-category-fills.ts`) — **non** `fill-pattern` ripetuto. Archi hover: tooltip sticky + thicken via paint `arcKey`. Globe: **niente** `maxBounds` (blocca rotate); `minZoom: 2.2`, `clickTolerance: 12`, ignore click dopo drag/rotate/pitch.
 
 **Path legacy (Leaflet):** solo se `MAP_RENDERER=leaflet`. Regole ESBuild sotto restano valide **solo** per quel host.
 

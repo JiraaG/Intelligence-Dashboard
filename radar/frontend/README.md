@@ -52,7 +52,7 @@ localStorage.setItem('radar.mapRenderer', 'leaflet'); // poi reload
 - Nation spiderfy: hub disco compatto (`radar-spider-root`); **tutte** le icone della categoria attiva (niente hard cap 24); size+distanza adattivi
 - Focus: pin summary = `preserveZoom`; poligono/toolbar = `fitBounds` (`maxZoom: 4`); `refocusCountry` se stesso codice; hub/pin/spider = `getCountryCentroid` (US/RU/NL mainland); hatching zoom &lt; 5 = `pickCountryCodeAt`
 - Overlay: dopo open/close sidebar → `map.resize()` (MapLibre) / `invalidateSize()` (Leaflet legacy)
-- Hatching MapLibre: `fill-pattern` multi-cat; archi zoom-pin: geometric dash; globe: no `maxBounds`; CSP Nginx apex + `*.basemaps.cartocdn.com`
+- Hatching MapLibre: fasce soft O→E (1 colore × tipologia da `map-summary`; mainland US/RU; **non** `fill-pattern` barcode); Leaflet legacy: SVG combo pattern; archi zoom-pin: geometric dash; globe: no `maxBounds`; CSP Nginx apex + `*.basemaps.cartocdn.com`
 - **Archi relazioni (Fase H + UI):** MapLibre great-circle (default); legacy Leaflet `relationsPane` z 550; zoom &lt; 5 multicolore; zoom ≥ 5 per-categoria + geometric dash; click → `relationClicked` / `loadRelationArticles` (bilaterale)
 - **Notizie Salvate:** contatore toolbar date-agnostic + tooltip nazioni; open = stesso zoom/spiderfy di LETTE/TROVATE; save⇒read, unread⇒unsave
 
