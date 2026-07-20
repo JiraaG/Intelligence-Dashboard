@@ -11,6 +11,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 | Area | Dove | Note |
 |------|------|------|
 | ECC manual / expansion | [`prompts/active/plan_prompt_ecc_manual_and_expansion.md`](prompts/active/plan_prompt_ecc_manual_and_expansion.md) | **ACTIVE (non eseguito)** — resta finché non si produce un piano deliverable |
+| Mappa 3D / globe | [`prompts/active/plan_prompt_map_3d_globe.md`](prompts/active/plan_prompt_map_3d_globe.md) | **ACTIVE (non eseguito)** — analisi switch 2D↔3D vs 3D-only + blueprint overview §3.I |
 
 ---
 

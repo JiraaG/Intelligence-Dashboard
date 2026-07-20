@@ -33,6 +33,7 @@ plan-audit/
 ## Prompt attivi
 
 * [plan_prompt_ecc_manual_and_expansion.md](prompts/active/plan_prompt_ecc_manual_and_expansion.md) — non ancora eseguito
+* [plan_prompt_map_3d_globe.md](prompts/active/plan_prompt_map_3d_globe.md) — mappa 3D / switch vs 3D-only (non eseguito)
 
 ## Prompt done (recente)
 
