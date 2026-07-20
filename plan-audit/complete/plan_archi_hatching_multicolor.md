@@ -44,7 +44,7 @@
 
 ## Residuo opzionale (non blocca GATE)
 
-- Linea **multicolore aggregata** anche a **zoom ≥ 5** (da decidere esplicitamente; oggi restano linee per-categoria).
+- Linea **multicolore aggregata** anche a **zoom ≥ 5**: **chiuso su MapLibre** (2026-07-20 — stile macro a tutti gli zoom). Resta intenzionalmente su **Leaflet legacy** (dash+fan ≥5, LEGACY FREEZE).
 - Frecce direzionali; query API server-side per pair; chip navigabili.
 
 ---

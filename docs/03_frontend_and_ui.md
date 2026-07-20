@@ -164,8 +164,9 @@ Per collegare le notizie multilaterali, la mappa disegna archi curvi bidireziona
 
 1. **Gestione dello Stato**: `StateService` espone `mapRelationsResource` sincronizzato con la data attiva e i filtri della toolbar. Al riceversi del segnale SSE `article_processed`, viene scatenato il reload atomico sia per il summary che per le relazioni.
 2. **Visualizzazione e Zoom**:
-   - **Zoom ≥ 5 (vista pin)**: gli archi sono divisi per categoria (1 linea per categoria geopolitica attiva per coppia paese), con spessore proporzionale al volume (`Math.min(6, 1 + volume * 0.5)`), opacity 0.8, e tratteggio **stabile al pan** (**geometric dash** = segmenti lat/lng con gap — **non** `line-dasharray` / CSS `stroke-dasharray`, che “scorre” al pan). Se la stessa coppia ha più categorie, le curve usano un **offset di curvatura** (fan parallelo) così le linee non si sovrappongono.
-   - **Zoom < 5 (vista hatching)**: gli archi vengono aggregati per coppia di paesi come una **singola linea multicolore** (segmenti consecutivi proporzionali al volume di ciascuna categoria, ordinata per volume decrescente). Stile soft con spessore ridotto (`Math.min(3, 1 + totalVolume * 0.3)`), opacity ~0.45; tooltip con breakdown (es. `Sicurezza 5 · Economia 2 · n=7`).
+   - **MapLibre (default, tutti gli zoom):** una sola linea aggregata per coppia di paesi, **multicolore continua** (segmenti proporzionali al volume per categoria, ordinati per volume decrescente). Stile soft (`Math.min(3, 1 + totalVolume * 0.3)`, opacity ~0.45); tooltip con breakdown (es. `Sicurezza 5 · Economia 2 · n=7`). **Niente** fan per-categoria né geometric dash.
+   - **Leaflet legacy — Zoom ≥ 5 (vista pin):** archi divisi per categoria (1 linea per categoria per coppia), spessore `Math.min(6, 1 + volume * 0.5)`, opacity 0.8, tratteggio **geometric dash** (segmenti lat/lng + gap — **non** `line-dasharray` / CSS `stroke-dasharray`). Multi-cat → **offset di curvatura** (fan parallelo).
+   - **Leaflet legacy — Zoom < 5 (vista hatching):** stessa macro multicolore aggregata di MapLibre (stile soft).
    - Vengono nascosti se viene aperta la vista di dettaglio di una specifica nazione (per evitare sovrapposizioni visive con il ventaglio di spiderfy).
 3. **Calcolo Centroidi**:
    - I centroidi vengono estratti dinamicamente dai confini GeoJSON caricati in cache.
@@ -173,8 +174,8 @@ Per collegare le notizie multilaterali, la mappa disegna archi curvi bidireziona
 4. **Stile Visivo**:
    - Colore dell'arco allineato alle variabili di stile della categoria geopolitica (`CATEGORY_CSS_VARS`).
    - Spessore proporzionale al volume aggregato di notizie.
-   - Zoom ≥ 5: tratteggio denso; zoom &lt; 5: linea continua soft aggregata.
-5. **Hover / click**: hit-area affidabile anche in Europa densa; click emette `relationClicked` → `StateService.loadRelationArticles` apre il carosello con le notizie bilaterali A↔B (macro: tutte le categorie; pin: sola tipologia dell’arco; entrambi i versi via `related_countries`).
+   - **MapLibre:** sempre linea continua soft aggregata. **Leaflet:** zoom ≥ 5 tratteggio denso per-cat; zoom &lt; 5 linea continua soft.
+5. **Hover / click**: hit-area affidabile anche in Europa densa; click emette `relationClicked` → `StateService.loadRelationArticles` apre il carosello con le notizie bilaterali A↔B (MapLibre e macro Leaflet: tutte le categorie; pin Leaflet: sola tipologia dell’arco; entrambi i versi via `related_countries`).
 
 Dettaglio ops FE: [`radar/frontend/README.md`](../radar/frontend/README.md).
 

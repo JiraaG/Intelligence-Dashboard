@@ -129,7 +129,7 @@ this.http.get<GeoJSON.FeatureCollection>('assets/data/countries.geo.json')
 
 ### Configurazione (MapLibre default)
 
-Sviluppo attivo su `radar-map/maplibre/`. Overlay resize: `map.resize()`. Spiderfy: hub + fan HTML custom (**senza** MarkerCluster; spirale se n≥9). Archi: great-circle + **geometric dash** a zoom pin; hover = Popup + thicken paint su `arcKey`. Hatching: fasce longitudinali soft (1 colore × tipologia da `map-summary`; mainland US/RU / largest-polygon; opacità ~0.34; `country-category-fills.ts`; **non** `fill-pattern` barcode; **non** fill solo `categories[0]`). Proiezione: `localStorage` `radar.mapProjection` = `globe`|`mercator`. Globe: **no** `maxBounds`; CSP Nginx deve permettere apex `basemaps.cartocdn.com`.
+Sviluppo attivo su `radar-map/maplibre/`. Overlay resize: `map.resize()`. Spiderfy: hub + fan HTML custom (**senza** MarkerCluster; spirale se n≥9). Archi: great-circle **macro multicolore solida** a tutti gli zoom (no fan/dash — Leaflet legacy conserva dash+fan ≥5). Hover = Popup + thicken paint su `arcKey`. Hatching: fasce longitudinali soft (1 colore × tipologia da `map-summary`; mainland US/RU / largest-polygon; opacità ~0.34; `country-category-fills.ts`; **non** `fill-pattern` barcode; **non** fill solo `categories[0]`). Proiezione: `localStorage` `radar.mapProjection` = `globe`|`mercator`. Globe: **no** `maxBounds`; CSP Nginx deve permettere apex `basemaps.cartocdn.com`.
 
 ### Path Leaflet legacy (solo se `MAP_RENDERER=leaflet`)
 
@@ -395,11 +395,10 @@ export class ArticleMockService {
 Per connettere le notizie multilaterali, il componente mappa riceve le relazioni tramite input `mapRelations` e le disegna sulla mappa.
 
 1. **Gestione Stato e Input**: ricevere `mapRelations` (`MapRelationRow[]`); sincronizzare via `mapRelationsResource` / `filteredMapRelations`.
-2. **Layer e Visibilità**: archi visibili in Day View (nascosti in nation detail); ridisegno al crossing zoom 5.
+2. **Layer e Visibilità**: archi visibili in Day View (nascosti in nation detail). MapLibre: stile fisso (no ridisegno al crossing zoom 5). Leaflet legacy: ridisegno al crossing zoom 5.
 3. **Drawing**:
-   - **MapLibre (default):** great-circle / LineString multi-segment; tratteggio **geometric dash** (non solo `line-dasharray`); hit-buffer → tooltip sticky + thicken → `relationClicked`.
-   - **Leaflet legacy:** Bézier + `L.polyline` su `relationsPane` z 550 — **VIETATO** `leaflet-curve`.
-   - Zoom ≥ 5: 1 linea per categoria + fan parallelo; zoom &lt; 5: macro multicolore aggregata.
+   - **MapLibre (default):** great-circle / LineString multi-segment **macro multicolore continua** (tutti gli zoom; no geometric dash, no fan); hit-buffer → tooltip sticky + thicken → `relationClicked`.
+   - **Leaflet legacy:** Bézier + `L.polyline` su `relationsPane` z 550 — **VIETATO** `leaflet-curve`. Zoom ≥ 5: 1 linea per categoria + geometric dash + fan; zoom &lt; 5: macro multicolore aggregata.
 
 ---
 
@@ -433,7 +432,7 @@ cd frontend && npm run verify-map-renderer
 - **BLOCCA** se: `import * as L from 'leaflet'` o `import 'leaflet.markercluster'` nei componenti (path legacy; TypeError con esbuild)
 - **BLOCCA** se: nuove feature su `radar-map/leaflet/` (LEGACY FREEZE) senza bug critico
 - **BLOCCA** se: uso di nuove dipendenze npm (es. `leaflet-curve`) per il disegno degli archi Leaflet
-- **BLOCCA** se: archi relazioni visibili in nation detail o non aggiornati al cambio zoom (devono essere ridisegnati quando si attraversa la soglia zoom 5)
+- **BLOCCA** se: archi relazioni visibili in nation detail; su **Leaflet legacy**, archi non ridisegnati al crossing zoom 5 (MapLibre: stile fisso macro — non richiede ridisegno al crossing)
 - **AVVISA** se: manca la transizione CSS per split-screen
 - **AVVISA** se: path Leaflet con `maxClusterRadius` ≠ 40 o `spiderfyOnMaxZoom` ≠ false; path MapLibre senza spiderfy custom
 - **BLOCCA** se: modifiche a `radar-sidebar/**` o introduzione di `app-article-list`

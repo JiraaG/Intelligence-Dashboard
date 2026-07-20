@@ -717,15 +717,15 @@ L'endpoint `GET /api/map-relations?date=YYYY-MM-DD` restituisce un payload JSON 
 
 Il frontend recupera le relazioni tramite `ArticleService` → `StateService.mapRelationsResource` (+ soft-refresh SSE). Disegno:
 
-- **Zoom &lt; 5 (hatching):** una Bézier **multicolore** aggregata per coppia (`aggregateRelations` + segmenti ∝ volume), classe `.relational-arc-flow--macro`.
-- **Zoom ≥ 5 (pin):** una linea **per categoria**, tratteggio **geometrico** (`addGeometricDashedPolyline`, no `dashArray`), fan parallelo se multi-categoria sulla stessa coppia.
-- **Pane:** `relationsPane` z **550** (canvas renderer) sopra confini/label (`labelsPane` z 450, `pointer-events: none`), sotto i marker (600).
-- **Hover/click:** hit-area `.relational-arc-hit` → emit `relationClicked` → `loadRelationArticles(A,B,category?)` apre sidebar/carosello bilaterale (macro: tutte le cat.; pin: sola tipologia; entrambi i versi via `related_countries`). Camera preservata.
+- **Zoom &lt; 5 (hatching):** una Bézier / great-circle **multicolore** aggregata per coppia (`aggregateRelations` + segmenti ∝ volume).
+- **Zoom ≥ 5 (pin):** **MapLibre** = stessa macro multicolore **continua** (no fan/dash). **Leaflet legacy** = una linea **per categoria**, tratteggio **geometrico** (`addGeometricDashedPolyline`, no `dashArray`), fan parallelo se multi-categoria.
+- **Pane (Leaflet):** `relationsPane` z **550** (canvas renderer) sopra confini/label (`labelsPane` z 450, `pointer-events: none`), sotto i marker (600).
+- **Hover/click:** hit-area → emit `relationClicked` → `loadRelationArticles(A,B,category?)` apre sidebar/carosello bilaterale (MapLibre/macro: tutte le cat.; pin Leaflet: sola tipologia; entrambi i versi via `related_countries`). Camera preservata.
 - **Nation open:** layer relazioni nascosto.
 
 Piano chiuso: [`plan-audit/complete/plan_archi_hatching_multicolor.md`](plan-audit/complete/plan_archi_hatching_multicolor.md). Dettaglio UI: [`docs/03_frontend_and_ui.md`](docs/03_frontend_and_ui.md).
 
-**Residuo opzionale:** multicolore aggregato anche a zoom ≥ 5 (oggi restano linee per-categoria).
+**Residuo opzionale:** chiuso su **MapLibre** (2026-07-20, macro anche ≥5). Resta solo su path **Leaflet legacy** (dash+fan ≥5).
 
 #### 5. Visualizzazione nel Carosello e Sidebar
 

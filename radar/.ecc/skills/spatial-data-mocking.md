@@ -358,15 +358,15 @@ con i dati mockati prima di connettere il backend reale.
 
 ### ✅ Test 7: Relazioni Geospaziali (Fase H + archi UI)
 
-- [ ] Day view zoom **&lt; 5**: archi **multicolore** aggregati visibili sopra hatching (non nascosti)
-- [ ] Day view zoom **≥ 5**: archi **per-categoria** con tratteggio stabile al pan; multi-cat stessa coppia → fan parallelo
+- [ ] Day view zoom **&lt; 5**: archi **multicolore** aggregati visibili sopra hatching (non nascosti) — MapLibre e Leaflet
+- [ ] Day view zoom **≥ 5**: **MapLibre** = stessa macro multicolore **continua** (no fan/dash); **Leaflet legacy** = archi **per-categoria** con geometric dash + fan parallelo multi-cat
 - [ ] Hover arco: tooltip + highlight (anche in Europa densa)
-- [ ] Click arco macro: sidebar/carosello con notizie bilaterali A↔B **tutte** le categorie (entrambi i versi)
-- [ ] Click arco pin: stessa cosa filtrata per la **tipologia** dell’arco
+- [ ] Click arco MapLibre / macro Leaflet: sidebar/carosello con notizie bilaterali A↔B **tutte** le categorie (entrambi i versi)
+- [ ] Click arco pin Leaflet (≥5): stessa cosa filtrata per la **tipologia** dell’arco
 - [ ] Nation-open: archi nascosti (no interferenza spiderfy)
 - [ ] Card: sezione "Paesi correlati" con chip se `related_countries` non vuoto
 - [ ] Zoom &lt; 5: hatching **multi-colore** — MapLibre: N fasce soft = N tipologie da `map-summary` (mainland; ordine legenda); Leaflet: SVG combo pattern — non fill solido di una sola categoria; non barcode `fill-pattern` su MapLibre
-- [ ] Path MapLibre: great-circle / LineString + geometric dash ≥5 + hover thicken/tooltip; path Leaflet legacy: `relationsPane`
+- [ ] Path MapLibre: great-circle / LineString macro multicolore solida (tutti gli zoom) + hover thicken/tooltip; path Leaflet legacy: `relationsPane` + geometric dash ≥5
 
 ---
 

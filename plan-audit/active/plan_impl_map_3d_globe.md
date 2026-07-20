@@ -33,8 +33,8 @@
 | Pin nazione conic-gradient (DivIcon)          | CSS conic non nativo WebGL                     | **HTML Marker** overlay (stesso DOM/CSS di oggi) ancorato al centroide                                                                         |
 | Hub `radar-spider-root` + spiderfy emoji MC   | `leaflet.markercluster` non esiste in MapLibre | Riscrittura fan custom (HTML markers su cerchio) + stessa policy zoom ≥5 keep / <5 collapse; **niente** MC                                     |
 | Dummy markers + `maxClusterRadius: 40`        | N/A in 3D                                      | Eliminare dummy; un hub per nazione + fan per categoria attiva                                                                                 |
-| Archi macro multicolore zoom basso            | Pane canvas Leaflet                            | Great-circle LineString multi-segment colorati (source layer) o custom layer; soglia zoom parity H                                             |
-| Archi dashed per-cat + fan zoom alto          | `addGeometricDashedPolyline` Leaflet-specific  | **Geometric dash** (segmenti LineString + gap) parity Leaflet — **non** affidarsi a `line-dasharray` pixel come unico tratteggio; hit-buffer + hover paint |
+| Archi macro multicolore zoom basso            | Pane canvas Leaflet                            | Great-circle LineString multi-segment colorati (source layer). **AS-IS MapLibre (post-ship):** stesso stile a **tutti** gli zoom (no fan/dash) |
+| Archi dashed per-cat + fan zoom alto          | `addGeometricDashedPolyline` Leaflet-specific  | **Solo Leaflet legacy.** MapLibre: **superseded** — macro multicolore solida anche a zoom ≥ 5 (UX intenzionale, non parity dash). Hit-buffer + hover paint restano |
 | Hover/click → `loadRelationArticles`          | Event model diverso                            | Click layer → stessi output App (`relationClicked`) → State invariato                                                                          |
 | Nation open nasconde archi                    | —                                              | Stesso gate su `detailArticles.length`                                                                                                         |
 | `.marker-read` senza rebuild                  | Fingerprint geometry                           | Stesso: mutare class su HTML marker; fingerprint resta in State/App                                                                            |
@@ -118,7 +118,7 @@ flowchart TD
 
 **Archi + pin per stack scelto:**
 
-- Archi: precompute great-circle (n punti) → GeoJSON LineString; macro = segmenti colorati ∝ volume; pin-zoom = **geometric dash** (segmenti + gap; **non** `line-dasharray` pixel) + fan offset; click su hit layer largo + hover thicken/tooltip.
+- Archi: precompute great-circle (n punti) → GeoJSON LineString; **MapLibre AS-IS:** sempre macro = segmenti colorati ∝ volume (linea continua, tutti gli zoom). **Leaflet legacy:** pin-zoom = **geometric dash** (segmenti + gap; **non** `line-dasharray` pixel) + fan offset. Click su hit layer largo + hover thicken/tooltip.
 - Pin/hub/spider: HTML overlay (riuso CSS conic in `[styles.scss](radar/frontend/src/styles.scss)`); fan emoji = markers su angoli equispaziati.
 
 **Air-gap (§3.D):** MapLibre **non** richiede terrain/imagery Cesium Ion. Fallback online→offline = cambio `style` URL a `/tiles/...` (aggiornare blueprint D: non solo PNG Leaflet). Terrain DEM = **out of scope** v1 (globe ellipsoid / flat-mercator+globe projection basta).
@@ -504,9 +504,9 @@ Correzioni dopo primo deploy Docker (non invalidano W1; aggiornano il SoT operat
 | CSP Nginx | Apex `basemaps.cartocdn.com` **obbligatorio** oltre `*.basemaps…`; `blob:` worker/child |
 | Globe navigation | **Niente** `maxBounds` su globe; `clickTolerance: 12`; ignore click post drag/rotate/pitch |
 | Hatching | Fasce soft O→E (1 colore × tipologia da `map-summary`; mainland US/RU / largest-polygon; helper `country-category-fills.ts`; **non** `fill-pattern` barcode; **non** fill solo `categories[0]`); fingerprint evita `setData` paesi inutili |
-| Archi ≥5 | **Geometric dash** (segmenti), non `line-dasharray` pixel; hover = paint `arcKey` + Popup |
+| Archi MapLibre | **Macro multicolore solida a tutti gli zoom** (no fan/dash; Leaflet legacy conserva geometric dash ≥5); hover = paint `arcKey` + Popup |
 | Centroidi | Largest-polygon + hardcode US/RU/**NL** |
 | Spiderfy | Pixel layout; n≥9 **spirale** MC; **no** `clusterClicked.emit(arts)` in spiderfy |
 | Budget FE | `angular.json` warn 2MB / error 3MB + `allowedCommonJsDependencies: maplibre-gl` |
 
-**Residui accettati (non bloccanti GATE I):** mid-zoom category clusters Leaflet MC non replicati 1:1; §3.J globo raffinato resta Futuro; STATUS.md non aggiornato finché non richiesto.
+**Residui accettati (non bloccanti GATE I):** mid-zoom category clusters Leaflet MC non replicati 1:1; §3.J globo raffinato resta Futuro; dash+fan relazioni solo su path Leaflet (MapLibre = macro solida intenzionale).

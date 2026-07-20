@@ -40,8 +40,8 @@ interface SpiderArticleMarker {
 }
 
 /**
- * Host MapLibre Radar: fasce soft per tipologia (zoom &lt; 5), pin day-view, archi great-circle,
- * hub + spiderfy emoji custom (no MarkerCluster).
+ * Host MapLibre Radar: fasce soft per tipologia (zoom &lt; 5), pin day-view, archi great-circle
+ * multicolore solidi (tutti gli zoom; no fan/dash), hub + spiderfy emoji custom (no MarkerCluster).
  *
  * @see plan-audit/active/plan_impl_map_3d_globe.md
  */
@@ -128,7 +128,6 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
   private countryBounds = new Map<string, [[number, number], [number, number]]>();
   private countriesGeoJson: GeoJSON.FeatureCollection | null = null;
   private lastGeometryFingerprint = '';
-  private lastRelationsZoomWasLegacy: boolean | null = null;
   private destroyed = false;
   private geoJsonSub: Subscription | null = null;
   private pendingTimeouts = new Set<ReturnType<typeof setTimeout>>();
@@ -565,14 +564,7 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
     this.refreshHatchingStyles();
     this.syncSummaryMarkerVisibility();
 
-    const isLegacyZoom = zoom >= MAP_ZOOM_PIN_THRESHOLD;
-    const relationsChangedZoom =
-      this.lastRelationsZoomWasLegacy !== null && isLegacyZoom !== this.lastRelationsZoomWasLegacy;
-
     this.syncRelationsVisibility();
-    if (relationsChangedZoom && this.articles().length === 0) {
-      this.drawGeospatialRelations(this.mapRelations());
-    }
 
     const nationOpen = this.articles().length > 0 || !!this.focusCountryCode();
     if (
@@ -1403,113 +1395,18 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
 
     if (relations.length === 0) {
       source.setData({ type: 'FeatureCollection', features: [] });
-      this.lastRelationsZoomWasLegacy = null;
       return;
     }
 
-    const isLegacyZoom = this.map.getZoom() >= MAP_ZOOM_PIN_THRESHOLD;
-    this.lastRelationsZoomWasLegacy = isLegacyZoom;
-    const features = isLegacyZoom
-      ? this.buildLegacyRelationFeatures(relations)
-      : this.buildMacroRelationFeatures(relations);
-    source.setData({ type: 'FeatureCollection', features });
+    // MapLibre: always one solid multicolor arc per nation pair (no per-cat fan / geometric dash).
+    // Leaflet legacy keeps zoom-gated dash+fan — do not port that here.
+    source.setData({
+      type: 'FeatureCollection',
+      features: this.buildMacroRelationFeatures(relations),
+    });
   }
 
-  /** Geometric dash segments (Leaflet parity) — avoids pixel dashArray drift on pan. */
-  private appendGeometricDashVisuals(
-    features: GeoJSON.Feature[],
-    coords: [number, number][],
-    props: {
-      arcKey: string;
-      color: string;
-      weight: number;
-      opacity: number;
-    },
-  ): void {
-    const dashSteps = 1;
-    const gapSteps = 1;
-    let i = 0;
-    let seg = 0;
-    while (i < coords.length - 1) {
-      const dashEnd = Math.min(coords.length - 1, i + dashSteps);
-      const slice = coords.slice(i, dashEnd + 1);
-      if (slice.length >= 2) {
-        features.push({
-          type: 'Feature',
-          id: `${props.arcKey}|v|${seg}`,
-          properties: {
-            role: 'visual',
-            arcKey: props.arcKey,
-            color: props.color,
-            weight: props.weight,
-            opacity: props.opacity,
-          },
-          geometry: { type: 'LineString', coordinates: slice },
-        });
-        seg++;
-      }
-      i = dashEnd + gapSteps;
-    }
-  }
-
-  private buildLegacyRelationFeatures(relations: MapRelationRow[]): GeoJSON.Feature[] {
-    const byPair = new Map<string, MapRelationRow[]>();
-    for (const r of relations) {
-      const key = `${r.source_country}|${r.target_country}`;
-      const list = byPair.get(key);
-      if (list) list.push(r);
-      else byPair.set(key, [r]);
-    }
-
-    const docStyle = getComputedStyle(document.documentElement);
-    const features: GeoJSON.Feature[] = [];
-    const steps = 60;
-    const baseCurvature = 0.2;
-    const curvatureStep = 0.07;
-
-    for (const group of byPair.values()) {
-      group.sort(
-        (a, b) => b.volume - a.volume || a.primary_category.localeCompare(b.primary_category),
-      );
-      const n = group.length;
-      for (let idx = 0; idx < n; idx++) {
-        const r = group[idx];
-        const p0 = this.getCountryCentroid(r.source_country);
-        const p2 = this.getCountryCentroid(r.target_country);
-        if (!p0 || !p2) continue;
-        const curvature = baseCurvature + (idx - (n - 1) / 2) * curvatureStep;
-        const coords = greatCircle(p0.lat, p0.lng, p2.lat, p2.lng, steps, curvature);
-        const color = this.resolveCategoryColor(r.primary_category, docStyle);
-        const weight = Math.min(6, 1 + r.volume * 0.5);
-        const opacity = 0.8;
-        const arcKey = `${r.source_country}|${r.target_country}|${r.primary_category}|${idx}`;
-        const tooltipText = `${r.source_country} ↔ ${r.target_country} · ${r.primary_category} · n=${r.volume}`;
-
-        this.appendGeometricDashVisuals(features, coords, {
-          arcKey,
-          color,
-          weight,
-          opacity,
-        });
-        features.push({
-          type: 'Feature',
-          id: `${arcKey}|h`,
-          properties: {
-            role: 'hit',
-            arcKey,
-            hitWeight: Math.max(28, weight * 6),
-            sourceCountry: r.source_country,
-            targetCountry: r.target_country,
-            category: r.primary_category,
-            tooltipText,
-          },
-          geometry: { type: 'LineString', coordinates: coords },
-        });
-      }
-    }
-    return features;
-  }
-
+  /** One great-circle per pair; color segments ∝ category volume (solid, all zoom levels). */
   private buildMacroRelationFeatures(relations: MapRelationRow[]): GeoJSON.Feature[] {
     const aggregated = this.aggregateRelations(relations);
     const docStyle = getComputedStyle(document.documentElement);

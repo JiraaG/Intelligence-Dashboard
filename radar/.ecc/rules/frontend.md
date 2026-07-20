@@ -420,12 +420,14 @@ const L = (window as any).L as typeof import('leaflet');
 3. **Visibilità e Sincronizzazione**:
    - La visibilità del layer relazioni deve essere sincronizzata con la modalità Day View (`articles().length === 0`).
    - Gli archi devono essere nascosti automaticamente solo se una nazione è aperta (nation detail view).
-   - Su `zoomend` / attraversamento della soglia zoom 5, la mappa deve ricalcolare e ridisegnare gli archi passando dalla modalità pin (zoom >= 5) alla modalità macro multicolor (zoom < 5) e viceversa.
+   - **MapLibre:** stile archi indipendente dallo zoom (sempre macro multicolore solida) — niente ridisegno al crossing zoom 5.
+   - **Leaflet legacy:** su `zoomend` / attraversamento della soglia zoom 5, ridisegnare gli archi passando da mode pin (zoom >= 5, dash+fan) a mode macro (zoom < 5) e viceversa.
 4. **Fingerprint Geometria Mappa**:
    - Per ottimizzare le prestazioni, il ricalcolo degli elementi della mappa (inclusi gli archi) deve basarsi su un fingerprint che include lo stato delle relazioni, per evitare di ridisegnare la mappa inutilmente se non ci sono cambiamenti strutturali.
 5. **Drawing degli Archi**:
-   - Zoom ≥ 5: una curva per-categoria (`CATEGORY_CSS_VARS`), spessore `Math.min(6, 1 + volume * 0.5)`, opacity 0.8, tratteggio **geometric dash** (segmenti lat/lng + gap — **vietato** affidarsi a `line-dasharray` / CSS dash come unico tratteggio: scorre al pan). Multi-cat → fan parallelo.
-   - Zoom < 5: macro aggregata multicolore, spessore soft, opacity ~0.45.
+   - **MapLibre (default):** una sola curva aggregata per coppia di nazioni, segmenti colore ∝ volume per categoria (`CATEGORY_CSS_VARS`), linea **continua** (no geometric dash, no fan parallelo), opacity ~0.45 — **a tutti i livelli di zoom**.
+   - **Leaflet legacy — Zoom ≥ 5:** una curva per-categoria (`CATEGORY_CSS_VARS`), spessore `Math.min(6, 1 + volume * 0.5)`, opacity 0.8, tratteggio **geometric dash** (segmenti lat/lng + gap — **vietato** affidarsi a `line-dasharray` / CSS dash come unico tratteggio: scorre al pan). Multi-cat → fan parallelo.
+   - **Leaflet legacy — Zoom < 5:** macro aggregata multicolore, spessore soft, opacity ~0.45.
    - Hover/click → `relationClicked` → `loadRelationArticles` (bilaterale A↔B).
 
 ---
