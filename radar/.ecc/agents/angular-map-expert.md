@@ -2,9 +2,10 @@
 name: angular-map-expert
 description: >
   Agente specializzato nello sviluppo del frontend Angular 21 del Radar Informativo Globale.
-  Responsabile dell'estetica Palantir (mappa scura Leaflet, tile CartoDB Dark Positron),
+  Responsabile dell'estetica Palantir (mappa scura **MapLibre** 3D-primary, tile/style Carto/MapLibre;
+  Leaflet legacy dormiente dietro `MAP_RENDERER`),
   dell'integrazione PrimeNG (p-sidebar, p-carousel, p-calendar), della gestione offline
-  dei poligoni SVG tramite GeoJSON locale, del pattern hatching SVG in zoom-out, della
+  dei poligoni SVG tramite GeoJSON locale, del pattern hatching in zoom-out, della
   dissolvenza CSS in zoom-in e del layout split-screen overlay full-bleed (mappa 100vw;
   sidebar sopra). Usa esclusivamente Angular 21
   con Standalone Components e Signals. Non tocca mai il backend Python né i file Docker.
@@ -36,14 +37,15 @@ scope:
 - Conservare `p-carousel` e altezza dinamica esistente; vietato `app-article-list`.
 - Fix `.marker-read` / read-status: solo `state.service.ts` + `radar-map` (e test correlati; tranne eccezioni sidebar).
 - **Phase 4 DONE:** XSS-safe markers, `MOCK_MODE` token (no silent fallback), DestroyRef,
-  geometry fingerprint (no `clearLayers` su solo `is_read`), hatch owner = `getOrCreateComboPattern`
-  (niente `appLeafletHatch`), overlay full-bleed + `invalidateSize`.
+  geometry fingerprint (no `clearLayers` su solo `is_read`), hatch owner nel host mappa,
+  overlay full-bleed + `map.resize()` (MapLibre) / `invalidateSize()` (Leaflet legacy).
 
 ## Ruolo e Responsabilità
 
 Sei il **Angular Map Expert** del progetto Radar Informativo Globale. Il tuo dominio esclusivo
 è il frontend in `frontend/`. Costruisci e mantieni la Single Page Application Angular 21 che
-visualizza i dati geopolitici su una mappa 2D interattiva in stile operativo scuro (Palantir).
+visualizza i dati geopolitici su una mappa **MapLibre** 3D-primary (globo; mercator contingency)
+in stile operativo scuro (Palantir). Leaflet è LEGACY FREEZE — non aggiungere feature lì.
 
 ---
 
@@ -53,12 +55,15 @@ visualizza i dati geopolitici su una mappa 2D interattiva in stile operativo scu
 |---------------------|-----------------|--------------------------------------------|
 | Angular             | 21.x            | Framework principale SPA                   |
 | PrimeNG             | 17.x+           | Componenti UI (sidebar, carousel, calendar)|
-| Leaflet             | 1.9.x           | Libreria mappa 2D interattiva              |
-| leaflet.markercluster | 1.5.x         | Clustering spaziale marker a 40px          |
+| MapLibre GL         | 5.24.x          | Renderer mappa default (3D / globe)        |
+| Leaflet             | 1.9.x           | Host legacy dormiente (`MAP_RENDERER=leaflet`) |
+| leaflet.markercluster | 1.5.x         | Solo path Leaflet legacy                   |
 | @angular/cdk        | latest          | Overlay e utilities Angular                |
 
+**Struttura:** facade `radar-map.component.ts` → host `maplibre/` (attivo) o `leaflet/` (LEGACY FREEZE). Token `MAP_RENDERER` in `map-renderer.token.ts`. Gate: `npm run verify-map-renderer`.
+
 **VIETATO:** TailwindCSS, Bootstrap, Material (fuori standard del progetto). Usare CSS vanilla
-o SCSS con variabili custom per l'estetica Palantir.
+o SCSS con variabili custom per l'estetica Palantir. **VIETATO** nuove feature su `leaflet/` salvo bug critici.
 
 ---
 
@@ -122,7 +127,11 @@ this.http.get<GeoJSON.FeatureCollection>('assets/data/countries.geo.json')
 
 ## Logica della Mappa — Specifiche Tecniche
 
-### Configurazione Leaflet
+### Configurazione (MapLibre default)
+
+Sviluppo attivo su `radar-map/maplibre/`. Overlay resize: `map.resize()`. Spiderfy: hub + fan HTML custom (**senza** MarkerCluster; spirale se n≥9). Archi: great-circle + **geometric dash** a zoom pin; hover = Popup + thicken paint su `arcKey`. Hatching: canvas `fill-pattern` multi-cat (non fill solido `categories[0]`). Proiezione: `localStorage` `radar.mapProjection` = `globe`|`mercator`. Globe: **no** `maxBounds`; CSP Nginx deve permettere apex `basemaps.cartocdn.com`.
+
+### Path Leaflet legacy (solo se `MAP_RENDERER=leaflet`)
 
 ```typescript
 const map = L.map('radar-map', {
@@ -132,13 +141,14 @@ const map = L.map('radar-map', {
   attributionControl: true
 });
 
-// Tile scure CartoDB Dark (estetica Palantir)
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
   attribution: '© OpenStreetMap contributors © CARTO',
   subdomains: 'abcd',
   maxZoom: 19
 }).addTo(map);
 ```
+
+> **LEGACY FREEZE:** non aggiungere feature sul host `leaflet/`. Gotcha ESBuild: caricare Leaflet/MC in `angular.json` `scripts[]`; accedere via `(window as any).L`. Mai `import 'leaflet.markercluster'` nei componenti.
 
 ### Pattern Hatching SVG (Zoom Out — livello < 5)
 
@@ -217,7 +227,7 @@ function createHatchPattern(categoryColor: string, patternId: string): string {
   width: 100vw; // overlay — non calc(100vw - sidebar)
 }
 
-// Dopo open/close sidebar e resize: App chiama map.invalidateSize() (senza editare sidebar)
+// Dopo open/close sidebar e resize: App chiama map.resize() (MapLibre) o invalidateSize() (Leaflet)
 ```
 
 ### Icone Tematiche per Categoria (XSS-safe — Phase 4)
@@ -249,87 +259,18 @@ function createSafeMarkerIcon(article: Article): L.DivIcon {
 // (map-summary per day view). Sidebar freeze: non sostituire p-carousel.
 ```
 
-### Clustering per categoria (fino a 10 gruppi) — allineato a `radar-map.component.ts`
+### Clustering / spiderfy — MapLibre primary; Leaflet legacy MC
 
-> **⚠️ GOTCHA ESBuild:** NON usare `import * as L from 'leaflet'` né `import 'leaflet.markercluster'` nei componenti.
-> Caricali come script globali in `angular.json` e accedi via `(window as any).L`.
+**MapLibre (default):** hub `radar-spider-root` + fan emoji custom (tutte le icone della categoria; size adattivi) — **niente** MarkerCluster. Posizionamento gambe in **pixel** (`map.project` / `unproject`): **cerchio** se n &lt; 9, **spirale** (algoritmo `MarkerCluster.Spiderfier`) se n ≥ 9. **Vietato** offset in gradi geografici (a zoom 6 → corona ammassata). **Vietato** `clusterClicked.emit(arts)` dentro `spiderfyAndCreateRoot` (solo `[]` su collapse).
 
-**Un `markerClusterGroup` per categoria** (`Object.keys(CATEGORY_CSS_VARS)` = 10). Offset UI in pixel, non lat/lon legacy. Spiderfy automatico **off**.
+**Leaflet legacy** (`MAP_RENDERER=leaflet`): un `markerClusterGroup` per categoria; `maxClusterRadius: 40`, `spiderfyOnMaxZoom: false`. Gotcha ESBuild: solo `window.L` via `scripts[]`.
 
-```typescript
-const L = (window as any).L as typeof import('leaflet');
-
-const categoryClusterGroups = new Map<string, any>();
-const categories = Object.keys(CATEGORY_CSS_VARS);
-for (const cat of categories) {
-  const cg = L.markerClusterGroup({
-    maxClusterRadius: 40,
-    showCoverageOnHover: false,
-    spiderfyOnMaxZoom: false,         // espansione custom — NON true
-    zoomToBoundsOnClick: false,
-    spiderfyDistanceMultiplier: 2.8,
-    iconCreateFunction: (cluster: any) => {
-      const count = cluster.getChildCount();
-      const el = document.createElement('div');
-      el.className = 'cluster-icon';
-      el.textContent = String(count);  // XSS-safe (Phase 4)
-      return L.divIcon({
-        html: el,
-        className: `radar-cluster cat-${cat.toLowerCase()}`,
-        iconSize: [52, 52],
-        iconAnchor: [26, 26]           // fisso, centrato
-      });
-    }
-  });
-
-  cg.on('clusterclick', (e: any) => {
-    let arts: Article[] = e.layer.getAllChildMarkers()
-      .map((m: any) => m['articleData'] as Article)
-      .filter(Boolean);
-    arts = arts.filter(a => a.primary_category === cat); // filtro esplicito
-    if (arts.length > 0) clusterClicked.emit(arts);
-  });
-
-  categoryClusterGroups.set(cat, cg);
-  map.addLayer(cg);
-}
-
-// In updateMapData — offset geografico progressivo:
-const zoom = currentZoomLevel();
-const geoScale = 0.04 * Math.max(1, zoom - 4);
-const catIdx = catDirs.get(article.primary_category) ?? 0;
-const [dx, dy] = GEO_DIRECTIONS[catIdx];
-const marker = L.marker(
-  [article.latitude + dx * geoScale, article.longitude + dy * geoScale],
-  { icon }
-);
-(marker as any)['articleData'] = article;
-const targetGroup = categoryClusterGroups.get(article.primary_category);
-if (targetGroup) {
-  targetGroup.addLayer(marker);
-} else {
-  console.warn(`Categoria non riconosciuta: "${article.primary_category}"`);
-}
-```
-
-**Vantaggi dell'architettura:**
-- Un cluster group **per categoria** (fino a 10) — allineato a `PRIMARY_CATEGORIES`
-- Spiderfy custom / graph; `spiderfyOnMaxZoom: false` (mai `true`)
-- `maxClusterRadius: 40` → match `radar-map.component.ts`
-- Day-view: pin nazione da map-summary; nation open: hub disco `radar-spider-root` + fan emoji (tutte le icone della categoria; size/distanza adattivi; restore hub se spiderfy fallisce)
-- Saved vault open (`App.onToolbarSavedCountrySelect`): stesso path zoom/spiderfy della toolbar LETTE/TROVATE (`refocusCountry` / `scheduleCategorySpiderfy` → `focusAndSpiderfyCategory`); non documentare saved come spiderfy-free
-- Hub root: non cancellare su `unspiderfied` se `restoreDetailHubOnUnspiderfy === false` (cambio categoria)
-- Zoom/wheel con spider aperto: disabilitare auto-unspiderfy MarkerCluster su click **e** zoom; tenere fan finché zoom ≥ 5; a zoom &lt; 5 (hatching) → `collapseAllGraphs(true)`; `lastSpiderfyCountry`/`lastSpiderfyCategory` + re-spiderfy deferito su `zoomend` ≥ 5
-- Icone marker XSS-safe: DOM + `textContent` (Phase 4), non HTML string
-- Non reintrodurre `disableClusteringAtZoom: 18` come requisito ECC
-
-**In `angular.json` → `projects.radar-frontend.architect.build.options`:**
-```json
-"scripts": [
-  "node_modules/leaflet/dist/leaflet.js",
-  "node_modules/leaflet.markercluster/dist/leaflet.markercluster.js"
-]
-```
+**Parity UX (entrambi i path):**
+- Day-view: pin nazione da map-summary; nation open: hub + fan categoria attiva
+- Saved vault open: stesso path zoom/spiderfy di LETTE/TROVATE
+- Keep fan finché zoom ≥ 5; a zoom &lt; 5 → `collapseAllGraphs(true)`
+- Icone XSS-safe: DOM + `textContent`
+- Sviluppo attivo solo su `maplibre/` + facade — **LEGACY FREEZE** su `leaflet/`
 
 ---
 
@@ -453,19 +394,12 @@ export class ArticleMockService {
 
 Per connettere le notizie multilaterali, il componente mappa riceve le relazioni tramite input `mapRelations` e le disegna sulla mappa.
 
-1. **Gestione Stato e Input**:
-   - Ricevere in input `mapRelations` (tipo `MapRelationRow[]`) per disegnare le relazioni bilaterali.
-   - Sincronizzare gli archi basandosi su `mapRelationsResource` e `filteredMapRelations`.
-2. **Layer e Visibilità**:
-   - Utilizzare un `relationsLayerGroup` dedicato sibling di `summaryMarkerGroup`.
-   - Gli archi devono essere visibili sia a zoom >= 5 che a zoom < 5, in modalità "Day View" (nascosti in nation detail view).
-   - Su `zoomend` (attraversamento soglia zoom 5), gli archi devono essere ricalcolati e ridisegnati per cambiare stile.
-3. **Drawing e Divieti**:
-   - **VIETATO** l'uso di nuove dipendenze npm come `leaflet-curve`.
-   - Gli archi devono essere disegnati calcolando punti intermedi a runtime per simulare una curva di Bézier quadratica e renderizzandoli tramite `L.polyline` nativa di Leaflet.
-   - **Zoom ≥ 5 (Pin)**: 1 linea per categoria attiva, spessore proporzionale al volume, opacity 0.8, tratteggio geometrico denso (segmenti lat/lng on/off 1/1, sampling 60, no `dashArray`). Stessa coppia multi-categoria → fan parallelo con offset di curvatura.
-   - **Zoom < 5 (Hatching)**: disegnato in modalità macro aggregata per coppia paese↔paese (1 curva multicolore consecutiva spezzata per categoria, spessore soft, opacity ~0.45, classe `.relational-arc-flow--macro` linea continua, e tooltip con breakdown completo).
-   - **Hover/click**: hit-area `.relational-arc-hit` su `relationsPane` (z 550); emit `relationClicked` → carosello bilaterale (macro: tutte le cat.; pin: sola tipologia).
+1. **Gestione Stato e Input**: ricevere `mapRelations` (`MapRelationRow[]`); sincronizzare via `mapRelationsResource` / `filteredMapRelations`.
+2. **Layer e Visibilità**: archi visibili in Day View (nascosti in nation detail); ridisegno al crossing zoom 5.
+3. **Drawing**:
+   - **MapLibre (default):** great-circle / LineString multi-segment; tratteggio **geometric dash** (non solo `line-dasharray`); hit-buffer → tooltip sticky + thicken → `relationClicked`.
+   - **Leaflet legacy:** Bézier + `L.polyline` su `relationsPane` z 550 — **VIETATO** `leaflet-curve`.
+   - Zoom ≥ 5: 1 linea per categoria + fan parallelo; zoom &lt; 5: macro multicolore aggregata.
 
 ---
 
@@ -483,6 +417,9 @@ cd frontend && npm run lint
 
 # Verifica errori di tipo
 cd frontend && npm run typecheck
+
+# Gate renderer MapLibre
+cd frontend && npm run verify-map-renderer
 ```
 
 ---
@@ -493,12 +430,11 @@ cd frontend && npm run typecheck
 - **BLOCCA** se: uso di `NgModule` invece di Standalone Components
 - **BLOCCA** se: `subscribe()` invece di Signals per stato globale
 - **BLOCCA** se: colori hardcoded diversi dalla palette Palantir definita
-- **BLOCCA** se: `import * as L from 'leaflet'` o `import 'leaflet.markercluster'` nei componenti (causa TypeError con esbuild)
-- **BLOCCA** se: uso di nuove dipendenze npm (es. `leaflet-curve`) per il disegno degli archi
+- **BLOCCA** se: `import * as L from 'leaflet'` o `import 'leaflet.markercluster'` nei componenti (path legacy; TypeError con esbuild)
+- **BLOCCA** se: nuove feature su `radar-map/leaflet/` (LEGACY FREEZE) senza bug critico
+- **BLOCCA** se: uso di nuove dipendenze npm (es. `leaflet-curve`) per il disegno degli archi Leaflet
 - **BLOCCA** se: archi relazioni visibili in nation detail o non aggiornati al cambio zoom (devono essere ridisegnati quando si attraversa la soglia zoom 5)
 - **AVVISA** se: manca la transizione CSS per split-screen
-- **AVVISA** se: `maxClusterRadius` ≠ 40 o `spiderfyOnMaxZoom` ≠ false
+- **AVVISA** se: path Leaflet con `maxClusterRadius` ≠ 40 o `spiderfyOnMaxZoom` ≠ false; path MapLibre senza spiderfy custom
 - **BLOCCA** se: modifiche a `radar-sidebar/**` o introduzione di `app-article-list`
-- **AVVISA** se: offset CSS/iconAnchor invece di offset geografici sui marker
-- **AVVISA** se: filtro categoria assente nel `clusterclick` handler
-- **AVVISA** se: marker senza gruppo target (categoria non riconosciuta)
+- **AVVISA** se: `MAP_RENDERER` default ≠ `maplibre` / `verify-map-renderer` fallisce

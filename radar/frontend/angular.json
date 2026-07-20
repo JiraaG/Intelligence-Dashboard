@@ -35,21 +35,20 @@
                 "output": "assets"
               }
             ],
-            "styles": [
-              "src/styles.scss"
-            ],
+            "styles": ["src/styles.scss"],
             "scripts": [
               "node_modules/leaflet/dist/leaflet.js",
               "node_modules/leaflet.markercluster/dist/leaflet.markercluster.js"
-            ]
+            ],
+            "allowedCommonJsDependencies": ["maplibre-gl"]
           },
           "configurations": {
             "production": {
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "500kB",
-                  "maximumError": "1050kB"
+                  "maximumWarning": "2MB",
+                  "maximumError": "3MB"
                 },
                 {
                   "type": "anyComponentStyle",
@@ -85,9 +84,7 @@
         "test": {
           "builder": "@angular/build:unit-test",
           "options": {
-            "setupFiles": [
-              "src/app/testing/leaflet.stub.ts"
-            ],
+            "setupFiles": ["src/app/testing/leaflet.stub.ts"],
             "buildTarget": "radar-frontend:build:development",
             "tsConfig": "tsconfig.spec.json"
           },

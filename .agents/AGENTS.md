@@ -7,7 +7,7 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 ## 1. Identità del Progetto & Stack Tecnologico
 
 * **Nome:** Radar Informativo Globale (Intelligence Dashboard)
-* **Obiettivo:** Applicazione web self-hosted, containerizzata e plug-and-play che aggrega feed RSS, li arricchisce semanticamente via LLM multi-provider (Gemini SDK e/o OpenAI-compat httpx) e li visualizza su una mappa 2D interattiva in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categoria geopolitica).
+* **Obiettivo:** Applicazione web self-hosted, containerizzata e plug-and-play che aggrega feed RSS, li arricchisce semanticamente via LLM multi-provider (Gemini SDK e/o OpenAI-compat httpx) e li visualizza su una mappa **MapLibre** 3D-primary (globo; mercator+pitch contingency) in stile Palantir (estetica scura, confini nitidi, marker tematici per categoria geopolitica). Leaflet resta dormiente (LEGACY FREEZE) dietro `MAP_RENDERER`.
 
 ### Stack Tecnologico Ufficiale
 * **Backend:** Python 3.12-slim (Docker) / 3.14 (locale). Demone asincrono con polling `WORKER_POLL_INTERVAL_SECONDS` (default 900).
@@ -15,9 +15,10 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 * **Database:** PostgreSQL 15 (`radar-db`). Accesso tramite driver asincrono `asyncpg` puro.
 * **Feed Source:** Miniflux REST API.
 * **Frontend:** Angular 21 (Standalone Components).
+* **Mappa:** MapLibre GL 5.24 (default) — facade `radar-map.component.ts` + host `maplibre/`; Leaflet 1.9 + MarkerCluster solo path legacy (`MAP_RENDERER=leaflet`, host `leaflet/`, LEGACY FREEZE). Token `services/map-renderer.token.ts`. Proiezione: `localStorage` `radar.mapProjection` = `globe`|`mercator`. Gate: `npm run verify-map-renderer`.
 * **Container:** Docker + docker-compose (servizi: `radar-db`, `radar-backend`, `radar-worker`, `radar-frontend`, `radar-miniflux`) su reti `radar-edge` + `radar-data` (Phase 3). Ingestione solo in `radar-worker`.
 * **Web Server:** Nginx (Alpine) per servire Angular e proxying `/api/`.
-* **Piani operativi:** [`plan_impl_phase_0_6.md`](../plan-audit/complete/plan_impl_phase_0_6.md) + [`plan_impl_phase_0_6_execution.md`](../plan-audit/complete/plan_impl_phase_0_6_execution.md). Post–branch restore (2026-07-15): **Phase 0–5 DONE**; Phase **6 DONE / GATE VERDE**. Final Release **F0–F4 COMPLETE** (2026-07-18; PR #1 merged); Fase 5 hardening **DEFERRED ACCETTATO** (non richiesto) — [`STATUS.md`](../plan-audit/STATUS.md).
+* **Piani operativi:** [`plan_impl_phase_0_6.md`](../plan-audit/complete/plan_impl_phase_0_6.md) + [`plan_impl_phase_0_6_execution.md`](../plan-audit/complete/plan_impl_phase_0_6_execution.md). Post–branch restore (2026-07-15): **Phase 0–5 DONE**; Phase **6 DONE / GATE VERDE**. Final Release **F0–F4 COMPLETE** (2026-07-18; PR #1 merged); Fase 5 hardening **DEFERRED ACCETTATO** (non richiesto) — [`STATUS.md`](../plan-audit/STATUS.md). MapLibre 3D-primary: [`plan_impl_map_3d_globe.md`](../plan-audit/active/plan_impl_map_3d_globe.md) (+ globo J: [`plan_impl_map_globe_projection.md`](../plan-audit/active/plan_impl_map_globe_projection.md)).
 
 ---
 
@@ -100,32 +101,31 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 ## 5. Vincoli Frontend Angular 21
 
 > [!WARNING]
-> ### ⚠️ Leaflet + ESBuild: Pattern di Importazione Obbligatorio
-> `leaflet.markercluster` è una libreria UMD che richiede `window.L`. Con Angular 21 + ESBuild
-> (`@angular/build:application`), un `import 'leaflet.markercluster'` come side-effect import
-> in un componente TypeScript crea un namespace Leaflet **separato** che non si aggancia al plugin.
-> **Soluzione:** caricare Leaflet e MarkerCluster come script globali in `angular.json` → `scripts[]`
-> e accedere via `const L = (window as any).L` nel componente.
-> Mai usare `import * as L from 'leaflet'` o `import 'leaflet.markercluster'` nei componenti.
+> ### ⚠️ MapLibre primary + Leaflet legacy (ESBuild)
+> **Default:** MapLibre GL (`radar-map/maplibre/`) via facade `radar-map.component.ts` + token `MAP_RENDERER` (`map-renderer.token.ts`; default `maplibre`). Gate: `npm run verify-map-renderer`.
+> **Spiderfy path MapLibre:** fan custom HTML markers — **senza** MarkerCluster; n &lt; 9 cerchio, n ≥ 9 **spirale** (algoritmo MarkerCluster, offset in pixel).
+> **Overlay:** dopo open/close sidebar → `map.resize()` (MapLibre). Legacy Leaflet: `invalidateSize()`.
+> **Leaflet dormiente:** host `radar-map/leaflet/` (LEGACY FREEZE). `leaflet.markercluster` richiede `window.L`: caricare Leaflet e MarkerCluster come script globali in `angular.json` → `scripts[]` **solo per il path legacy**; accedere via `const L = (window as any).L`. Mai `import * as L from 'leaflet'` o `import 'leaflet.markercluster'` nei componenti.
 
 > [!NOTE]
 > ### 🗺️ Regole di Visualizzazione Mappa e Clustering
-> 1. **Clustering per categoria**: un `L.markerClusterGroup` **per** `primary_category` raggruppa spazialmente gli articoli. Per forzare il corretto raggruppamento spaziale per nazione senza mostrare punti reali ridondanti, vengono impiegati marker invisibili (`isDummy: true`). Day-view: pin nazione da map-summary (non pallini per-categoria).
-> 2. **Impostazioni MarkerCluster e Spiderfy Custom**: Il raggio di clusterizzazione è stretto (`maxClusterRadius: 40`). Lo spiderfy automatico è disabilitato (`spiderfyOnMaxZoom: false`). La frammentazione dei cluster avviene tramite una logica custom (click e flyTo allo zoom 6). Non “allineare” a valori legacy 200/true.
-> 3. **Hub disco + fan emoji**: nation open usa hub compatto (`radar-spider-root`) e spiderfy emoji della categoria attiva (tutte le icone della categoria; size/distanza adattivi). Il root non deve sparire al cambio categoria (`unspiderfied` no-op se `restoreDetailHubOnUnspiderfy === false`). In caso di fallimento spiderfy, ripristinare sempre l’hub nazione. Con spider aperto: **non** auto-unspiderfy MarkerCluster su wheel/zoom; tenere fan + sidebar finché zoom ≥ 5; a zoom &lt; 5 (hatching) chiudere fan e sidebar (`collapseAllGraphs(true)` + `lastSpiderfy*`); su `zoomend` ≥ 5 re-spiderfy deferito per riallineare le gambe.
-> 4. **Estensione Bounding Box per Stati Trans-Antimeridiano**: Nel calcolo dello zoom di focus per nazioni con territori oltre la linea di cambio data (Stati Uniti `US` e Russia `RU`), per garantire la validità del bounding box ed evitare comportamenti bloccanti, utilizzare bounding box statici Mainland hardcoded:
->    * `US`: `L.latLngBounds(L.latLng(24.396308, -125.0), L.latLng(49.384358, -66.93457))`
->    * `RU`: `L.latLngBounds(L.latLng(41.1856, 19.6389), L.latLng(81.8587, 169.0))`
+> 1. **Day-view / nation:** day-view = pin nazione da map-summary; nation open = hub `radar-spider-root` + spiderfy emoji della categoria attiva. Path MapLibre: spiderfy custom (no MC). Path Leaflet legacy: un `L.markerClusterGroup` **per** `primary_category` con marker invisibili (`isDummy: true`) dove ancora usati.
+> 2. **Spiderfy policy (parity):** keep fan + sidebar finché zoom ≥ 5; a zoom &lt; 5 (hatching) chiudere fan e sidebar. Path MapLibre: **non** emettere `clusterClicked` da `spiderfyAndCreateRoot` (solo `[]` su collapse — altrimenti App riscrive carousel + auto-read). Path Leaflet: `maxClusterRadius: 40`, `spiderfyOnMaxZoom: false`; non auto-unspiderfy MC su wheel/zoom; su `zoomend` ≥ 5 re-spiderfy deferito.
+> 3. **Hub disco + fan emoji**: tutte le icone della categoria attiva (size/distanza adattivi). Path Leaflet: root non deve sparire al cambio categoria (`unspiderfied` no-op se `restoreDetailHubOnUnspiderfy === false`); in caso di fallimento spiderfy, ripristinare sempre l’hub nazione.
+> 4. **Estensione Bounding Box per Stati Trans-Antimeridiano**: Nel calcolo dello zoom di focus per nazioni con territori oltre la linea di cambio data (Stati Uniti `US` e Russia `RU`), utilizzare bounding box statici Mainland hardcoded (stesse costanti su MapLibre e Leaflet).
 > 5. **Legenda Colori**: Inserire una legenda glassmorphic orizzontale in assoluto in basso al centro della mappa (`bottom: 20px; left: 50%`) che mostri cerchi luminosi (`box-shadow` del colore di categoria) affiancati alle emoji e ai nomi delle categorie geopolitiche.
-> 6. **Limitazioni Zoom Mappa**: Impedire lo zoom all'indietro infinito e lo scroll laterale al di fuori della terraferma configurando `minZoom: 2.2`, `maxBounds` impostati sui limiti del globo terrestre (`[-85, -180]` a `[85, 180]`) e `maxBoundsViscosity: 1.0`.
-> 7. **Click e Zoom di Focus**: pin summary → `preserveZoom` (no fitBounds); poligono/toolbar → `fitBounds` con `maxZoom: 4`; ri-selezione stesso paese → `refocusCountry`. Zoom &lt; 5 (hatching): click nazione via map-click + `pickCountryCodeAt` (il canvas `relationsPane` blocca i click SVG). Hub/pin/spider e archi condividono l’anchor nazione (`getCountryCentroid`: US/RU mainland hardcoded) — **non** mediare lat/lng articolo (teatro estero sposterebbe il pallino in oceano).
-> 8. **Gestione Dinamica Altezza Carosello**: Il ridimensionamento dinamico dell'altezza delle schede nel carosello laterale DEVE essere calcolato estraendo l'ID univoco dell'articolo corrente (`document.getElementById('article-card-' + id)`) anziché affidarsi alla classe `.p-carousel-item-active` di PrimeNG, la quale introduce race-condition nel DOM al primo avvio.
-> 9. **Allineamento Flexbox e Troncamento Fonti**: Le sezioni di metadati contenenti stringhe potenzialmente lunghe (es. la fonte dell'articolo) e bottoni affiancati (es. `Leggi fonte →`) devono impiegare rigorosamente layout *Flexbox* (`flex: 1`, `min-width: 0` per il contenitore di testo e `flex-shrink: 0`, `white-space: nowrap` per il link).
-> 10. **Pulizia Prefisso Feed**: I titoli dei feed provenienti da Miniflux devono essere processati in Angular tramite Regex (es. `.replace(/^Feed:\s*/i, '')`) per rimuovere la dicitura automatica "Feed: " prima del rendering.
-> 11. **API Phase 5+:** day view via `GET /api/map-summary`; relations via `GET /api/map-relations` (archi Leaflet: pane `relationsPane`, click → carosello bilaterale); saved vault via `GET /api/saved-summary` (no date); nation open via `GET /api/articles` con envelope `{ items, next_cursor, total }` (page ≤ 100; FE concatena); saved open via `?saved=true` (ignora date). Mock solo con `MOCK_MODE`.
-> 12. **Overlay full-bleed:** mappa sempre `100vw`; sidebar sopra — non split 70%/30% che restringe la mappa; `invalidateSize()` dopo open/close.
-> 13. **Errori API / nation-fetch (T-P1-04):** `StateService.error` = `mapSummaryResource.error() ?? savedSummaryResource.error() ?? detailError()`. Fallimento `loadCountryArticles` / `loadSavedCountryArticles` → `detailError` + `closeSidebar(false)` (banner toolbar resta). Close utente → clear errore. Vietato fallback silenzioso a mock.
-> 14. **Notizie Salvate:** contatore toolbar date-agnostic; tooltip nazioni; carosello multi-day in `sidebarMode='saved'`; click nazione = stesso path di LETTE/TROVATE (`fitBounds` + `flyTo` 6 + spiderfy); save ⇒ read; unread ⇒ unsave.
+> 6. **Limitazioni Zoom Mappa**: `minZoom: 2.2`. Path **Leaflet** legacy: `maxBounds` mondo + viscosity. Path **MapLibre globe**: **non** impostare `maxBounds` (clampa/blocca la rotazione) — solo `minZoom` + `renderWorldCopies: false`. Contingency mercator: `radar.mapProjection=mercator`.
+> 7. **Click vs drag (MapLibre):** `clickTolerance: 12`; sopprimere country/relation click dopo `dragstart` / `rotatestart` / `pitchstart` / `map.isMoving()`.
+> 8. **Centroidi MultiPolygon:** largest-area polygon + hardcode **US / RU / NL** mainland (Natural Earth NL → Caraibi altrimenti mid-Atlantic).
+> 9. **CSP Nginx:** `connect-src` / `img-src` = apex `https://basemaps.cartocdn.com` **e** `https://*.basemaps.cartocdn.com`; `worker-src`/`child-src` `blob:` per MapLibre workers.
+> 10. **Click e Zoom di Focus**: pin summary → `preserveZoom` (no fitBounds); poligono/toolbar → `fitBounds` con `maxZoom: 4`; ri-selezione stesso paese → `refocusCountry`. Zoom &lt; 5 (hatching): click nazione via map-click + `pickCountryCodeAt`. Hub/pin/spider e archi condividono l’anchor nazione (`getCountryCentroid`) — **non** mediare lat/lng articolo.
+> 11. **Gestione Dinamica Altezza Carosello**: Il ridimensionamento dinamico dell'altezza delle schede nel carosello laterale DEVE essere calcolato estraendo l'ID univoco dell'articolo corrente (`document.getElementById('article-card-' + id)`) anziché affidarsi alla classe `.p-carousel-item-active` di PrimeNG, la quale introduce race-condition nel DOM al primo avvio.
+> 12. **Allineamento Flexbox e Troncamento Fonti**: Le sezioni di metadati contenenti stringhe potenzialmente lunghe (es. la fonte dell'articolo) e bottoni affiancati (es. `Leggi fonte →`) devono impiegare rigorosamente layout *Flexbox* (`flex: 1`, `min-width: 0` per il contenitore di testo e `flex-shrink: 0`, `white-space: nowrap` per il link).
+> 13. **Pulizia Prefisso Feed**: I titoli dei feed provenienti da Miniflux devono essere processati in Angular tramite Regex (es. `.replace(/^Feed:\s*/i, '')`) per rimuovere la dicitura automatica "Feed: " prima del rendering.
+> 14. **API Phase 5+:** day view via `GET /api/map-summary`; relations via `GET /api/map-relations` (archi MapLibre great-circle default; legacy Leaflet `relationsPane`; click → carosello bilaterale); saved vault via `GET /api/saved-summary` (no date); nation open via `GET /api/articles` con envelope `{ items, next_cursor, total }` (page ≤ 100; FE concatena); saved open via `?saved=true` (ignora date). Mock solo con `MOCK_MODE`.
+> 15. **Overlay full-bleed:** mappa sempre `100vw`; sidebar sopra — non split 70%/30% che restringe la mappa; `map.resize()` (MapLibre) / `invalidateSize()` (Leaflet) dopo open/close.
+> 16. **Errori API / nation-fetch (T-P1-04):** `StateService.error` = `mapSummaryResource.error() ?? savedSummaryResource.error() ?? detailError()`. Fallimento `loadCountryArticles` / `loadSavedCountryArticles` → `detailError` + `closeSidebar(false)` (banner toolbar resta). Close utente → clear errore. Vietato fallback silenzioso a mock.
+> 17. **Notizie Salvate:** contatore toolbar date-agnostic; tooltip nazioni; carosello multi-day in `sidebarMode='saved'`; click nazione = stesso path di LETTE/TROVATE (`fitBounds` + `flyTo` 6 + spiderfy); save ⇒ read; unread ⇒ unsave.
 
 ---
 

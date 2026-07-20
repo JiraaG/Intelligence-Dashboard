@@ -126,15 +126,19 @@ flowchart TD
 
 ### D. Frontend (`radar/frontend/`)
 
+* **MapLibre 3D-primary (Fase I):**
+  * Renderer default WebGL via `maplibre-gl` (globe; contingency mercator+pitch). Facade `app-radar-map` + host `maplibre/`; Leaflet AS-IS congelato in `leaflet/` (`MAP_RENDERER=leaflet` ops).
+  * Hatching / pin conic HTML / archi great-circle / hub+spiderfy custom (no MarkerCluster sul path 3D). `map.resize()` al posto di Leaflet `invalidateSize`.
+  * Follow-up globo raffinato: §3.J / [`plan_impl_map_globe_projection.md`](plan-audit/active/plan_impl_map_globe_projection.md).
 * **Reattività Signals-first:**
   * `StateService` centralizza lo stato. Utilizza `rxResource` di Angular 21 per governare le risorse asincrone `mapSummaryResource` (day-view) e `savedSummaryResource` (articoli salvati nel Vault) basandosi sui filtri di ricerca.
   * Gli articoli visualizzati per nazione vengono paginati in modo incrementale dal server via keyset (`next_cursor`), evitando il caricamento in memoria dell'intero database.
-* **Leaflet Safe per ESBuild:**
-  * A causa delle incompatibilità UMD prodotte dai bundler moderni con `@angular/build:application` (ESBuild), Leaflet e il plugin `leaflet.markercluster` vengono caricati globalmente como script statici in `angular.json` e agganciati al componente mappa tramite `const L = (window as any).L`.
+* **Leaflet legacy (dormiente):**
+  * Path 2D conservato per rollback / futuro switch UX. Caricato solo se `MAP_RENDERER=leaflet` (`window.__RADAR_MAP_RENDERER__` o `localStorage radar.mapRenderer`). Script globali `angular.json` `scripts[]` + `window.L` restano per quel host.
 * **Visualizzazione Grafica Avanzata:**
-  * **Hatching SVG:** Mappa corografica con tratteggi SVG dinamici calcolati client-side per evidenziare sovrapposizioni di categorie geopolitiche.
-  * **Pin Conic-Gradient:** Un pin per nazione che visualizza la distribuzione percentuale delle 10 categorie in tempo reale.
-  * **Spiderfy Custom:** I marker degli articoli all'interno del dettaglio nazione si dividono a raggiera mostrando l'icona emoji associata alla categoria dell'articolo attivo nel carosello.
+  * **Hatching:** corografia categorie a zoom basso (MapLibre fill / legacy SVG).
+  * **Pin Conic-Gradient:** un pin per nazione (HTML Marker) con distribuzione % delle 10 categorie.
+  * **Spiderfy Custom:** hub + fan emoji per categoria attiva nel carosello (parity path MapLibre senza MarkerCluster).
 
 ---
 
@@ -146,10 +150,12 @@ Sezioni sotto = blueprint (architettura + ricette). Stato prodotto aggiornato **
 |---------|------|--------|
 | **A** | LLM locale AMD / Ollama (Profilo F) | **DONE** — core `54c8038`, VRAM `2996625`; scorecard fixture **opz.** |
 | **B** | Real-time webhook / SSE / soft-refresh | **DONE / GATE VERDE** (2026-07-18) |
-| **C** | Dedup semantica `pgvector` | **BACKLOG** (prossima candidata) |
-| **D** | Mappe offline air-gapped | Futuro |
+| **C** | Dedup semantica `pgvector` | **BACKLOG** (prossima candidata; indipendente da I/J) |
+| **D** | Mappe offline air-gapped | **Futuro** — target FE = MapLibre `style` → `/tiles/` (non solo Leaflet PNG) |
 | **G** | Obsidian wiki-links bidirezionali | Futuro |
 | **H** | Grafo geospaziale / archi mappa | **DONE / GATE VERDE** (2026-07-18) |
+| **I** | Mappa 3D-primary MapLibre (parity; Leaflet dormiente) | **DONE** (2026-07-20) — SoT [`plan-audit/active/plan_impl_map_3d_globe.md`](plan-audit/active/plan_impl_map_3d_globe.md) |
+| **J** | Upgrade proiezione globo vero (follow-up I) | **Futuro** — SoT [`plan-audit/active/plan_impl_map_globe_projection.md`](plan-audit/active/plan_impl_map_globe_projection.md) |
 
 Quadro vivo: [`plan-audit/STATUS.md`](plan-audit/STATUS.md). Topologie lane env: [`plan-audit/complete/audit_llm_lane_env_generalization.md`](plan-audit/complete/audit_llm_lane_env_generalization.md).
 
@@ -508,16 +514,24 @@ async def commit_embedding(conn: asyncpg.Connection, article_id: int, title: str
 
 ### D. Mappe Offline in Ambienti Isolati (Air-Gapped)
 
-> **Stato: Futuro** — non iniziata.
+> **Stato: Futuro** — non iniziata. **Target FE aggiornato (Fase I):** consumatore primario = **MapLibre** (`style` / tiles via `/tiles/`), non più solo Leaflet PNG.
 
 Negli scenari operativi privi di connessione Internet (es. reti intranet locali o installazioni fisicamente isolate), il browser non può scaricare le mappe (tiles) geografiche dai server CDN esterni (CartoDB/OpenStreetMap). È necessario integrare un server di tile offline all'interno dello stack Docker.
 
 ```mermaid
 flowchart TD
-  Client[Browser FE] -->|1. Richiesta /tiles/{z}/{x}/{y}.png| Nginx[Nginx Reverse Proxy]
+  Client[Browser FE MapLibre] -->|1. Style o tiles /tiles/...| Nginx[Nginx Reverse Proxy]
   Nginx -->|2. Inoltro locale| TileServer[radar-tileserver: klokantech/tileserver-gl]
   TileServer -->|3. Query geografica| MBTiles[(world.mbtiles: 3GB)]
 ```
+
+#### Ordine rispetto a Fase I / J
+
+- **D non è in wave I** (I usa CDN Carto dark-matter GL style).
+- Può partire **dopo I** (CDN→locale su globe o 2.5D) **oppure in parallelo a J**; evitare D+J+rewrite insieme.
+- Style offline + globe aumenta GPU/IO: in air-gap validare budget con checklist in [`plan_impl_map_globe_projection.md`](plan-audit/active/plan_impl_map_globe_projection.md).
+- Path Leaflet dormiente: se `MAP_RENDERER=leaflet`, URL raster `/tiles/.../{z}/{x}/{y}.png` come blueprint storico sotto; **non** è il path primario.
+- Tileserver dovrebbe poter servire sia style MapLibre sia raster per legacy Leaflet.
 
 #### 1. Aggiunta del Tile Server in `docker-compose.yml`
 
@@ -537,8 +551,6 @@ Ospitare un file `.mbtiles` compresso del globo terrestre (scaricato in fase di 
 
 #### 2. Configurazione Nginx (`nginx.conf`)
 
-Configurare il proxy locale per servire le immagini della mappa in modo trasparente sulla stessa origine del frontend:
-
 ```nginx
 location /tiles/ {
     resolver 127.0.0.11 valid=10s;
@@ -550,9 +562,16 @@ location /tiles/ {
 }
 ```
 
-#### 3. Configurazione Leaflet (`radar-map.component.ts`)
+#### 3. Configurazione MapLibre (path primario)
 
-Configurare il caricamento delle tiles dal percorso relativo `/tiles/` locale dell'applicazione:
+Puntare lo style MapLibre al tileserver locale (esempio):
+
+```diff
+- style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
++ style: '/tiles/styles/dark-matter/style.json'
+```
+
+#### 4. Configurazione Leaflet legacy (solo se `MAP_RENDERER=leaflet`)
 
 ```diff
 -const tileLayerUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
@@ -715,3 +734,65 @@ Le card degli articoli includono una sezione dedicata "🌐 Paesi correlati" (do
 #### 6. Stile archi (no animazione CSS dash)
 
 Il tratteggio a zoom pin **non** usa `stroke-dasharray` / animazione CSS (sfasa a ogni pan Leaflet). I tratti sono segmenti lat/lng solidi + gap. Macro = linea continua soft.
+
+---
+
+### I. Mappa 3D-primary (MapLibre)
+
+> **Stato: DONE (2026-07-20).** SoT: [`plan-audit/active/plan_impl_map_3d_globe.md`](plan-audit/active/plan_impl_map_3d_globe.md).
+> Indipendente da §3.C (`pgvector`). Parity archi su §3.H; tile offline = §3.D (Futuro).
+> Decisione prodotto: **3D-primary MapLibre**; Leaflet path **congelato** (`MAP_RENDERER`), non eliminato; switch UX 2D↔3D = futuro (non J).
+
+Sostituisce Leaflet come renderer primario del day-view con MapLibre WebGL (globe projection; contingency mercator+pitch), preservando hatching, pin conic HTML, archi H, hub/spiderfy, saved parity, overlay full-bleed e contratto API Phase 5+.
+
+```mermaid
+flowchart TD
+  Summary[GET /api/map-summary] --> DayView[MapLibre day-view]
+  Relations[GET /api/map-relations] --> Arcs[Great-circle layers]
+  Articles[GET /api/articles] --> Spider[HTML hub + fan]
+  DayView --> Hatch[Hatch zoom basso]
+  DayView --> Pins[HTML conic pins zoom alto]
+  Arcs --> Sidebar[loadRelationArticles]
+  Spider --> Carousel[p-carousel FREEZE]
+  TilesOnline[Carto dark-matter GL CDN] -.-> DayView
+  TilesOffline["§3.D tileserver-gl /tiles/"] -.-> DayView
+```
+
+#### Esito W1
+
+- `maplibre-gl@5.24.0`
+- **projection=globe** default; contingency `localStorage radar.mapProjection=mercator` (+ pitch 45)
+- Flags: `MAP_RENDERER` (`window.__RADAR_MAP_RENDERER__` / `localStorage radar.mapRenderer`, default **maplibre**)
+
+#### Struttura FE
+
+```text
+radar-map/
+  radar-map.component.ts     ← facade (stessi Input/Output)
+  maplibre/                  ← path ATTIVO
+  leaflet/                   ← LEGACY FREEZE
+```
+
+#### Knobs
+
+- `MAP_RENDERER=maplibre|leaflet` (default maplibre; leaflet = ops/rollback/futuro switch)
+- `radar.mapProjection=globe|mercator`
+- Soglia zoom hatch↔pin (equivalente 5)
+- `npm run verify-map-renderer`
+
+#### Riferimento futuro obbligatorio
+
+> Se si vuole raffinare il globo (o v1 era 2.5D): ampliamento in **§3.J** / [`plan_impl_map_globe_projection.md`](plan-audit/active/plan_impl_map_globe_projection.md). Non ripartire da zero: riusare facade MapLibre + parity I.
+
+#### Fuori scope I
+
+Switch UX toolbar 2D↔3D; terrain DEM; §3.D tileserver in questa fase; Fase C; evolvere feature sul path Leaflet; comment-out monolitico.
+
+---
+
+### J. Upgrade globo vero (follow-up di I)
+
+> **Stato: Futuro.** Precondizione: Fase I DONE. SoT dettaglio: [`plan-audit/active/plan_impl_map_globe_projection.md`](plan-audit/active/plan_impl_map_globe_projection.md).
+
+Obiettivo: stabilizzare / raffinare `projection: globe` senza regressione parity (pin/archi/spider/sidebar). Flag `MAP_PROJECTION` / `radar.mapProjection`. Non fare in J: riscrivere State/API; sidebar; implementare §3.D (può essere parallelo o prima — vedi §3.D ordine fasi).
+

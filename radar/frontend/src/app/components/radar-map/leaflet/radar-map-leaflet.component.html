@@ -1,0 +1,40 @@
+<div class="radar-map-canvas-container">
+  @if (mapUnavailable()) {
+    <div class="map-unavailable" role="alert">
+      <h2>Mappa non disponibile</h2>
+      <p>Leaflet non è stato caricato. Ricarica la pagina o verifica gli script globali.</p>
+    </div>
+  } @else {
+    <!-- Host imperativo: L.map('#radar-map-leaflet') in radar-map-leaflet.component.ts (window.L). -->
+    <div
+      id="radar-map-leaflet"
+      class="radar-map-canvas"
+      [class.blur-active]="isParsingGeoJson()"
+    ></div>
+
+    <div class="map-legend" *ngIf="!isParsingGeoJson()">
+      <div class="legend-item" *ngFor="let item of legendItems">
+        <span
+          class="legend-color-dot"
+          [ngStyle]="{
+            'background-color': 'var(' + item.cssVar + ')',
+            'box-shadow': '0 0 8px var(' + item.cssVar + ')',
+          }"
+        ></span>
+        <span class="legend-icon">{{ item.icon }}</span>
+        <span class="legend-label">{{ item.label }}</span>
+      </div>
+    </div>
+
+    <div class="bootstrapping-overlay" *ngIf="isParsingGeoJson()">
+      <div class="loader-content">
+        <span class="loader-icon">📡</span>
+        <h2>INIZIALIZZAZIONE RADAR</h2>
+        <p>Caricamento e ottimizzazione dei confini vettoriali...</p>
+        <div class="loader-bar">
+          <div class="loader-bar-fill"></div>
+        </div>
+      </div>
+    </div>
+  }
+</div>

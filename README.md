@@ -1,8 +1,9 @@
 # Radar Informativo Globale
 
-> **Intelligence Dashboard** — Applicazione web self-hosted e containerizzata: aggrega feed RSS (Miniflux), li arricchisce via LLM multi-provider (Gemini SDK e/o OpenAI-compat httpx) e li visualizza su una mappa Leaflet.  
+> **Intelligence Dashboard** — Applicazione web self-hosted e containerizzata: aggrega feed RSS (Miniflux), li arricchisce via LLM multi-provider (Gemini SDK e/o OpenAI-compat httpx) e li visualizza su una mappa **MapLibre** 3D-primary (globo; mercator+pitch in contingency).  
+> Leaflet resta **dormiente** (LEGACY FREEZE) dietro token `MAP_RENDERER` — non è il default. Host: `radar-map/maplibre/` + `radar-map/leaflet/`.  
 > UI: `http://localhost/` (porta **80** → Nginx container **8080**). Miniflux admin **non** è pubblicato di default (overlay hardened/lan).  
-> Dipendenze esterne: feed RSS, API LLM (Gemini / DeepSeek / OpenAI / GLM / Grok), tile Carto.
+> Dipendenze esterne: feed RSS, API LLM (Gemini / DeepSeek / OpenAI / GLM / Grok), tile Carto / style MapLibre.
 
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
@@ -48,7 +49,7 @@ SoT: [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (Node 22 / Python 3.
 PYTHONPATH=backend python -m pytest -m "not live" -q
 
 # Frontend — da radar/frontend/ (dopo npm ci --legacy-peer-deps)
-npm run verify-geojson:fetch && npm run typecheck && npm run test:ci && npm run build:ci
+npm run verify-geojson:fetch && npm run verify-map-renderer && npm run typecheck && npm run test:ci && npm run build:ci
 ```
 
 ---
@@ -113,6 +114,8 @@ LLM (API esterna, non un servizio Compose): `gemini` (`google-genai`) e/o OpenAI
 | Python | `3.12-slim` | `radar/backend/Dockerfile` |
 | Node (build) | `22` | `radar/frontend/Dockerfile` |
 | Angular | `21.2` | `radar/frontend/package.json` |
+| MapLibre GL | `5.24.0` (default) | `radar/frontend/package.json` — facade `radar-map/`; host `maplibre/` |
+| Leaflet | `1.9.x` (legacy dormiente) | solo se `MAP_RENDERER=leaflet`; host `radar-map/leaflet/` |
 | Nginx | `1.27-alpine` | `radar/frontend/Dockerfile` |
 | PostgreSQL | `15` | `radar/docker-compose.yml` |
 | Miniflux | `2.3.2` | `radar/docker-compose.yml` |
@@ -219,7 +222,7 @@ Esempio Phase 6: `git checkout 56c2eff`. Dettaglio gate Phase 0–6: [plan_impl_
 | Compose + overlay | `radar/docker-compose.yml`, `radar/docker-compose.hardened.yml`, `radar/docker-compose.lan.yml` |
 | Ops backup/restore | `radar/ops/` |
 | Runbook | `radar/docs/runbook.md` |
-| Mappa / state / read-unread / archi | `radar/frontend/src/app/components/radar-map/`, `radar/frontend/src/app/services/state.service.ts` (`loadRelationArticles`) |
+| Mappa / state / read-unread / archi | `radar/frontend/src/app/components/radar-map/` (facade + `maplibre/` / `leaflet/`), `map-renderer.token.ts` (`MAP_RENDERER`), `state.service.ts` (`loadRelationArticles`) |
 | `MOCK_MODE` | `radar/frontend/src/app/services/mock-mode.token.ts` |
 | GeoJSON pin / verify | `radar/frontend/src/assets/data/ASSET_LICENSE.md`, `radar/frontend/scripts/verify-geojson.mjs` |
 | Sidebar (**frozen**) | `radar/frontend/src/app/components/radar-sidebar/` |
@@ -239,7 +242,7 @@ Esempio Phase 6: `git checkout 56c2eff`. Dettaglio gate Phase 0–6: [plan_impl_
 | GET | `/health` (host `:80`) | Healthcheck **Nginx FE** — risposta statica `ok`; **non** è l’API |
 | GET | `/api/articles` | Envelope `{items,next_cursor,total}` — `date` obbligatorio salvo `saved=true` (cross-day), `limit` ≤ 100 |
 | GET | `/api/map-summary` | Righe `country_code × primary_category` + count/lat/lon (day) |
-| GET | `/api/map-relations` | Righe undirected `source_country ↔ target_country` per categoria + volume. FE: archi Leaflet; click → carosello bilaterale |
+| GET | `/api/map-relations` | Righe undirected `source_country ↔ target_country` per categoria + volume. FE: archi MapLibre (great-circle; legacy Leaflet `relationsPane`); click → carosello bilaterale |
 | GET | `/api/saved-summary` | Stessa shape; solo `is_saved`; **senza date** |
 | GET | `/api/countries` | Rollup paese (compat) |
 | PATCH | `/api/articles/{id}/read_status` | Body `{is_read}`; unread ⇒ `is_saved=false` |
@@ -286,7 +289,7 @@ Dashboard finance/
     ├── frontend/
     │   ├── nginx.conf                 # listen 8080, resolver DNS, CSP
     │   ├── scripts/verify-geojson.mjs
-    │   ├── src/app/components/        # radar-map, toolbar, radar-sidebar (frozen)
+    │   ├── src/app/components/        # radar-map (facade + maplibre/ + leaflet/), toolbar, radar-sidebar (frozen)
     │   ├── src/app/services/          # StateService, ArticleService, MOCK_MODE
     │   └── src/assets/data/           # GeoJSON locale + ASSET_LICENSE.md
     ├── vault/                         # Markdown generati (gitignored)

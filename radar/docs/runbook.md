@@ -251,7 +251,24 @@ Windows: Git Bash / WSL. Preferire drill su stack usa-e-getta prima del restore 
 3. Ricrea **`radar-backend`** per applicare migrazioni (`schema_migrations` — abort su checksum mismatch).
 4. Ricrea **`radar-worker`** (uno solo); ready 503 breve fino a heartbeat.
 5. Ricrea **`radar-frontend`** (depends on live).
-6. Smoke: live, ready, `GET /api/articles?date=YYYY-MM-DD`, `GET /api/map-summary?date=…`, `GET /api/map-relations?date=…`, `GET /api/saved-summary`, `GET /api/articles?saved=true`, `PATCH /api/articles/{id}/saved_status` (save⇒read), UI mappa + toolbar **NOTIZIE SALVATE** (tooltip → zoom + spiderfy).
+6. Smoke: live, ready, `GET /api/articles?date=YYYY-MM-DD`, `GET /api/map-summary?date=…`, `GET /api/map-relations?date=…`, `GET /api/saved-summary`, `GET /api/articles?saved=true`, `PATCH /api/articles/{id}/saved_status` (save⇒read), UI mappa **MapLibre** (default) + toolbar **NOTIZIE SALVATE** (tooltip → zoom + spiderfy). Verifica renderer: confini + pin/archi su MapLibre; `npm run verify-map-renderer` in `radar/frontend` se rebuild FE.
+
+### Forzare Leaflet legacy (ops / debug)
+
+Default = MapLibre (`MAP_RENDERER`). Per attivare il path dormiente:
+
+```js
+// DevTools console, poi reload
+localStorage.setItem('radar.mapRenderer', 'leaflet');
+// oppure prima del bootstrap:
+window.__RADAR_MAP_RENDERER__ = 'leaflet';
+```
+
+Ripristino default: rimuovere la chiave / `localStorage.setItem('radar.mapRenderer', 'maplibre')` + reload. Proiezione MapLibre: `localStorage` key `radar.mapProjection` = `globe` \| `mercator`.
+
+**CSP / basemap:** se la console blocca `basemaps.cartocdn.com/.../style.json`, in `radar/frontend/nginx.conf` `connect-src` deve includere l’**apex** `https://basemaps.cartocdn.com` oltre a `https://*.basemaps.cartocdn.com` (il solo wildcard non basta). Rebuild FE dopo cambio CSP.
+
+Re-ingest Miniflux (distruttivo): sezione **Requeue** sopra + skill [`.agents/skills/radar-requeue-ops/SKILL.md`](../../.agents/skills/radar-requeue-ops/SKILL.md).
 
 Non puntare un load balancer a `/health/ready` se quello **riavvia** l’API su 503 transitori.
 

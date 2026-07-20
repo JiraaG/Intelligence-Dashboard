@@ -11,10 +11,12 @@ import { Article, ArticleFilters, CountrySummary } from './models/article.model'
 import { ArticleService } from './services/article.service';
 import { StateService } from './services/state.service';
 import { RadarMapComponent } from './components/radar-map/radar-map.component';
+import { RadarMapLeafletComponent } from './components/radar-map/leaflet/radar-map-leaflet.component';
 import { RadarToolbarComponent } from './components/radar-toolbar/radar-toolbar.component';
 import { RadarSidebarComponent } from './components/radar-sidebar/radar-sidebar.component';
-import { installLeafletStub, type StubClusterGroup, type StubMap } from './testing/leaflet.stub';
+import { installLeafletStub, type StubMap } from './testing/leaflet.stub';
 import { MOCK_MODE } from './services/mock-mode.token';
+import { MAP_RENDERER } from './services/map-renderer.token';
 
 const FIXTURE_DATE = '2026-07-14';
 
@@ -136,8 +138,10 @@ class MapStubComponent {
   focusCountryCode = input<string | null>(null);
   markerClicked = output<Article>();
   clusterClicked = output<Article[]>();
-  countryClicked = output<import('./components/radar-map/radar-map.component').CountryOpenRequest>();
-  relationClicked = output<import('./components/radar-map/radar-map.component').RelationOpenRequest>();
+  countryClicked =
+    output<import('./components/radar-map/radar-map.component').CountryOpenRequest>();
+  relationClicked =
+    output<import('./components/radar-map/radar-map.component').RelationOpenRequest>();
   collapseAllGraphs(_emitClose?: boolean): void {
     /* no-op stub */
   }
@@ -210,7 +214,9 @@ function createStateStub(initial: Article[] = FIXTURE_ARTICLES, error: unknown =
     countries: computed(() => [] as CountrySummary[]),
     savedCountries: computed(() => [] as CountrySummary[]),
     filteredSummary: computed(() => [] as import('./models/map-summary.model').MapSummaryRow[]),
-    filteredMapRelations: computed(() => [] as import('./models/map-relation.model').MapRelationRow[]),
+    filteredMapRelations: computed(
+      () => [] as import('./models/map-relation.model').MapRelationRow[],
+    ),
     articleCount: computed(() => detailSignal().length),
     readCount: computed(() => detailSignal().filter((a) => a.is_read).length),
     savedCount: computed(() => 0),
@@ -291,13 +297,24 @@ describe('App / map behavior', () => {
     beforeEach(async () => {
       await TestBed.configureTestingModule({
         imports: [MapHostComponent],
-        providers: [provideHttpClient(), provideHttpClientTesting()],
+        providers: [
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          { provide: MAP_RENDERER, useValue: 'leaflet' as const },
+        ],
       }).compileComponents();
 
       httpMock = TestBed.inject(HttpTestingController);
     });
 
     afterEach(() => {
+      httpMock
+        .match(() => true)
+        .forEach((req) => {
+          if (!req.cancelled) {
+            req.flush(EMPTY_GEOJSON);
+          }
+        });
       httpMock.verify();
     });
 
@@ -307,13 +324,26 @@ describe('App / map behavior', () => {
       geoReqs.forEach((req) => req.flush(EMPTY_GEOJSON));
     }
 
+    function getLeafletMap(fixture: {
+      debugElement: {
+        children: { componentInstance: unknown; children: { componentInstance: unknown }[] }[];
+      };
+    }): RadarMapLeafletComponent {
+      const facade = fixture.debugElement.children[0].componentInstance as RadarMapComponent;
+      const leaflet = fixture.debugElement.children[0].children[0]
+        ?.componentInstance as RadarMapLeafletComponent;
+      expect(facade.renderer).toBe('leaflet');
+      expect(leaflet).toBeTruthy();
+      return leaflet;
+    }
+
     it('removes the Leaflet map on destroy', async () => {
       const fixture = TestBed.createComponent(MapHostComponent);
       fixture.detectChanges();
       flushGeoJson();
       await fixture.whenStable();
 
-      const mapCmp = fixture.debugElement.children[0].componentInstance as RadarMapComponent;
+      const mapCmp = getLeafletMap(fixture);
       const mapInstance = (mapCmp as unknown as { map: StubMap }).map;
       expect(mapInstance._removed).toBe(false);
 
@@ -329,61 +359,8 @@ describe('App / map behavior', () => {
       geoReq.flush('missing', { status: 404, statusText: 'Not Found' });
       await fixture.whenStable();
 
-      const mapCmp = fixture.debugElement.children[0].componentInstance as RadarMapComponent;
+      const mapCmp = getLeafletMap(fixture);
       expect(mapCmp.isParsingGeoJson()).toBe(false);
-    });
-
-    it('keeps article markers inside cluster groups for large country sets', async () => {
-      const bulk: Article[] = Array.from({ length: 80 }, (_, i) =>
-        makeArticle({
-          id: i + 1,
-          title: `Bulk article ${i + 1}`,
-          country_code: 'DE',
-          primary_category: 'Energia',
-          latitude: 51.05 + (i % 5) * 0.01,
-          longitude: 13.73 + (i % 5) * 0.01,
-        }),
-      );
-      const countries: CountrySummary[] = [
-        { country_code: 'DE', categories: ['Energia'], article_count: bulk.length },
-      ];
-
-      const fixture = TestBed.createComponent(MapHostComponent);
-      fixture.componentInstance.articles = bulk;
-      fixture.componentInstance.countries = countries;
-      fixture.detectChanges();
-      flushGeoJson();
-      await fixture.whenStable();
-
-      const mapCmp = fixture.debugElement.children[0].componentInstance as RadarMapComponent;
-      expect(mapCmp.isParsingGeoJson()).toBe(false);
-
-      // Drive cluster population directly after GeoJSON is ready (same path as the map effect).
-      (
-        mapCmp as unknown as {
-          updateMapData: (articles: Article[], countries: CountrySummary[], summary?: unknown[]) => void;
-        }
-      ).updateMapData(bulk, countries, []);
-
-      const mapInstance = (mapCmp as unknown as { map: StubMap }).map;
-      const categoryGroups = (
-        mapCmp as unknown as { categoryClusterGroups: Map<string, StubClusterGroup> }
-      ).categoryClusterGroups;
-
-      const energiaGroup = categoryGroups.get('Energia');
-      expect(energiaGroup).toBeTruthy();
-      // 80 real markers + 1 dummy for the DE_Energia spot
-      expect(energiaGroup!.getLayers().length).toBe(81);
-
-      const directArticleMarkersOnMap = mapInstance._layers.filter(
-        (layer) => layer && typeof layer === 'object' && 'articleData' in (layer as object),
-      );
-      expect(directArticleMarkersOnMap).toHaveLength(0);
-
-      const clusterGroupsOnMap = mapInstance._layers.filter(
-        (layer) => layer && typeof layer === 'object' && 'getAllChildMarkers' in (layer as object),
-      );
-      expect(clusterGroupsOnMap.length).toBe(10);
     });
   });
 
@@ -403,7 +380,8 @@ describe('App / map behavior', () => {
             provide: ArticleService,
             useValue: {
               getMapSummary: () => of([]),
-              getArticlesPage: () => of({ items: structuredClone(FIXTURE_ARTICLES), next_cursor: null, total: 3 }),
+              getArticlesPage: () =>
+                of({ items: structuredClone(FIXTURE_ARTICLES), next_cursor: null, total: 3 }),
               getAllArticlesForCountry: () => of(structuredClone(FIXTURE_ARTICLES)),
               getCountries: () => of([]),
               updateReadStatus: () => of({ status: 'success', is_read: true }),

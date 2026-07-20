@@ -32,10 +32,10 @@ Harness per vincolare l’agente alle regole di produzione. Overlay Radar a **tr
 | `CLAUDE.md` | Entry-point sessione + skill map + nota spawn profili |
 | `settings.json` | Tool/domain whitelist; `hooks.notes` (non registra Cursor) |
 | `rules/` | Path-scoped SoT: `backend.md`, `frontend.md`, `docker.md`, `testing.md` |
-| `agents/` | Profili prompt: `pipeline-engineer`, `angular-map-expert`, `geo-data-architect` |
+| `agents/` | Profili prompt: `pipeline-engineer`, `angular-map-expert` (MapLibre 3D-primary + facade; Leaflet legacy freeze), `geo-data-architect` |
 | `hooks/` | Logica security/lint: `pre-tool-use.py`, `post-tool-use.py` |
 | `skills/` | Mirror flat delle skill (sync da `.agents`) |
-| `scripts/sync_skills.py` | `--check` / `--write` SoT → mirror |
+| `scripts/sync_skills.py` | `--check` / `--write` SoT → mirror — **dopo ogni edit** a `.agents/skills/*/SKILL.md` |
 
 ### Adapter Cursor — `.cursor/`
 
@@ -130,7 +130,7 @@ python radar/.ecc/scripts/sync_skills.py --check   # exit 0 se allineati
 python radar/.ecc/scripts/sync_skills.py --write   # copia SoT → mirror
 ```
 
-Dopo ogni edit a una skill SoT: `--write` (o fallisce il `--check` in CI/locale).
+Dopo ogni edit a una skill SoT: `--write` poi `--check` (exit 0). In CI/locale un `--check` fallito = mirror stale.
 
 ---
 
@@ -165,7 +165,8 @@ Prerequisito host per post-hook Python: `ruff` sul `PATH`.
 - Sidebar freeze: `radar-sidebar/**` + `p-carousel` (eccezione mirata: toggle Salva e chip `related_countries`)
 - Ingest solo `worker.py`; API in `main.py`
 - Reti `radar-edge` / `radar-data`; health live vs ready
-- Cluster: radius **40**, `spiderfyOnMaxZoom: false`; nation hub disco + fan tutte le icone (no hard cap 24; size/distanza adattivi)
+- Spiderfy: path MapLibre = fan custom (no MC); path Leaflet legacy = radius **40**, `spiderfyOnMaxZoom: false`; nation hub disco + fan tutte le icone (no hard cap 24; size/distanza adattivi)
+- Overlay resize: `map.resize()` (MapLibre) / `invalidateSize()` (Leaflet)
 - Notizie Salvate: `saved-summary` + `?saved=true`; click nazione = zoom/spiderfy parity LETTE/TROVATE; save⇒read, unread⇒unsave
 - Pydantic CSV `str`; FE `string[]` solo post-API
 - `MOCK_MODE` esplicito; no fallback silenzioso; nation/saved-fetch `detailError` → banner (T-P1-04)

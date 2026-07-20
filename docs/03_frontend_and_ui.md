@@ -11,11 +11,14 @@ Stack allineato a Phase **6 DONE / GATE VERDE**.
 | Layer | Scelta |
 |-------|--------|
 | Core | Angular 21.2 standalone, Signals, ESBuild |
-| Mappa | Leaflet 1.9.4 + markercluster 1.5.3 via `angular.json` `scripts[]` → `window.L` |
+| Mappa | **MapLibre GL 5.24** (default, 3D-primary / globe; mercator+pitch contingency) — facade `radar-map.component.ts` monta `maplibre/` o `leaflet/` via token `MAP_RENDERER` |
+| Mappa legacy | Leaflet 1.9.4 + markercluster 1.5.3 via `angular.json` `scripts[]` → `window.L` — **LEGACY FREEZE**, non default (`MAP_RENDERER=leaflet`) |
 | UI | PrimeNG 17 + Angular CDK 17 (peer mismatch → `npm ci --legacy-peer-deps`) |
 | Stile | SCSS (design system in `styles.scss`) |
 
-Script utili (`package.json`): `start`, `verify-geojson`, `verify-geojson:fetch`, `typecheck`, `test:ci`, `build:ci`, `lint`. **Non esiste** runner `ng e2e` in questo repo.
+Script utili (`package.json`): `start`, `verify-geojson`, `verify-geojson:fetch`, `verify-map-renderer`, `typecheck`, `test:ci`, `build:ci`, `lint`. **Non esiste** runner `ng e2e` in questo repo.
+
+Proiezione MapLibre: `localStorage` key `radar.mapProjection` = `globe` \| `mercator`. Resize overlay: path MapLibre chiama `map.resize()` (equivalente legacy `invalidateSize()`).
 
 ---
 
@@ -24,17 +27,20 @@ Script utili (`package.json`): `start`, `verify-geojson`, `verify-geojson:fetch`
 ```text
 App
 ├── RadarToolbarComponent     # data, filtri, LETTE/TROVATE, NOTIZIE SALVATE
-├── RadarMapComponent         # GeoJSON, hatching, cluster, pallini, spiderfy
+├── RadarMapComponent         # facade → MapLibre (default) o Leaflet legacy
+│   ├── maplibre/             # host 3D-primary (hatching, pin, spiderfy custom, archi)
+│   └── leaflet/              # LEGACY FREEZE (MarkerCluster + relationsPane)
 └── RadarSidebarComponent     # p-carousel (FROZEN; eccezione toggle Salva)
 
 Servizi:
 ├── StateService              # SoT signals + map-summary + saved-summary + nation/saved pages
 ├── ArticleService            # HTTP / mock gated
+├── MAP_RENDERER token        # default maplibre — window/localStorage override
 ├── MOCK_MODE token           # default false — no silent fallback
 └── ArticleMockService        # solo se MOCK_MODE=true
 ```
 
-Hatching SVG: owner in `radar-map.component.ts` (`getOrCreateComboPattern`) — non una directive separata obbligatoria.
+Hatching SVG / fill-pattern: owner nel host attivo (`maplibre/` o `leaflet/`) — non una directive separata obbligatoria.
 
 ---
 
@@ -86,26 +92,36 @@ Offline: `{ provide: MOCK_MODE, useValue: true }`. Errori API restano visibili �
 
 ---
 
-## Leaflet + ESBuild
+## MapLibre (default) + Leaflet legacy
 
-1. JS Leaflet e MarkerCluster in `angular.json` `scripts[]` → `window.L`
+**Default:** MapLibre GL via host `radar-map/maplibre/`. Token `MAP_RENDERER` in `services/map-renderer.token.ts` (override `window.__RADAR_MAP_RENDERER__` o `localStorage`; default `maplibre`). Gate CI: `npm run verify-map-renderer`.
+
+**Path 3D (MapLibre):** spiderfy hub+fan è **custom** (HTML markers) — **senza** `leaflet.markercluster`. Layout gambe: cerchio se n &lt; 9, **spirale MarkerCluster** se n ≥ 9 (raggio/leg in **pixel** via `project`/`unproject`, non gradi geografici). Overlay full-bleed: dopo open/close sidebar chiamare `map.resize()` (non `invalidateSize`). Hatching day-view: canvas → `map.addImage` → `fill-pattern` (multi-cat). Archi hover: tooltip sticky + thicken via paint `arcKey`. Globe: **niente** `maxBounds` (blocca rotate); `minZoom: 2.2`, `clickTolerance: 12`, ignore click dopo drag/rotate/pitch.
+
+**Path legacy (Leaflet):** solo se `MAP_RENDERER=leaflet`. Regole ESBuild sotto restano valide **solo** per quel host.
+
+### Leaflet + ESBuild (solo host legacy)
+
+1. JS Leaflet e MarkerCluster in `angular.json` `scripts[]` → `window.L` (necessari al path legacy)
 2. CSS Leaflet/MarkerCluster via `@import` in `src/styles.scss` (incluso da `angular.json` `styles[]`)
-3. Nel componente: `const L = (window as any).L`
+3. Nel componente legacy: `const L = (window as any).L`
 4. Vietato `import 'leaflet.markercluster'` nei componenti
 5. Test: stub `src/app/testing/leaflet.stub.ts`
 
 ---
 
-## Clustering
+## Clustering / spiderfy
 
-Un `markerClusterGroup` **per ciascuna delle 10 categorie** (nation detail):
+**MapLibre (default):** nessun MarkerCluster — hub nazione + fan emoji custom per categoria attiva (stessa UX: keep zoom ≥ 5, collapse &lt; 5).
+
+**Leaflet legacy:** un `markerClusterGroup` **per ciascuna delle 10 categorie** (nation detail):
 
 - `maxClusterRadius: 40`
 - `spiderfyOnMaxZoom: false` (espansione custom / flyTo)
 - `iconCreateFunction` → icona nascosta (0×0): day-view usa pin summary; nation open usa hub disco + fan emoji
 - Non ripristinare raggio 200 o spiderfy automatico legacy
 
-Read/unread/save: fingerprint geometria + `syncMarkerReadState` — toggle `is_read` **non** deve `clearLayers` (icone spiderfy restano). Logica in `state.service.ts` + `radar-map.component.ts`, non nella sidebar (sidebar solo delega click). Auto-mark come letta: in `app.ts` su `activeArticleChanged` se `!is_read`. Card **Salva notizia** / **Rimuovi dai salvati**. Coupling: save ⇒ read; unread ⇒ unsave.
+Read/unread/save: fingerprint geometria + sync marker read — toggle `is_read` **non** deve ricostruire i layer (icone spiderfy restano). Logica in `state.service.ts` + host mappa, non nella sidebar (sidebar solo delega click). Auto-mark come letta: in `app.ts` su `activeArticleChanged` se `!is_read`. Card **Salva notizia** / **Rimuovi dai salvati**. Coupling: save ⇒ read; unread ⇒ unsave.
 
 PATCH read status: update ottimistico + rollback; risposta `{status, is_read, is_saved?}`.
 PATCH saved status: update ottimistico + rollback; risposta `{status, is_saved, is_read?}`.
@@ -139,15 +155,17 @@ GeoJSON locale: `assets/data/countries.geo.json` (no CDN in produzione; pin in `
 
 ## Relazioni Geospaziali (Grafo — Fase H)
 
-Per collegare le notizie multilaterali, la mappa disegna archi curvi bidirezionali (mediante interpolazione di punti tramite `L.polyline`) tra i centroidi dei paesi.
+Per collegare le notizie multilaterali, la mappa disegna archi curvi bidirezionali tra i centroidi dei paesi.
+
+- **MapLibre (default):** great-circle / LineString multi-segment (source layer o layer dedicato); hit-buffer per hover/click; stessa semantica star e stessi output (`relationClicked` → `loadRelationArticles`).
+- **Leaflet legacy:** interpolazione Bézier + `L.polyline` sul pane **`relationsPane`** (z-index **550**).
 
 **Semantica v1 (star, non clique):** ogni articolo con `country_code` primario e `related_countries` genera archi **solo** primary↔ciascun related (undirected `LEAST/GREATEST`). Un accordo USA–Italia–Francia (`US` + `IT,FR`) produce gli archi US–IT e US–FR, **non** IT–FR, a meno che un altro articolo non colleghi direttamente IT e FR. Il click su un arco apre il carosello bilaterale della sola coppia cliccata.
 
 1. **Gestione dello Stato**: `StateService` espone `mapRelationsResource` sincronizzato con la data attiva e i filtri della toolbar. Al riceversi del segnale SSE `article_processed`, viene scatenato il reload atomico sia per il summary che per le relazioni.
 2. **Visualizzazione e Zoom**:
-   - Gli archi vengono disegnati in un `relationsLayerGroup` dedicato sul pane Leaflet **`relationsPane`** (z-index **550**: sopra confini GeoJSON e label tile z 450, sotto i marker z 600), così hover/click non sono rubati dai poligoni nazione né coperti dai nomi CartoDB.
-   - **Zoom ≥ 5 (vista pin)**: gli archi sono divisi per categoria (1 linea per categoria geopolitica attiva per coppia paese), con spessore proporzionale al volume (`Math.min(6, 1 + volume * 0.5)`), opacity 0.8, e tratteggio **geometrico** (tratti solidi lat/lng + gap — niente `dashArray`/CSS, così non “scorre” a ogni pan). Se la stessa coppia ha più categorie, le Bézier usano un **offset di curvatura** (fan parallelo) così le linee non si sovrappongono.
-   - **Zoom < 5 (vista hatching)**: gli archi vengono aggregati per coppia di paesi come una **singola linea multicolore** (spezzata in segmenti consecutivi proporzionali al volume di ciascuna categoria collegata, ordinata per volume decrescente). Hanno uno stile soft con spessore ridotto (`Math.min(3, 1 + totalVolume * 0.3)`), opacity ~0.45, classe `.relational-arc-flow--macro` (linea continua, senza dash) ed il tooltip mostra il breakdown delle categorie e del volume totale (es. `Sicurezza 5 · Economia 2 · n=7`).
+   - **Zoom ≥ 5 (vista pin)**: gli archi sono divisi per categoria (1 linea per categoria geopolitica attiva per coppia paese), con spessore proporzionale al volume (`Math.min(6, 1 + volume * 0.5)`), opacity 0.8, e tratteggio **stabile al pan** (**geometric dash** = segmenti lat/lng con gap — **non** `line-dasharray` / CSS `stroke-dasharray`, che “scorre” al pan). Se la stessa coppia ha più categorie, le curve usano un **offset di curvatura** (fan parallelo) così le linee non si sovrappongono.
+   - **Zoom < 5 (vista hatching)**: gli archi vengono aggregati per coppia di paesi come una **singola linea multicolore** (segmenti consecutivi proporzionali al volume di ciascuna categoria, ordinata per volume decrescente). Stile soft con spessore ridotto (`Math.min(3, 1 + totalVolume * 0.3)`), opacity ~0.45; tooltip con breakdown (es. `Sicurezza 5 · Economia 2 · n=7`).
    - Vengono nascosti se viene aperta la vista di dettaglio di una specifica nazione (per evitare sovrapposizioni visive con il ventaglio di spiderfy).
 3. **Calcolo Centroidi**:
    - I centroidi vengono estratti dinamicamente dai confini GeoJSON caricati in cache.
@@ -155,8 +173,8 @@ Per collegare le notizie multilaterali, la mappa disegna archi curvi bidireziona
 4. **Stile Visivo**:
    - Colore dell'arco allineato alle variabili di stile della categoria geopolitica (`CATEGORY_CSS_VARS`).
    - Spessore proporzionale al volume aggregato di notizie.
-   - Zoom ≥ 5: tratteggio geometrico denso (sampling Bézier 60, tratti on/off 1/1 via `addGeometricDashedPolyline`); zoom &lt; 5: linea continua soft `.relational-arc-flow--macro`.
-5. **Hover / click**: hit-area su pane `relationsPane` (z 550, sopra confini e label tile, sotto i pin) per tooltip/highlight affidabili anche in Europa densa; click emette `relationClicked` → `StateService.loadRelationArticles` apre il carosello con le notizie bilaterali A↔B (macro: tutte le categorie; pin: sola tipologia dell’arco; entrambi i versi via `related_countries`).
+   - Zoom ≥ 5: tratteggio denso; zoom &lt; 5: linea continua soft aggregata.
+5. **Hover / click**: hit-area affidabile anche in Europa densa; click emette `relationClicked` → `StateService.loadRelationArticles` apre il carosello con le notizie bilaterali A↔B (macro: tutte le categorie; pin: sola tipologia dell’arco; entrambi i versi via `related_countries`).
 
 Dettaglio ops FE: [`radar/frontend/README.md`](../radar/frontend/README.md).
 

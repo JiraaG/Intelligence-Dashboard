@@ -4,17 +4,26 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 // Reset Globale e Box Model
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-html, body {
+html,
+body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family:
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--color-bg-primary);
@@ -24,54 +33,54 @@ html, body {
 /* ─── CSS CUSTOM PROPERTIES (PALETTE OPERATIVA E LAYOUT) ────────────────────── */
 :root {
   // Sfondi (Glassmorphism e Dark Mode Palantir)
-  --color-bg-primary:     #0a0a0f;                 // Nero profondo base mappa
-  --color-bg-secondary:   #0d1117;                 // Sidebar e pannelli
-  --color-bg-card:        #161b22;                 // Card notizie
-  --color-bg-overlay:     rgba(10, 10, 15, 0.95);  // Sidebar glass
-  --color-bg-toolbar:     rgba(13, 17, 23, 0.90);  // Toolbar glass
+  --color-bg-primary: #0a0a0f; // Nero profondo base mappa
+  --color-bg-secondary: #0d1117; // Sidebar e pannelli
+  --color-bg-card: #161b22; // Card notizie
+  --color-bg-overlay: rgba(10, 10, 15, 0.95); // Sidebar glass
+  --color-bg-toolbar: rgba(13, 17, 23, 0.9); // Toolbar glass
 
   // Bordi e Linee Operative
-  --color-border-primary: rgba(0, 212, 255, 0.12);  // Ciano soft
-  --color-border-accent:  rgba(0, 212, 255, 0.40);  // Ciano attivo
-  --color-border-card:    rgba(0, 212, 255, 0.08);  // Bordo card
-  --color-map-stroke:     rgba(0, 212, 255, 0.15);  // Colore stroke mappa
+  --color-border-primary: rgba(0, 212, 255, 0.12); // Ciano soft
+  --color-border-accent: rgba(0, 212, 255, 0.4); // Ciano attivo
+  --color-border-card: rgba(0, 212, 255, 0.08); // Bordo card
+  --color-map-stroke: rgba(0, 212, 255, 0.15); // Colore stroke mappa
   --color-map-stroke-active: rgba(0, 212, 255, 0.25); // Colore stroke attiva
 
   // Tipografia
-  --color-text-primary:   #e6edf3;                 // Testo principale
-  --color-text-secondary: #8b949e;                 // Testo descrittivo/secondario
-  --color-text-muted:     #484f58;                 // Testo inattivo/disabilitato
-  --color-text-accent:    #58a6ff;                 // Accenti e link ciano-blu
+  --color-text-primary: #e6edf3; // Testo principale
+  --color-text-secondary: #8b949e; // Testo descrittivo/secondario
+  --color-text-muted: #484f58; // Testo inattivo/disabilitato
+  --color-text-accent: #58a6ff; // Accenti e link ciano-blu
 
   // Categorie Geopolitiche Immutabili (Richiamo Hatching SVG e Marker)
-  --color-nucleare:       #00E5FF;                 // Ciano neon nucleare
-  --color-energia:        #FFEA00;                 // Giallo brillante energia
-  --color-infrastrutture: #9E9E9E;                 // Grigio/Argento infrastrutture
-  --color-geopolitica:    #E040FB;                 // Magenta geopolitica
-  --color-economia:       #00E676;                 // Verde neon economia
-  --color-tecnologia:     #2979FF;                 // Blu acceso tecnologia
-  --color-spazio:         #7C4DFF;                 // Viola scuro spazio
-  --color-ambiente:       #8BC34A;                 // Verde lime ambiente
-  --color-salute:         #FF1744;                 // Rosso puro salute
-  --color-sicurezza:      #FF9100;                 // Arancione sicurezza
+  --color-nucleare: #00e5ff; // Ciano neon nucleare
+  --color-energia: #ffea00; // Giallo brillante energia
+  --color-infrastrutture: #9e9e9e; // Grigio/Argento infrastrutture
+  --color-geopolitica: #e040fb; // Magenta geopolitica
+  --color-economia: #00e676; // Verde neon economia
+  --color-tecnologia: #2979ff; // Blu acceso tecnologia
+  --color-spazio: #7c4dff; // Viola scuro spazio
+  --color-ambiente: #8bc34a; // Verde lime ambiente
+  --color-salute: #ff1744; // Rosso puro salute
+  --color-sicurezza: #ff9100; // Arancione sicurezza
 
   // Classificazione Sentiment
-  --color-sentiment-pos:  #3fb950;                 // Verde positivo
-  --color-sentiment-neu:  #8b949e;                 // Grigio neutrale
-  --color-sentiment-neg:  #f85149;                 // Rosso negativo
+  --color-sentiment-pos: #3fb950; // Verde positivo
+  --color-sentiment-neu: #8b949e; // Grigio neutrale
+  --color-sentiment-neg: #f85149; // Rosso negativo
 
   // Transizioni standardizzate (Smoothness e Easing)
-  --transition-smooth:    cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-fast:      0.15s var(--transition-smooth);
-  --transition-medium:    0.35s var(--transition-smooth);
-  --transition-slow:      0.6s var(--transition-smooth);
+  --transition-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: 0.15s var(--transition-smooth);
+  --transition-medium: 0.35s var(--transition-smooth);
+  --transition-slow: 0.6s var(--transition-smooth);
 
   // Misure di Layout
-  --sidebar-width:        35vw;
-  --sidebar-min-width:    420px;
-  --toolbar-height:       56px;
-  --z-toolbar:            900;
-  --z-sidebar:            1000;
+  --sidebar-width: 35vw;
+  --sidebar-min-width: 420px;
+  --toolbar-height: 56px;
+  --z-toolbar: 900;
+  --z-sidebar: 1000;
 }
 
 /* ─── IMPORTAZIONI PRIME-NG E LEAFLET ─────────────────────────────────────── */
@@ -81,6 +90,7 @@ html, body {
 @import 'leaflet/dist/leaflet.css';
 @import 'leaflet.markercluster/dist/MarkerCluster.css';
 @import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
+@import 'maplibre-gl/dist/maplibre-gl.css';
 
 /* ─── OVERRIDE LEAFLET (ESTETICA SCURA E PANES MULTILIVELLO) ──────────────── */
 
@@ -110,7 +120,7 @@ html, body {
 // Cluster Operativi (Glassmorphism e Glow Ciano) — Base neutra
 .radar-cluster {
   background: rgba(0, 212, 255, 0.08) !important;
-  border: 1.5px solid rgba(0, 212, 255, 0.40) !important;
+  border: 1.5px solid rgba(0, 212, 255, 0.4) !important;
   border-radius: 50%;
   backdrop-filter: blur(8px);
   box-shadow: 0 0 10px rgba(0, 212, 255, 0.12);
@@ -131,52 +141,72 @@ html, body {
   &.cat-nucleare {
     border-color: var(--color-nucleare) !important;
     box-shadow: 0 0 12px rgba(0, 229, 255, 0.25);
-    .cluster-icon { color: var(--color-nucleare) !important; }
+    .cluster-icon {
+      color: var(--color-nucleare) !important;
+    }
   }
   &.cat-energia {
     border-color: var(--color-energia) !important;
     box-shadow: 0 0 12px rgba(255, 234, 0, 0.25);
-    .cluster-icon { color: var(--color-energia) !important; }
+    .cluster-icon {
+      color: var(--color-energia) !important;
+    }
   }
   &.cat-infrastrutture {
     border-color: var(--color-infrastrutture) !important;
     box-shadow: 0 0 12px rgba(158, 158, 158, 0.25);
-    .cluster-icon { color: var(--color-infrastrutture) !important; }
+    .cluster-icon {
+      color: var(--color-infrastrutture) !important;
+    }
   }
   &.cat-geopolitica {
     border-color: var(--color-geopolitica) !important;
     box-shadow: 0 0 12px rgba(224, 64, 251, 0.25);
-    .cluster-icon { color: var(--color-geopolitica) !important; }
+    .cluster-icon {
+      color: var(--color-geopolitica) !important;
+    }
   }
   &.cat-economia {
     border-color: var(--color-economia) !important;
     box-shadow: 0 0 12px rgba(0, 230, 118, 0.25);
-    .cluster-icon { color: var(--color-economia) !important; }
+    .cluster-icon {
+      color: var(--color-economia) !important;
+    }
   }
   &.cat-tecnologia {
     border-color: var(--color-tecnologia) !important;
     box-shadow: 0 0 12px rgba(41, 121, 255, 0.25);
-    .cluster-icon { color: var(--color-tecnologia) !important; }
+    .cluster-icon {
+      color: var(--color-tecnologia) !important;
+    }
   }
   &.cat-spazio {
     border-color: var(--color-spazio) !important;
     box-shadow: 0 0 12px rgba(124, 77, 255, 0.25);
-    .cluster-icon { color: var(--color-spazio) !important; }
+    .cluster-icon {
+      color: var(--color-spazio) !important;
+    }
   }
   &.cat-ambiente {
     border-color: var(--color-ambiente) !important;
     box-shadow: 0 0 12px rgba(139, 195, 74, 0.25);
-    .cluster-icon { color: var(--color-ambiente) !important; }
+    .cluster-icon {
+      color: var(--color-ambiente) !important;
+    }
   }
   &.cat-salute {
     border-color: var(--color-salute) !important;
     box-shadow: 0 0 12px rgba(255, 23, 68, 0.25);
-    .cluster-icon { color: var(--color-salute) !important; }
+    .cluster-icon {
+      color: var(--color-salute) !important;
+    }
   }
   &.cat-sicurezza {
     border-color: var(--color-sicurezza) !important;
     box-shadow: 0 0 12px rgba(255, 152, 0, 0.25);
-    .cluster-icon { color: var(--color-sicurezza) !important; }
+    .cluster-icon {
+      color: var(--color-sicurezza) !important;
+    }
   }
 }
 
@@ -295,7 +325,9 @@ html, body {
   height: 30px;
   font-size: 1.05rem;
   filter: drop-shadow(0 0 5px rgba(0, 212, 255, 0.32));
-  transition: transform var(--transition-fast), filter var(--transition-fast);
+  transition:
+    transform var(--transition-fast),
+    filter var(--transition-fast);
   cursor: pointer;
 
   &:hover {
@@ -344,7 +376,7 @@ html, body {
 
 /* Non-sidebar focus-visible (toolbar / map chrome). Sidebar styles are frozen. */
 button:focus-visible,
-[role="button"]:focus-visible {
+[role='button']:focus-visible {
   outline: 2px solid var(--color-border-accent);
   outline-offset: 2px;
 }

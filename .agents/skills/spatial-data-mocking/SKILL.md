@@ -304,6 +304,8 @@ Produzione: `{ provide: MOCK_MODE, useValue: false }` — errori API (map-summar
 Usa questo checklist per verificare che ogni funzionalità della mappa funzioni correttamente
 con i dati mockati prima di connettere il backend reale.
 
+> **MapLibre parity (Phase I):** i Test 1–7 sotto devono passare sul renderer **default MapLibre** con la **stessa UX** del path Leaflet legacy (hatching, pin, spiderfy, overlay, salvati, archi). Forzare Leaflet solo per regressione ops: `localStorage.setItem('radar.mapRenderer','leaflet')` + reload.
+
 ### ✅ Test 1: Hatching SVG in Zoom-Out (livello < 5)
 
 - [ ] La Germania mostra due colori di hatching (Tecnologia + Energia)
@@ -320,22 +322,23 @@ con i dati mockati prima di connettere il backend reale.
 - [ ] L'hatching SVG sfuma gradualmente con CSS transition opacity a 0
 - [ ] I marker puntuali compaiono con icona tematica (categorie 10: es. ☢️ Nucleare, ⚡ Energia, 💻 Tecnologia, 🌿 Ambiente)
 - [ ] I due marker tedeschi (Dresda Tecnologia e Monaco Energia) sono separati e cliccabili
-- [ ] I due marker ucraini (Zaporizhzhia Nucleare e Kakhovka Ambiente) **NON** formano un cluster unico — ciascuno appartiene al proprio cluster group di categoria
-- [ ] A zoom intermedio (5-9), i marker della stessa categoria in aree vicine si raggruppano in cluster colorati per categoria
+- [ ] I due marker ucraini (Zaporizhzhia Nucleare e Kakhovka Ambiente) **NON** formano un cluster unico — ciascuno appartiene al proprio gruppo di categoria (MapLibre: hub/fan custom; Leaflet legacy: cluster group)
+- [ ] A zoom intermedio (5-9), i marker della stessa categoria in aree vicine si raggruppano per categoria (parity UX)
 
-### ✅ Test 3: Cluster per Categoria e Carosello PrimeNG
+### ✅ Test 3: Cluster / spiderfy per Categoria e Carosello PrimeNG
 
-- [ ] I cluster usano le 10 categorie valide (Nucleare, Energia, Infrastrutture, Geopolitica, Economia, Tecnologia, Spazio, Ambiente, Salute, Sicurezza) — **no** Chip/Acqua/Elettronica come primary
-- [ ] Cliccando su un cluster categoria si apre la sidebar sinistra con **solo** gli articoli di quella categoria
+- [ ] Le 10 categorie valide (Nucleare…Sicurezza) — **no** Chip/Acqua/Elettronica come primary
+- [ ] Cliccando hub/categoria si apre la sidebar sinistra con **solo** gli articoli di quella categoria
 - [ ] Il componente `p-carousel` scorre correttamente tra le notizie della categoria selezionata (**osservare only** — non editare `radar-sidebar/**`)
 - [ ] Ogni slide del carousel mostra: titolo, summary, badge tags, link sorgente
-- [ ] `spiderfyOnMaxZoom: false`; `maxClusterRadius: 40` — espansione custom, non spiderfy Leaflet automatico
+- [ ] MapLibre: spiderfy custom **senza** MarkerCluster; n &lt; 9 cerchio / n ≥ 9 **spirale** (pixel, non gradi); Leaflet legacy: `spiderfyOnMaxZoom: false`, `maxClusterRadius: 40`
+- [ ] MapLibre: **non** riscrivere il carosello allo spiderfy (`clusterClicked` solo su collapse `[]`)
 
 ### ✅ Test 4: Overlay Full-Bleed (Phase 4)
 
 - [ ] Mappa occupa 100vw / 100vh in stato idle
 - [ ] Al click su marker/nazione: **mappa resta 100vw**; sidebar disegna **sopra** (overlay) — **non** restringere a 70%/30%
-- [ ] Dopo open/close sidebar: `map.invalidateSize()` viene chiamato
+- [ ] Dopo open/close sidebar: `map.resize()` (MapLibre) / `map.invalidateSize()` (Leaflet legacy)
 - [ ] Cliccando fuori dalla sidebar o sul bottone ✕, sidebar chiude; mappa resta full-bleed
 
 ### ✅ Test 5: Filtraggio Temporale p-calendar
@@ -349,19 +352,21 @@ con i dati mockati prima di connettere il backend reale.
 
 - [ ] Contatore toolbar **NOTIZIE SALVATE** non dipende dalla data del calendario
 - [ ] Tooltip **Nazioni Salvate** elenca paesi con badge count
-- [ ] Click nazione → carousel multi-day + **fitBounds / flyTo 6 + spiderfy** (parity LETTE/TROVATE)
+- [ ] Click nazione → carousel multi-day + **fitBounds / flyTo 6 + spiderfy** (parity LETTE/TROVATE; MapLibre e Leaflet)
 - [ ] Card: **Salva notizia** / **Rimuovi dai salvati**; save ⇒ letta; unread ⇒ unsave
 - [ ] Mock: `getSavedSummary` + `getArticlesPage({ saved: true })`
 
 ### ✅ Test 7: Relazioni Geospaziali (Fase H + archi UI)
 
 - [ ] Day view zoom **&lt; 5**: archi **multicolore** aggregati visibili sopra hatching (non nascosti)
-- [ ] Day view zoom **≥ 5**: archi **per-categoria** con tratteggio geometrico (fermo al pan); multi-cat stessa coppia → fan parallelo
-- [ ] Hover arco: tooltip + highlight (anche in Europa densa; linee sopra i nomi tile)
+- [ ] Day view zoom **≥ 5**: archi **per-categoria** con tratteggio stabile al pan; multi-cat stessa coppia → fan parallelo
+- [ ] Hover arco: tooltip + highlight (anche in Europa densa)
 - [ ] Click arco macro: sidebar/carosello con notizie bilaterali A↔B **tutte** le categorie (entrambi i versi)
 - [ ] Click arco pin: stessa cosa filtrata per la **tipologia** dell’arco
 - [ ] Nation-open: archi nascosti (no interferenza spiderfy)
 - [ ] Card: sezione "Paesi correlati" con chip se `related_countries` non vuoto
+- [ ] Zoom &lt; 5: hatching **multi-colore** (MapLibre `fill-pattern` combo / Leaflet SVG pattern) — non fill solido di una sola categoria
+- [ ] Path MapLibre: great-circle / LineString + geometric dash ≥5 + hover thicken/tooltip; path Leaflet legacy: `relationsPane`
 
 ---
 

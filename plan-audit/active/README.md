@@ -6,8 +6,10 @@ Questa directory contiene i piani di progettazione e di implementazione attualme
 
 **Attivo**
 
-- Nessun piano di implementazione in corso.
+- **Fase I — Mappa 3D-primary (MapLibre)** — [`plan_impl_map_3d_globe.md`](plan_impl_map_3d_globe.md) (**codice + docs shipped** 2026-07-20; move a `complete/` su ok utente). Follow-up globo: sempre [`plan_impl_map_globe_projection.md`](plan_impl_map_globe_projection.md) (§3.J).
+- **Fase J — Upgrade globo vero** — [`plan_impl_map_globe_projection.md`](plan_impl_map_globe_projection.md) (**Futuro / BACKLOG**).
 - Prompt non eseguito: [`../prompts/active/plan_prompt_ecc_manual_and_expansion.md`](../prompts/active/plan_prompt_ecc_manual_and_expansion.md) (ECC manual / expansion).
+- Prompt mappa 3D (origine analisi): [`../prompts/active/plan_prompt_map_3d_globe.md`](../prompts/active/plan_prompt_map_3d_globe.md).
 
 **Completati di recente (riferimento)**
 
@@ -17,6 +19,6 @@ Questa directory contiene i piani di progettazione e di implementazione attualme
 - **Fase H (Grafo Geospaziale)** — [`../complete/master_plan_impl_phase_H_geospatial_graph.md`](../complete/master_plan_impl_phase_H_geospatial_graph.md).
 - **Fase B (Real-Time / SSE)** — in [`../complete/`](../complete/).
 
-Roadmap parallela (`radar_overview_and_upgrades.md` §3): **Fase C — Deduplicazione semantica (`pgvector`)** in backlog.
+Roadmap parallela (`radar_overview_and_upgrades.md` §3): **Fase C — Deduplicazione semantica (`pgvector`)** in backlog (indipendente da I/J).
 
 Quadro globale: [`../STATUS.md`](../STATUS.md).

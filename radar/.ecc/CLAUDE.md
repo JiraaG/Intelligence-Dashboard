@@ -9,8 +9,9 @@
 **Nome:** Radar Informativo Globale (Intelligence Dashboard)
 **Versione:** 0.2.0
 **Obiettivo:** Applicazione web self-hosted, containerizzata e plug-and-play che aggrega feed RSS,
-li arricchisce semanticamente via LLM multi-provider (Gemini SDK e/o OpenAI-compat httpx) e li visualizza su una mappa 2D interattiva
-in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categoria geopolitica).
+li arricchisce semanticamente via LLM multi-provider (Gemini SDK e/o OpenAI-compat httpx) e li visualizza su una mappa **MapLibre** 3D-primary
+(globo; mercator+pitch contingency) in stile Palantir (estetica scura, confini nitidi, marker tematici per categoria geopolitica).
+Leaflet resta dormiente (LEGACY FREEZE) dietro `MAP_RENDERER`.
 
 ### Vincoli post–branch restore (2026-07-15)
 
@@ -18,7 +19,8 @@ in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categ
 - **Phase B (Real-Time Ingestion & Soft Refresh) DONE / GATE VERDE**: Webhook HMAC (`POST /api/webhooks/miniflux`), streaming SSE (`GET /api/articles/events`), dedicated Postgres LISTEN connections (no pool), Angular zone-isolated soft refresh with reference-preserving merge, and pending mutation protection.
 - **Final Release F0–F4 COMPLETE** (2026-07-18): PR #1 `refactor/testing` → `develop` merged 2026-07-17; F1–F4 PASS. Fase 5 (digest pin / drop `--legacy-peer-deps`) = **DEFERRED ACCETTATO**, non richiesto. Quadro: `plan-audit/STATUS.md`.
 - **Presenti (Phase 1–5 + follow-up):** migrazioni `001`–`011` (incluso `008_outbox_miniflux_marked_at`, `009_llm_model_cooldown`, `010_articles_is_saved`, `011_articles_related_countries`), outbox, ledger quote, cooldown modelli, `radar-worker`, reti `radar-edge`/`radar-data`, `/health/live`+`/ready`, CSP Nginx, `ops/` backup, Gemini `build_gemini_response_schema()`, FE `MOCK_MODE` / DestroyRef / XSS-safe markers / read-unread senza rebuild cluster / **`detailError` nation-fetch → banner toolbar (T-P1-04)** / **Notizie Salvate** (`is_saved`, saved-summary, toolbar vault).
-- **Phase 5 API/FE:** `GET /api/map-summary` (`country×category`); `GET /api/map-relations` (archi; FE: `relationsPane` z550, hover/click → `loadRelationArticles`); `GET /api/saved-summary` (vault, no date); `GET /api/articles` → `{items,next_cursor,total}` (keyset `id`, limit≤100, LATERAL; `saved=true` cross-day); `PATCH read_status` / `saved_status` (unread⇒unsave; save⇒read); `backend/app/api/articles_query.py`; migrazioni `007`+. FE: giorno da summary + **pin nazione** sul centroide paese (`getCountryCentroid`; US/RU mainland — non media lat/lng pezzo); hatching click zoom &lt; 5 via `pickCountryCodeAt`; nazione = hub disco + spiderfy categoria attiva; vault salvati = tooltip + spiderfy parity LETTE/TROVATE. **Vietato** `article-list`. Sidebar freeze resta (due eccezioni mirate: toggle Salva e chip `related_countries`). Restore tip map/summary: `a240b3c`.
+- **Phase 5 API/FE:** `GET /api/map-summary` (`country×category`); `GET /api/map-relations` (archi MapLibre great-circle default; legacy Leaflet `relationsPane` z550; hover/click → `loadRelationArticles`); `GET /api/saved-summary` (vault, no date); `GET /api/articles` → `{items,next_cursor,total}` (keyset `id`, limit≤100, LATERAL; `saved=true` cross-day); `PATCH read_status` / `saved_status` (unread⇒unsave; save⇒read); `backend/app/api/articles_query.py`; migrazioni `007`+. FE: giorno da summary + **pin nazione** sul centroide paese (`getCountryCentroid`; US/RU mainland — non media lat/lng pezzo); hatching click zoom &lt; 5 via `pickCountryCodeAt`; nazione = hub disco + spiderfy categoria attiva; vault salvati = tooltip + spiderfy parity LETTE/TROVATE. **Vietato** `article-list`. Sidebar freeze resta (due eccezioni mirate: toggle Salva e chip `related_countries`). Restore tip map/summary: `a240b3c`.
+- **Phase I MapLibre GATE:** renderer default MapLibre GL 5.24 — facade `radar-map.component.ts` + host `maplibre/`; Leaflet host `leaflet/` LEGACY FREEZE via `MAP_RENDERER`. Gate: `npm run verify-map-renderer`. Spiderfy: spirale n≥9 (pixel); hatching `fill-pattern`; archi geometric dash; globe senza `maxBounds`; CSP apex Carto. SoT: `plan-audit/active/plan_impl_map_3d_globe.md` (+ J: `plan_impl_map_globe_projection.md`).
 - Pipeline ingest in `backend/app/worker.py`; `main.py` è API-only. Compose: 5 servizi su edge+data.
 - **Sidebar freeze:** non refactorare `frontend/src/app/components/radar-sidebar/**`; tenere `p-carousel` + altezza via `article-card-{id}`; vietato `app-article-list`. Eccezione: toggle Salva (`is_saved`) + sezione chip `related_countries`.
 - Bug **read/unread** (`.marker-read`): risolto in Phase 4 via `state.service.ts` + `radar-map.component.ts`. Unread ⇒ unsave; save ⇒ read.
@@ -36,7 +38,7 @@ in stile Palantir (estetica scura, confini SVG nitidi, marker tematici per categ
 | Feed Source | Miniflux REST API                       | Articoli non letti, deduplica per URL       |
 | Frontend    | Angular 21 (Standalone Components)      | Signals, lazy loading                       |
 | UI Library  | PrimeNG 17+                             | p-sidebar, p-carousel, p-calendar           |
-| Mappa       | Leaflet + CartoDB Dark Positron          | GeoJSON locale in assets/data/             |
+| Mappa       | MapLibre GL 5.24 (default) + Leaflet legacy dormiente | Facade `radar-map/`; host `maplibre/` / `leaflet/`; token `MAP_RENDERER`; GeoJSON locale in assets/data/ |
 | Container   | Docker + docker-compose                  | Cinque servizi su `radar-edge` + `radar-data` |
 | Web Server  | Nginx (Alpine)                          | Serve build Angular, porta 8080 (mappa host 80→8080); CSP Phase 3  |
 
@@ -206,6 +208,9 @@ cd frontend && npm run start
 cd frontend && node scripts/verify-geojson.mjs
 # in Dockerfile FE: RUN node scripts/verify-geojson.mjs --fetch  (prima di npm run build)
 
+# Gate MapLibre default (Phase I)
+cd frontend && npm run verify-map-renderer
+
 # Ops runbook
 # vedi radar/docs/runbook.md
 
@@ -264,7 +269,7 @@ Miniflux API (`WORKER_POLL_INTERVAL_SECONDS`, default 900)
 Shortcut Markdown: `.cursor/commands/radar-verify.md`, `radar-smoke.md`, `radar-lint.md`.
 
 Quando spawnare Task con profilo ECC (prompt da `radar/.ecc/agents/`):
-- **angular-map-expert** — mappa Leaflet/cluster/overlay (non sidebar)
+- **angular-map-expert** — mappa MapLibre / facade / overlay (non sidebar); Leaflet solo legacy
 - **pipeline-engineer** — worker, classification, commit/outbox
 - **geo-data-architect** — GeoJSON assets, verify script, bounds
 
@@ -274,9 +279,10 @@ Non auto-dispatch: l’agente sceglie il Task esplicitamente.
 > - Nei **mock FE** `infrastructural_entities` / `companies_involved` / `tags` restano tipicamente `string[]`. Nello **schema Pydantic** Gemini sono `str` CSV — non convertire il validator a `List[str]`.
 > - Mock/prod: token `MOCK_MODE` esplicito (default `false`); **no** auto-fallback silenzioso su errore API. Nation-fetch: `detailError` unito in `StateService.error()`; catch `closeSidebar(false)` preserva il banner (T-P1-04).
 > - Il componente mappa espone quattro output: `markerClicked`, `clusterClicked`, `countryClicked`, `relationClicked` (archi bilaterali → sidebar).
-> - **⚠️ Leaflet + esbuild:** caricare Leaflet e MarkerCluster come script globali in `angular.json` → `scripts[]`; accedere via `window.L`. Mai `import 'leaflet.markercluster'` nei componenti. Test: stub in `src/app/testing/leaflet.stub.ts`.
-> - **🗂️ Clustering attuale:** un `markerClusterGroup` **per categoria** con `maxClusterRadius: 40`, `spiderfyOnMaxZoom: false`. Day-view = pin nazione; nation open = hub `radar-spider-root` + fan emoji (tutte le icone della categoria, size/distanza adattivi). Disabilitare auto-unspiderfy MC su click **e** zoom; spider resta fino a zoom ≥ 5, chiude a hatching (&lt; 5). Non ripristinare i valori legacy 100/200 + spiderfy true / icona ad anello composita per-categoria.
-> - **Archi:** `relationsPane` z 550 (sopra confini/label, sotto pin); zoom &lt; 5 multicolore; ≥ 5 tratteggio geometrico + fan; click → `loadRelationArticles`.
+> - **MapLibre default:** host `radar-map/maplibre/`; token `MAP_RENDERER`; gate `npm run verify-map-renderer`. Spiderfy custom **senza** MarkerCluster. Resize: `map.resize()`.
+> - **Leaflet legacy:** host `radar-map/leaflet/` (LEGACY FREEZE). Caricare Leaflet e MarkerCluster in `angular.json` → `scripts[]`; accedere via `window.L`. Mai `import 'leaflet.markercluster'` nei componenti. Test: stub in `src/app/testing/leaflet.stub.ts`.
+> - **🗂️ Spiderfy / clustering:** MapLibre = hub + fan custom; Leaflet legacy = `markerClusterGroup` per categoria (`maxClusterRadius: 40`, `spiderfyOnMaxZoom: false`). Day-view = pin nazione; keep fan zoom ≥ 5, chiude a hatching (&lt; 5).
+> - **Archi:** MapLibre great-circle (default); Leaflet `relationsPane` z 550; zoom &lt; 5 multicolore; ≥ 5 tratteggio + fan; click → `loadRelationArticles`.
 
 ---
 
