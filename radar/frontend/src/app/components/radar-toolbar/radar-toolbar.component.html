@@ -10,31 +10,169 @@
   >
   </p-calendar>
 
-  <!-- Sentiment MultiSelect -->
-  <p-multiSelect
-    [options]="sentimentOptions"
-    [(ngModel)]="selectedSentiment"
-    (onChange)="onFiltersChange()"
-    optionLabel="label"
-    optionValue="value"
-    placeholder="Sentiment"
-    [maxSelectedLabels]="1"
-    selectedItemsLabel="{0} selezionati"
+  <!-- Sentiment (pattern Relazioni Attive) -->
+  <div
+    class="article-count-container"
+    (mouseenter)="isSentimentTooltipHovered.set(true)"
+    (mouseleave)="isSentimentTooltipHovered.set(false)"
   >
-  </p-multiSelect>
+    <button
+      type="button"
+      class="article-count"
+      [class.is-active]="selectedSentiment().length > 0"
+      (click)="toggleSentimentTooltip($event)"
+      [attr.aria-expanded]="isSentimentTooltipVisible()"
+      aria-haspopup="true"
+    >
+      Sentiment
+      @if (selectedSentiment().length > 0) {
+        <strong>{{ selectedSentiment().length }}/{{ sentimentOptions.length }}</strong>
+      }
+    </button>
 
-  <!-- Tipologia MultiSelect -->
-  <p-multiSelect
-    [options]="categoryOptions"
-    [(ngModel)]="selectedCategories"
-    (onChange)="onFiltersChange()"
-    optionLabel="label"
-    optionValue="value"
-    placeholder="Tipologia"
-    [maxSelectedLabels]="1"
-    selectedItemsLabel="{0} selezionate"
+    <div
+      class="countries-tooltip filter-tooltip"
+      *ngIf="isSentimentTooltipVisible()"
+      role="listbox"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="tooltip-header">
+        <span class="tooltip-title">Sentiment</span>
+        <button
+          type="button"
+          class="tooltip-close-btn"
+          (click)="closeSentimentTooltip($event)"
+          aria-label="Chiudi"
+        >
+          ✕
+        </button>
+      </div>
+      <div class="tooltip-actions">
+        <button
+          type="button"
+          class="tooltip-action-btn"
+          (click)="onToggleSelectAllSentiment($event)"
+        >
+          {{ sentimentAllSelected() ? 'Deseleziona tutto' : 'Seleziona tutto' }}
+        </button>
+      </div>
+      <div class="tooltip-filter-wrap">
+        <input
+          type="search"
+          class="tooltip-filter"
+          [value]="sentimentFilter()"
+          (input)="onSentimentFilterInput($event)"
+          placeholder="Filtra sentiment…"
+          aria-label="Filtra sentiment"
+        />
+      </div>
+      <div class="tooltip-list">
+        <div
+          class="tooltip-row tooltip-row--switch"
+          *ngFor="let opt of filteredSentimentOptions()"
+          role="option"
+        >
+          <span class="country-name">{{ opt.label }}</span>
+          <button
+            type="button"
+            class="ios-switch"
+            role="switch"
+            [attr.aria-checked]="isSentimentOn(opt.value)"
+            [attr.aria-label]="'Attiva ' + opt.value"
+            [class.is-on]="isSentimentOn(opt.value)"
+            (click)="onToggleSentiment(opt.value, $event)"
+          >
+            <span class="ios-switch__thumb" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="tooltip-empty" *ngIf="filteredSentimentOptions().length === 0">
+          Nessun sentiment corrisponde al filtro
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tipologia (pattern Relazioni Attive) -->
+  <div
+    class="article-count-container"
+    (mouseenter)="isCategoryTooltipHovered.set(true)"
+    (mouseleave)="isCategoryTooltipHovered.set(false)"
   >
-  </p-multiSelect>
+    <button
+      type="button"
+      class="article-count"
+      [class.is-active]="selectedCategories().length > 0"
+      (click)="toggleCategoryTooltip($event)"
+      [attr.aria-expanded]="isCategoryTooltipVisible()"
+      aria-haspopup="true"
+    >
+      Tipologia
+      @if (selectedCategories().length > 0) {
+        <strong>{{ selectedCategories().length }}/{{ categoryOptions.length }}</strong>
+      }
+    </button>
+
+    <div
+      class="countries-tooltip filter-tooltip"
+      *ngIf="isCategoryTooltipVisible()"
+      role="listbox"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="tooltip-header">
+        <span class="tooltip-title">Tipologia</span>
+        <button
+          type="button"
+          class="tooltip-close-btn"
+          (click)="closeCategoryTooltip($event)"
+          aria-label="Chiudi"
+        >
+          ✕
+        </button>
+      </div>
+      <div class="tooltip-actions">
+        <button
+          type="button"
+          class="tooltip-action-btn"
+          (click)="onToggleSelectAllCategories($event)"
+        >
+          {{ categoryAllSelected() ? 'Deseleziona tutto' : 'Seleziona tutto' }}
+        </button>
+      </div>
+      <div class="tooltip-filter-wrap">
+        <input
+          type="search"
+          class="tooltip-filter"
+          [value]="categoryFilter()"
+          (input)="onCategoryFilterInput($event)"
+          placeholder="Filtra tipologia…"
+          aria-label="Filtra tipologia"
+        />
+      </div>
+      <div class="tooltip-list">
+        <div
+          class="tooltip-row tooltip-row--switch"
+          *ngFor="let opt of filteredCategoryOptions()"
+          role="option"
+        >
+          <span class="country-name">{{ opt.label }}</span>
+          <button
+            type="button"
+            class="ios-switch"
+            role="switch"
+            [attr.aria-checked]="isCategoryOn(opt.value)"
+            [attr.aria-label]="'Attiva ' + opt.value"
+            [class.is-on]="isCategoryOn(opt.value)"
+            (click)="onToggleCategory(opt.value, $event)"
+          >
+            <span class="ios-switch__thumb" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="tooltip-empty" *ngIf="filteredCategoryOptions().length === 0">
+          Nessuna tipologia corrisponde al filtro
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div class="divider"></div>
 
@@ -192,16 +330,13 @@
         </button>
       </div>
       <div class="tooltip-actions">
-        <button type="button" class="tooltip-action-btn" (click)="onSelectAllRelations($event)">
-          Seleziona tutto
-        </button>
         <button
           type="button"
-          class="tooltip-action-btn tooltip-action-btn--muted"
-          (click)="onClearAllRelations($event)"
-          [disabled]="relationEnabledCount() === 0"
+          class="tooltip-action-btn"
+          (click)="onToggleSelectAllRelations($event)"
+          [disabled]="relationTotalCount() === 0"
         >
-          Deseleziona tutto
+          {{ relationsAllSelected() ? 'Deseleziona tutto' : 'Seleziona tutto' }}
         </button>
       </div>
       <div class="tooltip-filter-wrap">
@@ -249,7 +384,6 @@
     <div class="api-error-banner" role="alert">Errore API — dati non disponibili</div>
   }
 
-  <!-- Progress Bar per stato caricamento asincrono -->
   <div class="loader-wrapper" *ngIf="isLoading()">
     <p-progressBar mode="indeterminate" styleClass="radar-progress-bar"></p-progressBar>
   </div>

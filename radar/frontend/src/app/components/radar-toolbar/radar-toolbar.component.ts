@@ -2,7 +2,6 @@ import { Component, input, output, signal, computed, inject } from '@angular/cor
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CalendarModule } from 'primeng/calendar';
-import { MultiSelectModule } from 'primeng/multiselect';
 import { ProgressBarModule } from 'primeng/progressbar';
 import {
   ArticleFilters,
@@ -12,33 +11,34 @@ import {
 } from '../../models/article.model';
 import { StateService } from '../../services/state.service';
 
+export interface FilterOption<T extends string = string> {
+  label: string;
+  value: T;
+}
+
 /**
  * Toolbar filtri giorno: data, sentiment, categorie, liste paesi e Relazioni attive.
- * Non carica ``Article[]`` — solo rollup ``CountrySummary`` + conteggi.
- * Emit ``filtersChange`` / ``countrySelected`` verso App/StateService.
- * Relazioni Wave 1: toggle nazioni via StateService (OR stella).
+ * Sentiment / Tipologia / Relazioni: stesso pattern tooltip (filtro testo, toggle iOS,
+ * un solo bottone Seleziona/Deseleziona tutto).
  *
  * @see docs/03; radar-api-contract (day = map-summary); frontend.md Regola 12.
  */
 @Component({
   selector: 'app-radar-toolbar',
   standalone: true,
-  imports: [CommonModule, FormsModule, CalendarModule, MultiSelectModule, ProgressBarModule],
+  imports: [CommonModule, FormsModule, CalendarModule, ProgressBarModule],
   templateUrl: './radar-toolbar.component.html',
   styleUrl: './radar-toolbar.component.scss',
 })
 export class RadarToolbarComponent {
   private readonly state = inject(StateService);
 
-  /** Rollup day-view (paesi) senza Article[] completo. */
   countries = input<CountrySummary[]>([]);
-  /** Rollup vault salvati (cross-day). */
   savedCountries = input<CountrySummary[]>([]);
   articleCount = input<number>(0);
   readCount = input<number>(0);
   savedCount = input<number>(0);
   isLoading = input<boolean>(false);
-  /** Banner errore unificato (map-summary o detailError nation-fetch). */
   apiError = input<boolean>(false);
 
   filtersChange = output<ArticleFilters>();
@@ -49,10 +49,11 @@ export class RadarToolbarComponent {
   selectedSentiment = signal<Sentiment[]>([]);
   selectedCategories = signal<PrimaryCategory[]>([]);
 
-  /** Filtri testo nazione (tooltip). */
   nationsFilter = signal('');
   savedNationsFilter = signal('');
   relationsFilter = signal('');
+  sentimentFilter = signal('');
+  categoryFilter = signal('');
 
   isTooltipHovered = signal(false);
   isTooltipClicked = signal(false);
@@ -76,10 +77,38 @@ export class RadarToolbarComponent {
       this.relationOptions().length > 0,
   );
 
+  isSentimentTooltipHovered = signal(false);
+  isSentimentTooltipClicked = signal(false);
+  isSentimentTooltipVisible = computed(
+    () => this.isSentimentTooltipHovered() || this.isSentimentTooltipClicked(),
+  );
+
+  isCategoryTooltipHovered = signal(false);
+  isCategoryTooltipClicked = signal(false);
+  isCategoryTooltipVisible = computed(
+    () => this.isCategoryTooltipHovered() || this.isCategoryTooltipClicked(),
+  );
+
   readonly relationOptions = computed(() => this.state.relationCountryOptions());
   readonly relationEnabled = computed(() => this.state.relationCountriesEnabled());
   readonly relationEnabledCount = computed(() => this.relationEnabled().size);
   readonly relationTotalCount = computed(() => this.relationOptions().length);
+  /** True se tutte le nazioni relazione sono attive → bottone = Deseleziona tutto. */
+  readonly relationsAllSelected = computed(
+    () =>
+      this.relationTotalCount() > 0 && this.relationEnabledCount() === this.relationTotalCount(),
+  );
+
+  readonly sentimentAllSelected = computed(
+    () =>
+      this.sentimentOptions.length > 0 &&
+      this.selectedSentiment().length === this.sentimentOptions.length,
+  );
+  readonly categoryAllSelected = computed(
+    () =>
+      this.categoryOptions.length > 0 &&
+      this.selectedCategories().length === this.categoryOptions.length,
+  );
 
   readonly countriesList = computed(() => this.buildCountryList(this.countries()));
   readonly savedCountriesList = computed(() => this.buildCountryList(this.savedCountries()));
@@ -93,16 +122,22 @@ export class RadarToolbarComponent {
   readonly filteredRelationOptions = computed(() =>
     this.filterByNationQuery(this.relationOptions(), this.relationsFilter()),
   );
+  readonly filteredSentimentOptions = computed(() =>
+    this.filterOptionsByLabel(this.sentimentOptions, this.sentimentFilter()),
+  );
+  readonly filteredCategoryOptions = computed(() =>
+    this.filterOptionsByLabel(this.categoryOptions, this.categoryFilter()),
+  );
 
   readonly today = new Date();
 
-  readonly sentimentOptions = [
+  readonly sentimentOptions: FilterOption<Sentiment>[] = [
     { label: '▲ Positivo', value: 'Positivo' },
     { label: '● Neutrale', value: 'Neutrale' },
     { label: '▼ Negativo', value: 'Negativo' },
   ];
 
-  readonly categoryOptions = [
+  readonly categoryOptions: FilterOption<PrimaryCategory>[] = [
     { label: '☢️ Nucleare', value: 'Nucleare' },
     { label: '⚡ Energia', value: 'Energia' },
     { label: '🏗️ Infrastrutture', value: 'Infrastrutture' },
@@ -115,7 +150,6 @@ export class RadarToolbarComponent {
     { label: '🛡️ Sicurezza', value: 'Sicurezza' },
   ];
 
-  /** Nomi IT per ISO comuni; fallback Intl / codice grezzo sotto. */
   readonly COUNTRY_NAMES: Record<string, string> = {
     IT: 'Italia',
     DE: 'Germania',
@@ -144,11 +178,21 @@ export class RadarToolbarComponent {
     XX: 'World Wide',
   };
 
+  private closeAllPanelsExcept(
+    keep: 'nations' | 'saved' | 'relations' | 'sentiment' | 'category' | null,
+  ): void {
+    if (keep !== 'nations') this.isTooltipClicked.set(false);
+    if (keep !== 'saved') this.isSavedTooltipClicked.set(false);
+    if (keep !== 'relations') this.isRelationsTooltipClicked.set(false);
+    if (keep !== 'sentiment') this.isSentimentTooltipClicked.set(false);
+    if (keep !== 'category') this.isCategoryTooltipClicked.set(false);
+  }
+
   toggleTooltip(event: Event): void {
     event.stopPropagation();
-    this.isTooltipClicked.update((v) => !v);
-    this.isSavedTooltipClicked.set(false);
-    this.isRelationsTooltipClicked.set(false);
+    const next = !this.isTooltipClicked();
+    this.closeAllPanelsExcept(next ? 'nations' : null);
+    this.isTooltipClicked.set(next);
   }
 
   closeTooltip(event: Event): void {
@@ -159,9 +203,9 @@ export class RadarToolbarComponent {
 
   toggleSavedTooltip(event: Event): void {
     event.stopPropagation();
-    this.isSavedTooltipClicked.update((v) => !v);
-    this.isTooltipClicked.set(false);
-    this.isRelationsTooltipClicked.set(false);
+    const next = !this.isSavedTooltipClicked();
+    this.closeAllPanelsExcept(next ? 'saved' : null);
+    this.isSavedTooltipClicked.set(next);
   }
 
   closeSavedTooltip(event: Event): void {
@@ -172,15 +216,41 @@ export class RadarToolbarComponent {
 
   toggleRelationsTooltip(event: Event): void {
     event.stopPropagation();
-    this.isRelationsTooltipClicked.update((v) => !v);
-    this.isTooltipClicked.set(false);
-    this.isSavedTooltipClicked.set(false);
+    const next = !this.isRelationsTooltipClicked();
+    this.closeAllPanelsExcept(next ? 'relations' : null);
+    this.isRelationsTooltipClicked.set(next);
   }
 
   closeRelationsTooltip(event: Event): void {
     event.stopPropagation();
     this.isRelationsTooltipClicked.set(false);
     this.isRelationsTooltipHovered.set(false);
+  }
+
+  toggleSentimentTooltip(event: Event): void {
+    event.stopPropagation();
+    const next = !this.isSentimentTooltipClicked();
+    this.closeAllPanelsExcept(next ? 'sentiment' : null);
+    this.isSentimentTooltipClicked.set(next);
+  }
+
+  closeSentimentTooltip(event: Event): void {
+    event.stopPropagation();
+    this.isSentimentTooltipClicked.set(false);
+    this.isSentimentTooltipHovered.set(false);
+  }
+
+  toggleCategoryTooltip(event: Event): void {
+    event.stopPropagation();
+    const next = !this.isCategoryTooltipClicked();
+    this.closeAllPanelsExcept(next ? 'category' : null);
+    this.isCategoryTooltipClicked.set(next);
+  }
+
+  closeCategoryTooltip(event: Event): void {
+    event.stopPropagation();
+    this.isCategoryTooltipClicked.set(false);
+    this.isCategoryTooltipHovered.set(false);
   }
 
   selectCountry(countryCode: string, event: Event): void {
@@ -206,14 +276,60 @@ export class RadarToolbarComponent {
     this.state.toggleRelationCountry(code);
   }
 
-  onSelectAllRelations(event: Event): void {
+  /** Un solo bottone: se tutte on → clear; altrimenti select-all. */
+  onToggleSelectAllRelations(event: Event): void {
     event.stopPropagation();
-    this.state.selectAllRelationCountries();
+    if (this.relationsAllSelected()) {
+      this.state.clearRelationCountries();
+    } else {
+      this.state.selectAllRelationCountries();
+    }
   }
 
-  onClearAllRelations(event: Event): void {
+  isSentimentOn(value: Sentiment): boolean {
+    return this.selectedSentiment().includes(value);
+  }
+
+  onToggleSentiment(value: Sentiment, event: Event): void {
     event.stopPropagation();
-    this.state.clearRelationCountries();
+    const cur = this.selectedSentiment();
+    this.selectedSentiment.set(
+      cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value],
+    );
+    this.onFiltersChange();
+  }
+
+  onToggleSelectAllSentiment(event: Event): void {
+    event.stopPropagation();
+    if (this.sentimentAllSelected()) {
+      this.selectedSentiment.set([]);
+    } else {
+      this.selectedSentiment.set(this.sentimentOptions.map((o) => o.value));
+    }
+    this.onFiltersChange();
+  }
+
+  isCategoryOn(value: PrimaryCategory): boolean {
+    return this.selectedCategories().includes(value);
+  }
+
+  onToggleCategory(value: PrimaryCategory, event: Event): void {
+    event.stopPropagation();
+    const cur = this.selectedCategories();
+    this.selectedCategories.set(
+      cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value],
+    );
+    this.onFiltersChange();
+  }
+
+  onToggleSelectAllCategories(event: Event): void {
+    event.stopPropagation();
+    if (this.categoryAllSelected()) {
+      this.selectedCategories.set([]);
+    } else {
+      this.selectedCategories.set(this.categoryOptions.map((o) => o.value));
+    }
+    this.onFiltersChange();
   }
 
   onNationsFilterInput(event: Event): void {
@@ -231,7 +347,16 @@ export class RadarToolbarComponent {
     this.relationsFilter.set((event.target as HTMLInputElement).value);
   }
 
-  /** Bandiera emoji da ISO-2; ``XX`` → ``WW``; codepoint invalidi → bandiera bianca. */
+  onSentimentFilterInput(event: Event): void {
+    event.stopPropagation();
+    this.sentimentFilter.set((event.target as HTMLInputElement).value);
+  }
+
+  onCategoryFilterInput(event: Event): void {
+    event.stopPropagation();
+    this.categoryFilter.set((event.target as HTMLInputElement).value);
+  }
+
   getFlagEmoji(countryCode: string): string {
     if (!countryCode || countryCode === 'XX') return 'WW';
     const codePoints = countryCode
@@ -245,10 +370,6 @@ export class RadarToolbarComponent {
     }
   }
 
-  /**
-   * Data locale → ``YYYY-MM-DD`` (compensa timezone offset).
-   * Sentiment/categorie vuoti → ``null`` (filtro assente lato StateService/API).
-   */
   onFiltersChange(): void {
     const date = this.selectedDate();
     const offset = date.getTimezoneOffset();
@@ -297,5 +418,16 @@ export class RadarToolbarComponent {
     const q = query.trim().toLowerCase();
     if (!q) return list;
     return list.filter((c) => c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q));
+  }
+
+  private filterOptionsByLabel<T extends string>(
+    options: FilterOption<T>[],
+    query: string,
+  ): FilterOption<T>[] {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter(
+      (o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q),
+    );
   }
 }
