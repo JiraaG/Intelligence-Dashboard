@@ -36,6 +36,10 @@ data/postgres/
 # ─── Ops backup (pg_dump + vault.tar.gz; mai in Git) ─────────────────────────
 backups/
 
+# ─── Miniflux runtime dumps (seed + OPML commit-ready restano tracciati) ─────
+config/miniflux-feeds.live.*
+config/miniflux-feeds.json
+
 # ─── IDE e sistema operativo ─────────────────────────────────────────────────
 .idea/
 .vscode/

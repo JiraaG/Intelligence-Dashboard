@@ -77,6 +77,25 @@ Miniflux is on the **data** network only. Options:
 
 Create an API key in Miniflux → Settings → API Keys, put it in `.env` as `MINIFLUX_API_KEY`.
 
+### Feed seed (OPML + scraper config)
+
+Commit-ready list (from repo-root [`RSS.txt`](../../RSS.txt)):
+
+- `config/miniflux-feeds.seed.json` — titles, categories, crawler, `user_agent`, `scraper_rules`
+- `config/miniflux-feeds.opml` — portable OPML (categories only; full settings live in the seed)
+
+```bash
+# Publish admin UI, then import/update all feeds on a fresh PC:
+docker compose -f docker-compose.yml -f docker-compose.lan.yml up -d
+./ops/import-miniflux-feeds.sh          # Git Bash / WSL
+# → http://localhost:8080
+
+# Optional: dump what is live now (not for commit — *.live.* gitignored):
+./ops/export-miniflux-feeds.sh
+```
+
+Scripts load `MINIFLUX_API_KEY` via `ops/_load_dotenv.sh`. Override URL with `MINIFLUX_ADMIN_URL` if needed.
+
 ---
 
 ## Hardened override (loopback FE)
@@ -105,20 +124,35 @@ Frontend is **never** on `radar-data`. Worker is **only** on `radar-data`.
 
 ```bash
 # Git Bash / WSL / Linux (not raw PowerShell)
-./ops/backup-postgres.sh
+./ops/backup-postgres.sh              # recommended: dump + Miniflux seed, NO vault
+./ops/backup-postgres.sh --with-vault # also archive vault markdown
+./ops/sync-miniflux-seed.sh           # refresh config/* from live Miniflux (for git)
 ```
 
 Scripts load `radar/.env` via `ops/_load_dotenv.sh` (KEY=VALUE only — safe if comments contain `()`). Defaults: `POSTGRES_USER=radar_user`, `POSTGRES_DB=radar_db`.
 
-Produces `backups/<UTC-stamp>/`:
+Produces `backups/<UTC-stamp>/` (gitignored):
 
-- `radar_<db>.dump` — `pg_dump -Fc`
-- `vault.tar.gz` — Obsidian vault bind mount
-- `SHA256SUMS` — checksums
+- `radar_<db>.dump` — `pg_dump -Fc` (Radar + Miniflux tables)
+- `miniflux/miniflux-feeds.seed.json` + `.opml` — feed config snapshot
+- `BACKUP_INFO.txt` — restore hints
+- `vault.tar.gz` — only with `--with-vault`
+- `SHA256SUMS`
+
+**Git SoT (clone → ready feeds):** `config/miniflux-feeds.seed.json` (+ `.opml`).  
+Commit the seed after `./ops/sync-miniflux-seed.sh` or after a backup that syncs live Miniflux.  
+Do **not** commit `backups/` or vault articles.
+
+Fresh PC:
+
+```bash
+cp .env.example .env          # secrets + later MINIFLUX_API_KEY
+./ops/bootstrap-miniflux.sh   # up + import seed (or import-miniflux-feeds.sh)
+```
 
 Warns if `article_outbox` has `pending` / `writing` rows (crash-consistent, not cross-FS atomic). Retention: `RETENTION_DAYS` (default 7).
 
-Env: `BACKUP_ROOT`, `RETENTION_DAYS`, `COMPOSE` (default `docker compose`).
+Env: `BACKUP_ROOT`, `RETENTION_DAYS`, `COMPOSE`, `SKIP_VAULT`, `SYNC_SEED`, `MINIFLUX_ADMIN_URL`.
 
 ---
 

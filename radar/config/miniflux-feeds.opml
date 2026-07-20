@@ -1,0 +1,63 @@
+<?xml version='1.0' encoding='utf-8'?>
+<opml version="2.0">
+  <head>
+    <title>Radar Miniflux feeds</title>
+  </head>
+  <body>
+    <outline text="BBC News" title="BBC News">
+      <outline type="rss" text="BBC News — Business" title="BBC News — Business" xmlUrl="https://feeds.bbci.co.uk/news/business/rss.xml" />
+      <outline type="rss" text="BBC News — Science &amp; Environment" title="BBC News — Science &amp; Environment" xmlUrl="https://feeds.bbci.co.uk/news/science_and_environment/rss.xml" />
+      <outline type="rss" text="BBC News — Technology" title="BBC News — Technology" xmlUrl="https://feeds.bbci.co.uk/news/technology/rss.xml" />
+      <outline type="rss" text="BBC News — World" title="BBC News — World" xmlUrl="https://feeds.bbci.co.uk/news/world/rss.xml" />
+    </outline>
+    <outline text="CNBC" title="CNBC">
+      <outline type="rss" text="CNBC — Asia" title="CNBC — Asia" xmlUrl="https://www.cnbc.com/id/19832390/device/rss/rss.html" />
+      <outline type="rss" text="CNBC — Business" title="CNBC — Business" xmlUrl="https://www.cnbc.com/id/10001147/device/rss/rss.html" />
+      <outline type="rss" text="CNBC — Economy" title="CNBC — Economy" xmlUrl="https://www.cnbc.com/id/20910258/device/rss/rss.html" />
+      <outline type="rss" text="CNBC — Europe" title="CNBC — Europe" xmlUrl="https://www.cnbc.com/id/19794221/device/rss/rss.html" />
+      <outline type="rss" text="CNBC — Finance" title="CNBC — Finance" xmlUrl="https://www.cnbc.com/id/10000664/device/rss/rss.html" />
+      <outline type="rss" text="CNBC — Health and Science" title="CNBC — Health and Science" xmlUrl="https://www.cnbc.com/id/10000108/device/rss/rss.html" />
+      <outline type="rss" text="CNBC — Politics" title="CNBC — Politics" xmlUrl="https://www.cnbc.com/id/10000113/device/rss/rss.html" />
+      <outline type="rss" text="CNBC — Technology" title="CNBC — Technology" xmlUrl="https://www.cnbc.com/id/19854910/device/rss/rss.html" />
+      <outline type="rss" text="CNBC — World" title="CNBC — World" xmlUrl="https://www.cnbc.com/id/100727362/device/rss/rss.html" />
+    </outline>
+    <outline text="Deutsche Welle" title="Deutsche Welle">
+      <outline type="rss" text="DW — Business" title="DW — Business" xmlUrl="https://rss.dw.com/rdf/rss-en-bus" />
+      <outline type="rss" text="DW — World" title="DW — World" xmlUrl="https://rss.dw.com/rdf/rss-en-world" />
+    </outline>
+    <outline text="Hacker News" title="Hacker News">
+      <outline type="rss" text="Hacker News — Newest" title="Hacker News — Newest" xmlUrl="https://hnrss.org/newest" />
+    </outline>
+    <outline text="NASA" title="NASA">
+      <outline type="rss" text="NASA — Aeronautics" title="NASA — Aeronautics" xmlUrl="https://www.nasa.gov/aeronautics/feed/" />
+      <outline type="rss" text="NASA — News Release" title="NASA — News Release" xmlUrl="https://www.nasa.gov/news-release/feed/" />
+      <outline type="rss" text="NASA — Technology" title="NASA — Technology" xmlUrl="https://www.nasa.gov/technology/feed/" />
+    </outline>
+    <outline text="NPR" title="NPR">
+      <outline type="rss" text="NPR — Business" title="NPR — Business" xmlUrl="https://feeds.npr.org/1006/rss.xml" />
+      <outline type="rss" text="NPR — Science" title="NPR — Science" xmlUrl="https://feeds.npr.org/1007/rss.xml" />
+      <outline type="rss" text="NPR — Technology" title="NPR — Technology" xmlUrl="https://feeds.npr.org/1019/rss.xml" />
+      <outline type="rss" text="NPR — US Politics" title="NPR — US Politics" xmlUrl="https://feeds.npr.org/1014/rss.xml" />
+      <outline type="rss" text="NPR — World" title="NPR — World" xmlUrl="https://feeds.npr.org/1004/rss.xml" />
+    </outline>
+    <outline text="Nature" title="Nature">
+      <outline type="rss" text="Nature — News" title="Nature — News" xmlUrl="https://www.nature.com/nature.rss" />
+    </outline>
+    <outline text="The Guardian" title="The Guardian">
+      <outline type="rss" text="The Guardian — Business" title="The Guardian — Business" xmlUrl="https://www.theguardian.com/uk/business/rss" />
+      <outline type="rss" text="The Guardian — Environment" title="The Guardian — Environment" xmlUrl="https://www.theguardian.com/uk/environment/rss" />
+      <outline type="rss" text="The Guardian — Science" title="The Guardian — Science" xmlUrl="https://www.theguardian.com/science/rss" />
+      <outline type="rss" text="The Guardian — Technology" title="The Guardian — Technology" xmlUrl="https://www.theguardian.com/uk/technology/rss" />
+      <outline type="rss" text="The Guardian — World" title="The Guardian — World" xmlUrl="https://www.theguardian.com/world/rss" />
+    </outline>
+    <outline text="Wired" title="Wired">
+      <outline type="rss" text="Wired — AI" title="Wired — AI" xmlUrl="https://www.wired.com/feed/tag/ai/latest/rss" />
+      <outline type="rss" text="Wired — Business" title="Wired — Business" xmlUrl="https://www.wired.com/feed/category/business/latest/rss" />
+      <outline type="rss" text="Wired — Science" title="Wired — Science" xmlUrl="https://www.wired.com/feed/category/science/latest/rss" />
+      <outline type="rss" text="Wired — Security" title="Wired — Security" xmlUrl="https://www.wired.com/feed/category/security/latest/rss" />
+    </outline>
+    <outline text="Yahoo Finance" title="Yahoo Finance">
+      <outline type="rss" text="Yahoo Finance — News" title="Yahoo Finance — News" xmlUrl="https://finance.yahoo.com/news/rssindex" />
+    </outline>
+  </body>
+</opml>

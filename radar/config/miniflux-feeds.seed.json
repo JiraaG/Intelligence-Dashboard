@@ -1,0 +1,252 @@
+{
+  "source": "miniflux-live",
+  "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "crawler_default": true,
+  "feeds": [
+    {
+      "category": "BBC News",
+      "title": "BBC News — Business",
+      "feed_url": "https://feeds.bbci.co.uk/news/business/rss.xml",
+      "scraper_rules": "#main-content",
+      "crawler": true
+    },
+    {
+      "category": "BBC News",
+      "title": "BBC News — Science & Environment",
+      "feed_url": "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml",
+      "scraper_rules": "#main-content",
+      "crawler": true
+    },
+    {
+      "category": "BBC News",
+      "title": "BBC News — Technology",
+      "feed_url": "https://feeds.bbci.co.uk/news/technology/rss.xml",
+      "scraper_rules": "#main-content",
+      "crawler": true
+    },
+    {
+      "category": "BBC News",
+      "title": "BBC News — World",
+      "feed_url": "https://feeds.bbci.co.uk/news/world/rss.xml",
+      "scraper_rules": "#main-content",
+      "crawler": true
+    },
+    {
+      "category": "CNBC",
+      "title": "CNBC — Asia",
+      "feed_url": "https://www.cnbc.com/id/19832390/device/rss/rss.html",
+      "scraper_rules": ".ArticleBody-articleBody",
+      "crawler": true
+    },
+    {
+      "category": "CNBC",
+      "title": "CNBC — Business",
+      "feed_url": "https://www.cnbc.com/id/10001147/device/rss/rss.html",
+      "scraper_rules": ".ArticleBody-articleBody",
+      "crawler": true
+    },
+    {
+      "category": "CNBC",
+      "title": "CNBC — Economy",
+      "feed_url": "https://www.cnbc.com/id/20910258/device/rss/rss.html",
+      "scraper_rules": ".ArticleBody-articleBody",
+      "crawler": true
+    },
+    {
+      "category": "CNBC",
+      "title": "CNBC — Europe",
+      "feed_url": "https://www.cnbc.com/id/19794221/device/rss/rss.html",
+      "scraper_rules": ".ArticleBody-articleBody",
+      "crawler": true
+    },
+    {
+      "category": "CNBC",
+      "title": "CNBC — Finance",
+      "feed_url": "https://www.cnbc.com/id/10000664/device/rss/rss.html",
+      "scraper_rules": ".ArticleBody-articleBody",
+      "crawler": true
+    },
+    {
+      "category": "CNBC",
+      "title": "CNBC — Health and Science",
+      "feed_url": "https://www.cnbc.com/id/10000108/device/rss/rss.html",
+      "scraper_rules": ".ArticleBody-articleBody",
+      "crawler": true
+    },
+    {
+      "category": "CNBC",
+      "title": "CNBC — Politics",
+      "feed_url": "https://www.cnbc.com/id/10000113/device/rss/rss.html",
+      "scraper_rules": ".ArticleBody-articleBody",
+      "crawler": true
+    },
+    {
+      "category": "CNBC",
+      "title": "CNBC — Technology",
+      "feed_url": "https://www.cnbc.com/id/19854910/device/rss/rss.html",
+      "scraper_rules": ".ArticleBody-articleBody",
+      "crawler": true
+    },
+    {
+      "category": "CNBC",
+      "title": "CNBC — World",
+      "feed_url": "https://www.cnbc.com/id/100727362/device/rss/rss.html",
+      "scraper_rules": ".ArticleBody-articleBody",
+      "crawler": true
+    },
+    {
+      "category": "Deutsche Welle",
+      "title": "DW — Business",
+      "feed_url": "https://rss.dw.com/rdf/rss-en-bus",
+      "scraper_rules": "article",
+      "crawler": true
+    },
+    {
+      "category": "Deutsche Welle",
+      "title": "DW — World",
+      "feed_url": "https://rss.dw.com/rdf/rss-en-world",
+      "scraper_rules": "article",
+      "crawler": true
+    },
+    {
+      "category": "Hacker News",
+      "title": "Hacker News — Newest",
+      "feed_url": "https://hnrss.org/newest",
+      "scraper_rules": "",
+      "crawler": false
+    },
+    {
+      "category": "NASA",
+      "title": "NASA — Aeronautics",
+      "feed_url": "https://www.nasa.gov/aeronautics/feed/",
+      "scraper_rules": ".entry-content",
+      "crawler": true
+    },
+    {
+      "category": "NASA",
+      "title": "NASA — News Release",
+      "feed_url": "https://www.nasa.gov/news-release/feed/",
+      "scraper_rules": ".entry-content",
+      "crawler": true
+    },
+    {
+      "category": "NASA",
+      "title": "NASA — Technology",
+      "feed_url": "https://www.nasa.gov/technology/feed/",
+      "scraper_rules": ".entry-content",
+      "crawler": true
+    },
+    {
+      "category": "NPR",
+      "title": "NPR — Business",
+      "feed_url": "https://feeds.npr.org/1006/rss.xml",
+      "scraper_rules": ".storytext",
+      "crawler": true
+    },
+    {
+      "category": "NPR",
+      "title": "NPR — Science",
+      "feed_url": "https://feeds.npr.org/1007/rss.xml",
+      "scraper_rules": ".storytext",
+      "crawler": true
+    },
+    {
+      "category": "NPR",
+      "title": "NPR — Technology",
+      "feed_url": "https://feeds.npr.org/1019/rss.xml",
+      "scraper_rules": ".storytext",
+      "crawler": true
+    },
+    {
+      "category": "NPR",
+      "title": "NPR — US Politics",
+      "feed_url": "https://feeds.npr.org/1014/rss.xml",
+      "scraper_rules": ".storytext",
+      "crawler": true
+    },
+    {
+      "category": "NPR",
+      "title": "NPR — World",
+      "feed_url": "https://feeds.npr.org/1004/rss.xml",
+      "scraper_rules": ".storytext",
+      "crawler": true
+    },
+    {
+      "category": "Nature",
+      "title": "Nature — News",
+      "feed_url": "https://www.nature.com/nature.rss",
+      "scraper_rules": "article",
+      "crawler": true
+    },
+    {
+      "category": "The Guardian",
+      "title": "The Guardian — Business",
+      "feed_url": "https://www.theguardian.com/uk/business/rss",
+      "scraper_rules": "article",
+      "crawler": true
+    },
+    {
+      "category": "The Guardian",
+      "title": "The Guardian — Environment",
+      "feed_url": "https://www.theguardian.com/uk/environment/rss",
+      "scraper_rules": "article",
+      "crawler": true
+    },
+    {
+      "category": "The Guardian",
+      "title": "The Guardian — Science",
+      "feed_url": "https://www.theguardian.com/science/rss",
+      "scraper_rules": "article",
+      "crawler": true
+    },
+    {
+      "category": "The Guardian",
+      "title": "The Guardian — Technology",
+      "feed_url": "https://www.theguardian.com/uk/technology/rss",
+      "scraper_rules": "article",
+      "crawler": true
+    },
+    {
+      "category": "The Guardian",
+      "title": "The Guardian — World",
+      "feed_url": "https://www.theguardian.com/world/rss",
+      "scraper_rules": "article",
+      "crawler": true
+    },
+    {
+      "category": "Wired",
+      "title": "Wired — AI",
+      "feed_url": "https://www.wired.com/feed/tag/ai/latest/rss",
+      "scraper_rules": ".body__inner-container",
+      "crawler": true
+    },
+    {
+      "category": "Wired",
+      "title": "Wired — Business",
+      "feed_url": "https://www.wired.com/feed/category/business/latest/rss",
+      "scraper_rules": ".body__inner-container",
+      "crawler": true
+    },
+    {
+      "category": "Wired",
+      "title": "Wired — Science",
+      "feed_url": "https://www.wired.com/feed/category/science/latest/rss",
+      "scraper_rules": ".body__inner-container",
+      "crawler": true
+    },
+    {
+      "category": "Wired",
+      "title": "Wired — Security",
+      "feed_url": "https://www.wired.com/feed/category/security/latest/rss",
+      "scraper_rules": ".body__inner-container",
+      "crawler": true
+    },
+    {
+      "category": "Yahoo Finance",
+      "title": "Yahoo Finance — News",
+      "feed_url": "https://finance.yahoo.com/news/rssindex",
+      "scraper_rules": ".caas-body",
+      "crawler": true
+    }
+  ]
+}
