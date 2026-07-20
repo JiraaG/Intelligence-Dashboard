@@ -1110,7 +1110,7 @@ Aggiornare frontmatter `description` / `version` a `1.2.0` includendo webhook + 
 | `MINIFLUX_WEBHOOK_SECRET` | Secret HMAC (Miniflux → Settings → Integrations → Webhook). URL: `http://radar-backend:8000/api/webhooks/miniflux` |
 ```
 
-4. Link: `plan-audit/active/master_plan_impl_phase_B.md`.
+4. Link: `plan-audit/complete/master_plan_impl_phase_B.md`.
 
 ### 5.4 Checklist ops Miniflux post-deploy
 

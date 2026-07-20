@@ -371,7 +371,7 @@ Questa sezione è **parte del deliverable Fase H**, non un afterthought. Ogni ca
 | [`radar/docs/runbook.md`](../../radar/docs/runbook.md) | Smoke post-deploy: aggiungere `GET /api/map-relations?date=…` accanto a map-summary / saved-summary. |
 | [`radar/ops/README.md`](../../radar/ops/README.md) | Solo se elenca checklist API smoke; allineare a runbook. |
 | [`plan-audit/STATUS.md`](../STATUS.md) | Fase H = ACTIVE (piano); residuo “NEXT” non più solo C — H in corso di pianificazione/implementazione quando avviata; C resta in roadmap. |
-| [`plan-audit/active/README.md`](./README.md) | Puntare a questo master plan. |
+| [`plan-audit/active/README.md`](../active/README.md) | Indice active (piani chiusi → `complete/`). |
 | [`plan-audit/complete/`](../complete/) | **Non** spostare questo file finché GATE H non è verde. |
 
 **Non toccare** (salvo drift scoperto): report remediation storici, prompt `prompts/done/`, stub `archive/`.

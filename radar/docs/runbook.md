@@ -197,7 +197,7 @@ Dopo smoke, re-ingest nella finestra worker ≈ 48h con lo script ufficiale (dry
 1. Ripristinare in `.env` il blocco **Profilo B** (DeepSeek-only).
 2. `docker compose up -d radar-worker` **senza** `-f docker-compose.ollama-host.yml`.
 
-Piano: [`plan_impl_fase_A_local_amd_ollama.md`](../../plan-audit/active/plan_impl_fase_A_local_amd_ollama.md). SoT lane: [`sot_llm_multi_model_fallback.md`](../../plan-audit/complete/sot_llm_multi_model_fallback.md).
+Piano: [`plan_impl_fase_A_local_amd_ollama.md`](../../plan-audit/complete/plan_impl_fase_A_local_amd_ollama.md). SoT lane: [`sot_llm_multi_model_fallback.md`](../../plan-audit/complete/sot_llm_multi_model_fallback.md).
 
 ---
 

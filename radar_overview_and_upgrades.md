@@ -138,20 +138,33 @@ flowchart TD
 
 ---
 
-## 3. Sviluppi Futuri e Upgrade (Blueprint Tecnici)
+## 3. Upgrade e Blueprint Tecnici
 
-Di seguito vengono definiti i piani operativi per l'estensione del sistema. Ogni upgrade è corredato di dettagli architetturali, modifiche al codice e configurazioni.
+Sezioni sotto = blueprint (architettura + ricette). Stato prodotto aggiornato **2026-07-20**:
+
+| Sezione | Tema | Stato |
+|---------|------|--------|
+| **A** | LLM locale AMD / Ollama (Profilo F) | **DONE** — core `54c8038`, VRAM `2996625`; scorecard fixture **opz.** |
+| **B** | Real-time webhook / SSE / soft-refresh | **DONE / GATE VERDE** (2026-07-18) |
+| **C** | Dedup semantica `pgvector` | **BACKLOG** (prossima candidata) |
+| **D** | Mappe offline air-gapped | Futuro |
+| **G** | Obsidian wiki-links bidirezionali | Futuro |
+| **H** | Grafo geospaziale / archi mappa | **DONE / GATE VERDE** (2026-07-18) |
+
+Quadro vivo: [`plan-audit/STATUS.md`](plan-audit/STATUS.md). Topologie lane env: [`plan-audit/complete/audit_llm_lane_env_generalization.md`](plan-audit/complete/audit_llm_lane_env_generalization.md).
 
 ---
 
 ### A. Configurazione Locale AMD GPU (Radeon RX 6750 XT 12GB) + LLM Lanes
 
-L'obiettivo è abilitare l'elaborazione locale a costo zero sulla GPU AMD Radeon RX 6750 XT (Navi 22 / **gfx1030**, 12 GB VRAM).
+> **Stato: DONE (2026-07-19).** Profilo F Local-Hybrid shipped; unload VRAM idle shipped. Residuo non bloccante: scorecard fixture formale opzionale. Ops corrente tipico può essere **Profilo A** (Gemini Flash Lite + DeepSeek) o **F** (Ollama + DeepSeek) — solo `.env` (+ overlay ollama-host per F).
+
+L'obiettivo (raggiunto) è abilitare l'elaborazione locale a costo zero sulla GPU AMD Radeon RX 6750 XT (Navi 22 / **gfx1030**, 12 GB VRAM).
 
 **Modello di riferimento (tag Ollama reali):** base `gemma4:12b` (~7.6 GB); **ops Profilo F tipico = `gemma4-radar`** (Modelfile `FROM gemma4:12b` + `PARAMETER num_ctx 8192`, lascia headroom VRAM su 12 GB).  
 **Nota naming:** non esiste un tag Ollama `gemma4:14b` / `gemma4:14b-instruct-q4_K_M`; le workstation tag pubbliche sono `gemma4:12b`, `gemma4:26b` (~18 GB, troppo grande per full-GPU su 12 GB), `gemma4:31b`. Alternative ≤12 GB: `qwen3:14b` (~9.3 GB).
 
-**Integrazione vincolante:** nessun SDK `ollama` / `ollama.chat`. Il worker parla a Ollama solo via **HTTP OpenAI-compat** già nel client (`PROVIDER=openai` + `BASE_URL=…/v1` via httpx; dialect stock; package `openai` vietato). Client: `think=true`, `num_ctx/num_predict=8192`, `normalize_llm_json_dict`, **no SIMPLE→DeepSeek escalate**. **VRAM lifecycle:** `keep_alive` busy sulle classify; unload nativo `keep_alive=0` a fine ciclo idle (`ollama_lifecycle.py`, env `OLLAMA_*`). Piano: [`plan-audit/active/plan_impl_fase_A_local_amd_ollama.md`](plan-audit/active/plan_impl_fase_A_local_amd_ollama.md) (**Profilo F** Local-Hybrid, core `54c8038` + unload VRAM).
+**Integrazione vincolante:** nessun SDK `ollama` / `ollama.chat`. Il worker parla a Ollama solo via **HTTP OpenAI-compat** già nel client (`PROVIDER=openai` + `BASE_URL=…/v1` via httpx; dialect stock; package `openai` vietato). Client: `think=true`, `num_ctx/num_predict=8192`, `normalize_llm_json_dict`, **no SIMPLE→DeepSeek escalate/residual**. **VRAM lifecycle:** `keep_alive` busy sulle classify; unload nativo `keep_alive=0` a fine ciclo idle (`ollama_lifecycle.py`, env `OLLAMA_*`). Piano: [`plan-audit/complete/plan_impl_fase_A_local_amd_ollama.md`](plan-audit/complete/plan_impl_fase_A_local_amd_ollama.md) (**Profilo F** Local-Hybrid, core `54c8038` + unload VRAM `2996625`).
 
 **Portabilità OS:** il contratto è lo stesso su **Linux, Windows e macOS** — installare Ollama, fare `ollama pull` del modello desiderato, puntare `LLM_SIMPLE_BASE_URL` (o COMPLEX) a `http://host.docker.internal:11434/v1` (o DNS container se usi `radar-ollama`). L’accelerazione GPU è responsabilità di Ollama sull’host (ROCm su Linux AMD, Metal su Apple Silicon, CUDA/altrove dove supportato; altrimenti CPU). **iOS/iPadOS non sono un host** per lo stack Docker Radar + Ollama server.
 
@@ -214,7 +227,7 @@ Esempio servizio (appendice — non default ops):
 
 #### 3. Scenari di deployment & configurazione `.env`
 
-Quattro topologie; **default ops su questa macchina = Scenario 2 (Profilo F)**. URL sotto = path host; per path container sostituire con `http://radar-ollama:11434/v1`.
+Quattro topologie; **Profilo F / Scenario 2 = path locale shipped** (opt-in). URL sotto = path host; per path container sostituire con `http://radar-ollama:11434/v1`.
 
 ##### Scenario 1: Full Local (entrambe le lane)
 Air-gap / costo cloud zero. Stesso modello locale su SIMPLE e COMPLEX (effort `none` vs `high`). Residual cross-lane debole se Ollama è down (stesso endpoint).
@@ -316,6 +329,8 @@ LLM_COMPLEX_TIMEOUT=180
 
 ### B. Ingestione Real-Time e Soft Refresh Frontend (SSE / Webhooks)
 
+> **Stato: DONE / GATE VERDE (2026-07-18).** SoT: [`plan-audit/complete/master_plan_impl_phase_B.md`](plan-audit/complete/master_plan_impl_phase_B.md). La sezione resta come blueprint storico; non ripartire da zero.
+
 Sostituire il meccanismo di polling asincrono periodico del worker con un'ingestione real-time reattiva. Miniflux invierà un webhook a FastAPI non appena un articolo viene inserito; a sua volta, il backend notificherà il frontend tramite Server-Sent Events (SSE) per aggiornare la mappa senza ricaricare la pagina.
 
 #### 1. Flusso di Messaggistica Real-Time
@@ -408,6 +423,8 @@ export class RealTimeStateService {
 
 ### C. Deduplicazione Semantica tramite Embeddings (`pgvector`)
 
+> **Stato: BACKLOG** — non iniziata; indipendente da A/B/H. Candidata naturale per il prossimo ciclo di sviluppo.
+
 Invece di limitarsi a una deduplica basata sull'URL esatto (inadeguata se feed diversi pubblicano lo stesso articolo con domini o parametri UTM differenti), l'introduzione di `pgvector` consente di calcolare un embedding del titolo o del sommario per rilevare la similarità semantica prima di invocare il processo di classificazione LLM.
 
 #### 1. Modifiche al Database: Script di Migrazione (`011_pgvector_dedup.sql`)
@@ -491,6 +508,8 @@ async def commit_embedding(conn: asyncpg.Connection, article_id: int, title: str
 
 ### D. Mappe Offline in Ambienti Isolati (Air-Gapped)
 
+> **Stato: Futuro** — non iniziata.
+
 Negli scenari operativi privi di connessione Internet (es. reti intranet locali o installazioni fisicamente isolate), il browser non può scaricare le mappe (tiles) geografiche dai server CDN esterni (CartoDB/OpenStreetMap). È necessario integrare un server di tile offline all'interno dello stack Docker.
 
 ```mermaid
@@ -543,6 +562,8 @@ Configurare il caricamento delle tiles dal percorso relativo `/tiles/` locale de
 ---
 
 ### G. Obsidian Vault: Collegamenti Bidirezionali (Wiki-Links)
+
+> **Stato: Futuro** — non iniziata.
 
 Per sfruttare appieno la visualizzazione a grafo e l'interconnessione concettuale all'interno di Obsidian, la generazione del Markdown deve incorporare la sintassi Wiki-Link (`[[Entità]]`) per le aziende coinvolte e i tag geografici o categoriali.
 
@@ -609,6 +630,8 @@ def generate_markdown_content(article: GeopoliticalArticleSchema) -> str:
 ---
 
 ### H. Visualizzazione a Grafo Geospaziale (Relazioni sulla Mappa)
+
+> **Stato: DONE / GATE VERDE (2026-07-18).** SoT: [`plan-audit/complete/master_plan_impl_phase_H_geospatial_graph.md`](plan-audit/complete/master_plan_impl_phase_H_geospatial_graph.md) + archi UI [`plan_archi_hatching_multicolor.md`](plan-audit/complete/plan_archi_hatching_multicolor.md). Blueprint storico sotto; non ripartire da zero.
 
 Questo modulo permette di tracciare visivamente le relazioni bilaterali e multilaterali (es. un trattato commerciale tra Italia e Cina, o un attacco informatico russo verso gli Stati Uniti) disegnando archi di connessione dinamici tra i centroidi dei rispettivi paesi direttamente sulla mappa Leaflet.
 

@@ -1,8 +1,8 @@
 # Piano di Implementazione — Fase A: LLM locale AMD / Ollama
 
 **Progetto:** Radar Informativo Globale (Intelligence Dashboard)  
-**Documento:** `plan-audit/active/plan_impl_fase_A_local_amd_ollama.md`  
-**Stato:** ACTIVE (follow-up) — **Profilo F core + VRAM unload shipped**; residuo opz. = gate qualità / scorecard fixture formale  
+**Documento:** `plan-audit/complete/plan_impl_fase_A_local_amd_ollama.md`  
+**Stato:** COMPLETE (ops) — **Profilo F core + VRAM unload shipped**; residuo **opz.** = scorecard fixture formale (non bloccante)  
 **Data:** 2026-07-19  
 **Prompt origine:** [`../prompts/done/plan_prompt_fase_A_local_amd_ollama.md`](../prompts/done/plan_prompt_fase_A_local_amd_ollama.md)  
 **Blueprint:** [`../../radar_overview_and_upgrades.md`](../../radar_overview_and_upgrades.md) §3.A  

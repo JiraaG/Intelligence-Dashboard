@@ -11,6 +11,7 @@ Documenti **completati**. Non sono backlog. Per il quadro fatto vs da fare vedi 
 | [plan_docs_monorepo_source.md](plan_docs_monorepo_source.md) | Checklist allineamento docs monorepo | ESEGUITO |
 | [sot_llm_multi_model_fallback.md](sot_llm_multi_model_fallback.md) | SoT LLM multi-provider + Profili A–F | COMPLETATO / vivo |
 | [audit_llm_lane_env_generalization.md](audit_llm_lane_env_generalization.md) | Audit topologie SIMPLE/COMPLEX + S3 failover | COMPLETATO (`c9ef842`) |
+| [plan_impl_fase_A_local_amd_ollama.md](plan_impl_fase_A_local_amd_ollama.md) | Fase A LLM locale AMD/Ollama (Profilo F) | COMPLETATO (`54c8038` / VRAM `2996625`) |
 | [plan_release_final_gate.md](plan_release_final_gate.md) | Piano Final Release (F0–F4) | COMPLETATO |
 | [plan_code_comments_beginner_audit.md](plan_code_comments_beginner_audit.md) | Piano commenti IT (P0 done) | COMPLETATO |
 | [note_notizie_salvate.md](note_notizie_salvate.md) | Feature note Notizie Salvate (`is_saved`) | COMPLETATO |

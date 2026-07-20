@@ -10,11 +10,11 @@ Cartella di audit, prompt orchestratore e SoT del modulo Radar.
 
 ## `active/` — vivi
 
-* [plan_impl_fase_A_local_amd_ollama.md](active/plan_impl_fase_A_local_amd_ollama.md) — Fase A follow-up opz. (scorecard fixture); Profilo F core + VRAM **DONE**
+* Nessun piano di implementazione in corso (solo prompt ECC in `prompts/active/`)
 
 ## `complete/` — chiusi
 
-Vedi [`complete/README.md`](complete/README.md) (Phase 0–6, SoT LLM, audit lane env topology `c9ef842`, Fase B/H, archi UI, Final Release, commenti, Notizie Salvate, playbook, ticket status, monorepo check).
+Vedi [`complete/README.md`](complete/README.md) (Phase 0–6, SoT LLM, Fase A Ollama, audit lane env, Fase B/H, archi UI, Final Release, commenti, Notizie Salvate, playbook, ticket status, monorepo check).
 
 ## Layout
 
@@ -22,7 +22,7 @@ Vedi [`complete/README.md`](complete/README.md) (Phase 0–6, SoT LLM, audit lan
 plan-audit/
   STATUS.md                 ← fatto vs da fare (leggere per primo)
   README.md                 ← questo indice
-  active/                   Piani in corso (Fase A follow-up)
+  active/                   Vuoto di piani (vedi README in cartella)
   complete/                 Piani e checklist COMPLETATI
   prompts/active/           Prompt non ancora eseguiti (ECC manual/expansion)
   prompts/done/             Prompt eseguiti (storico)
