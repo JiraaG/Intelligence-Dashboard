@@ -65,7 +65,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 
 **Nessun residuo operativo obbligatorio sulla Fase A / B / H / archi UI / W1 filtri / classification refine / map anchors / Profilo F core / audit env.** Branch di riferimento feature: `feature/upgrades`. Candidata immediata relazioni: **Wave 2 archi elevati**. Blueprint parallelo: **§3.C pgvector**.
 
-**Restore points (catena `feature/upgrades`):** pin threshold+hysteresis **`8086d15`**; toolbar unify Sentiment/Tipologia `33c348e`; W1 filtri nazioni **`ec771b1`**; archi MapLibre solidi `0d942ed`; docs LLM env `c9ef842`; Profilo F + VRAM `2996625`; Local-Hybrid `54c8038`; map anchors `a240b3c`; click hatching `911463a`; classification/geo `f7cf83d`; archi UI Leaflet `5c74e57`.
+**Restore points (catena `feature/upgrades`):** pin threshold+hysteresis **`7a2bfc9`**; toolbar unify Sentiment/Tipologia `33c348e`; W1 filtri nazioni **`ec771b1`**; archi MapLibre solidi `0d942ed`; docs LLM env `c9ef842`; Profilo F + VRAM `2996625`; Local-Hybrid `54c8038`; map anchors `a240b3c`; click hatching `911463a`; classification/geo `f7cf83d`; archi UI Leaflet `5c74e57`.
 
 Prompt Final Release: [`prompts/done/audit_prompt_final_release_gate.md`](prompts/done/audit_prompt_final_release_gate.md) — **non rieseguire** (F0–F4 chiusi).
 
