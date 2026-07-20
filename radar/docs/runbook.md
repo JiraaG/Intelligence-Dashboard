@@ -219,15 +219,28 @@ Su `failed` persistenti: `last_error`, mount `./vault`, permessi, poi restart wo
 
 ## Backup / restore
 
-Procedure e flag: **[ops/README.md](../ops/README.md)**.
+Procedure complete: **[ops/README.md](../ops/README.md)**. Guida utente Miniflux (feed minimi + seed): [`docs/01_getting_started.md`](../../docs/01_getting_started.md) §6.
 
 ```bash
+# Config-first (no vault markdown) — dump DB + snapshot seed/OPML in backups/
 ./ops/backup-postgres.sh
+./ops/backup-postgres.sh --with-vault   # include vault/
+
+# Aggiorna SoT git da Miniflux live (poi commit config/)
+./ops/sync-miniflux-seed.sh
+
+# Fresh PC: API key in .env, poi
+./ops/import-miniflux-feeds.sh
+# oppure
+./ops/bootstrap-miniflux.sh
+
+# Restore DB completo (opzionale; include articoli Postgres)
 ./ops/restore-postgres.sh ./backups/<UTC-stamp>
 ./ops/restore-postgres.sh ./backups/<UTC-stamp> --with-vault
 ```
 
-Windows: Git Bash / WSL. Preferire drill su stack usa-e-getta prima del restore prod.
+Windows: Git Bash / WSL. Preferire drill su stack usa-e-getta prima del restore prod.  
+`backups/` è gitignored; i feed da riprodurre su un clone sono `config/miniflux-feeds.seed.json` (+ `.opml`).
 
 ---
 

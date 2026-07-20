@@ -79,6 +79,8 @@ Create an API key in Miniflux → Settings → API Keys, put it in `.env` as `MI
 
 ### Feed seed (OPML + scraper config)
 
+Guida utente (config minima + backup): [`docs/01_getting_started.md`](../../docs/01_getting_started.md) §6.
+
 Commit-ready list (from repo-root [`RSS.txt`](../../RSS.txt)):
 
 - `config/miniflux-feeds.seed.json` — titles, categories, crawler, `user_agent`, `scraper_rules`

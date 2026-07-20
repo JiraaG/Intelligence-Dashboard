@@ -26,6 +26,8 @@ Apri **http://localhost/**. Knobs LLM / Profili A–F: [`radar/.env.example`](ra
 
 **Routing LLM:** `.env.example` ops tipico = **Profilo B** + `LLM_ROUTING_MODE=complexity`. Default codice boot-safe (senza env) = `LLM_ROUTING_MODE=off` + `LLM_ROUTING_SHADOW=true` — non confondere i due. Local-Hybrid = **Profilo F** (SIMPLE Ollama / COMPLEX cloud).
 
+**Miniflux (feed):** UI solo con overlay lan/hardened (`:8080`). Config minima: API key in `.env` + `./ops/import-miniflux-feeds.sh` (seed in [`radar/config/`](radar/config/)). Backup senza vault: `./ops/backup-postgres.sh`. Dettaglio: [docs/01_getting_started.md](docs/01_getting_started.md) §6 e [radar/ops/README.md](radar/ops/README.md).
+
 Dettagli env, health e Miniflux: [docs/01_getting_started.md](docs/01_getting_started.md) e [radar/ops/README.md](radar/ops/README.md).  
 Requeue (re-ingest distruttivo): [radar/docs/runbook.md](radar/docs/runbook.md) — preview `… requeue_articles 50 --dry-run`; reale senza `--dry-run`; **prova da zero** `… --purge-all` poi `docker compose restart radar-worker`.  
 Volume notizie ≈ numero di feed Miniflux (catalogo [RSS.txt](RSS.txt)); pochi feed → poche card in mappa.
@@ -121,7 +123,7 @@ Build FE Docker: `npm ci --legacy-peer-deps` (peer matrix Angular/PrimeNG).
 
 | # | Documento | Contenuto |
 |---|-----------|-----------|
-| 01 | [docs/01_getting_started.md](docs/01_getting_started.md) | Installazione, `.env`, Docker, health, Miniflux |
+| 01 | [docs/01_getting_started.md](docs/01_getting_started.md) | Installazione, `.env`, Docker, health, Miniflux feed/backup |
 | 02 | [docs/02_architecture_and_backend.md](docs/02_architecture_and_backend.md) | Worker, migrazioni, API, quote, outbox |
 | 03 | [docs/03_frontend_and_ui.md](docs/03_frontend_and_ui.md) | Mappa, map-summary, archi relazioni (hover/click bilaterale), `MOCK_MODE`, stato UI |
 | 04 | [docs/04_ecc_framework.md](docs/04_ecc_framework.md) | Harness ECC: `.agents` + `.ecc` + wiring Cursor |

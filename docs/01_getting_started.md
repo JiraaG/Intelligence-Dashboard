@@ -120,23 +120,80 @@ docker compose exec radar-db psql -U radar_user -d radar_db -c "\dt"
 
 ---
 
-## 6. Miniflux e ingest
+## 6. Miniflux: configurazione minima feed e ingest
 
-1. Pubblica Miniflux (lan/hardened) e apri l’UI admin.
-2. **Settings → API Keys → Create** → copia in `.env` come `MINIFLUX_API_KEY`.
-3. `docker compose up -d` (rispetta `depends_on` healthy) per rileggere l’env. Evitare `docker compose restart` su tutti i servizi insieme: Postgres può essere ancora in recovery mentre backend/worker aprono il pool (`CannotConnectNowError`). Preferire `up -d` o restart ordinato (`radar-db` → wait healthy → resto); `init_pool` ritenta errori transienti di startup.
-4. Aggiungi feed (catalogo: [RSS.txt](../RSS.txt)). **Il volume mappa dipende dai feed sottoscritti in Miniflux**, non dal solo worker: con 1–2 feed (es. BBC World + NASA) tipicamente ~40–60 articoli/48h; per ~centinaia di notizie/giorno servono le fonti del catalogo (Guardian, BBC sezioni, NPR, DW, CNBC, …).
+Miniflux è l’unica sorgente RSS. **Di default non ha porte host** — per l’UI admin:
 
-Con unread Miniflux alti, tenere `MINIFLUX_LIMIT` ≤ ~50 sotto il cap `MAX_MINIFLUX_RESPONSE_BYTES` (5MB). Se un modello Gemini/Gemma restituisce HTTP 500 in classificazione (tipico Profilo A), impostare in `.env` `LLM_SIMPLE_MODEL` / `LLM_COMPLEX_MODEL` (o legacy `GEMINI_MODEL`, es. `gemini-3.1-flash-lite`) e riavviare solo `radar-worker` — **non** commitare `.env`.
+```bash
+cd radar
+docker compose -f docker-compose.yml -f docker-compose.lan.yml up -d
+# → http://localhost:8080
+# (hardened: solo 127.0.0.1:8080)
+```
 
-**Ciclo reale (worker, non API):**
+### Configurazione minima (obbligatoria)
+
+| Passo | Cosa fare |
+|-------|-----------|
+| 1. Admin | Login con `MINIFLUX_ADMIN_USERNAME` / `MINIFLUX_ADMIN_PASSWORD` da `.env` |
+| 2. API key | **Settings → API Keys → Create** → copia in `.env` come `MINIFLUX_API_KEY` |
+| 3. Rileggi env | `docker compose up -d` (preferire `up -d`, non `restart` parallelo di tutto lo stack) |
+| 4. Feed | Importa lo seed versionato (non aggiungere i feed a mano se parti da zero) |
+
+```bash
+# Da radar/, Git Bash / WSL — applica categorie, URL, scraper CSS, crawler, User-Agent
+./ops/import-miniflux-feeds.sh
+# oppure one-shot dopo clone:
+./ops/bootstrap-miniflux.sh
+```
+
+**SoT feed in Git** (non sostituibile da un dump Postgres “vecchio”):
+
+| File | Contenuto |
+|------|-----------|
+| [`radar/config/miniflux-feeds.seed.json`](../radar/config/miniflux-feeds.seed.json) | Config completa: titolo, categoria, `feed_url`, `scraper_rules`, `crawler`, `user_agent` |
+| [`radar/config/miniflux-feeds.opml`](../radar/config/miniflux-feeds.opml) | OPML portabile (categorie/URL; le regole scraper vivono nello seed) |
+| [`RSS.txt`](../RSS.txt) | Catalogo umano di riferimento (URL + selettori CSS) |
+
+**Volume mappa:** dipende dai feed sottoscritti in Miniflux, non dal solo worker. Con 1–2 feed (es. BBC World + NASA) tipicamente ~40–60 articoli/48h; per ~centinaia di notizie/giorno importa lo seed completo (Guardian, BBC sezioni, NPR, DW, CNBC, …).
+
+Per ogni feed nello seed Radar usa tipicamente:
+
+- **Fetch original content** (`crawler: true`) — tranne Hacker News
+- **Scraper rules** CSS (es. `article`, `#main-content`, `.storytext`) come in `RSS.txt`
+- **User-Agent** browser-like (campo nello seed / per-feed in Miniflux)
+
+Opzionale ma utile: in Miniflux **Settings → Integrations → Webhook** punta a  
+`http://radar-backend:8000/api/webhooks/miniflux` con lo stesso secret di `MINIFLUX_WEBHOOK_SECRET`.
+
+Knobs worker: `MINIFLUX_LIMIT` tipico **50** (sotto `MAX_MINIFLUX_RESPONSE_BYTES=5MB`). Se un modello Gemini/Gemma dà HTTP 500 in classificazione, cambia `LLM_*_MODEL` / legacy `GEMINI_MODEL` in `.env` e riavvia solo `radar-worker` — **non** commitare `.env`.
+
+### Backup feed / config (senza articoli vault)
+
+```bash
+cd radar
+# Dump Postgres + snapshot seed/OPML; vault markdown OMESSO di default
+./ops/backup-postgres.sh              # Git Bash / WSL
+./ops/backup-postgres.sh --with-vault # solo se serve anche vault/
+
+# Aggiorna i file in config/ da Miniflux live (poi commit)
+./ops/sync-miniflux-seed.sh
+```
+
+- Output locale (gitignored): `radar/backups/<UTC-stamp>/` con `radar_*.dump`, `miniflux/*.seed.json`, `BACKUP_INFO.txt`
+- **Da commitare** dopo sync: `config/miniflux-feeds.seed.json` + `.opml`
+- Su un PC nuovo: `.env` → stack up → API key → `./ops/import-miniflux-feeds.sh` (il restore del dump è opzionale e include anche articoli DB)
+
+Dettaglio script: [`radar/ops/README.md`](../radar/ops/README.md).
+
+### Ciclo ingest (worker, non API)
 
 - Servizio `radar-worker` (`python -m app.worker`), leadership via advisory lock
 - Polling `WORKER_POLL_INTERVAL_SECONDS` (default **900** = 15 min); all’avvio forza `PUT /v1/feeds/refresh`
 - Entry **unread** ultime ~48h (`published_after`), dedup URL in PostgreSQL; Miniflux ricontrolla i feed tipicamente ~ogni ora
 - Complexity v2.2 → QuotaLedger reserve → classificazione multi-provider (lane SIMPLE / COMPLEX) → eventuale cooldown modello → commit DB + outbox → vault atomico → mark-read Miniflux solo se completed
 - Quote durable per lane: `llm_request_ledger` (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`; soft-trim = `LLM_SIMPLE.rpd` se >0; RPM/TPM=attesa stessa lane; RPD/cooldown=`QuotaDailyExceeded` → residual altra lane; free=RPM/RPD(+TPM), paid=budget)
-- Requeue ops (re-ingest distruttivo): [runbook](../radar/docs/runbook.md) — preview `… requeue_articles 50 --dry-run`; reale senza `--dry-run`; **prova da zero** `… requeue_articles 100 --purge-all` (wipe vault + DELETE tutte le `articles`) poi `docker compose restart radar-worker`
+- Requeue ops (re-ingest distruttivo): [runbook](../radar/docs/runbook.md) — preview `docker compose exec -T radar-worker python -m app.scripts.requeue_articles 50 --dry-run`; reale senza `--dry-run`; **prova da zero** `… requeue_articles 100 --purge-all` (wipe vault + DELETE tutte le `articles`) poi `docker compose restart radar-worker`
 
 Riavviare solo `radar-backend` **non** riavvia l’ingest: serve `radar-worker`.
 
@@ -152,11 +209,12 @@ Riavviare solo `radar-backend` **non** riavvia l’ingest: serve `radar-worker`.
 | 429 / rate limit LLM | Ledger + Retry-After; quote lane (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`); Studio / dashboard provider |
 | Auth / key LLM | Key lane o legacy (`GEMINI_*` / `DEEPSEEK_*` / `OPENAI_*`) allineate al `PROVIDER` della lane |
 | Articoli bloccati / requeue | [runbook](../radar/docs/runbook.md) — `--dry-run` poi `requeue_articles`; prova da zero `--purge-all` |
-| Poche notizie in mappa (~decine vs ~centinaia) | Contare i feed in Miniflux UI (`GET /v1/feeds`); aggiungere fonti da [RSS.txt](../RSS.txt). Non è un bug FE se Miniflux ha solo 1–2 feed |
+| Poche notizie in mappa (~decine vs ~centinaia) | Contare i feed in Miniflux UI (`GET /v1/feeds`); importare lo seed (`./ops/import-miniflux-feeds.sh`) / [RSS.txt](../RSS.txt). Non è un bug FE se Miniflux ha solo 1–2 feed |
 | Mappa senza confini | Manca o SHA errato su `countries.geo.json` → `npm run verify-geojson:fetch` |
-| Nessun articolo nuovo | `MINIFLUX_API_KEY`, log `radar-worker`, quote lane (`LLM_SIMPLE_RPD` / budget), cooldown; attendere poll 15 min + refresh feed ~1h |
+| Nessun articolo nuovo | `MINIFLUX_API_KEY`, seed importato?, log `radar-worker`, quote lane (`LLM_SIMPLE_RPD` / budget), cooldown; attendere poll 15 min + refresh feed ~1h |
 | Payload Miniflux troppo grande / log 5MB | Abbassare `MINIFLUX_LIMIT` (tipico 50); non alzare cieco il cap |
 | Classificazione → fallback / HTTP 500 modello | Verificare `LLM_*_MODEL` / legacy `GEMINI_MODEL` in `.env`; riavviare `radar-worker` — **non** commitare `.env` |
 | Soft-news → `Tecnologia`/`XX` eccessivo | Prompt + soft-remap in `classification/` (anti-XX, sport→Geopolitica); requeue mirato |
+| Solo 2 feed / config “vuota” dopo restore | Il dump Postgres non è il SoT feed: rieseguire `./ops/import-miniflux-feeds.sh` dallo seed in `config/` |
 
-Backup/restore: [radar/ops/README.md](../radar/ops/README.md) (`radar/ops/backup-postgres.sh`, `restore-postgres.sh`). Persistenza: `radar/data/postgres/`, `radar/vault/`.
+Backup/restore e seed Miniflux: [radar/ops/README.md](../radar/ops/README.md) + §6 sopra. Persistenza DB: `radar/data/postgres/` (gitignored); vault: `radar/vault/` (solo `.gitkeep` in Git).
