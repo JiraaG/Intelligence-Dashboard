@@ -22,7 +22,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 
 | Area | Dove | Note |
 |------|------|------|
-| Relazioni — filtro nazioni (Wave 1) | [`complete/plan_impl_map_relations_nation_filter.md`](complete/plan_impl_map_relations_nation_filter.md) | **COMPLETE / GATE VERDE** 2026-07-20 — toolbar **RELAZIONI ATTIVE** (default OFF, OR stella, toggle iOS); `visibleMapRelations`; paint/hover invariati. **Restore:** tip commit W1 su `feature/upgrades` (pre-W1 archi: `0d942ed`). |
+| Relazioni — filtro nazioni (Wave 1) | [`complete/plan_impl_map_relations_nation_filter.md`](complete/plan_impl_map_relations_nation_filter.md) | **COMPLETE / GATE VERDE** 2026-07-20 — toolbar **RELAZIONI ATTIVE** (default OFF, OR stella, toggle iOS); `visibleMapRelations`; paint/hover invariati. **Restore point:** `ec771b1` su `feature/upgrades` (pre-W1 archi: `0d942ed`). |
 | Fase A — LLM locale AMD/Ollama | [`complete/plan_impl_fase_A_local_amd_ollama.md`](complete/plan_impl_fase_A_local_amd_ollama.md) | **COMPLETE** — W1–W4 + VRAM unload **DONE** (`54c8038` / `2996625`). Scorecard fixture formale = **opz. non bloccante**. |
 | Audit LLM env topology | [`complete/audit_llm_lane_env_generalization.md`](complete/audit_llm_lane_env_generalization.md) | **DONE** 2026-07-20 — S3 failover, ricette 1–8, no residual Ollama-think; W2 codice cancelled. Restore docs: **`c9ef842`**. |
 | Profilo F Local-Hybrid (impl) | codice + overlay + docs | **DONE** 2026-07-19 — commit **`54c8038`** su `feature/upgrades`. |
@@ -64,7 +64,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 
 **Nessun residuo operativo obbligatorio sulla Fase A / B / H / archi UI / W1 filtri / classification refine / map anchors / Profilo F core / audit env.** Branch di riferimento feature: `feature/upgrades`. Candidata immediata relazioni: **Wave 2 archi elevati**. Blueprint parallelo: **§3.C pgvector**.
 
-**Restore points (catena `feature/upgrades`):** W1 filtri nazioni = tip commit chiusura W1; archi MapLibre solidi `0d942ed`; docs LLM env `c9ef842`; Profilo F + VRAM `2996625`; Local-Hybrid `54c8038`; map anchors `a240b3c`; click hatching `911463a`; classification/geo `f7cf83d`; archi UI Leaflet `5c74e57`.
+**Restore points (catena `feature/upgrades`):** W1 filtri nazioni **`ec771b1`**; archi MapLibre solidi `0d942ed`; docs LLM env `c9ef842`; Profilo F + VRAM `2996625`; Local-Hybrid `54c8038`; map anchors `a240b3c`; click hatching `911463a`; classification/geo `f7cf83d`; archi UI Leaflet `5c74e57`.
 
 Prompt Final Release: [`prompts/done/audit_prompt_final_release_gate.md`](prompts/done/audit_prompt_final_release_gate.md) — **non rieseguire** (F0–F4 chiusi).
 

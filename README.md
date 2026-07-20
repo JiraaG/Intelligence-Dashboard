@@ -201,11 +201,11 @@ Restore SHA sotto (Phase 0–6). Il branch di lavoro corrente può differire —
 | Fase H | `d9508a5` | Grafo geospaziale: `related_countries`, `/api/map-relations`, archi + chip |
 | Archi UI | `5c74e57` (`feature/upgrades`) | Multicolore &lt;5, tratteggio geometrico ≥5, `relationsPane`, click → sidebar bilaterale — **restore point** Leaflet-era |
 | Archi MapLibre solidi | `0d942ed` (`feature/upgrades`) | Macro multicolore solida a **tutti** gli zoom (path MapLibre) |
-| Relazioni Wave 1 (filtro nazioni) | tip `feature/upgrades` (grep `RELAZIONI ATTIVE`) | Toolbar **RELAZIONI ATTIVE** → `visibleMapRelations` (OR stella, default OFF); paint invariato — piano [`plan_impl_map_relations_nation_filter.md`](plan-audit/complete/plan_impl_map_relations_nation_filter.md) |
+| Relazioni Wave 1 (filtro nazioni) | `ec771b1` (`feature/upgrades`) | Toolbar **RELAZIONI ATTIVE** → `visibleMapRelations` (OR stella, default OFF); paint invariato — piano [`plan_impl_map_relations_nation_filter.md`](plan-audit/complete/plan_impl_map_relations_nation_filter.md) — **restore point** |
 
 Esempio restore tip archi UI Leaflet-era: `git checkout 5c74e57` (branch `feature/upgrades`).  
 Esempio restore pre-filtro-nazioni (archi sempre tutti visibili): `git checkout 0d942ed`.  
-Esempio restore W1 filtri: tip commit chiusura W1 (message contiene `RELAZIONI ATTIVE`) — dettaglio: [plan_impl_map_relations_nation_filter.md](plan-audit/complete/plan_impl_map_relations_nation_filter.md) + [STATUS.md](plan-audit/STATUS.md).
+Esempio restore W1 filtri: `git checkout ec771b1` — dettaglio: [plan_impl_map_relations_nation_filter.md](plan-audit/complete/plan_impl_map_relations_nation_filter.md) + [STATUS.md](plan-audit/STATUS.md).
 
 Esempio Phase 6: `git checkout 56c2eff`. Dettaglio gate Phase 0–6: [plan_impl_phase_0_6_execution.md](plan-audit/complete/plan_impl_phase_0_6_execution.md).
 
