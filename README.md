@@ -17,20 +17,24 @@
 ```bash
 cd radar
 cp .env.example .env   # lane keys LLM (Profili A–F) + password DB/Miniflux (no `$` nelle password)
-docker compose up --build -d
+# Miniflux admin: crea API key (Settings → API Keys) → MINIFLUX_API_KEY in .env
+./ops/bootstrap-miniflux.sh   # compose + lan :8080 + import seed feed (config/)
 ```
 
-Apri **http://localhost/**. Knobs LLM / Profili A–F: [`radar/.env.example`](radar/.env.example) + SoT [`sot_llm_multi_model_fallback.md`](plan-audit/complete/sot_llm_multi_model_fallback.md).  
+Apri **http://localhost/** (mappa) e **http://localhost:8080** (Miniflux).  
+Alternativa senza bootstrap: `docker compose up --build -d` poi `./ops/import-miniflux-feeds.sh` (serve già `MINIFLUX_API_KEY` + overlay lan/hardened).
+
+Knobs LLM / Profili A–F: [`radar/.env.example`](radar/.env.example) + SoT [`sot_llm_multi_model_fallback.md`](plan-audit/complete/sot_llm_multi_model_fallback.md).  
 **Profilo F (Local-Hybrid):** Ollama host + overlay [`radar/docker-compose.ollama-host.yml`](radar/docker-compose.ollama-host.yml) — runbook [`radar/docs/runbook.md`](radar/docs/runbook.md) § Local-Hybrid (VRAM: unload a idle via `OLLAMA_*` / `ops/verify-ollama-vram.sh`).  
 **Limiti lane:** RPM/TPM pieni → attesa stessa lane; RPD/cooldown → residual cross-lane (es. Flash Lite → DeepSeek). Dettaglio: SoT §0 + skill `radar-quota-ledger`.
 
 **Routing LLM:** `.env.example` ops tipico = **Profilo B** + `LLM_ROUTING_MODE=complexity`. Default codice boot-safe (senza env) = `LLM_ROUTING_MODE=off` + `LLM_ROUTING_SHADOW=true` — non confondere i due. Local-Hybrid = **Profilo F** (SIMPLE Ollama / COMPLEX cloud).
 
-**Miniflux (feed):** UI solo con overlay lan/hardened (`:8080`). Config minima: API key in `.env` + `./ops/import-miniflux-feeds.sh` (seed in [`radar/config/`](radar/config/)). Backup senza vault: `./ops/backup-postgres.sh`. Dettaglio: [docs/01_getting_started.md](docs/01_getting_started.md) §6 e [radar/ops/README.md](radar/ops/README.md).
+**Miniflux / PC nuovo / backup:** seed in [`radar/config/`](radar/config/); dettaglio §6 [docs/01_getting_started.md](docs/01_getting_started.md) + [radar/ops/README.md](radar/ops/README.md). Backup config-first: `./ops/backup-postgres.sh` (senza vault di default).
 
-Dettagli env, health e Miniflux: [docs/01_getting_started.md](docs/01_getting_started.md) e [radar/ops/README.md](radar/ops/README.md).  
+Dettagli env e health: [docs/01_getting_started.md](docs/01_getting_started.md).  
 Requeue (re-ingest distruttivo): [radar/docs/runbook.md](radar/docs/runbook.md) — preview `… requeue_articles 50 --dry-run`; reale senza `--dry-run`; **prova da zero** `… --purge-all` poi `docker compose restart radar-worker`.  
-Volume notizie ≈ numero di feed Miniflux (catalogo [RSS.txt](RSS.txt)); pochi feed → poche card in mappa.
+Volume notizie ≈ feed Miniflux (seed / [RSS.txt](RSS.txt)); pochi feed → poche card in mappa.
 
 La build frontend richiede l’asset GeoJSON `radar/frontend/src/assets/data/countries.geo.json` (gitignored). Provisioning: [`ASSET_LICENSE.md`](radar/frontend/src/assets/data/ASSET_LICENSE.md) + `npm run verify-geojson:fetch` (Docker lo esegue in build).
 
