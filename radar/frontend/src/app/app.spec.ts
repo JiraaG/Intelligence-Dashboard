@@ -217,6 +217,16 @@ function createStateStub(initial: Article[] = FIXTURE_ARTICLES, error: unknown =
     filteredMapRelations: computed(
       () => [] as import('./models/map-relation.model').MapRelationRow[],
     ),
+    visibleMapRelations: computed(
+      () => [] as import('./models/map-relation.model').MapRelationRow[],
+    ),
+    relationCountriesEnabled: signal(new Set<string>()),
+    relationCountryOptions: computed(
+      () => [] as { code: string; name: string; arcCount: number }[],
+    ),
+    toggleRelationCountry(_code: string): void {},
+    selectAllRelationCountries(): void {},
+    clearRelationCountries(): void {},
     articleCount: computed(() => detailSignal().length),
     readCount: computed(() => detailSignal().filter((a) => a.is_read).length),
     savedCount: computed(() => 0),

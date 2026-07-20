@@ -1,6 +1,6 @@
 # plan-audit — STATUS (fatto vs da fare)
 
-Quadro operativo aggiornato **2026-07-20** (Fase A LLM locale **COMPLETE**; audit LLM env `c9ef842`; Profilo F `54c8038` + VRAM `2996625`; overview §3 allineata).  
+Quadro operativo aggiornato **2026-07-20** (Wave 1 Relazioni nazioni **GATE VERDE**; Fase A LLM locale **COMPLETE**; audit LLM env `c9ef842`; Profilo F `54c8038` + VRAM `2996625`).  
 Indice cartelle: [`README.md`](README.md).  
 Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`](remediation/audit_remediation_final_release_handoff.md).
 
@@ -10,8 +10,11 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 
 | Area | Dove | Note |
 |------|------|------|
-| ECC manual / expansion | [`prompts/active/plan_prompt_ecc_manual_and_expansion.md`](prompts/active/plan_prompt_ecc_manual_and_expansion.md) | **ACTIVE (non eseguito)** — resta finché non si produce un piano deliverable |
-| Mappa 3D / globe | [`prompts/active/plan_prompt_map_3d_globe.md`](prompts/active/plan_prompt_map_3d_globe.md) | **ACTIVE (non eseguito)** — analisi switch 2D↔3D vs 3D-only + blueprint overview §3.I |
+| Relazioni — archi elevati 3D (Wave 2) | [`active/plan_impl_map_relations_arcs_3d.md`](active/plan_impl_map_relations_arcs_3d.md) | **ACTIVE (spike)** — prerequisito W1 **DONE**. MapLibre `line` flat; no `line-z-offset`; CustomLayer vs deck.gl. |
+| Mappa 3D-primary (Phase I) | [`active/plan_impl_map_3d_globe.md`](active/plan_impl_map_3d_globe.md) | Codice + docs shipped; post-ship hatching soft + archi macro solidi |
+| Upgrade globo §3.J | [`active/plan_impl_map_globe_projection.md`](active/plan_impl_map_globe_projection.md) | Futuro / BACKLOG |
+| ECC manual / expansion | [`prompts/active/plan_prompt_ecc_manual_and_expansion.md`](prompts/active/plan_prompt_ecc_manual_and_expansion.md) | ACTIVE (non eseguito) |
+| Prompt mappa 3D (origine) | [`prompts/active/plan_prompt_map_3d_globe.md`](prompts/active/plan_prompt_map_3d_globe.md) | Storico analisi |
 
 ---
 
@@ -19,6 +22,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 
 | Area | Dove | Note |
 |------|------|------|
+| Relazioni — filtro nazioni (Wave 1) | [`complete/plan_impl_map_relations_nation_filter.md`](complete/plan_impl_map_relations_nation_filter.md) | **COMPLETE / GATE VERDE** 2026-07-20 — toolbar **RELAZIONI ATTIVE** (default OFF, OR stella, toggle iOS); `visibleMapRelations`; paint/hover invariati. **Restore:** tip commit W1 su `feature/upgrades` (pre-W1 archi: `0d942ed`). |
 | Fase A — LLM locale AMD/Ollama | [`complete/plan_impl_fase_A_local_amd_ollama.md`](complete/plan_impl_fase_A_local_amd_ollama.md) | **COMPLETE** — W1–W4 + VRAM unload **DONE** (`54c8038` / `2996625`). Scorecard fixture formale = **opz. non bloccante**. |
 | Audit LLM env topology | [`complete/audit_llm_lane_env_generalization.md`](complete/audit_llm_lane_env_generalization.md) | **DONE** 2026-07-20 — S3 failover, ricette 1–8, no residual Ollama-think; W2 codice cancelled. Restore docs: **`c9ef842`**. |
 | Profilo F Local-Hybrid (impl) | codice + overlay + docs | **DONE** 2026-07-19 — commit **`54c8038`** su `feature/upgrades`. |
@@ -41,7 +45,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 | Piani ECC / Limits / stub | [`archive/`](archive/) | SUPERSEDED / PRD |
 | Phase B Real-Time (webhook/SSE/soft-refresh) | [`complete/master_plan_impl_phase_B.md`](complete/master_plan_impl_phase_B.md) + [`implementation`](complete/implementation_plan_phase_B.md) + [`analisi`](complete/analisi_dettagliata_fase_B.md) | **DONE / GATE VERDE** 2026-07-18 — HMAC webhook, LISTEN dedicate, SSE, Angular soft-refresh |
 | Fase H — Grafo geospaziale | [`complete/master_plan_impl_phase_H_geospatial_graph.md`](complete/master_plan_impl_phase_H_geospatial_graph.md) | **DONE / GATE VERDE** (2026-07-18) — related_countries, GET /api/map-relations, archi mappa, chip carosello, allineamento docs + ECC. |
-| Archi multicolore + click bilaterale | [`complete/plan_archi_hatching_multicolor.md`](complete/plan_archi_hatching_multicolor.md) | **DONE / GATE VERDE** (2026-07-18) — Leaflet: macro &lt;5 + tratteggio geometrico ≥5. **MapLibre post-ship (2026-07-20):** macro multicolore solida a **tutti** gli zoom. |
+| Archi multicolore + click bilaterale | [`complete/plan_archi_hatching_multicolor.md`](complete/plan_archi_hatching_multicolor.md) | **DONE / GATE VERDE** (2026-07-18) — Leaflet: macro &lt;5 + tratteggio geometrico ≥5. **MapLibre post-ship (2026-07-20):** macro multicolore solida a **tutti** gli zoom (`0d942ed`). |
 
 ---
 
@@ -55,15 +59,16 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 | Fase C — Dedup semantica `pgvector` | **BACKLOG** | Vedi `radar_overview_and_upgrades.md` §3.C; non iniziata; indipendente da H / A |
 | Fase A — LLM locale AMD/Ollama | **COMPLETE** | Impl + VRAM **DONE**. Scorecard fixture = opz. Piano [`complete/plan_impl_fase_A_local_amd_ollama.md`](complete/plan_impl_fase_A_local_amd_ollama.md). |
 | Fase H — Grafo geospaziale | **DONE** | related_countries + GET /api/map-relations + archi mappa + chip carosello (2026-07-18). |
-| Archi UI (multicolore + click) | **DONE** | Piano [`complete/plan_archi_hatching_multicolor.md`](complete/plan_archi_hatching_multicolor.md). **MapLibre:** residuo opzionale “multicolore anche ≥5” **chiuso** (2026-07-20). Leaflet legacy: dash+fan ≥5 invariato. |
+| Archi UI (multicolore + click) | **DONE** | Piano [`complete/plan_archi_hatching_multicolor.md`](complete/plan_archi_hatching_multicolor.md). **MapLibre:** residuo opzionale “multicolore anche ≥5” **chiuso** (`0d942ed`). Leaflet legacy: dash+fan ≥5 invariato. |
+| Relazioni filtro nazioni (Wave 1) | **DONE** | [`complete/plan_impl_map_relations_nation_filter.md`](complete/plan_impl_map_relations_nation_filter.md). Prossimo: spike Wave 2 elevate. |
 
-**Nessun residuo operativo obbligatorio sulla Fase A / B / H / archi UI / classification refine / map anchors / Profilo F core / audit env.** Branch di riferimento feature: `feature/upgrades`. Prossima candidata blueprint: **§3.C pgvector**.
+**Nessun residuo operativo obbligatorio sulla Fase A / B / H / archi UI / W1 filtri / classification refine / map anchors / Profilo F core / audit env.** Branch di riferimento feature: `feature/upgrades`. Candidata immediata relazioni: **Wave 2 archi elevati**. Blueprint parallelo: **§3.C pgvector**.
 
-**Restore point (docs overview §3 + Fase A complete):** vedi commit di questo allineamento. Precedenti: docs LLM env `c9ef842` / index `ebfc78b`; Profilo F + VRAM `2996625`; core Local-Hybrid `54c8038`; map anchors `a240b3c`; click hatching `911463a`; classification/geo `f7cf83d`; archi UI `5c74e57`.
+**Restore points (catena `feature/upgrades`):** W1 filtri nazioni = tip commit chiusura W1; archi MapLibre solidi `0d942ed`; docs LLM env `c9ef842`; Profilo F + VRAM `2996625`; Local-Hybrid `54c8038`; map anchors `a240b3c`; click hatching `911463a`; classification/geo `f7cf83d`; archi UI Leaflet `5c74e57`.
 
 Prompt Final Release: [`prompts/done/audit_prompt_final_release_gate.md`](prompts/done/audit_prompt_final_release_gate.md) — **non rieseguire** (F0–F4 chiusi).
 
-**Fuori scope:** scorecard Fase A senza richiesta; refactor/restyle di `radar-sidebar/**` al di fuori delle eccezioni mirate; riaprire ticket CLOSED; rieseguire P0 commenti senza richiesta; attivare Fase 5 senza decisione esplicita.
+**Fuori scope:** scorecard Fase A senza richiesta; refactor/restyle di `radar-sidebar/**` al di fuori delle eccezioni mirate; riaprire ticket CLOSED; rieseguire P0 commenti senza richiesta; attivare Fase 5 senza decisione esplicita; implementare Wave 2 elevate senza spike GATE.
 
 ---
 
@@ -72,8 +77,8 @@ Prompt Final Release: [`prompts/done/audit_prompt_final_release_gate.md`](prompt
 ```text
 plan-audit/
   STATUS.md          ← questo file (quadro fatto / residui)
-  active/            ← vuoto di piani (prompt ECC in prompts/active)
-  complete/          ← Piani COMPLETATI (Fase A, audit LLM env, Phase 0–6, B/H, …)
+  active/            ← Wave 2 elevate, Phase I map, §3.J, prompt ECC
+  complete/          ← Piani COMPLETATI (W1 filtri, Fase A, Phase 0–6, B/H, …)
   prompts/active/    ← prompt non eseguiti (ECC manual/expansion)
   prompts/done/      ← storico (incl. Fase A Ollama, Fase H wave 1–3, Final Release Gate)
   remediation/       ← report DONE (incl. F1–F4)

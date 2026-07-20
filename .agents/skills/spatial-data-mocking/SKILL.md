@@ -358,9 +358,11 @@ con i dati mockati prima di connettere il backend reale.
 
 ### ✅ Test 7: Relazioni Geospaziali (Fase H + archi UI)
 
-- [ ] Day view zoom **&lt; 5**: archi **multicolore** aggregati visibili sopra hatching (non nascosti) — MapLibre e Leaflet
+- [ ] Day view zoom **&lt; 5**: archi **multicolore** aggregati visibili sopra hatching (non nascosti) — MapLibre e Leaflet — **solo se** almeno una nazione è flaggata nel pannello Relazioni (default: nessuna → **0 archi**)
 - [ ] Day view zoom **≥ 5**: **MapLibre** = stessa macro multicolore **continua** (no fan/dash); **Leaflet legacy** = archi **per-categoria** con geometric dash + fan parallelo multi-cat
-- [ ] Hover arco: tooltip + highlight (anche in Europa densa)
+- [ ] Pannello **Relazioni** (toolbar **RELAZIONI ATTIVE**, come LETTE/TROVATE): toggle iOS a destra del nome + Seleziona tutto / Deseleziona tutto; semantica OR (USA on + Cina off → arco USA↔Cina sì); filtro testo nazione anche su Nazioni Coinvolte / Nazioni Salvate
+- [ ] Tipologia toolbar filtra categorie **prima** del filtro nazioni
+- [ ] Hover arco: tooltip + highlight (anche in Europa densa) — invariato rispetto a pre-filtro
 - [ ] Click arco MapLibre / macro Leaflet: sidebar/carosello con notizie bilaterali A↔B **tutte** le categorie (entrambi i versi)
 - [ ] Click arco pin Leaflet (≥5): stessa cosa filtrata per la **tipologia** dell’arco
 - [ ] Nation-open: archi nascosti (no interferenza spiderfy)

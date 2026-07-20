@@ -1,4 +1,4 @@
-import { Injectable, inject, signal, computed, NgZone, DestroyRef } from '@angular/core';
+import { Injectable, inject, signal, computed, effect, NgZone, DestroyRef } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { firstValueFrom } from 'rxjs';
 import { ArticleService } from './article.service';
@@ -6,6 +6,53 @@ import { Article, ArticleFilters, CountrySummary, PrimaryCategory } from '../mod
 import { MapSummaryRow } from '../models/map-summary.model';
 import { MapRelationRow } from '../models/map-relation.model';
 import { MOCK_MODE } from './mock-mode.token';
+
+/** Opzione nazione nel pannello filtri Relazioni (Wave 1). */
+export interface RelationCountryOption {
+  code: string;
+  name: string;
+  /** Numero di righe ``filteredMapRelations`` che toccano il codice. */
+  arcCount: number;
+}
+
+/** Endpoint unici da righe relations, ordinati per nome IT. */
+export function buildRelationCountryOptions(rows: MapRelationRow[]): RelationCountryOption[] {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const src = row.source_country.toUpperCase();
+    const tgt = row.target_country.toUpperCase();
+    counts.set(src, (counts.get(src) ?? 0) + 1);
+    counts.set(tgt, (counts.get(tgt) ?? 0) + 1);
+  }
+  const displayNames = new Intl.DisplayNames(['it-IT'], { type: 'region' });
+  const options: RelationCountryOption[] = [];
+  for (const [code, arcCount] of counts) {
+    let name: string;
+    try {
+      name = displayNames.of(code) || code;
+    } catch {
+      name = code;
+    }
+    options.push({ code, name, arcCount });
+  }
+  return options.sort((a, b) => a.name.localeCompare(b.name, 'it'));
+}
+
+/**
+ * Filtro nazioni OR (stella): arco se source ∈ enabled oppure target ∈ enabled.
+ * Enabled vuoto → nessuna riga.
+ */
+export function filterMapRelationsByEnabledCountries(
+  rows: MapRelationRow[],
+  enabled: ReadonlySet<string>,
+): MapRelationRow[] {
+  if (enabled.size === 0) return [];
+  return rows.filter(
+    (row) =>
+      enabled.has(row.source_country.toUpperCase()) ||
+      enabled.has(row.target_country.toUpperCase()),
+  );
+}
 
 export interface ArticleProcessedEvent {
   article_id: number;
@@ -116,8 +163,7 @@ export class StateService {
   readonly mapSummaryResource = rxResource({
     params: () => {
       const f = this.filters();
-      const sentiment =
-        f.sentiment && f.sentiment.length > 0 ? f.sentiment : undefined;
+      const sentiment = f.sentiment && f.sentiment.length > 0 ? f.sentiment : undefined;
       return { date: f.date, sentiment };
     },
     stream: (p) =>
@@ -131,8 +177,7 @@ export class StateService {
   readonly mapRelationsResource = rxResource({
     params: () => {
       const f = this.filters();
-      const sentiment =
-        f.sentiment && f.sentiment.length > 0 ? f.sentiment : undefined;
+      const sentiment = f.sentiment && f.sentiment.length > 0 ? f.sentiment : undefined;
       return { date: f.date, sentiment };
     },
     stream: (p) =>
@@ -146,8 +191,7 @@ export class StateService {
   readonly savedSummaryResource = rxResource({
     params: () => {
       const f = this.filters();
-      const sentiment =
-        f.sentiment && f.sentiment.length > 0 ? f.sentiment : undefined;
+      const sentiment = f.sentiment && f.sentiment.length > 0 ? f.sentiment : undefined;
       return { sentiment };
     },
     stream: (p) =>
@@ -170,6 +214,71 @@ export class StateService {
     const cats = this.filters().categories;
     if (!cats || cats.length === 0) return raw;
     return raw.filter((row) => cats.includes(row.primary_category));
+  });
+
+  /**
+   * Nazioni attive per gli archi (Wave 1). Default vuoto → 0 archi permanenti.
+   * Semantica OR (stella): arco visibile se source ∈ enabled OR target ∈ enabled.
+   */
+  readonly relationCountriesEnabled = signal<ReadonlySet<string>>(new Set());
+
+  /** Endpoint unici da ``filteredMapRelations``, ordinati per nome IT. */
+  readonly relationCountryOptions = computed((): RelationCountryOption[] =>
+    buildRelationCountryOptions(this.filteredMapRelations()),
+  );
+
+  /**
+   * Archi dopo filtro Tipologia e filtro nazioni (OR). Binding mappa day-view.
+   * Default enabled vuoto → [].
+   */
+  readonly visibleMapRelations = computed((): MapRelationRow[] =>
+    filterMapRelationsByEnabledCountries(
+      this.filteredMapRelations(),
+      this.relationCountriesEnabled(),
+    ),
+  );
+
+  /** Toggle singola nazione nel filtro Relazioni. */
+  toggleRelationCountry(code: string): void {
+    const key = code.toUpperCase();
+    const next = new Set(this.relationCountriesEnabled());
+    if (next.has(key)) {
+      next.delete(key);
+    } else {
+      next.add(key);
+    }
+    this.relationCountriesEnabled.set(next);
+  }
+
+  /** Seleziona tutte le nazioni presenti in ``relationCountryOptions``. */
+  selectAllRelationCountries(): void {
+    this.relationCountriesEnabled.set(new Set(this.relationCountryOptions().map((o) => o.code)));
+  }
+
+  /** Deseleziona tutto (torna a 0 archi). */
+  clearRelationCountries(): void {
+    this.relationCountriesEnabled.set(new Set());
+  }
+
+  /**
+   * Prune: se Tipologia/data rimuove nazioni dalle opzioni, togli i codici stale
+   * (non auto-selezionare nuove nazioni).
+   */
+  private readonly pruneRelationCountriesEffect = effect(() => {
+    const valid = new Set(this.relationCountryOptions().map((o) => o.code));
+    const enabled = this.relationCountriesEnabled();
+    let changed = false;
+    const next = new Set<string>();
+    for (const code of enabled) {
+      if (valid.has(code)) {
+        next.add(code);
+      } else {
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.relationCountriesEnabled.set(next);
+    }
   });
 
   /** Righe saved-summary con filtro categoria client-side. */
@@ -499,8 +608,7 @@ export class StateService {
         const art = this.detailArticles().find((a) => a.id === articleId);
         const beforeRead = !!art?.is_read;
         const beforeSaved = !!art?.is_saved;
-        const nextSaved =
-          res.is_saved !== undefined ? res.is_saved : !isRead ? false : beforeSaved;
+        const nextSaved = res.is_saved !== undefined ? res.is_saved : !isRead ? false : beforeSaved;
         this.detailArticles.update((arts) => {
           return arts.map((a) => {
             if (a.id !== articleId) return a;
@@ -511,7 +619,12 @@ export class StateService {
           });
         });
         if (art && beforeRead !== res.is_read) {
-          this.patchSummaryReadCount(art.country_code, art.primary_category, beforeRead, res.is_read);
+          this.patchSummaryReadCount(
+            art.country_code,
+            art.primary_category,
+            beforeRead,
+            res.is_read,
+          );
         }
         if (art && beforeSaved !== nextSaved) {
           this.patchSavedSummaryCount(
@@ -586,8 +699,7 @@ export class StateService {
         const art = this.detailArticles().find((a) => a.id === articleId);
         const beforeSaved = !!art?.is_saved;
         const beforeRead = !!art?.is_read;
-        const nextRead =
-          res.is_read !== undefined ? res.is_read : res.is_saved ? true : beforeRead;
+        const nextRead = res.is_read !== undefined ? res.is_read : res.is_saved ? true : beforeRead;
         this.detailArticles.update((arts) => {
           return arts.map((a) => {
             if (a.id !== articleId) return a;

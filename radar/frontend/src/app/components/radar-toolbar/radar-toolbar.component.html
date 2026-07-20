@@ -1,11 +1,4 @@
 <div class="radar-toolbar">
-  <div class="brand-group">
-    <span class="brand-icon">📡</span>
-    <span class="brand-title">RADAR</span>
-  </div>
-
-  <div class="divider"></div>
-
   <!-- Calendario PrimeNG -->
   <p-calendar
     [(ngModel)]="selectedDate"
@@ -13,7 +6,8 @@
     [maxDate]="today"
     dateFormat="yy-mm-dd"
     [showIcon]="true"
-    placeholder="Seleziona Data">
+    placeholder="Seleziona Data"
+  >
   </p-calendar>
 
   <!-- Sentiment MultiSelect -->
@@ -25,7 +19,8 @@
     optionValue="value"
     placeholder="Sentiment"
     [maxSelectedLabels]="1"
-    selectedItemsLabel="{0} selezionati">
+    selectedItemsLabel="{0} selezionati"
+  >
   </p-multiSelect>
 
   <!-- Tipologia MultiSelect -->
@@ -37,80 +32,221 @@
     optionValue="value"
     placeholder="Tipologia"
     [maxSelectedLabels]="1"
-    selectedItemsLabel="{0} selezionate">
+    selectedItemsLabel="{0} selezionate"
+  >
   </p-multiSelect>
 
   <div class="divider"></div>
 
-  <div class="article-count-container"
-       (mouseenter)="isTooltipHovered.set(true)"
-       (mouseleave)="isTooltipHovered.set(false)">
+  <div
+    class="article-count-container"
+    (mouseenter)="isTooltipHovered.set(true)"
+    (mouseleave)="isTooltipHovered.set(false)"
+  >
     <button
       type="button"
       class="article-count"
       (click)="toggleTooltip($event)"
       [attr.aria-expanded]="isTooltipVisible()"
-      aria-haspopup="true">
+      aria-haspopup="true"
+    >
       NOTIZIE LETTE/TROVATE: <strong>{{ readCount() }}/{{ articleCount() }}</strong>
     </button>
 
-    <!-- Hover/Click countries tooltip -->
-    <div class="countries-tooltip" *ngIf="isTooltipVisible() && countriesList().length > 0" role="listbox">
+    <div
+      class="countries-tooltip"
+      *ngIf="isTooltipVisible() && countriesList().length > 0"
+      role="listbox"
+    >
       <div class="tooltip-header">
         <span class="tooltip-title">Nazioni Coinvolte</span>
-        <button type="button" class="tooltip-close-btn" (click)="closeTooltip($event)" aria-label="Chiudi">✕</button>
+        <button
+          type="button"
+          class="tooltip-close-btn"
+          (click)="closeTooltip($event)"
+          aria-label="Chiudi"
+        >
+          ✕
+        </button>
+      </div>
+      <div class="tooltip-filter-wrap" (click)="$event.stopPropagation()">
+        <input
+          type="search"
+          class="tooltip-filter"
+          [value]="nationsFilter()"
+          (input)="onNationsFilterInput($event)"
+          placeholder="Filtra nazione…"
+          aria-label="Filtra nazioni coinvolte"
+        />
       </div>
       <div class="tooltip-list">
         <button
           type="button"
           class="tooltip-row clickable"
-          *ngFor="let c of countriesList()"
+          *ngFor="let c of filteredCountriesList()"
           (click)="selectCountry(c.code, $event)"
-          role="option">
+          role="option"
+        >
           <span class="country-flag">{{ getFlagEmoji(c.code) }}</span>
           <span class="country-name">{{ c.name }}</span>
           <span class="country-badge">{{ c.readCount }}/{{ c.count }}</span>
         </button>
+        <div class="tooltip-empty" *ngIf="filteredCountriesList().length === 0">
+          Nessuna nazione corrisponde al filtro
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="article-count-container"
-       (mouseenter)="isSavedTooltipHovered.set(true)"
-       (mouseleave)="isSavedTooltipHovered.set(false)">
+  <div
+    class="article-count-container"
+    (mouseenter)="isSavedTooltipHovered.set(true)"
+    (mouseleave)="isSavedTooltipHovered.set(false)"
+  >
     <button
       type="button"
       class="article-count"
       (click)="toggleSavedTooltip($event)"
       [attr.aria-expanded]="isSavedTooltipVisible()"
-      aria-haspopup="true">
+      aria-haspopup="true"
+    >
       NOTIZIE SALVATE: <strong>{{ savedCount() }}</strong>
     </button>
 
-    <div class="countries-tooltip" *ngIf="isSavedTooltipVisible() && savedCountriesList().length > 0" role="listbox">
+    <div
+      class="countries-tooltip"
+      *ngIf="isSavedTooltipVisible() && savedCountriesList().length > 0"
+      role="listbox"
+    >
       <div class="tooltip-header">
         <span class="tooltip-title">Nazioni Salvate</span>
-        <button type="button" class="tooltip-close-btn" (click)="closeSavedTooltip($event)" aria-label="Chiudi">✕</button>
+        <button
+          type="button"
+          class="tooltip-close-btn"
+          (click)="closeSavedTooltip($event)"
+          aria-label="Chiudi"
+        >
+          ✕
+        </button>
+      </div>
+      <div class="tooltip-filter-wrap" (click)="$event.stopPropagation()">
+        <input
+          type="search"
+          class="tooltip-filter"
+          [value]="savedNationsFilter()"
+          (input)="onSavedNationsFilterInput($event)"
+          placeholder="Filtra nazione…"
+          aria-label="Filtra nazioni salvate"
+        />
       </div>
       <div class="tooltip-list">
         <button
           type="button"
           class="tooltip-row clickable"
-          *ngFor="let c of savedCountriesList()"
+          *ngFor="let c of filteredSavedCountriesList()"
           (click)="selectSavedCountry(c.code, $event)"
-          role="option">
+          role="option"
+        >
           <span class="country-flag">{{ getFlagEmoji(c.code) }}</span>
           <span class="country-name">{{ c.name }}</span>
           <span class="country-badge">{{ c.count }}</span>
         </button>
+        <div class="tooltip-empty" *ngIf="filteredSavedCountriesList().length === 0">
+          Nessuna nazione corrisponde al filtro
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    class="article-count-container"
+    (mouseenter)="isRelationsTooltipHovered.set(true)"
+    (mouseleave)="isRelationsTooltipHovered.set(false)"
+  >
+    <button
+      type="button"
+      class="article-count"
+      (click)="toggleRelationsTooltip($event)"
+      [attr.aria-expanded]="isRelationsTooltipVisible()"
+      aria-haspopup="true"
+    >
+      RELAZIONI ATTIVE:
+      <strong>{{ relationEnabledCount() }}/{{ relationTotalCount() }}</strong>
+    </button>
+
+    <div
+      class="countries-tooltip relations-tooltip"
+      *ngIf="isRelationsTooltipVisible()"
+      role="listbox"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="tooltip-header">
+        <span class="tooltip-title">Relazioni Attive</span>
+        <button
+          type="button"
+          class="tooltip-close-btn"
+          (click)="closeRelationsTooltip($event)"
+          aria-label="Chiudi"
+        >
+          ✕
+        </button>
+      </div>
+      <div class="tooltip-actions">
+        <button type="button" class="tooltip-action-btn" (click)="onSelectAllRelations($event)">
+          Seleziona tutto
+        </button>
+        <button
+          type="button"
+          class="tooltip-action-btn tooltip-action-btn--muted"
+          (click)="onClearAllRelations($event)"
+          [disabled]="relationEnabledCount() === 0"
+        >
+          Deseleziona tutto
+        </button>
+      </div>
+      <div class="tooltip-filter-wrap">
+        <input
+          type="search"
+          class="tooltip-filter"
+          [value]="relationsFilter()"
+          (input)="onRelationsFilterInput($event)"
+          placeholder="Filtra nazione…"
+          aria-label="Filtra nazioni relazioni"
+        />
+      </div>
+      <div class="tooltip-list">
+        <div
+          class="tooltip-row tooltip-row--switch"
+          *ngFor="let opt of filteredRelationOptions()"
+          role="option"
+        >
+          <span class="country-flag">{{ getFlagEmoji(opt.code) }}</span>
+          <span class="country-name">{{ opt.name }}</span>
+          <button
+            type="button"
+            class="ios-switch"
+            role="switch"
+            [attr.aria-checked]="isRelationEnabled(opt.code)"
+            [attr.aria-label]="'Attiva relazioni per ' + opt.name"
+            [class.is-on]="isRelationEnabled(opt.code)"
+            (click)="onToggleRelation(opt.code, $event)"
+          >
+            <span class="ios-switch__thumb" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="tooltip-empty" *ngIf="filteredRelationOptions().length === 0">
+          {{
+            relationOptions().length === 0
+              ? 'Nessuna relazione nel giorno'
+              : 'Nessuna nazione corrisponde al filtro'
+          }}
+        </div>
       </div>
     </div>
   </div>
 
   @if (apiError()) {
-    <div class="api-error-banner" role="alert">
-      Errore API — dati non disponibili
-    </div>
+    <div class="api-error-banner" role="alert">Errore API — dati non disponibili</div>
   }
 
   <!-- Progress Bar per stato caricamento asincrono -->

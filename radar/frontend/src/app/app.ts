@@ -1,4 +1,12 @@
-import { Component, computed, effect, inject, signal, viewChild, HostListener } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+  viewChild,
+  HostListener,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { StateService } from './services/state.service';
 import { Article, ArticleFilters, PrimaryCategory } from './models/article.model';
@@ -12,18 +20,19 @@ import { RadarSidebarComponent } from './components/radar-sidebar/radar-sidebar.
 
 /**
  * Shell UI: mappa + toolbar + sidebar (freeze: importata, mai modificata qui).
+ * Relazioni Wave 1: filtro nazioni nella toolbar (``RELAZIONI ATTIVE``).
  *
  * Coordina nation-open (generation token), ``invalidateSize`` prima di spiderfy,
  * close che può preservare ``detailError``, auto-read sul cambio card carosello.
  *
- * @see SoT: frontend.md §2b/§7; skill radar-sidebar-freeze.
+ * @see SoT: frontend.md §2b/§7/§12; skill radar-sidebar-freeze.
  */
 @Component({
   selector: 'app-root',
   standalone: true,
   imports: [CommonModule, RadarMapComponent, RadarToolbarComponent, RadarSidebarComponent],
   templateUrl: './app.html',
-  styleUrl: './app.scss'
+  styleUrl: './app.scss',
 })
 export class App {
   readonly state = inject(StateService);
@@ -70,11 +79,9 @@ export class App {
           relation.category,
         );
       } else {
-        await (
-          this.state.sidebarMode() === 'saved'
-            ? this.state.softReloadSavedCountryArticles(focus!)
-            : this.state.softReloadCountryArticles(focus!)
-        );
+        await (this.state.sidebarMode() === 'saved'
+          ? this.state.softReloadSavedCountryArticles(focus!)
+          : this.state.softReloadCountryArticles(focus!));
       }
       if (gen !== this.nationOpenGeneration) return;
 
@@ -97,18 +104,18 @@ export class App {
     }
   }
 
-  selectedArticle  = signal<Article | null>(null);
-  clusterArticles  = signal<Article[]>([]);
-  isSidebarOpen    = signal<boolean>(false);
+  selectedArticle = signal<Article | null>(null);
+  clusterArticles = signal<Article[]>([]);
+  isSidebarOpen = signal<boolean>(false);
   focusCountryCode = signal<string | null>(null);
 
   readonly mapComponent = viewChild(RadarMapComponent);
 
   articleCount = computed(() => this.state.articleCount());
-  readCount    = computed(() => this.state.readCount());
-  savedCount   = computed(() => this.state.savedCount());
+  readCount = computed(() => this.state.readCount());
+  savedCount = computed(() => this.state.savedCount());
   /** Overlay full-bleed: true quando la sidebar è aperta (mappa resta 100vw). */
-  isMapSplit   = computed(() => this.isSidebarOpen());
+  isMapSplit = computed(() => this.isSidebarOpen());
 
   /** Ignora risultati nation-fetch obsoleti se l'utente cambia pallino in fretta. */
   private nationOpenGeneration = 0;
@@ -163,8 +170,7 @@ export class App {
    * @param req Codice paese oppure ``CountryOpenRequest`` (preserveZoom / category).
    */
   async onCountryClick(req: CountryOpenRequest | string): Promise<void> {
-    const open: CountryOpenRequest =
-      typeof req === 'string' ? { countryCode: req } : req;
+    const open: CountryOpenRequest = typeof req === 'string' ? { countryCode: req } : req;
     if (!open.countryCode) return;
 
     const gen = ++this.nationOpenGeneration;
@@ -181,18 +187,12 @@ export class App {
       }
 
       const category = open.category;
-      const sidebarArts = category
-        ? arts.filter((a) => a.primary_category === category)
-        : arts;
+      const sidebarArts = category ? arts.filter((a) => a.primary_category === category) : arts;
       const focusList = sidebarArts.length > 0 ? sidebarArts : arts;
       // Allinea ordine carosello (sort categoria) così spiderfy segue la card visibile.
       const displayArticle =
-        (category
-          ? arts.find((a) => a.primary_category === category)
-          : undefined) ??
-        [...focusList].sort((a, b) =>
-          a.primary_category.localeCompare(b.primary_category),
-        )[0] ??
+        (category ? arts.find((a) => a.primary_category === category) : undefined) ??
+        [...focusList].sort((a, b) => a.primary_category.localeCompare(b.primary_category))[0] ??
         focusList[0];
 
       this.selectedArticle.set(displayArticle);

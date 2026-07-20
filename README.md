@@ -199,9 +199,13 @@ Restore SHA sotto (Phase 0–6). Il branch di lavoro corrente può differire —
 | Phase 6 | `56c2eff` | GATE VERDE: docs, GeoJSON fetch+verify, CI, runbook, hooks |
 | Phase B | `885628f` | Real-time webhook + SSE soft-refresh (GATE VERDE) |
 | Fase H | `d9508a5` | Grafo geospaziale: `related_countries`, `/api/map-relations`, archi + chip |
-| Archi UI | `5c74e57` (`feature/upgrades`) | Multicolore &lt;5, tratteggio geometrico ≥5, `relationsPane`, click → sidebar bilaterale — **restore point** |
+| Archi UI | `5c74e57` (`feature/upgrades`) | Multicolore &lt;5, tratteggio geometrico ≥5, `relationsPane`, click → sidebar bilaterale — **restore point** Leaflet-era |
+| Archi MapLibre solidi | `0d942ed` (`feature/upgrades`) | Macro multicolore solida a **tutti** gli zoom (path MapLibre) |
+| Relazioni Wave 1 (filtro nazioni) | tip `feature/upgrades` (grep `RELAZIONI ATTIVE`) | Toolbar **RELAZIONI ATTIVE** → `visibleMapRelations` (OR stella, default OFF); paint invariato — piano [`plan_impl_map_relations_nation_filter.md`](plan-audit/complete/plan_impl_map_relations_nation_filter.md) |
 
-Esempio restore tip archi UI: `git checkout 5c74e57` (branch `feature/upgrades`). Dettaglio: [plan_archi_hatching_multicolor.md](plan-audit/complete/plan_archi_hatching_multicolor.md) + [STATUS.md](plan-audit/STATUS.md).
+Esempio restore tip archi UI Leaflet-era: `git checkout 5c74e57` (branch `feature/upgrades`).  
+Esempio restore pre-filtro-nazioni (archi sempre tutti visibili): `git checkout 0d942ed`.  
+Esempio restore W1 filtri: tip commit chiusura W1 (message contiene `RELAZIONI ATTIVE`) — dettaglio: [plan_impl_map_relations_nation_filter.md](plan-audit/complete/plan_impl_map_relations_nation_filter.md) + [STATUS.md](plan-audit/STATUS.md).
 
 Esempio Phase 6: `git checkout 56c2eff`. Dettaglio gate Phase 0–6: [plan_impl_phase_0_6_execution.md](plan-audit/complete/plan_impl_phase_0_6_execution.md).
 
@@ -222,7 +226,7 @@ Esempio Phase 6: `git checkout 56c2eff`. Dettaglio gate Phase 0–6: [plan_impl_
 | Compose + overlay | `radar/docker-compose.yml`, `radar/docker-compose.hardened.yml`, `radar/docker-compose.lan.yml` |
 | Ops backup/restore | `radar/ops/` |
 | Runbook | `radar/docs/runbook.md` |
-| Mappa / state / read-unread / archi | `radar/frontend/src/app/components/radar-map/` (facade + `maplibre/` / `leaflet/`), `map-renderer.token.ts` (`MAP_RENDERER`), `state.service.ts` (`loadRelationArticles`) |
+| Mappa / state / read-unread / archi | `radar/frontend/src/app/components/radar-map/` (facade + `maplibre/` / `leaflet/`), `map-renderer.token.ts` (`MAP_RENDERER`), `state.service.ts` (`loadRelationArticles`, `visibleMapRelations`), `radar-toolbar` (**RELAZIONI ATTIVE**) |
 | `MOCK_MODE` | `radar/frontend/src/app/services/mock-mode.token.ts` |
 | GeoJSON pin / verify | `radar/frontend/src/assets/data/ASSET_LICENSE.md`, `radar/frontend/scripts/verify-geojson.mjs` |
 | Sidebar (**frozen**) | `radar/frontend/src/app/components/radar-sidebar/` |
@@ -242,7 +246,7 @@ Esempio Phase 6: `git checkout 56c2eff`. Dettaglio gate Phase 0–6: [plan_impl_
 | GET | `/health` (host `:80`) | Healthcheck **Nginx FE** — risposta statica `ok`; **non** è l’API |
 | GET | `/api/articles` | Envelope `{items,next_cursor,total}` — `date` obbligatorio salvo `saved=true` (cross-day), `limit` ≤ 100 |
 | GET | `/api/map-summary` | Righe `country_code × primary_category` + count/lat/lon (day) |
-| GET | `/api/map-relations` | Righe undirected `source_country ↔ target_country` per categoria + volume. FE: archi MapLibre (great-circle macro multicolore solida, tutti gli zoom; legacy Leaflet `relationsPane` dash+fan ≥5); click → carosello bilaterale |
+| GET | `/api/map-relations` | Righe undirected `source_country ↔ target_country` per categoria + volume. FE: archi MapLibre (great-circle macro multicolore solida, tutti gli zoom; legacy Leaflet `relationsPane` dash+fan ≥5); **filtro nazioni toolbar RELAZIONI ATTIVE** → solo `visibleMapRelations` (default 0 archi); click → carosello bilaterale |
 | GET | `/api/saved-summary` | Stessa shape; solo `is_saved`; **senza date** |
 | GET | `/api/countries` | Rollup paese (compat) |
 | PATCH | `/api/articles/{id}/read_status` | Body `{is_read}`; unread ⇒ `is_saved=false` |
@@ -259,8 +263,8 @@ Dashboard finance/
 ├── docs/                              # Manuali operatori 01–04
 ├── plan-audit/                        # vedi plan-audit/STATUS.md (fatto vs da fare)
 │   ├── STATUS.md
-│   ├── active/                        # SoT LLM + Final Release Gate
-│   ├── complete/                      # Phase 0–6, playbook, ticket, docs checklist
+│   ├── active/                        # Wave 2 elevate, Phase I map, §3.J, …
+│   ├── complete/                      # Phase 0–6, W1 filtri Relazioni, B/H, Fase A, …
 │   ├── remediation/ + prompts/
 │   └── archive/
 ├── ecc_deep_dive_analysis_v2.md       # Manuale ECC (descrizione; skill map può essere stale → SoT LLM)

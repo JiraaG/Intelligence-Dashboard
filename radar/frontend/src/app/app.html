@@ -9,21 +9,23 @@
   [apiError]="!!state.error()"
   (filtersChange)="onFiltersChange($event)"
   (countrySelected)="onToolbarCountrySelect($event)"
-  (savedCountrySelected)="onToolbarSavedCountrySelect($event)">
+  (savedCountrySelected)="onToolbarSavedCountrySelect($event)"
+>
 </app-radar-toolbar>
 
-<!-- Mappa Leaflet -->
+<!-- Mappa MapLibre (default) / Leaflet legacy -->
 <div class="map-container" [class.split-active]="isMapSplit()">
   <app-radar-map
     [articles]="state.detailArticles()"
     [countries]="state.countries()"
     [mapSummary]="state.filteredSummary()"
-    [mapRelations]="state.filteredMapRelations()"
+    [mapRelations]="state.visibleMapRelations()"
     [focusCountryCode]="focusCountryCode()"
     (markerClicked)="onMarkerClick($event)"
     (clusterClicked)="onClusterClick($event)"
     (countryClicked)="onCountryClick($event)"
-    (relationClicked)="onRelationClick($event)">
+    (relationClicked)="onRelationClick($event)"
+  >
   </app-radar-map>
 </div>
 
@@ -34,5 +36,6 @@
   [isOpen]="isSidebarOpen()"
   (closed)="closeSidebar()"
   (categoryClicked)="onSidebarCategoryClick($event)"
-  (activeArticleChanged)="onActiveArticleChanged($event)">
+  (activeArticleChanged)="onActiveArticleChanged($event)"
+>
 </app-radar-sidebar>

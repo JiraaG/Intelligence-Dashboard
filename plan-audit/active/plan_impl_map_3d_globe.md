@@ -504,9 +504,9 @@ Correzioni dopo primo deploy Docker (non invalidano W1; aggiornano il SoT operat
 | CSP Nginx | Apex `basemaps.cartocdn.com` **obbligatorio** oltre `*.basemaps…`; `blob:` worker/child |
 | Globe navigation | **Niente** `maxBounds` su globe; `clickTolerance: 12`; ignore click post drag/rotate/pitch |
 | Hatching | Fasce soft O→E (1 colore × tipologia da `map-summary`; mainland US/RU / largest-polygon; helper `country-category-fills.ts`; **non** `fill-pattern` barcode; **non** fill solo `categories[0]`); fingerprint evita `setData` paesi inutili |
-| Archi MapLibre | **Macro multicolore solida a tutti gli zoom** (no fan/dash; Leaflet legacy conserva geometric dash ≥5); hover = paint `arcKey` + Popup |
+| Archi MapLibre | **Macro multicolore solida a tutti gli zoom** (no fan/dash; Leaflet legacy conserva geometric dash ≥5); hover = paint `arcKey` + Popup. **W1 DONE:** filtro nazioni [`../complete/plan_impl_map_relations_nation_filter.md`](../complete/plan_impl_map_relations_nation_filter.md); **W2 spike:** elevate 3D [`plan_impl_map_relations_arcs_3d.md`](plan_impl_map_relations_arcs_3d.md) |
 | Centroidi | Largest-polygon + hardcode US/RU/**NL** |
 | Spiderfy | Pixel layout; n≥9 **spirale** MC; **no** `clusterClicked.emit(arts)` in spiderfy |
 | Budget FE | `angular.json` warn 2MB / error 3MB + `allowedCommonJsDependencies: maplibre-gl` |
 
-**Residui accettati (non bloccanti GATE I):** mid-zoom category clusters Leaflet MC non replicati 1:1; §3.J globo raffinato resta Futuro; dash+fan relazioni solo su path Leaflet (MapLibre = macro solida intenzionale).
+**Residui accettati (non bloccanti GATE I):** mid-zoom category clusters Leaflet MC non replicati 1:1; §3.J globo raffinato resta Futuro; dash+fan relazioni solo su path Leaflet (MapLibre = macro solida intenzionale). Follow-up relazioni: W1 filtri nazioni **COMPLETE**; W2 archi elevati in `plan-audit/active/plan_impl_map_relations_arcs_3d.md`.

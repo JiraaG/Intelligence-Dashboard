@@ -413,14 +413,16 @@ const L = (window as any).L as typeof import('leaflet');
 
 1. **Gestione Stato e Risorsa**:
    - Utilizzare `StateService.mapRelationsResource` per caricare le relazioni bilaterali dal backend.
-   - Esporre il segnale derivato `filteredMapRelations` che filtra le relazioni in base ai filtri attivi (se presenti).
+   - Esporre il segnale derivato `filteredMapRelations` che filtra le relazioni in base ai filtri Tipologia attivi (toolbar).
+   - **Wave 1 — filtro nazioni MapLibre (DONE):** `relationCountriesEnabled` (default `Set` vuoto → **0 archi**), `relationCountryOptions`, `visibleMapRelations` (OR stella: arco se `source ∈ enabled` **oppure** `target ∈ enabled`). API: `toggleRelationCountry` / `selectAllRelationCountries` / `clearRelationCountries` + prune. Binding mappa: `[mapRelations]="state.visibleMapRelations()"` — **non** `filteredMapRelations()` diretto. Piano: `plan-audit/complete/plan_impl_map_relations_nation_filter.md`.
+   - UI: sezione toolbar **RELAZIONI ATTIVE** (`X/Y`); tooltip con **toggle iOS** a destra del nome + Seleziona/Deseleziona tutto + filtro testo nazione (stesso filtro anche su Nazioni Coinvolte / Salvate). **VIETATO** toccare `radar-sidebar/**`. **VIETATO** ripristinare un pannello dock sinistro dedicato.
 2. **Layer Dedicato sulla Mappa**:
    - **MapLibre (default):** archi great-circle / LineString su source layer dedicato (hit-buffer hover/click).
    - **Leaflet legacy:** `relationsLayerGroup` su pane `relationsPane` (z 550) con `L.polyline` Bézier — **VIETATO** `leaflet-curve`.
 3. **Visibilità e Sincronizzazione**:
    - La visibilità del layer relazioni deve essere sincronizzata con la modalità Day View (`articles().length === 0`).
    - Gli archi devono essere nascosti automaticamente solo se una nazione è aperta (nation detail view).
-   - **MapLibre:** stile archi indipendente dallo zoom (sempre macro multicolore solida) — niente ridisegno al crossing zoom 5.
+   - **MapLibre:** stile archi indipendente dallo zoom (sempre macro multicolore solida) — niente ridisegno al crossing zoom 5. Filtro nazioni Wave 1 **non** cambia paint/hover/draw.
    - **Leaflet legacy:** su `zoomend` / attraversamento della soglia zoom 5, ridisegnare gli archi passando da mode pin (zoom >= 5, dash+fan) a mode macro (zoom < 5) e viceversa.
 4. **Fingerprint Geometria Mappa**:
    - Per ottimizzare le prestazioni, il ricalcolo degli elementi della mappa (inclusi gli archi) deve basarsi su un fingerprint che include lo stato delle relazioni, per evitare di ridisegnare la mappa inutilmente se non ci sono cambiamenti strutturali.
@@ -429,6 +431,7 @@ const L = (window as any).L as typeof import('leaflet');
    - **Leaflet legacy — Zoom ≥ 5:** una curva per-categoria (`CATEGORY_CSS_VARS`), spessore `Math.min(6, 1 + volume * 0.5)`, opacity 0.8, tratteggio **geometric dash** (segmenti lat/lng + gap — **vietato** affidarsi a `line-dasharray` / CSS dash come unico tratteggio: scorre al pan). Multi-cat → fan parallelo.
    - **Leaflet legacy — Zoom < 5:** macro aggregata multicolore, spessore soft, opacity ~0.45.
    - Hover/click → `relationClicked` → `loadRelationArticles` (bilaterale A↔B).
+   - **Fuori scope Wave 1 (chiuso):** soft-restyle archi / nation-hover preview. **Wave 2 (active):** archi elevati 3D — `plan-audit/active/plan_impl_map_relations_arcs_3d.md`.
 
 ---
 

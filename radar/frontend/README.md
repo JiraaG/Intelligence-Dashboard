@@ -53,7 +53,7 @@ localStorage.setItem('radar.mapRenderer', 'leaflet'); // poi reload
 - Focus: pin summary = `preserveZoom`; poligono/toolbar = `fitBounds` (`maxZoom: 4`); `refocusCountry` se stesso codice; hub/pin/spider = `getCountryCentroid` (US/RU/NL mainland); hatching zoom &lt; 5 = `pickCountryCodeAt`
 - Overlay: dopo open/close sidebar → `map.resize()` (MapLibre) / `invalidateSize()` (Leaflet legacy)
 - Hatching MapLibre: fasce soft O→E (1 colore × tipologia da `map-summary`; mainland US/RU; **non** `fill-pattern` barcode); Leaflet legacy: SVG combo pattern; archi MapLibre: macro multicolore solida a tutti gli zoom; Leaflet zoom-pin: geometric dash; globe: no `maxBounds`; CSP Nginx apex + `*.basemaps.cartocdn.com`
-- **Archi relazioni (Fase H + UI):** MapLibre great-circle (default) = **sempre** una linea aggregata multicolore continua; legacy Leaflet `relationsPane` z 550 = zoom &lt; 5 multicolore / zoom ≥ 5 per-categoria + geometric dash; click → `relationClicked` / `loadRelationArticles` (bilaterale)
+- **Archi relazioni (Fase H + UI):** MapLibre great-circle (default) = **sempre** una linea aggregata multicolore continua; legacy Leaflet `relationsPane` z 550 = zoom &lt; 5 multicolore / zoom ≥ 5 per-categoria + geometric dash; click → `relationClicked` / `loadRelationArticles` (bilaterale). **Filtro nazioni Wave 1 (DONE):** toolbar **RELAZIONI ATTIVE** (default OFF, toggle iOS) → `visibleMapRelations` (OR stella); paint/hover invariati; filtro testo nazione anche su LETTE/TROVATE e SALVATE. Piano: `plan-audit/complete/plan_impl_map_relations_nation_filter.md`
 - **Notizie Salvate:** contatore toolbar date-agnostic + tooltip nazioni; open = stesso zoom/spiderfy di LETTE/TROVATE; save⇒read, unread⇒unsave
 
 ## Docker

@@ -10,11 +10,14 @@ Cartella di audit, prompt orchestratore e SoT del modulo Radar.
 
 ## `active/` — vivi
 
-* Nessun piano di implementazione in corso (solo prompt ECC in `prompts/active/`)
+* Relazioni Wave 2 elevate 3D — [`active/plan_impl_map_relations_arcs_3d.md`](active/plan_impl_map_relations_arcs_3d.md) (spike; W1 DONE)
+* Fase I MapLibre 3D-primary — [`active/plan_impl_map_3d_globe.md`](active/plan_impl_map_3d_globe.md)
+* §3.J globo — [`active/plan_impl_map_globe_projection.md`](active/plan_impl_map_globe_projection.md)
+* Prompt ECC in `prompts/active/`
 
 ## `complete/` — chiusi
 
-Vedi [`complete/README.md`](complete/README.md) (Phase 0–6, SoT LLM, Fase A Ollama, audit lane env, Fase B/H, archi UI, Final Release, commenti, Notizie Salvate, playbook, ticket status, monorepo check).
+Vedi [`complete/README.md`](complete/README.md) (Phase 0–6, SoT LLM, Fase A Ollama, audit lane env, Fase B/H, archi UI, **W1 filtro nazioni Relazioni**, Final Release, commenti, Notizie Salvate, playbook, ticket status, monorepo check).
 
 ## Layout
 

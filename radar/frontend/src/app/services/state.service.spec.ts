@@ -3,8 +3,14 @@ import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Article } from '../models/article.model';
+import { MapRelationRow } from '../models/map-relation.model';
 import { ArticleService } from './article.service';
-import { isBilateralRelationArticle, StateService } from './state.service';
+import {
+  buildRelationCountryOptions,
+  filterMapRelationsByEnabledCountries,
+  isBilateralRelationArticle,
+  StateService,
+} from './state.service';
 import { MOCK_MODE } from './mock-mode.token';
 
 const SAMPLE: Article = {
@@ -164,11 +170,13 @@ describe('StateService detailError (T-P1-04)', () => {
         primary_category: 'Economia' as const,
       };
 
-      articleService.getAllArticlesForCountry.mockImplementation((_date: string, country: string) => {
-        if (country === 'IT') return of([itCnEco, itCnEnergy, itUs]);
-        if (country === 'CN') return of([cnItEco]);
-        return of([]);
-      });
+      articleService.getAllArticlesForCountry.mockImplementation(
+        (_date: string, country: string) => {
+          if (country === 'IT') return of([itCnEco, itCnEnergy, itUs]);
+          if (country === 'CN') return of([cnItEco]);
+          return of([]);
+        },
+      );
 
       const all = await state.loadRelationArticles('IT', 'CN');
       expect(all.map((a) => a.id).sort()).toEqual([1, 2, 3]);
@@ -212,5 +220,102 @@ describe('StateService detailError (T-P1-04)', () => {
 
       expect(art1.is_saved).toBe(true); // preserved because it was pending
     });
+  });
+});
+
+describe('StateService visibleMapRelations nation filter (Wave 1)', () => {
+  const US_CN: MapRelationRow = {
+    source_country: 'US',
+    target_country: 'CN',
+    primary_category: 'Geopolitica',
+    volume: 3,
+  };
+  const US_DE: MapRelationRow = {
+    source_country: 'US',
+    target_country: 'DE',
+    primary_category: 'Economia',
+    volume: 1,
+  };
+  const CN_JP: MapRelationRow = {
+    source_country: 'CN',
+    target_country: 'JP',
+    primary_category: 'Tecnologia',
+    volume: 2,
+  };
+  const ROWS = [US_CN, US_DE, CN_JP];
+
+  let state: StateService;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: MOCK_MODE, useValue: true },
+        {
+          provide: ArticleService,
+          useValue: {
+            getMapSummary: vi.fn(() => of([])),
+            getMapRelations: vi.fn(() => of([])),
+            getSavedSummary: vi.fn(() => of([])),
+            getAllArticlesForCountry: vi.fn(),
+            updateReadStatus: vi.fn(() => of({ status: 'ok', is_read: true })),
+          },
+        },
+        StateService,
+      ],
+    });
+    state = TestBed.inject(StateService);
+  });
+
+  it('defaults to empty enabled set', () => {
+    expect(state.relationCountriesEnabled().size).toBe(0);
+    expect(filterMapRelationsByEnabledCountries(ROWS, state.relationCountriesEnabled())).toEqual(
+      [],
+    );
+  });
+
+  it('OR star: US on / CN off shows US↔CN and US↔DE, hides CN↔JP', () => {
+    state.toggleRelationCountry('US');
+    const visible = filterMapRelationsByEnabledCountries(ROWS, state.relationCountriesEnabled());
+    expect(visible).toHaveLength(2);
+    expect(visible).toEqual(expect.arrayContaining([US_CN, US_DE]));
+    expect(
+      visible.find((r) => r.source_country === 'CN' && r.target_country === 'JP'),
+    ).toBeUndefined();
+  });
+
+  it('selectAllRelationCountries / clearRelationCountries mutate enabled set', () => {
+    // Options empty without resource payload — seed via selectAll on options helper.
+    const codes = buildRelationCountryOptions(ROWS).map((o) => o.code);
+    state.relationCountriesEnabled.set(new Set(codes));
+    expect(state.relationCountriesEnabled().size).toBe(4);
+    expect(
+      filterMapRelationsByEnabledCountries(ROWS, state.relationCountriesEnabled()),
+    ).toHaveLength(3);
+
+    state.clearRelationCountries();
+    expect(state.relationCountriesEnabled().size).toBe(0);
+    expect(filterMapRelationsByEnabledCountries(ROWS, state.relationCountriesEnabled())).toEqual(
+      [],
+    );
+  });
+
+  it('buildRelationCountryOptions sorts IT names and counts arcs', () => {
+    const opts = buildRelationCountryOptions(ROWS);
+    expect(opts.map((o) => o.code).sort()).toEqual(['CN', 'DE', 'JP', 'US']);
+    expect(opts.find((o) => o.code === 'US')?.arcCount).toBe(2);
+    expect(opts.find((o) => o.code === 'CN')?.arcCount).toBe(2);
+  });
+
+  it('Tipologia subset then nation filter (composition)', () => {
+    const afterTipologia = ROWS.filter((r) => r.primary_category === 'Economia');
+    expect(afterTipologia).toEqual([US_DE]);
+    state.selectAllRelationCountries(); // no-op on empty options from resource
+    state.relationCountriesEnabled.set(
+      new Set(buildRelationCountryOptions(afterTipologia).map((o) => o.code)),
+    );
+    expect(
+      filterMapRelationsByEnabledCountries(afterTipologia, state.relationCountriesEnabled()),
+    ).toEqual([US_DE]);
   });
 });
