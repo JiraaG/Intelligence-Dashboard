@@ -136,7 +136,7 @@ flowchart TD
 * **Leaflet legacy (dormiente):**
   * Path 2D conservato per rollback / futuro switch UX. Caricato solo se `MAP_RENDERER=leaflet` (`window.__RADAR_MAP_RENDERER__` o `localStorage radar.mapRenderer`). Script globali `angular.json` `scripts[]` + `window.L` restano per quel host.
 * **Visualizzazione Grafica Avanzata:**
-  * **Hatching:** corografia categorie a zoom basso (MapLibre fill / legacy SVG).
+  * **Hatching (MapLibre):** fasce soft O→E (1 colore × tipologia da `map-summary`); mainland US/RU; isole significative ≥0.5% area largest; clip terra∩strip via `polygon-clipping` (no fill in mare). Helper `maplibre/country-category-fills.ts`. Leaflet legacy: SVG combo.
   * **Pin Conic-Gradient:** un pin per nazione (HTML Marker) con distribuzione % delle 10 categorie.
   * **Spiderfy Custom:** hub + fan emoji per categoria attiva nel carosello (parity path MapLibre senza MarkerCluster).
 
@@ -144,7 +144,7 @@ flowchart TD
 
 ## 3. Upgrade e Blueprint Tecnici
 
-Sezioni sotto = blueprint (architettura + ricette). Stato prodotto aggiornato **2026-07-20**:
+Sezioni sotto = blueprint (architettura + ricette). Stato prodotto aggiornato **2026-07-21**:
 
 | Sezione | Tema | Stato |
 |---------|------|--------|
@@ -154,7 +154,7 @@ Sezioni sotto = blueprint (architettura + ricette). Stato prodotto aggiornato **
 | **D** | Mappe offline air-gapped | **Futuro** — target FE = MapLibre `style` → `/tiles/` (non solo Leaflet PNG) |
 | **G** | Obsidian wiki-links bidirezionali | Futuro |
 | **H** | Grafo geospaziale / archi mappa | **DONE / GATE VERDE** (2026-07-18) |
-| **I** | Mappa 3D-primary MapLibre (parity; Leaflet dormiente) | **DONE** (2026-07-20) — SoT [`plan-audit/active/plan_impl_map_3d_globe.md`](plan-audit/active/plan_impl_map_3d_globe.md) |
+| **I** | Mappa 3D-primary MapLibre (parity; Leaflet dormiente) | **DONE** (2026-07-20) — SoT [`plan-audit/active/plan_impl_map_3d_globe.md`](plan-audit/active/plan_impl_map_3d_globe.md); follow-up hatching isole/anti-bleed **GATE VERDE** 2026-07-21 ([`plan_impl_map_category_fills_islands.md`](plan-audit/complete/plan_impl_map_category_fills_islands.md)) |
 | **J** | Upgrade proiezione globo vero (follow-up I) | **Futuro** — SoT [`plan-audit/active/plan_impl_map_globe_projection.md`](plan-audit/active/plan_impl_map_globe_projection.md) |
 
 Quadro vivo: [`plan-audit/STATUS.md`](plan-audit/STATUS.md). Topologie lane env: [`plan-audit/complete/audit_llm_lane_env_generalization.md`](plan-audit/complete/audit_llm_lane_env_generalization.md).
@@ -778,6 +778,7 @@ radar-map/
 - `MAP_RENDERER=maplibre|leaflet` (default maplibre; leaflet = ops/rollback/futuro switch)
 - `radar.mapProjection=globe|mercator`
 - Soglia zoom hatch↔pin: `MAP_ZOOM_PIN_THRESHOLD=4` + `MAP_ZOOM_PIN_HYSTERESIS=0.4` (`resolvePinMode` / `pinModeActive` — anti-flicker pan globo)
+- Hatching MapLibre: isole ≥0.5% largest + `polygon-clipping` terra∩strip — [`plan_impl_map_category_fills_islands.md`](plan-audit/complete/plan_impl_map_category_fills_islands.md)
 - `npm run verify-map-renderer`
 
 #### Riferimento futuro obbligatorio

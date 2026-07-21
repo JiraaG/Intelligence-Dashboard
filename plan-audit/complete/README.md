@@ -21,4 +21,5 @@ Documenti **completati**. Non sono backlog. Per il quadro fatto vs da fare vedi 
 | [master_plan_impl_phase_H_geospatial_graph.md](master_plan_impl_phase_H_geospatial_graph.md) | Fase H (Grafo Geospaziale) | COMPLETATO / GATE VERDE |
 | [plan_archi_hatching_multicolor.md](plan_archi_hatching_multicolor.md) | Follow-up H: archi multicolore + click bilaterale | COMPLETATO / GATE VERDE |
 | [plan_impl_map_relations_nation_filter.md](plan_impl_map_relations_nation_filter.md) | Wave 1: filtro nazioni Relazioni (toolbar RELAZIONI ATTIVE) | COMPLETATO / GATE VERDE 2026-07-20 |
+| [plan_impl_map_category_fills_islands.md](plan_impl_map_category_fills_islands.md) | MapLibre hatching: isole ≥0.5% + anti-bleed `polygon-clipping` | COMPLETATO / GATE VERDE 2026-07-21 |
 

@@ -40,7 +40,7 @@
               "node_modules/leaflet/dist/leaflet.js",
               "node_modules/leaflet.markercluster/dist/leaflet.markercluster.js"
             ],
-            "allowedCommonJsDependencies": ["maplibre-gl"]
+            "allowedCommonJsDependencies": ["maplibre-gl", "polygon-clipping"]
           },
           "configurations": {
             "production": {

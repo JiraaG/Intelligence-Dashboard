@@ -1,6 +1,6 @@
 # plan-audit — STATUS (fatto vs da fare)
 
-Quadro operativo aggiornato **2026-07-20** (Wave 1 Relazioni nazioni **GATE VERDE**; Fase A LLM locale **COMPLETE**; audit LLM env `c9ef842`; Profilo F `54c8038` + VRAM `2996625`).  
+Quadro operativo aggiornato **2026-07-21** (MapLibre hatching isole/anti-bleed **GATE VERDE**; Wave 1 Relazioni nazioni **GATE VERDE**; Fase A LLM locale **COMPLETE**; audit LLM env `c9ef842`; Profilo F `54c8038` + VRAM `2996625`).  
 Indice cartelle: [`README.md`](README.md).  
 Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`](remediation/audit_remediation_final_release_handoff.md).
 
@@ -11,8 +11,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 | Area | Dove | Note |
 |------|------|------|
 | Relazioni — archi elevati 3D (Wave 2) | [`active/plan_impl_map_relations_arcs_3d.md`](active/plan_impl_map_relations_arcs_3d.md) | **ACTIVE (spike)** — prerequisito W1 **DONE**. MapLibre `line` flat; no `line-z-offset`; CustomLayer vs deck.gl. |
-| Fix fasce tipologia (isole + anti-bleed) | [`active/plan_impl_map_category_fills_islands.md`](active/plan_impl_map_category_fills_islands.md) | **ACTIVE** — tutte le nazioni; prompt [`prompts/active/plan_prompt_map_category_fills_islands.md`](prompts/active/plan_prompt_map_category_fills_islands.md) |
-| Mappa 3D-primary (Phase I) | [`active/plan_impl_map_3d_globe.md`](active/plan_impl_map_3d_globe.md) | Codice + docs shipped; post-ship hatching soft + archi macro solidi |
+| Mappa 3D-primary (Phase I) | [`active/plan_impl_map_3d_globe.md`](active/plan_impl_map_3d_globe.md) | Codice + docs shipped; post-ship hatching soft + archi macro solidi; follow-up isole/anti-bleed **COMPLETE** |
 | Upgrade globo §3.J | [`active/plan_impl_map_globe_projection.md`](active/plan_impl_map_globe_projection.md) | Futuro / BACKLOG |
 | ECC manual / expansion | [`prompts/active/plan_prompt_ecc_manual_and_expansion.md`](prompts/active/plan_prompt_ecc_manual_and_expansion.md) | ACTIVE (non eseguito) |
 | Prompt mappa 3D (origine) | [`prompts/active/plan_prompt_map_3d_globe.md`](prompts/active/plan_prompt_map_3d_globe.md) | Storico analisi |
@@ -23,6 +22,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 
 | Area | Dove | Note |
 |------|------|------|
+| Fix fasce tipologia (isole + anti-bleed) | [`complete/plan_impl_map_category_fills_islands.md`](complete/plan_impl_map_category_fills_islands.md) | **COMPLETE / GATE VERDE** 2026-07-21 — `extractPaintPolygons` + `polygon-clipping` terra∩strip; sweep MultiPolygon; **Restore point:** tip commit chiusura GATE su `feature/upgrades` (registrato in README restore table). Prompt [`prompts/done/plan_prompt_map_category_fills_islands.md`](prompts/done/plan_prompt_map_category_fills_islands.md). |
 | Relazioni — filtro nazioni (Wave 1) | [`complete/plan_impl_map_relations_nation_filter.md`](complete/plan_impl_map_relations_nation_filter.md) | **COMPLETE / GATE VERDE** 2026-07-20 — toolbar **RELAZIONI ATTIVE** (default OFF, OR stella, toggle iOS); `visibleMapRelations`; paint/hover invariati. **Restore point:** `ec771b1` su `feature/upgrades` (pre-W1 archi: `0d942ed`). |
 | Fase A — LLM locale AMD/Ollama | [`complete/plan_impl_fase_A_local_amd_ollama.md`](complete/plan_impl_fase_A_local_amd_ollama.md) | **COMPLETE** — W1–W4 + VRAM unload **DONE** (`54c8038` / `2996625`). Scorecard fixture formale = **opz. non bloccante**. |
 | Audit LLM env topology | [`complete/audit_llm_lane_env_generalization.md`](complete/audit_llm_lane_env_generalization.md) | **DONE** 2026-07-20 — S3 failover, ricette 1–8, no residual Ollama-think; W2 codice cancelled. Restore docs: **`c9ef842`**. |
@@ -63,14 +63,16 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 | Archi UI (multicolore + click) | **DONE** | Piano [`complete/plan_archi_hatching_multicolor.md`](complete/plan_archi_hatching_multicolor.md). **MapLibre:** residuo opzionale “multicolore anche ≥5” **chiuso** (`0d942ed`). Leaflet legacy: dash+fan su latch pin (`MAP_ZOOM_PIN_THRESHOLD=4` + isteresi). |
 | Relazioni filtro nazioni (Wave 1) | **DONE** | [`complete/plan_impl_map_relations_nation_filter.md`](complete/plan_impl_map_relations_nation_filter.md). Prossimo: spike Wave 2 elevate. |
 | Pin zoom soglia + isteresi globo | **DONE** | `MAP_ZOOM_PIN_THRESHOLD=4`, `MAP_ZOOM_PIN_HYSTERESIS=0.4`, `resolvePinMode` / `pinModeActive` — anti-flicker pan MapLibre globe. |
+| Hatching isole + anti-bleed MapLibre | **DONE** | [`complete/plan_impl_map_category_fills_islands.md`](complete/plan_impl_map_category_fills_islands.md) — GATE 2026-07-21. |
 
-**Nessun residuo operativo obbligatorio sulla Fase A / B / H / archi UI / W1 filtri / classification refine / map anchors / Profilo F core / audit env.** Branch di riferimento feature: `feature/upgrades`. Candidata immediata relazioni: **Wave 2 archi elevati**. Blueprint parallelo: **§3.C pgvector**.
+**Nessun residuo operativo obbligatorio sulla Fase A / B / H / archi UI / W1 filtri / hatching isole / classification refine / map anchors / Profilo F core / audit env.** Branch di riferimento feature: `feature/upgrades`. Candidata immediata relazioni: **Wave 2 archi elevati**. Blueprint parallelo: **§3.C pgvector**.
 
-**Restore points (catena `feature/upgrades`):** pin threshold+hysteresis **`7a2bfc9`**; toolbar unify Sentiment/Tipologia `33c348e`; W1 filtri nazioni **`ec771b1`**; archi MapLibre solidi `0d942ed`; docs LLM env `c9ef842`; Profilo F + VRAM `2996625`; Local-Hybrid `54c8038`; map anchors `a240b3c`; click hatching `911463a`; classification/geo `f7cf83d`; archi UI Leaflet `5c74e57`.
+**Restore points (catena `feature/upgrades`):** hatching isole/anti-bleed **GATE tip** (vedi README + commit messaggio); pin threshold+hysteresis **`7a2bfc9`**; toolbar unify Sentiment/Tipologia `33c348e`; W1 filtri nazioni **`ec771b1`**; archi MapLibre solidi `0d942ed`; docs LLM env `c9ef842`; Profilo F + VRAM `2996625`; Local-Hybrid `54c8038`; map anchors `a240b3c`; click hatching `911463a`; classification/geo `f7cf83d`; archi UI Leaflet `5c74e57`.
 
-Prompt Final Release: [`prompts/done/audit_prompt_final_release_gate.md`](prompts/done/audit_prompt_final_release_gate.md) — **non rieseguire** (F0–F4 chiusi).
+Prompt Final Release: [`prompts/done/audit_prompt_final_release_gate.md`](prompts/done/audit_prompt_final_release_gate.md) — **non rieseguire** (F0–F4 chiusi).  
+Prompt isole fills: [`prompts/done/plan_prompt_map_category_fills_islands.md`](prompts/done/plan_prompt_map_category_fills_islands.md) — **non rieseguire**.
 
-**Fuori scope:** scorecard Fase A senza richiesta; refactor/restyle di `radar-sidebar/**` al di fuori delle eccezioni mirate; riaprire ticket CLOSED; rieseguire P0 commenti senza richiesta; attivare Fase 5 senza decisione esplicita; implementare Wave 2 elevate senza spike GATE.
+**Fuori scope:** scorecard Fase A senza richiesta; refactor/restyle di `radar-sidebar/**` al di fuori delle eccezioni mirate; riaprire ticket CLOSED; rieseguire P0 commenti senza richiesta; attivare Fase 5 senza decisione esplicita; implementare Wave 2 elevate senza spike GATE; nuove skill/hooks solo per hatching (non richieste).
 
 ---
 
@@ -80,9 +82,9 @@ Prompt Final Release: [`prompts/done/audit_prompt_final_release_gate.md`](prompt
 plan-audit/
   STATUS.md          ← questo file (quadro fatto / residui)
   active/            ← Wave 2 elevate, Phase I map, §3.J, prompt ECC
-  complete/          ← Piani COMPLETATI (W1 filtri, Fase A, Phase 0–6, B/H, …)
+  complete/          ← Piani COMPLETATI (isole fills, W1 filtri, Fase A, Phase 0–6, B/H, …)
   prompts/active/    ← prompt non eseguiti (ECC manual/expansion)
-  prompts/done/      ← storico (incl. Fase A Ollama, Fase H wave 1–3, Final Release Gate)
+  prompts/done/      ← storico (incl. isole fills, Fase A Ollama, Fase H, Final Release Gate)
   remediation/       ← report DONE (incl. F1–F4)
   archive/           ← SUPERSEDED / scratch / ECC early
 ```

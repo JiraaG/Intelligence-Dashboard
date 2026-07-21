@@ -368,7 +368,7 @@ con i dati mockati prima di connettere il backend reale.
 - [ ] Click arco pin Leaflet (≥4): stessa cosa filtrata per la **tipologia** dell’arco
 - [ ] Nation-open: archi nascosti (no interferenza spiderfy)
 - [ ] Card: sezione "Paesi correlati" con chip se `related_countries` non vuoto
-- [ ] Zoom &lt; 4: hatching **multi-colore** — MapLibre: N fasce soft = N tipologie da `map-summary` (mainland; ordine legenda); Leaflet: SVG combo pattern — non fill solido di una sola categoria; non barcode `fill-pattern` su MapLibre
+- [ ] Zoom &lt; 4: hatching **multi-colore** — MapLibre: N fasce soft = N tipologie da `map-summary` (mainland US/RU; isole significative ≥0.5% area largest; clip terra∩strip — niente bande in mare; ordine legenda); Leaflet: SVG combo pattern — non fill solido di una sola categoria; non barcode `fill-pattern` su MapLibre
 - [ ] Path MapLibre: great-circle / LineString macro multicolore solida (tutti gli zoom) + hover thicken/tooltip; path Leaflet legacy: `relationsPane` + geometric dash ≥4
 
 ---

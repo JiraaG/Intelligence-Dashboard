@@ -29,7 +29,7 @@
 
 | Feature AS-IS                                 | Gap 3D                                         | Mitigation                                                                                                                                     |
 | --------------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Day hatching zoom &lt; `MAP_ZOOM_PIN_THRESHOLD` (4) + isteresi 0.4 | No SVG overlay Leaflet                         | **AS-IS MapLibre:** fasce soft O→E (1 colore × tipologia; mainland US/RU). Spike storico: `fill-pattern` / canvas — **superseded** post-ship (leggibilità globo). Leaflet legacy: SVG combo. Latch: `resolvePinMode` / `pinModeActive` |
+| Day hatching zoom &lt; `MAP_ZOOM_PIN_THRESHOLD` (4) + isteresi 0.4 | No SVG overlay Leaflet                         | **AS-IS MapLibre:** fasce soft O→E (1 colore × tipologia; mainland US/RU; isole ≥0.5% largest; `polygon-clipping` terra∩strip). Spike storico: `fill-pattern` / canvas — **superseded** post-ship (leggibilità globo). Leaflet legacy: SVG combo. Latch: `resolvePinMode` / `pinModeActive` |
 | Pin nazione conic-gradient (DivIcon)          | CSS conic non nativo WebGL                     | **HTML Marker** overlay (stesso DOM/CSS di oggi) ancorato al centroide                                                                         |
 | Hub `radar-spider-root` + spiderfy emoji MC   | `leaflet.markercluster` non esiste in MapLibre | Riscrittura fan custom (HTML markers su cerchio) + policy latch pin keep / latch hatching collapse; **niente** MC                                     |
 | Dummy markers + `maxClusterRadius: 40`        | N/A in 3D                                      | Eliminare dummy; un hub per nazione + fan per categoria attiva                                                                                 |
@@ -503,7 +503,7 @@ Correzioni dopo primo deploy Docker (non invalidano W1; aggiornano il SoT operat
 |------|----------------|
 | CSP Nginx | Apex `basemaps.cartocdn.com` **obbligatorio** oltre `*.basemaps…`; `blob:` worker/child |
 | Globe navigation | **Niente** `maxBounds` su globe; `clickTolerance: 12`; ignore click post drag/rotate/pitch |
-| Hatching | Fasce soft O→E (1 colore × tipologia da `map-summary`; mainland US/RU / largest-polygon; helper `country-category-fills.ts`; **non** `fill-pattern` barcode; **non** fill solo `categories[0]`); fingerprint evita `setData` paesi inutili |
+| Hatching | Fasce soft O→E (1 colore × tipologia da `map-summary`; mainland US/RU; isole ≥0.5% area largest; clip terra∩strip `polygon-clipping`; helper `country-category-fills.ts`; **non** `fill-pattern` barcode; **non** fill solo `categories[0]`); fingerprint evita `setData` paesi inutili |
 | Archi MapLibre | **Macro multicolore solida a tutti gli zoom** (no fan/dash; Leaflet legacy conserva geometric dash ≥5); hover = paint `arcKey` + Popup. **W1 DONE:** filtro nazioni [`../complete/plan_impl_map_relations_nation_filter.md`](../complete/plan_impl_map_relations_nation_filter.md); **W2 spike:** elevate 3D [`plan_impl_map_relations_arcs_3d.md`](plan_impl_map_relations_arcs_3d.md) |
 | Centroidi | Largest-polygon + hardcode US/RU/**NL** |
 | Spiderfy | Pixel layout; n≥9 **spirale** MC; **no** `clusterClicked.emit(arts)` in spiderfy |

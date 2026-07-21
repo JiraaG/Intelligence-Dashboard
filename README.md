@@ -2,7 +2,7 @@
 
 > **Intelligence Dashboard** — Applicazione web self-hosted e containerizzata: aggrega feed RSS (Miniflux), li arricchisce via LLM multi-provider (Gemini SDK e/o OpenAI-compat httpx) e li visualizza su una mappa **MapLibre** 3D-primary (globo; mercator+pitch in contingency).  
 > Leaflet resta **dormiente** (LEGACY FREEZE) dietro token `MAP_RENDERER` — non è il default. Host: `radar-map/maplibre/` + `radar-map/leaflet/`.  
-> UI: `http://localhost/` (porta **80** → Nginx container **8080**). Miniflux admin **non** è pubblicato di default (overlay hardened/lan).  
+> UI: `http://localhost/` (porta **80** → Nginx container **8080**). Miniflux admin **non** è pubblicato di default — usare overlay [`docker-compose.lan.yml`](radar/docker-compose.lan.yml) (`0.0.0.0:8080`) o [`docker-compose.hardened.yml`](radar/docker-compose.hardened.yml) (`127.0.0.1:8080`), oppure `./ops/bootstrap-miniflux.sh`.  
 > Dipendenze esterne: feed RSS, API LLM (Gemini / DeepSeek / OpenAI / GLM / Grok), tile Carto / style MapLibre.
 
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
@@ -132,7 +132,7 @@ Build FE Docker: `npm ci --legacy-peer-deps` (peer matrix Angular/PrimeNG).
 |---|-----------|-----------|
 | 01 | [docs/01_getting_started.md](docs/01_getting_started.md) | Installazione, `.env`, Docker, health, Miniflux feed/backup |
 | 02 | [docs/02_architecture_and_backend.md](docs/02_architecture_and_backend.md) | Worker, migrazioni, API, quote, outbox |
-| 03 | [docs/03_frontend_and_ui.md](docs/03_frontend_and_ui.md) | Mappa, map-summary, archi relazioni (hover/click bilaterale), `MOCK_MODE`, stato UI |
+| 03 | [docs/03_frontend_and_ui.md](docs/03_frontend_and_ui.md) | Mappa MapLibre (hatching isole/anti-bleed, pin, spiderfy), map-summary, archi relazioni (hover/click bilaterale), `MOCK_MODE`, stato UI |
 | 04 | [docs/04_ecc_framework.md](docs/04_ecc_framework.md) | Harness ECC: `.agents` + `.ecc` + wiring Cursor |
 
 **Percorso per ruolo (non è una sequenza unica 01→04):** day-1 ops → `docs/01` + [ops](radar/ops/README.md) + [runbook](radar/docs/runbook.md); backend/API → `docs/02`; FE prodotto → `docs/03` + [frontend README](radar/frontend/README.md); agenti Cursor → `docs/04` + AGENTS/CLAUDE.
@@ -154,7 +154,7 @@ Build FE Docker: `npm ci --legacy-peer-deps` (peer matrix Angular/PrimeNG).
 | [STATUS.md](plan-audit/STATUS.md) | **Quadro** fatto vs residui post-gate |
 | [plan_release_final_gate.md](plan-audit/complete/plan_release_final_gate.md) | Piano Final Release (**F1–F4 PASS**; PR + Fase 5 deferred — **≠** Phase 6 GATE) |
 | [sot_llm_multi_model_fallback.md](plan-audit/complete/sot_llm_multi_model_fallback.md) | SoT LLM multi-provider + Profili A–F |
-| [complete/](plan-audit/complete/) | Phase 0–6, Fase B/H, archi UI, playbook, ticket status, checklist docs (**chiusi**) |
+| [complete/](plan-audit/complete/) | Phase 0–6, Fase B/H, archi UI, W1 filtri, hatching isole/anti-bleed, playbook, ticket status, checklist docs (**chiusi**) |
 | [remediation/](plan-audit/remediation/) | Report ticket + Final Release F1–F4 |
 
 ### Governance agenti (ECC)
@@ -202,10 +202,12 @@ Restore SHA sotto (Phase 0–6). Il branch di lavoro corrente può differire —
 | Archi UI | `5c74e57` (`feature/upgrades`) | Multicolore &lt;5, tratteggio geometrico ≥5, `relationsPane`, click → sidebar bilaterale — **restore point** Leaflet-era |
 | Archi MapLibre solidi | `0d942ed` (`feature/upgrades`) | Macro multicolore solida a **tutti** gli zoom (path MapLibre) |
 | Relazioni Wave 1 (filtro nazioni) | `ec771b1` (`feature/upgrades`) | Toolbar **RELAZIONI ATTIVE** → `visibleMapRelations` (OR stella, default OFF); paint invariato — piano [`plan_impl_map_relations_nation_filter.md`](plan-audit/complete/plan_impl_map_relations_nation_filter.md) — **restore point** |
+| Hatching isole + anti-bleed MapLibre | tip GATE (`feature/upgrades`) | `extractPaintPolygons` + `polygon-clipping` terra∩strip; isole ≥0.5% largest; US/RU mainland — piano [`plan_impl_map_category_fills_islands.md`](plan-audit/complete/plan_impl_map_category_fills_islands.md) — **restore point** (SHA = commit di chiusura GATE) |
 
 Esempio restore tip archi UI Leaflet-era: `git checkout 5c74e57` (branch `feature/upgrades`).  
 Esempio restore pre-filtro-nazioni (archi sempre tutti visibili): `git checkout 0d942ed`.  
-Esempio restore W1 filtri: `git checkout ec771b1` — dettaglio: [plan_impl_map_relations_nation_filter.md](plan-audit/complete/plan_impl_map_relations_nation_filter.md) + [STATUS.md](plan-audit/STATUS.md).
+Esempio restore W1 filtri: `git checkout ec771b1` — dettaglio: [plan_impl_map_relations_nation_filter.md](plan-audit/complete/plan_impl_map_relations_nation_filter.md) + [STATUS.md](plan-audit/STATUS.md).  
+Esempio restore hatching isole/anti-bleed: tip commit GATE su `feature/upgrades` — [plan_impl_map_category_fills_islands.md](plan-audit/complete/plan_impl_map_category_fills_islands.md).
 
 Esempio Phase 6: `git checkout 56c2eff`. Dettaglio gate Phase 0–6: [plan_impl_phase_0_6_execution.md](plan-audit/complete/plan_impl_phase_0_6_execution.md).
 
@@ -226,7 +228,7 @@ Esempio Phase 6: `git checkout 56c2eff`. Dettaglio gate Phase 0–6: [plan_impl_
 | Compose + overlay | `radar/docker-compose.yml`, `radar/docker-compose.hardened.yml`, `radar/docker-compose.lan.yml` |
 | Ops backup/restore | `radar/ops/` |
 | Runbook | `radar/docs/runbook.md` |
-| Mappa / state / read-unread / archi | `radar/frontend/src/app/components/radar-map/` (facade + `maplibre/` / `leaflet/`), `map-renderer.token.ts` (`MAP_RENDERER`), `state.service.ts` (`loadRelationArticles`, `visibleMapRelations`), `radar-toolbar` (**RELAZIONI ATTIVE**) |
+| Mappa / state / read-unread / archi / hatching | `radar/frontend/src/app/components/radar-map/` (facade + `maplibre/` / `leaflet/`), `maplibre/country-category-fills.ts` (`polygon-clipping`), `map-renderer.token.ts` (`MAP_RENDERER`), `state.service.ts` (`loadRelationArticles`, `visibleMapRelations`), `radar-toolbar` (**RELAZIONI ATTIVE**) |
 | `MOCK_MODE` | `radar/frontend/src/app/services/mock-mode.token.ts` |
 | GeoJSON pin / verify | `radar/frontend/src/assets/data/ASSET_LICENSE.md`, `radar/frontend/scripts/verify-geojson.mjs` |
 | Sidebar (**frozen**) | `radar/frontend/src/app/components/radar-sidebar/` |

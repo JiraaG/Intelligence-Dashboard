@@ -1,14 +1,15 @@
 # Plan prompt — Fix fasce tipologia MapLibre (isole + anti-bleed, tutte le nazioni)
 
-> **Stato: ACTIVE (non eseguito)** — incollare in chat Agent (o Plan→Agent dopo conferma).  
-> **Piano SoT:** [`../active/plan_impl_map_category_fills_islands.md`](../active/plan_impl_map_category_fills_islands.md)  
+> **Stato: DONE / GATE VERDE (2026-07-21)** — archiviato; **non rieseguire**.  
+> **Piano SoT:** [`../../complete/plan_impl_map_category_fills_islands.md`](../../complete/plan_impl_map_category_fills_islands.md)  
 > **Data prompt:** 2026-07-21  
 > **Branch:** `feature/upgrades`  
-> **Restore pin/hysteresis (contesto):** `7a2bfc9`
+> **Restore pin/hysteresis (contesto):** `7a2bfc9`  
+> **Restore GATE isole/anti-bleed:** tip commit chiusura (STATUS + README)
 
 ---
 
-## PROMPT (incolla in Agent mode)
+## PROMPT (storico — eseguito)
 
 ```text
 # Task — Fix fasce tipologia MapLibre: isole + anti-bleed (TUTTE le nazioni)
@@ -58,8 +59,6 @@ Leaflet SVG hatching; Wave 2; sidebar; nuove skill/hooks; commit/push senza rich
 
 ---
 
-## Uso
+## Chiusura
 
-1. Aprire chat nuova su `feature/upgrades`.
-2. Incollare il blocco `PROMPT` in **Agent**.
-3. A GATE VERDE: spostare piano in `plan-audit/complete/`, prompt in `prompts/done/`, aggiornare `STATUS.md` + `active/README.md`.
+GATE 2026-07-21: piano in `plan-audit/complete/`, questo file in `prompts/done/`, STATUS + README restore aggiornati. **Non rieseguire** il prompt.
