@@ -7,7 +7,7 @@
 **Contesto mappa:** [`../active/plan_impl_map_3d_globe.md`](../active/plan_impl_map_3d_globe.md) (Phase I MapLibre)  
 **Soglia hatch↔pin:** `MAP_ZOOM_PIN_THRESHOLD=4` + isteresi (`7a2bfc9`)  
 **Quadro:** [`../STATUS.md`](../STATUS.md)  
-**Restore point:** tip `feature/upgrades` al commit di chiusura GATE (registrato in STATUS + README restore table)
+**Restore point:** `32203c9` su `feature/upgrades` (registrato in STATUS + README restore table)
 
 ---
 

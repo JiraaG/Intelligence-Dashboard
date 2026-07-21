@@ -202,12 +202,12 @@ Restore SHA sotto (Phase 0–6). Il branch di lavoro corrente può differire —
 | Archi UI | `5c74e57` (`feature/upgrades`) | Multicolore &lt;5, tratteggio geometrico ≥5, `relationsPane`, click → sidebar bilaterale — **restore point** Leaflet-era |
 | Archi MapLibre solidi | `0d942ed` (`feature/upgrades`) | Macro multicolore solida a **tutti** gli zoom (path MapLibre) |
 | Relazioni Wave 1 (filtro nazioni) | `ec771b1` (`feature/upgrades`) | Toolbar **RELAZIONI ATTIVE** → `visibleMapRelations` (OR stella, default OFF); paint invariato — piano [`plan_impl_map_relations_nation_filter.md`](plan-audit/complete/plan_impl_map_relations_nation_filter.md) — **restore point** |
-| Hatching isole + anti-bleed MapLibre | tip GATE (`feature/upgrades`) | `extractPaintPolygons` + `polygon-clipping` terra∩strip; isole ≥0.5% largest; US/RU mainland — piano [`plan_impl_map_category_fills_islands.md`](plan-audit/complete/plan_impl_map_category_fills_islands.md) — **restore point** (SHA = commit di chiusura GATE) |
+| Hatching isole + anti-bleed MapLibre | `32203c9` (`feature/upgrades`) | `extractPaintPolygons` + `polygon-clipping` terra∩strip; isole ≥0.5% largest; US/RU mainland — piano [`plan_impl_map_category_fills_islands.md`](plan-audit/complete/plan_impl_map_category_fills_islands.md) — **restore point** |
 
 Esempio restore tip archi UI Leaflet-era: `git checkout 5c74e57` (branch `feature/upgrades`).  
 Esempio restore pre-filtro-nazioni (archi sempre tutti visibili): `git checkout 0d942ed`.  
 Esempio restore W1 filtri: `git checkout ec771b1` — dettaglio: [plan_impl_map_relations_nation_filter.md](plan-audit/complete/plan_impl_map_relations_nation_filter.md) + [STATUS.md](plan-audit/STATUS.md).  
-Esempio restore hatching isole/anti-bleed: tip commit GATE su `feature/upgrades` — [plan_impl_map_category_fills_islands.md](plan-audit/complete/plan_impl_map_category_fills_islands.md).
+Esempio restore hatching isole/anti-bleed: `git checkout 32203c9` — [plan_impl_map_category_fills_islands.md](plan-audit/complete/plan_impl_map_category_fills_islands.md).
 
 Esempio Phase 6: `git checkout 56c2eff`. Dettaglio gate Phase 0–6: [plan_impl_phase_0_6_execution.md](plan-audit/complete/plan_impl_phase_0_6_execution.md).
 

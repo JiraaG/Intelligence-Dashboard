@@ -5,7 +5,7 @@
 > **Data prompt:** 2026-07-21  
 > **Branch:** `feature/upgrades`  
 > **Restore pin/hysteresis (contesto):** `7a2bfc9`  
-> **Restore GATE isole/anti-bleed:** tip commit chiusura (STATUS + README)
+> **Restore GATE isole/anti-bleed:** `32203c9`
 
 ---
 
