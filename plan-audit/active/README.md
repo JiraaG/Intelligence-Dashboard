@@ -6,10 +6,11 @@ Questa directory contiene i piani di progettazione e di implementazione attualme
 
 **Attivo**
 
+- **Fix fasce tipologia (isole + anti-bleed)** — [`plan_impl_map_category_fills_islands.md`](plan_impl_map_category_fills_islands.md) (**ACTIVE**; prompt [`../prompts/active/plan_prompt_map_category_fills_islands.md`](../prompts/active/plan_prompt_map_category_fills_islands.md)).
 - **Relazioni Wave 2 — archi elevati 3D** — [`plan_impl_map_relations_arcs_3d.md`](plan_impl_map_relations_arcs_3d.md) (**spike**; prerequisito W1 = [`../complete/plan_impl_map_relations_nation_filter.md`](../complete/plan_impl_map_relations_nation_filter.md) **GATE VERDE**).
 - **Fase I — Mappa 3D-primary (MapLibre)** — [`plan_impl_map_3d_globe.md`](plan_impl_map_3d_globe.md) (**codice + docs shipped** 2026-07-20; move a `complete/` su ok utente). Follow-up globo: sempre [`plan_impl_map_globe_projection.md`](plan_impl_map_globe_projection.md) (§3.J).
 - **Fase J — Upgrade globo vero** — [`plan_impl_map_globe_projection.md`](plan_impl_map_globe_projection.md) (**Futuro / BACKLOG**).
-- Prompt non eseguito: [`../prompts/active/plan_prompt_ecc_manual_and_expansion.md`](../prompts/active/plan_prompt_ecc_manual_and_expansion.md) (ECC manual / expansion).
+- Prompt non eseguito: [`../prompts/active/plan_prompt_ecc_manual_and_expansion.md`](../prompts/active/plan_prompt_ecc_manual_and_expansion.md) (ECC manual / expansion); [`../prompts/active/plan_prompt_map_category_fills_islands.md`](../prompts/active/plan_prompt_map_category_fills_islands.md) (fasce isole/bleed).
 - Prompt mappa 3D (origine analisi): [`../prompts/active/plan_prompt_map_3d_globe.md`](../prompts/active/plan_prompt_map_3d_globe.md).
 
 **Completati di recente (riferimento)**

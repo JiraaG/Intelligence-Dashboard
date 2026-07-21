@@ -11,6 +11,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 | Area | Dove | Note |
 |------|------|------|
 | Relazioni — archi elevati 3D (Wave 2) | [`active/plan_impl_map_relations_arcs_3d.md`](active/plan_impl_map_relations_arcs_3d.md) | **ACTIVE (spike)** — prerequisito W1 **DONE**. MapLibre `line` flat; no `line-z-offset`; CustomLayer vs deck.gl. |
+| Fix fasce tipologia (isole + anti-bleed) | [`active/plan_impl_map_category_fills_islands.md`](active/plan_impl_map_category_fills_islands.md) | **ACTIVE** — tutte le nazioni; prompt [`prompts/active/plan_prompt_map_category_fills_islands.md`](prompts/active/plan_prompt_map_category_fills_islands.md) |
 | Mappa 3D-primary (Phase I) | [`active/plan_impl_map_3d_globe.md`](active/plan_impl_map_3d_globe.md) | Codice + docs shipped; post-ship hatching soft + archi macro solidi |
 | Upgrade globo §3.J | [`active/plan_impl_map_globe_projection.md`](active/plan_impl_map_globe_projection.md) | Futuro / BACKLOG |
 | ECC manual / expansion | [`prompts/active/plan_prompt_ecc_manual_and_expansion.md`](prompts/active/plan_prompt_ecc_manual_and_expansion.md) | ACTIVE (non eseguito) |
