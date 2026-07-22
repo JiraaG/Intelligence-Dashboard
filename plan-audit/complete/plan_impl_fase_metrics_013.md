@@ -1,8 +1,8 @@
 # Piano impl — Fase Metrics 013 (FinOps / diagnostica)
 
-> **Stato: ACTIVE / BACKLOG IMPLEMENTAZIONE** (documenti pronti 2026-07-22; codice non ancora shipped)  
+> **Stato: COMPLETE / GATE VERDE** (2026-07-22; micro-fix verify `6120628`)  
 > **Branch:** `feature/upgrades`  
-> **Prompt Agent (impl):** [`../prompts/active/agent_prompt_fase_metrics_013.md`](../prompts/active/agent_prompt_fase_metrics_013.md)  
+> **Prompt Agent (impl):** [`../prompts/done/agent_prompt_fase_metrics_013.md`](../prompts/done/agent_prompt_fase_metrics_013.md)  
 > **Piano Cursor (origine):** `.cursor/plans/metrics_schema_013_*.plan.md`  
 > **Prerequisito:** Fase C `012` **GATE VERDE** — [`../complete/plan_impl_fase_C_semantic_dedup.md`](../complete/plan_impl_fase_C_semantic_dedup.md)  
 > **Ops LLM attuale:** SIMPLE = `gemini-3.5-flash-lite`, L1 fallback = `gemini-3.1-flash-lite`, COMPLEX = DeepSeek (Profilo A hybrid)
@@ -158,7 +158,7 @@ ALTER TABLE article_embeddings
 
 Correlazione ledger: `miniflux_entry_id` noto pre-classify → post-INSERT/replace `UPDATE llm_request_ledger SET article_id=$1 WHERE miniflux_entry_id=$2 AND article_id IS NULL` (tutte le righe dello stesso entry: retry/L1/residual/`quality:compare`).
 
-**Review delta (2026-07-22):** vedi correzioni C1–C8 in [`../prompts/active/agent_prompt_fase_metrics_013.md`](../prompts/active/agent_prompt_fase_metrics_013.md) — ClassificationResult breaking, article_id solo post-commit, URL event con `a.id`, geo enum SoT, test blast radius.
+**Review delta (2026-07-22):** vedi correzioni C1–C8 in [`../prompts/done/agent_prompt_fase_metrics_013.md`](../prompts/done/agent_prompt_fase_metrics_013.md) — ClassificationResult breaking, article_id solo post-commit, URL event con `a.id`, geo enum SoT, test blast radius.
 
 ---
 
@@ -256,7 +256,7 @@ Preferire `up -d --build` a restart parallelo cieco (skill `radar-docker-ops`).
 
 ## 12. Note di Closeout
 
-- **2026-07-22 Micro-fix GATE VERDE:** `verify_metrics_013.py` aggiornato con scoping del controllo ledger NULL-rate sulle righe recenti 48h (`miniflux_entry_id IS NOT NULL AND created_at > NOW() - INTERVAL '48 hours'`) evitando falsi positivi sullo storico pre-013. Immagine container `radar-worker` rebuildata ad HEAD e verificata live in stato exit 0 superato.
+- **2026-07-22 Micro-fix GATE VERDE (`6120628`):** `verify_metrics_013.py` scope NULL-rate ledger alle righe recenti 48h (evita falsi positivi pre-013); worker rebuild + verify live exit 0. Evidenza same-day: requeue batch post-fix ha prodotto pezzi denorm+ledger coerenti sotto la finestra scoped; checklist §10 verify/docs chiusa.
 
 ---
 

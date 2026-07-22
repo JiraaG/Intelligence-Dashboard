@@ -29,6 +29,8 @@ Worker soft-trim usa solo `LLM_SIMPLE.rpd` (se > 0) — indipendente dal provide
 
 RPM/TPM pieni → attesa sulla **stessa** lane (no cross). **RPD esaurita** → `QuotaDailyExceeded` → cooldown + residual cross-lane.
 
+- Gemini same-provider `LLM_SIMPLE_FALLBACKS` condividono i contatori `LLM_SIMPLE_*` (lane ledger). Free tier Studio **per modello** ≠ RPD Radar per lane.
+
 Residual cross-lane fattura `ref.quota_lane` (SIMPLE↔COMPLEX se identity diversa).
 
 **Custom purpose `quality:compare`:** usa contatori lane=`complex`; il campo `purpose` è memorizzato **as-is** nel ledger (non overwrite a `classify:complex`).

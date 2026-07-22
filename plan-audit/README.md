@@ -14,6 +14,7 @@ Cartella di audit, prompt orchestratore e SoT del modulo Radar.
 * Fase I MapLibre 3D-primary — [`active/plan_impl_map_3d_globe.md`](active/plan_impl_map_3d_globe.md)
 * §3.J globo — [`active/plan_impl_map_globe_projection.md`](active/plan_impl_map_globe_projection.md)
 * Prompt ECC in `prompts/active/`
+* **Metrics 013 FinOps** — COMPLETE / GATE VERDE → [`complete/plan_impl_fase_metrics_013.md`](complete/plan_impl_fase_metrics_013.md) (prompt verify-fix in `prompts/done/`)
 
 ## `complete/` — chiusi
 
@@ -35,12 +36,12 @@ plan-audit/
 
 ## Prompt attivi
 
-* [agent_prompt_fase_metrics_013_verify_fix.md](prompts/active/agent_prompt_fase_metrics_013_verify_fix.md) — **Metrics 013 micro-fix** (verify ledger scoped + rebuild + STATUS → GREEN onesto)
 * [plan_prompt_ecc_manual_and_expansion.md](prompts/active/plan_prompt_ecc_manual_and_expansion.md) — non ancora eseguito
 * [plan_prompt_map_3d_globe.md](prompts/active/plan_prompt_map_3d_globe.md) — mappa 3D / switch vs 3D-only (non eseguito)
 
 ## Prompt done (recente)
 
+* [agent_prompt_fase_metrics_013_verify_fix.md](prompts/done/agent_prompt_fase_metrics_013_verify_fix.md) — **Metrics 013 micro-fix** (verify ledger scoped + rebuild + STATUS → GREEN onesto)
 * [agent_prompt_fase_metrics_013_gate_closeout.md](prompts/done/agent_prompt_fase_metrics_013_gate_closeout.md) — closeout YELLOW→GREEN (funzionale; verify ancora da scoped)
 * [agent_prompt_fase_metrics_013.md](prompts/done/agent_prompt_fase_metrics_013.md) — Metrics 013 impl
 * [agent_prompt_fase_C_semantic_dedup.md](prompts/done/agent_prompt_fase_C_semantic_dedup.md) — Fase C semantic dedup GATE (2026-07-22)

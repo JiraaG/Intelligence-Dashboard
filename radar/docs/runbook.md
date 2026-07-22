@@ -64,6 +64,7 @@ Sintomi: log worker con wait/`429`/`Retry-After`; pochi articoli nuovi; ready pu
 - Soft-trim worker: solo `LLM_SIMPLE.rpd` se `> 0`. Free tier → RPM/RPD `> 0`; paid → RPM/RPD `= 0` + `*_BUDGET_USD_DAY` / 402
 - Failover S3: L1 `LLM_*_FALLBACKS` (CSV **stesso** provider) → L2 residual cross-lane → L3 fallback article. `*_FALLBACKS=` vuoto = nessun L1 (sostituto cross-provider = residual, non CSV).
 - Cascata Gemini same-provider (opz.): `LLM_SIMPLE_FALLBACKS` o legacy `GEMINI_MODEL_FALLBACKS` solo se chiave lane assente
+- **Studio per-model ≠ Radar lane RPD (Profilo A / Gemini):** Google AI Studio free tier è **per modello** (es. `gemini-3.5-flash-lite` e `gemini-3.1-flash-lite` hanno ciascuno i propri RPM/TPM/RPD). Radar `LLM_SIMPLE_RPD` è **per lane** (condiviso da primary + `LLM_SIMPLE_FALLBACKS` same-provider). Quando il ledger batte RPD, **entrambi** 3.5 e 3.1 sono bloccati anche se Studio mostra ancora quota free su 3.5. Soft-trim può bypassare l’ibernazione via residual COMPLEX (DeepSeek): gli articoli processano, ma **non** su Gemini SIMPLE. Ops: dopo un requeue same-day grande con RPD locale esaurita e Studio 3.5 ancora free → bump temporaneo `LLM_SIMPLE_RPD` poi ripristino a 500, oppure attendere rollover UTC; **non** trattare il remaining Studio come remaining Radar.
 - Cooldown 24h hard-fail: tabella `llm_model_cooldown` (`LLM_MODEL_COOLDOWN_HOURS`) — **non** per 429 brevi con Retry-After
 - Routing: `LLM_ROUTING_MODE=complexity` + lane env:
   - `LLM_SIMPLE_PROVIDER` / `LLM_SIMPLE_MODEL` (lane SIMPLE only — effort tipico `none`)
