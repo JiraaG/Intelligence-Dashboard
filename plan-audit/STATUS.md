@@ -69,7 +69,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 
 **Nessun residuo operativo obbligatorio sulla Fase A / B / C / H / archi UI / W1 filtri / hatching isole / classification refine / map anchors / Profilo F core / audit env.** Branch di riferimento feature: `feature/upgrades`. Candidata immediata relazioni: **Wave 2 archi elevati**. **§3.C pgvector** = **COMPLETE / GATE VERDE** ([`complete/plan_impl_fase_C_semantic_dedup.md`](complete/plan_impl_fase_C_semantic_dedup.md)).
 
-**Restore points (catena `feature/upgrades`):** Fase C semantic dedup **`9680e7e`**; hatching isole/anti-bleed **`32203c9`**; pin threshold+hysteresis **`7a2bfc9`**; toolbar unify Sentiment/Tipologia `33c348e`; W1 filtri nazioni **`ec771b1`**; archi MapLibre solidi `0d942ed`; docs LLM env `c9ef842`; Profilo F + VRAM `2996625`; Local-Hybrid `54c8038`; map anchors `a240b3c`; click hatching `911463a`; classification/geo `f7cf83d`; archi UI Leaflet `5c74e57`.
+**Restore points (catena `feature/upgrades`):** Fase C semantic dedup **`f1e1de0`**; hatching isole/anti-bleed **`32203c9`**; pin threshold+hysteresis **`7a2bfc9`**; toolbar unify Sentiment/Tipologia `33c348e`; W1 filtri nazioni **`ec771b1`**; archi MapLibre solidi `0d942ed`; docs LLM env `c9ef842`; Profilo F + VRAM `2996625`; Local-Hybrid `54c8038`; map anchors `a240b3c`; click hatching `911463a`; classification/geo `f7cf83d`; archi UI Leaflet `5c74e57`.
 
 Prompt Final Release: [`prompts/done/audit_prompt_final_release_gate.md`](prompts/done/audit_prompt_final_release_gate.md) — **non rieseguire** (F0–F4 chiusi).  
 Prompt isole fills: [`prompts/done/plan_prompt_map_category_fills_islands.md`](prompts/done/plan_prompt_map_category_fills_islands.md) — **non rieseguire**.

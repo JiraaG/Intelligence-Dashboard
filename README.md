@@ -205,7 +205,7 @@ Restore SHA sotto (Phase 0–6). Il branch di lavoro corrente può differire —
 | Archi MapLibre solidi | `0d942ed` (`feature/upgrades`) | Macro multicolore solida a **tutti** gli zoom (path MapLibre) |
 | Relazioni Wave 1 (filtro nazioni) | `ec771b1` (`feature/upgrades`) | Toolbar **RELAZIONI ATTIVE** → `visibleMapRelations` (OR stella, default OFF); paint invariato — piano [`plan_impl_map_relations_nation_filter.md`](plan-audit/complete/plan_impl_map_relations_nation_filter.md) — **restore point** |
 | Hatching isole + anti-bleed MapLibre | `32203c9` (`feature/upgrades`) | `extractPaintPolygons` + `polygon-clipping` terra∩strip; isole ≥0.5% largest; US/RU mainland — piano [`plan_impl_map_category_fills_islands.md`](plan-audit/complete/plan_impl_map_category_fills_islands.md) — **restore point** |
-| Fase C — dedup semantica (`pgvector`) | `9680e7e` (`feature/upgrades`) | Migrazione `012`, embedder CPU MiniLM, soglia sim **0.80**, `quality:compare` COMPLEX, replace in-place — piano [`plan_impl_fase_C_semantic_dedup.md`](plan-audit/complete/plan_impl_fase_C_semantic_dedup.md) — **restore point** |
+| Fase C — dedup semantica (`pgvector`) | `f1e1de0` (`feature/upgrades`) | Migrazione `012`, embedder CPU MiniLM, soglia sim **0.80**, `quality:compare` COMPLEX, replace in-place — piano [`plan_impl_fase_C_semantic_dedup.md`](plan-audit/complete/plan_impl_fase_C_semantic_dedup.md) — **restore point** |
 
 Esempio restore tip archi UI Leaflet-era: `git checkout 5c74e57` (branch `feature/upgrades`).  
 Esempio restore pre-filtro-nazioni (archi sempre tutti visibili): `git checkout 0d942ed`.  
