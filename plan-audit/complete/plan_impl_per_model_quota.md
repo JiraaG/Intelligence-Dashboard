@@ -1,9 +1,9 @@
 # Piano impl — Quote per-modello (lane SIMPLE/COMPLEX + FALLBACKS)
 
-> **Stato: ACTIVE / docs W0** (2026-07-22) — codice non ancora shipped  
+> **Stato: COMPLETE / GATE VERDE** (2026-07-22) — commit `9848f5b` + docs R8 `docs/02` allineato  
 > **Branch:** `feature/upgrades`  
-> **Prompt Agent:** [`../prompts/active/agent_prompt_per_model_quota.md`](../prompts/active/agent_prompt_per_model_quota.md)  
-> **SoT correlato:** [`../complete/sot_llm_multi_model_fallback.md`](../complete/sot_llm_multi_model_fallback.md) (C8 “cap per-model” → questa fase)  
+> **Prompt Agent:** [`../prompts/done/agent_prompt_per_model_quota.md`](../prompts/done/agent_prompt_per_model_quota.md)  
+> **SoT correlato:** [`sot_llm_multi_model_fallback.md`](sot_llm_multi_model_fallback.md) (C8 per-model **Implementato**)  
 > **Prerequisito ops:** Metrics 013 GATE VERDE; Profilo A: primary `gemini-3.5-flash-lite`, L1 `gemini-3.1-flash-lite`
 
 ---
@@ -189,14 +189,14 @@ Nuovo o estensione: `python -m app.scripts.verify_per_model_quota` (opz. nel wor
 
 ## 7. Checklist GATE
 
-- [ ] Contatori per-model in reserve
-- [ ] Override `MODEL_LIMITS` + default lane + `0` unmanaged
-- [ ] Soft-trim catena
-- [ ] pytest verde incluso caso A esausto → B ok
-- [ ] Live: 3.5 classifica con 3.1 alto/esausto
-- [ ] Requeue 24h (vault+unread) senza errori bloccanti
-- [ ] Docs/ECC/SoT aggiornati (no “shared by design” come contratto)
-- [ ] Commit dettagliato; plan → `complete/`; prompt → `done/`
+- [x] Contatori per-model in reserve
+- [x] Override `MODEL_LIMITS` + default lane + `0` unmanaged
+- [x] Soft-trim catena
+- [x] pytest verde incluso caso A esausto → B ok
+- [x] Live: 3.5 classifica con 3.1 alto/esausto
+- [x] Requeue 24h (vault+unread) senza errori bloccanti
+- [x] Docs/ECC/SoT aggiornati (no “shared by design” come contratto) — incluso `docs/02`
+- [x] Commit dettagliato; plan → `complete/`; prompt → `done/`
 
 ---
 
@@ -226,5 +226,5 @@ Piano orchestratore **~90% allineato**. Correzioni da applicare in impl:
 | R7 | GATE | **Vietato** bump `LLM_SIMPLE_RPD` di lane per dimostrare 3.5; dry-run requeue; N≈created_today; `verify_metrics_013` + `verify_per_model_quota`. |
 | R8 | Docs extra | Anche `docs/02_architecture_and_backend.md` e `.agents/AGENTS.md` se citano RPD lane-shared. |
 
-Prompt Agent aggiornato con R1–R8: [`../prompts/active/agent_prompt_per_model_quota.md`](../prompts/active/agent_prompt_per_model_quota.md).
+Prompt Agent aggiornato con R1–R8: [`../prompts/done/agent_prompt_per_model_quota.md`](../prompts/done/agent_prompt_per_model_quota.md).
 

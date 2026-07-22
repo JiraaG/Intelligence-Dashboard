@@ -60,4 +60,4 @@ plan-audit/
 * **Limits Plan (DONE):** [archive/plans/plan_llm_limits_periodicity_docs_ecc.md](archive/plans/plan_llm_limits_periodicity_docs_ecc.md)
 * **Stub LLM:** [archive/llm-stubs/](archive/llm-stubs/) — non usare
 * **Provider:** `gemini`\|`deepseek`\|`openai`\|`glm`\|`grok`\|`claude`(stub). Dialect: deepseek=`thinking`; openai/glm/grok=`stock`
-* **Limiti:** per-lane; `0`=unmanaged; soft-trim=`LLM_SIMPLE.rpd` (bypass ibernazione se residual COMPLEX); RPM/TPM=attesa stessa lane; RPD/cooldown=`QuotaDailyExceeded`→cross-lane; free=RPM/RPD(+TPM); paid=BUDGET
+* **Limiti:** tetti per-lane + contatori per-model; `0`=unmanaged; soft-trim=residuo catena SIMPLE (bypass ibernazione se residual COMPLEX); RPM/TPM=attesa stessa lane (spacing); RPD/cooldown=`QuotaDailyExceeded`→L1 poi cross-lane; free=RPM/RPD(+TPM); paid=BUDGET
