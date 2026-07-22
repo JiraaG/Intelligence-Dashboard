@@ -4,7 +4,8 @@ description: >
   QuotaLedger durable: reserve/complete/fail su llm_request_ledger prima di ogni tentativo
   provider; limiti per-lane LLM_SIMPLE_* / LLM_COMPLEX_* (0=unmanaged); soft-trim =
   LLM_SIMPLE.rpd se >0; free=RPM/RPD vs paid=BUDGET; RPD half-open; rispettare 429 Retry-After.
-  Complexity v2.2: BORDERLINE → purpose classify:complex.
+  Complexity v2.2: BORDERLINE → purpose classify:complex;
+  effort da LLM_BORDERLINE_REASONING_EFFORT (default high, ops tipico none).
 when_to_use:
   - classification/quota.py, cooldown.py, llm_request_ledger, client cascade/retry
 version: 2.3.1

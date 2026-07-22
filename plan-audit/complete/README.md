@@ -4,6 +4,10 @@ Documenti **completati**. Non sono backlog. Per il quadro fatto vs da fare vedi 
 
 | File | Ruolo | Stato |
 |------|--------|-------|
+| [plan_impl_borderline_effort_split.md](plan_impl_borderline_effort_split.md) | BORDERLINE DeepSeek effort `LLM_BORDERLINE_REASONING_EFFORT` (ops `none` + escalate `high`) | **COMPLETE / GATE VERDE** 2026-07-22 |
+| [plan_impl_per_model_quota.md](plan_impl_per_model_quota.md) | Quote RPM/TPM/RPD per-model (FALLBACKS pool separati) | **COMPLETE / GATE VERDE** 2026-07-22 |
+| [plan_impl_fase_metrics_013.md](plan_impl_fase_metrics_013.md) | Metrics 013 FinOps / denorm articles + ledger | **COMPLETE / GATE VERDE** 2026-07-22 |
+| [plan_impl_fase_C_semantic_dedup.md](plan_impl_fase_C_semantic_dedup.md) | Dedup semantica pgvector + quality:compare | **COMPLETE / GATE VERDE** 2026-07-22 |
 | [plan_impl_phase_0_6.md](plan_impl_phase_0_6.md) | Piano consolidamento Phase 0–6 | DONE / GATE VERDE |
 | [plan_impl_phase_0_6_execution.md](plan_impl_phase_0_6_execution.md) | Scoreboard esecuzione | Chiuso |
 | [plan_docs_audit_playbook.md](plan_docs_audit_playbook.md) | Playbook audit/remediation | CLOSED |

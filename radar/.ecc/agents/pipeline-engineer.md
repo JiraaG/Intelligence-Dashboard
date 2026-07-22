@@ -5,7 +5,7 @@ description: >
   Radar Informativo Globale. Responsabile esclusivo del backend Python: worker ingest
   (`worker.py` / Compose `radar-worker`), integrazione Miniflux API, chiamate Gemini / OpenAI-compat
   (DeepSeek/OpenAI/GLM/Grok via httpx) con schema Pydantic, QuotaLedger, complexity lane v2.2
-  (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`; BORDERLINE→COMPLEX; dialect deepseek|openai) e
+  (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`; BORDERLINE→COMPLEX con `LLM_BORDERLINE_REASONING_EFFORT`; dialect deepseek|openai) e
   scrittura idempotente su PostgreSQL. DEVE ESSERE USATO
   per qualsiasi modifica a `backend/app/worker.py`, `main.py` (API) e ai moduli di
   pipeline (extraction/, classification/, commit/, core/). Non tocca mai il frontend né i file Docker.
@@ -161,7 +161,7 @@ Lane: `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (`LLM_ROUTING_MODE=complexity`).
 Legacy `LLM_RPM` / `DEEPSEEK_RPM` = alias fill-gap, non tetto globale.
 Soft-trim worker = solo `LLM_SIMPLE.rpd` se `> 0`. Free → RPM/RPD; paid → budget + 402.
 Residual SIMPLE↔COMPLEX se identity diversa (fattura `ref.quota_lane`).
-**Complexity v2.2:** BORDERLINE usa catena COMPLEX (`purpose=classify:complex`); SIMPLE → `classify:simple`.
+**Complexity v2.2:** BORDERLINE usa catena COMPLEX (`purpose=classify:complex`) con effort da `LLM_BORDERLINE_REASONING_EFFORT` (default safe `high`, target ops `none` + escalate `high`); SIMPLE → `classify:simple`.
 **Dialect:** `deepseek` → payload `thinking`; `openai`/`glm`/`grok` → stock (no campi DeepSeek-only). `claude` = stub.
 Package `openai` vietato. SoT: `plan-audit/complete/sot_llm_multi_model_fallback.md` + skill `radar-quota-ledger`.
 

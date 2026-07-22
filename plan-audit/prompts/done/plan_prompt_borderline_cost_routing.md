@@ -2,7 +2,7 @@
 
 > **Stato: DONE** — analisi chiusa 2026-07-22; PO ha confermato TO-BE effort-split.  
 > **Esito:** BL resta su DeepSeek (non Gemini); target `LLM_BORDERLINE_REASONING_EFFORT=none` + escalate high.  
-> **Impl SoT:** [`../../active/plan_impl_borderline_effort_split.md`](../../active/plan_impl_borderline_effort_split.md)  
+> **Impl SoT:** [`../../complete/plan_impl_borderline_effort_split.md`](../../complete/plan_impl_borderline_effort_split.md)  
 > **Prompt Agent:** [`../active/agent_prompt_borderline_effort_split.md`](../active/agent_prompt_borderline_effort_split.md)  
 > **Branch:** `feature/upgrades`
 

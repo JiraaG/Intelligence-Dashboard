@@ -2,7 +2,7 @@
 
 > **Stato: ACTIVE** — ripresa / closeout dopo walkthrough (2026-07-22).  
 > **Uso:** incolla nella **stessa** chat Agent che ha già implementato R1–R12 (contesto vivo).  
-> **SoT:** [`../../active/plan_impl_borderline_effort_split.md`](../../active/plan_impl_borderline_effort_split.md)  
+> **SoT:** [`../../complete/plan_impl_borderline_effort_split.md`](../../complete/plan_impl_borderline_effort_split.md)  
 > **PO:** ancora **nessun git commit** finché non richiesto.
 
 ---
@@ -46,7 +46,7 @@
 Hai già implementato lo split (R1 effort per-call, `_borderline_chain`, docs parziali, requeue live con `none`). Un audit esterno ha trovato gap di completezza sotto. **Non** riscrivere il design. Chiudi C1–C12. **Nessun git commit**.
 
 ## Autorità
-1. `plan-audit/active/plan_impl_borderline_effort_split.md` §5–§9
+1. `plan-audit/complete/plan_impl_borderline_effort_split.md` §5–§9
 2. Questo closeout
 3. Skills requeue/docker/quota-ledger
 4. Sidebar freeze; schema immutabile

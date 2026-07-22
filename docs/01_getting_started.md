@@ -10,7 +10,7 @@ Guida per portare su **Radar Informativo Globale** con Docker. Fonte knobs: [`ra
 - RAM consigliata ≥ 4 GB
 - Porte host (compose base): **80** (frontend). Backend, DB e Miniflux restano interni.
 - Accesso rete a: feed RSS, API LLM (Gemini e/o OpenAI-compat: DeepSeek / OpenAI / GLM / Grok), tile/style mappa (Carto / MapLibre — renderer default **MapLibre** 3D-primary; Leaflet solo via `MAP_RENDERER`)
-- Ops tipico LLM: **Profilo B** in [`radar/.env.example`](../radar/.env.example) (DeepSeek-only) con `LLM_ROUTING_MODE=complexity` e `LLM_ROUTING_SHADOW=false`. **Profilo F (Local-Hybrid):** Ollama host + overlay `docker-compose.ollama-host.yml` — vedi [runbook § Local-Hybrid](../radar/docs/runbook.md) (include lifecycle VRAM / `OLLAMA_*` + `ops/verify-ollama-vram.sh`). Default codice boot-safe **senza** `.env`: `LLM_ROUTING_MODE=off` + `LLM_ROUTING_SHADOW=true` — copiare `.env.example` attiva già il profilo ops, non il default codice.
+- Ops tipico LLM: **Profilo B** in [`radar/.env.example`](../radar/.env.example) (DeepSeek-only) con `LLM_ROUTING_MODE=complexity` e `LLM_ROUTING_SHADOW=false`. Effort BORDERLINE: `LLM_BORDERLINE_REASONING_EFFORT` (example safe `high`; ops tipico post-GATE `none` + escalate `high`). **Profilo F (Local-Hybrid):** Ollama host + overlay `docker-compose.ollama-host.yml` — vedi [runbook § Local-Hybrid](../radar/docs/runbook.md) (include lifecycle VRAM / `OLLAMA_*` + `ops/verify-ollama-vram.sh`). Default codice boot-safe **senza** `.env`: `LLM_ROUTING_MODE=off` + `LLM_ROUTING_SHADOW=true` — copiare `.env.example` attiva già il profilo ops, non il default codice.
 
 Miniflux UI su host solo con overlay:
 
@@ -34,7 +34,7 @@ Categorie principali (dettaglio in `.env.example`):
 |------|--------|
 | Runtime | `RADAR_ENV`, `RADAR_TIME_ZONE` |
 | CORS | `CORS_ALLOW_ORIGINS` (vuoto in prod dietro Nginx; es. `http://localhost:4200` per `ng serve`) |
-| LLM | Lane `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (provider=`gemini`\|`deepseek`\|`openai`\|`glm`\|`grok`\|`claude` **stub**; model/RPM/TPM/RPD/budget; `0`=unmanaged); dialect OpenAI-compat: deepseek=`thinking`, openai/glm/grok=stock; soft-trim = `LLM_SIMPLE.rpd` se >0; **RPM/TPM wait stessa lane**; **RPD/cooldown → residual cross-lane**; free=RPM/RPD(+TPM), paid=BUDGET; legacy fill-gap; Profili A–F in `.env.example` + SoT LLM (F = Local-Hybrid Ollama host) |
+| LLM | Lane `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (provider=`gemini`\|`deepseek`\|`openai`\|`glm`\|`grok`\|`claude` **stub**; model/RPM/TPM/RPD/budget; `0`=unmanaged); BORDERLINE effort `LLM_BORDERLINE_REASONING_EFFORT` (default safe `high`, ops tipico `none`); dialect OpenAI-compat: deepseek=`thinking`, openai/glm/grok=stock; soft-trim = `LLM_SIMPLE.rpd` se >0; **RPM/TPM wait stessa lane**; **RPD/cooldown → residual cross-lane**; free=RPM/RPD(+TPM), paid=BUDGET; legacy fill-gap; Profili A–F in `.env.example` + SoT LLM (F = Local-Hybrid Ollama host) |
 | Worker | coda/concorrenza, `WORKER_POLL_INTERVAL_SECONDS` (default 900), heartbeat |
 | Miniflux | URL interno, API key, `MINIFLUX_LIMIT` (tipico **50**; `100` può superare `MAX_MINIFLUX_RESPONSE_BYTES=5MB`), timeout/byte caps |
 | Postgres | user/password/db, `DATABASE_URL` (Compose la costruisce in container con image `pgvector/pgvector:0.8.0-pg15`) |

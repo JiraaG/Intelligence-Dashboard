@@ -265,7 +265,7 @@ dialect `openai` = stock chat/completions (niente campi DeepSeek-only). Effort d
 | KPI | Banda | Fuori banda |
 |-----|-------|-------------|
 | Share COMPLEX (pre-call) | monitor | Con ops DeepSeek none/high tipicamente &lt;20% (G+L rari) |
-| Share BORDERLINE | monitor | Ora costa come COMPLEX (high); L-sola non gonfia più questa fascia |
+| Share BORDERLINE | monitor | Stesso `purpose=classify:complex`; effort da `LLM_BORDERLINE_REASONING_EFFORT` (ops tipico `none` + escalate `high`); L-sola non gonfia questa fascia |
 | Escalate / giorno | monitor | Spike → G debole o JSON fragile |
 | XX su lane SIMPLE | trend vs baseline | Se peggiora → rafforzare G |
 | USD DeepSeek / giorno | ≤ budget soft-cap | Soft-cap in `QuotaLedger` (`0` = off) |
@@ -485,7 +485,8 @@ Ops: edit `.env` → `docker compose up -d --build radar-worker` (o restart) →
 | Metrica | Attesa |
 |---------|--------|
 | Latenza p50 (Profilo B DeepSeek none) | Tipicamente bassa (non-thinking) |
-| Latenza p95 COMPLEX / BORDERLINE | +0.5–3s (`effort=high`) — ok worker async |
+| Latenza p95 COMPLEX | +0.5–3s (`effort=high`) — ok worker async |
+| Latenza p95 BORDERLINE | tipico bassa con ops `effort=none`; +0.5–3s solo su escalate `high` |
 | Costo @ 25% COMPLEX / 1500 art (paid DeepSeek) | **~$0.25–0.75/giorno** |
 | Mix | COMPLEX 20–40%, BORDERLINE 15–35% (osservabile con shadow 3g) |
 | Qualità | Meno ValidationError / meno XX “sbagliati” su pezzi multi-paese |
@@ -573,8 +574,8 @@ Poi: `docker compose up -d --build radar-worker` · VERIFY_IN_STUDIO · shadow 3
 Adottare design **complexity + lane env v2.2** (implementato; vedi remediation):
 
 1. Cascata provider/model **per lane** via env (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`).  
-2. DeepSeek Flash via **httpx** (no package `openai`): SIMPLE tipico `effort=none`; BORDERLINE/COMPLEX tipico `high`.  
-3. Lane = heuristic v2.2: L-sola→SIMPLE; 1 di {G,E,X}→BORDERLINE→**catena COMPLEX**; ≥2→COMPLEX.  
+2. DeepSeek Flash via **httpx** (no package `openai`): SIMPLE tipico `effort=none`; COMPLEX tipico `high`; BORDERLINE effort da `LLM_BORDERLINE_REASONING_EFFORT` (default safe `high`, target ops `none` + escalate `high`).  
+3. Lane = heuristic v2.2: L-sola→SIMPLE; 1 di {G,E,X}→BORDERLINE→**catena COMPLEX** (stesso provider/model, effort dedicato); ≥2→COMPLEX.  
 4. Shadow opzionale per calibrazione; KPI mix monitorati (non forzare 20–40% se feed corti).  
 5. Cooldown SQL `009`; ledger per `purpose=classify:{simple|complex}`.  
 6. Soft-cap budget USD se `BUDGET_USD_DAY` > 0; RPM/TPM/RPD tipicamente `0` su paid.

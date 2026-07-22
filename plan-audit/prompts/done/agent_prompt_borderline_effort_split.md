@@ -1,7 +1,7 @@
 # Agent prompt — BORDERLINE effort split (review R1–R12 + GATE requeue)
 
 > **Stato: ACTIVE** — usa **questo** prompt per l’implementazione (sostituisce il prompt corto precedente).  
-> **Piano SoT:** [`../../active/plan_impl_borderline_effort_split.md`](../../active/plan_impl_borderline_effort_split.md) — **obbligatorio §9 Review R1–R12**  
+> **Piano SoT:** [`../../complete/plan_impl_borderline_effort_split.md`](../../complete/plan_impl_borderline_effort_split.md) — **obbligatorio §9 Review R1–R12**  
 > **Branch:** `feature/upgrades`  
 > **Analisi:** [`../done/plan_prompt_borderline_cost_routing.md`](../done/plan_prompt_borderline_cost_routing.md)  
 > **PO:** nessun `git commit` / `git push` in questa wave.
@@ -27,7 +27,7 @@
 Pipeline engineer Radar. Implementa lo split effort BORDERLINE, applica le correzioni R1–R12, aggiorna docs/ECC, esegui pytest + requeue live end-to-end. Schema/prompt classify **immutabili**. Sidebar freeze. **Nessun git commit**.
 
 ## Autorità (ordine)
-1. `plan-audit/active/plan_impl_borderline_effort_split.md` (SoT) — incluso **§9 R1–R12**
+1. `plan-audit/complete/plan_impl_borderline_effort_split.md` (SoT) — incluso **§9 R1–R12**
 2. Questo prompt (chiusure operative)
 3. Skills: `radar-quota-ledger`, `llm-json-extraction`, `radar-requeue-ops`, `radar-docker-ops`
 4. SoT lane `plan-audit/complete/sot_llm_multi_model_fallback.md` §4 (aggiorna in place)
