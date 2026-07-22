@@ -14,11 +14,12 @@ Cartella di audit, prompt orchestratore e SoT del modulo Radar.
 * Fase I MapLibre 3D-primary — [`active/plan_impl_map_3d_globe.md`](active/plan_impl_map_3d_globe.md)
 * §3.J globo — [`active/plan_impl_map_globe_projection.md`](active/plan_impl_map_globe_projection.md)
 * Prompt ECC in `prompts/active/`
+* **Quote per-modello** — COMPLETE / GATE VERDE → [`complete/plan_impl_per_model_quota.md`](complete/plan_impl_per_model_quota.md) (prompt in `prompts/done/`)
 * **Metrics 013 FinOps** — COMPLETE / GATE VERDE → [`complete/plan_impl_fase_metrics_013.md`](complete/plan_impl_fase_metrics_013.md) (prompt verify-fix in `prompts/done/`)
 
 ## `complete/` — chiusi
 
-Vedi [`complete/README.md`](complete/README.md) (**Metrics 013 FinOps**, Phase 0–6, SoT LLM, Fase A Ollama, audit lane env, Fase B/H, archi UI, **W1 filtro nazioni Relazioni**, **Fase C semantic dedup**, Final Release, commenti, Notizie Salvate, playbook, ticket status, monorepo check).
+Vedi [`complete/README.md`](complete/README.md) (**Quote per-modello**, **Metrics 013 FinOps**, Phase 0–6, SoT LLM, Fase A Ollama, audit lane env, Fase B/H, archi UI, **W1 filtro nazioni Relazioni**, **Fase C semantic dedup**, Final Release, commenti, Notizie Salvate, playbook, ticket status, monorepo check).
 
 ## Layout
 
@@ -40,6 +41,8 @@ plan-audit/
 * [plan_prompt_map_3d_globe.md](prompts/active/plan_prompt_map_3d_globe.md) — mappa 3D / switch vs 3D-only (non eseguito)
 
 ## Prompt done (recente)
+
+* [agent_prompt_per_model_quota.md](prompts/done/agent_prompt_per_model_quota.md) — **Quote per-modello** (failover L1 pool separati; GATE live 3.5 vs 3.1 2026-07-22)
 
 * [agent_prompt_fase_metrics_013_verify_fix.md](prompts/done/agent_prompt_fase_metrics_013_verify_fix.md) — **Metrics 013 micro-fix** (verify ledger scoped + rebuild + STATUS → GREEN onesto)
 * [agent_prompt_fase_metrics_013_gate_closeout.md](prompts/done/agent_prompt_fase_metrics_013_gate_closeout.md) — closeout YELLOW→GREEN (funzionale; verify ancora da scoped)

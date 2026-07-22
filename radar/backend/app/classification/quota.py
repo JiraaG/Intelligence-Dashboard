@@ -215,6 +215,10 @@ class QuotaLedger:
             LANE_SIMPLE: simple_limits,
             LANE_COMPLEX: complex_limits,
         }
+        self._lane_configs = {
+            LANE_SIMPLE: simple_cfg,
+            LANE_COMPLEX: complex_cfg,
+        }
         self._tz = time_zone
         self._tz_name = time_zone_name
         self._sleep: SleepFn = sleep or asyncio.sleep
@@ -245,6 +249,22 @@ class QuotaLedger:
             c.budget_usd_day,
             time_zone_name,
         )
+
+    def _limits_for(self, lane: str, model: str | None = None) -> _LaneLimits:
+        """Restituisce i limiti _LaneLimits per lane e modello (default lane o override model_limits)."""
+        norm_lane = _normalize_lane(lane)
+        cfg = self._lane_configs.get(norm_lane)
+        base = self._limits.get(norm_lane, self._limits[LANE_SIMPLE])
+        if model and cfg and model in cfg.model_limits:
+            rpm, tpm, rpd = cfg.model_limits[model]
+            return _LaneLimits(
+                rpm=rpm,
+                tpm=tpm,
+                rpd=rpd,
+                budget_usd_day=base.budget_usd_day,
+                usd_per_1m_tokens=base.usd_per_1m_tokens,
+            )
+        return base
 
     def min_interval_seconds(self, lane: str = LANE_SIMPLE) -> float:
         """Intervallo minimo tra reserve in-process (``60/rpm``); ``0`` se RPM unmanaged."""
@@ -498,7 +518,7 @@ class QuotaLedger:
         Raises:
             QuotaBudgetExceeded / QuotaDailyExceeded (non ritornano wait).
         """
-        limits = self._limits[lane]
+        limits = self._limits_for(lane, model)
         purpose_exact = purpose_for_lane(lane)
         cost_est = estimate_usd(estimated_tokens, limits.usd_per_1m_tokens)
 
@@ -541,11 +561,13 @@ class QuotaLedger:
                         WHERE created_at > $1
                           AND status = ANY($2::text[])
                           AND (lane = $3 OR (lane IS NULL AND purpose = $4))
+                          AND ($5::text IS NULL OR model = $5)
                         """,
                         window_start,
                         list(_ACTIVE_STATUSES),
                         lane,
                         purpose_exact,
+                        model,
                     )
                     if int(rpm_count or 0) >= limits.rpm:
                         oldest = await conn.fetchval(
@@ -555,11 +577,13 @@ class QuotaLedger:
                             WHERE created_at > $1
                               AND status = ANY($2::text[])
                               AND (lane = $3 OR (lane IS NULL AND purpose = $4))
+                              AND ($5::text IS NULL OR model = $5)
                             """,
                             window_start,
                             list(_ACTIVE_STATUSES),
                             lane,
                             purpose_exact,
+                            model,
                         )
                         wait = 0.5
                         if oldest is not None:
@@ -580,11 +604,13 @@ class QuotaLedger:
                         WHERE created_at > $1
                           AND status = ANY($2::text[])
                           AND (lane = $3 OR (lane IS NULL AND purpose = $4))
+                          AND ($5::text IS NULL OR model = $5)
                         """,
                         window_start,
                         list(_ACTIVE_STATUSES),
                         lane,
                         purpose_exact,
+                        model,
                     )
                     if int(token_sum or 0) + estimated_tokens > limits.tpm:
                         oldest = await conn.fetchval(
@@ -594,11 +620,13 @@ class QuotaLedger:
                             WHERE created_at > $1
                               AND status = ANY($2::text[])
                               AND (lane = $3 OR (lane IS NULL AND purpose = $4))
+                              AND ($5::text IS NULL OR model = $5)
                             """,
                             window_start,
                             list(_ACTIVE_STATUSES),
                             lane,
                             purpose_exact,
+                            model,
                         )
                         wait = 0.5
                         if oldest is not None:
@@ -617,18 +645,20 @@ class QuotaLedger:
                           AND created_at < $2
                           AND status = ANY($3::text[])
                           AND (lane = $4 OR (lane IS NULL AND purpose = $5))
+                          AND ($6::text IS NULL OR model = $6)
                         """,
                         day_start,
                         day_end,
                         list(_ACTIVE_STATUSES),
                         lane,
                         purpose_exact,
+                        model,
                     )
                     if int(rpd_count or 0) >= limits.rpd:
                         # Non sleep fino al rollover: sblocca ClassificationClient
                         # per residual sull'altra lane. RPM/TPM invece attendono.
                         raise QuotaDailyExceeded(
-                            f"lane={lane} RPD={limits.rpd} exhausted "
+                            f"lane={lane} model={model or 'default'} RPD={limits.rpd} exhausted "
                             f"(until day_end={day_end.isoformat()})"
                         )
 

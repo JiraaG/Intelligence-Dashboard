@@ -156,11 +156,14 @@ class FakeConnection:
 
         if "SUM(COALESCE" in q:
             statuses = set(next((a for a in args if isinstance(a, (list, tuple, set))), ["reserved", "completed", "failed"]))
+            target_model = args[-1] if ("model =" in q or "model = $" in q) and isinstance(args[-1], str) else None
             total = 0
             if "created_at >=" in q and "created_at <" in q:
                 day_start, day_end = args[0], args[1]
                 for row in self._store.rows.values():
                     if not (day_start <= row.created_at < day_end and row.status in statuses):
+                        continue
+                    if target_model is not None and row.model != target_model:
                         continue
                     total += (
                         row.actual_tokens
@@ -172,6 +175,8 @@ class FakeConnection:
             for row in self._store.rows.values():
                 if not (row.created_at > window_start and row.status in statuses):
                     continue
+                if target_model is not None and row.model != target_model:
+                    continue
                 total += (
                     row.actual_tokens
                     if row.actual_tokens is not None
@@ -181,20 +186,27 @@ class FakeConnection:
 
         if "MIN(created_at)" in q:
             statuses = set(next((a for a in args if isinstance(a, (list, tuple, set))), ["reserved", "completed", "failed"]))
+            target_model = args[-1] if ("model =" in q or "model = $" in q) and isinstance(args[-1], str) else None
             window_start = args[0]
             times = [
                 row.created_at
                 for row in self._store.rows.values()
                 if row.created_at > window_start
                 and row.status in statuses
+                and (target_model is None or row.model == target_model)
             ]
             return min(times) if times else None
 
         if "COUNT(*)" in q:
             statuses = set(next((a for a in args if isinstance(a, (list, tuple, set))), ["reserved", "completed", "failed"]))
+            target_model = args[-1] if ("model =" in q or "model = $" in q) and isinstance(args[-1], str) else None
 
             def _match(row: _Row) -> bool:
-                return row.status in statuses
+                if row.status not in statuses:
+                    return False
+                if target_model is not None and row.model != target_model:
+                    return False
+                return True
 
             if "created_at >=" in q and "created_at <" in q:
                 day_start, day_end = args[0], args[1]
@@ -276,6 +288,8 @@ def _ledgers(
     deepseek_tpm: int = 0,
     deepseek_rpd: int = 0,
     deepseek_budget_usd_day: float = 0.0,
+    simple: LlmLaneConfig | None = None,
+    complex_lane: LlmLaneConfig | None = None,
 ) -> tuple[InMemoryLedgerStore, FakePool, ControllableClock, list[QuotaLedger]]:
     clock = clock or ControllableClock()
     store = InMemoryLedgerStore(utc_now=clock.utc_now)
@@ -284,6 +298,8 @@ def _ledgers(
     ledgers = [
         QuotaLedger(
             pool,
+            simple=simple,
+            complex_lane=complex_lane,
             rpm=rpm,
             tpm=tpm,
             rpd=rpd,
@@ -575,7 +591,7 @@ async def test_gemini_and_deepseek_rpd_independent() -> None:
 
     rid = await asyncio.wait_for(
         ledger.reserve(
-            estimated_tokens=1,
+            estimated_tokens=1000,
             model="deepseek-v4-flash",
             lane="complex",
         ),
@@ -613,3 +629,110 @@ async def test_deepseek_budget_raises_when_exceeded() -> None:
             model="deepseek-v4-flash",
             lane="complex",
         )
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_per_model_quota_separation() -> None:
+    """Stessa lane (simple), due modelli, RPD=1 ciascuno: A esausto non blocca B."""
+    from app.core.llm_lanes import LlmLaneConfig, parse_model_limits
+    simple_cfg = LlmLaneConfig(
+        lane="simple",
+        provider="gemini",
+        model="gemini-3.5-flash-lite",
+        api_key="test-key",
+        base_url="",
+        rpm=10,
+        tpm=0,
+        rpd=1,
+        budget_usd_day=0.0,
+        usd_per_1m_tokens=0.0,
+        timeout=60.0,
+        reasoning_effort="high",
+        fallbacks=("gemini-3.1-flash-lite",),
+        model_limits=parse_model_limits("gemini-3.5-flash-lite:10:0:1,gemini-3.1-flash-lite:10:0:1"),
+    )
+    store, _pool, _clock, (ledger,) = _ledgers(
+        rpm=10,
+        tpm=0,
+        rpd=1,
+        n=1,
+        simple=simple_cfg,
+    )
+    # Reserve per model A (3.1)
+    rid1 = await ledger.reserve(
+        estimated_tokens=1, model="gemini-3.1-flash-lite", lane="simple"
+    )
+    assert rid1 > 0
+
+    # Secondo reserve per model A -> QuotaDailyExceeded
+    with pytest.raises(QuotaDailyExceeded) as exc_info:
+        await ledger.reserve(
+            estimated_tokens=1, model="gemini-3.1-flash-lite", lane="simple"
+        )
+    assert "gemini-3.1-flash-lite" in str(exc_info.value)
+
+    # Reserve per model B (3.5) -> OK (pool indipendente)
+    rid2 = await ledger.reserve(
+        estimated_tokens=1, model="gemini-3.5-flash-lite", lane="simple"
+    )
+    assert rid2 > 0
+
+
+@pytest.mark.unit
+def test_model_limits_override_and_fail_fast() -> None:
+    """Parse MODEL_LIMITS CSV valid e fail-fast su malformato (R4)."""
+    from app.core.llm_lanes import LlmConfigError, LlmLaneConfig, limits_for_model, parse_model_limits
+
+    raw = "gemini-3.5-flash-lite:12:250000:500,gemini-3.1-flash-lite:12:250000:450"
+    parsed = parse_model_limits(raw)
+    assert parsed["gemini-3.5-flash-lite"] == (12, 250000, 500)
+    assert parsed["gemini-3.1-flash-lite"] == (12, 250000, 450)
+
+    cfg = LlmLaneConfig(
+        lane="simple",
+        provider="gemini",
+        model="gemini-3.5-flash-lite",
+        api_key="key",
+        base_url="",
+        rpm=10,
+        tpm=0,
+        rpd=300,
+        budget_usd_day=0.0,
+        usd_per_1m_tokens=0.0,
+        timeout=60.0,
+        reasoning_effort="high",
+        fallbacks=("gemini-3.1-flash-lite",),
+        model_limits=parsed,
+    )
+    assert limits_for_model(cfg, "gemini-3.5-flash-lite") == (12, 250000, 500)
+    assert limits_for_model(cfg, "gemini-3.1-flash-lite") == (12, 250000, 450)
+    assert limits_for_model(cfg, "other-model") == (10, 0, 300)
+
+    # Fail-fast su malformato
+    for bad in [
+        "invalid_format",
+        "model:12:250000",
+        "model:12:abc:500",
+        "model:-1:250000:500",
+        ":12:250000:500",
+    ]:
+        with pytest.raises(LlmConfigError):
+            parse_model_limits(bad)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_unmanaged_rpd_zero() -> None:
+    """rpd=0 unmanaged: nessuna QuotaDailyExceeded da RPD (R3)."""
+    store, _pool, _clock, (ledger,) = _ledgers(
+        rpm=0,
+        tpm=0,
+        rpd=0,
+        n=1,
+    )
+    for _ in range(5):
+        rid = await ledger.reserve(
+            estimated_tokens=1, model="unmanaged-model", lane="simple"
+        )
+        assert rid > 0

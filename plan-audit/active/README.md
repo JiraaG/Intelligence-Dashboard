@@ -14,16 +14,10 @@ Questa directory contiene i piani di progettazione e di implementazione attualme
 
 **Completati di recente (riferimento)**
 
-- **Metrics 013 — FinOps / diagnostica** — [`../complete/plan_impl_fase_metrics_013.md`](../complete/plan_impl_fase_metrics_013.md) (**GATE VERDE** 2026-07-22; strict verify scoped 48h, denorm 14 campi, ledger linkage, API metrics).
-- **Fase C — Dedup semantica + quality balanced** — [`../complete/plan_impl_fase_C_semantic_dedup.md`](../complete/plan_impl_fase_C_semantic_dedup.md) (**GATE VERDE** 2026-07-22; prompts: [`../prompts/done/plan_prompt_fase_C_semantic_dedup.md`](../prompts/done/plan_prompt_fase_C_semantic_dedup.md), [`../prompts/done/agent_prompt_fase_C_semantic_dedup.md`](../prompts/done/agent_prompt_fase_C_semantic_dedup.md)).
-- **Fix fasce tipologia (isole + anti-bleed)** — [`../complete/plan_impl_map_category_fills_islands.md`](../complete/plan_impl_map_category_fills_islands.md) (GATE VERDE 2026-07-21; `polygon-clipping` terra∩strip).
-- **Relazioni Wave 1 — filtro nazioni** — [`../complete/plan_impl_map_relations_nation_filter.md`](../complete/plan_impl_map_relations_nation_filter.md) (GATE VERDE 2026-07-20; toolbar **RELAZIONI ATTIVE**).
-- **Fase A — LLM locale AMD / Ollama** — [`../complete/plan_impl_fase_A_local_amd_ollama.md`](../complete/plan_impl_fase_A_local_amd_ollama.md) (`54c8038` / VRAM `2996625`; scorecard opz.).
-- **Audit LLM env topology** — [`../complete/audit_llm_lane_env_generalization.md`](../complete/audit_llm_lane_env_generalization.md) (`c9ef842`).
-- **Archi multicolore + click bilaterale** — [`../complete/plan_archi_hatching_multicolor.md`](../complete/plan_archi_hatching_multicolor.md) (GATE VERDE 2026-07-18; MapLibre solidi `0d942ed`).
-- **Fase H (Grafo Geospaziale)** — [`../complete/master_plan_impl_phase_H_geospatial_graph.md`](../complete/master_plan_impl_phase_H_geospatial_graph.md).
-- **Fase B (Real-Time / SSE)** — in [`../complete/`](../complete/).
-
-Roadmap parallela (`radar_overview_and_upgrades.md` §3): **Fase C — Deduplicazione semantica (`pgvector`)** — **COMPLETE / GATE VERDE** 2026-07-22.
+- **Quote per-modello (FALLBACKS pool separati)** — [`../complete/plan_impl_per_model_quota.md`](../complete/plan_impl_per_model_quota.md) (**GATE VERDE** 2026-07-22; prompt in `../prompts/done/`).
+- **Metrics 013 — FinOps / diagnostica** — [`../complete/plan_impl_fase_metrics_013.md`](../complete/plan_impl_fase_metrics_013.md) (**GATE VERDE** 2026-07-22).
+- **Fase C — Dedup semantica + quality balanced** — [`../complete/plan_impl_fase_C_semantic_dedup.md`](../complete/plan_impl_fase_C_semantic_dedup.md) (**GATE VERDE** 2026-07-22).
+- **Fix fasce tipologia (isole + anti-bleed)** — [`../complete/plan_impl_map_category_fills_islands.md`](../complete/plan_impl_map_category_fills_islands.md) (GATE VERDE 2026-07-21).
+- **Relazioni Wave 1 — filtro nazioni** — [`../complete/plan_impl_map_relations_nation_filter.md`](../complete/plan_impl_map_relations_nation_filter.md) (GATE VERDE 2026-07-20).
 
 Quadro globale: [`../STATUS.md`](../STATUS.md).

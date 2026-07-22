@@ -23,7 +23,7 @@ SoT:
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Mapping
 
 LLM_PROVIDERS = frozenset({"gemini", "deepseek", "openai", "glm", "grok", "claude"})
@@ -86,6 +86,7 @@ class LlmLaneConfig:
     timeout: float
     reasoning_effort: str
     fallbacks: tuple[str, ...]
+    model_limits: dict[str, tuple[int, int, int]] = field(default_factory=dict)
 
     @property
     def available(self) -> bool:
@@ -110,6 +111,57 @@ class LlmLaneConfig:
             if fb and fb not in out:
                 out.append(fb)
         return tuple(out)
+
+
+def limits_for_model(lane_cfg: LlmLaneConfig, model: str | None) -> tuple[int, int, int]:
+    """Limiti (rpm, tpm, rpd) per un modello specifico in una lane.
+
+    Se ``model`` ha un override in ``lane_cfg.model_limits``, restituisce quel trio.
+    Altrimenti restituisce i default di lane ``(lane_cfg.rpm, lane_cfg.tpm, lane_cfg.rpd)``.
+    """
+    if model and model in lane_cfg.model_limits:
+        return lane_cfg.model_limits[model]
+    return (lane_cfg.rpm, lane_cfg.tpm, lane_cfg.rpd)
+
+
+def parse_model_limits(raw: str | None) -> dict[str, tuple[int, int, int]]:
+    """Parse CSV di override limiti per modello: ``model:rpm:tpm:rpd,model2:...``.
+
+    Returns:
+        Dizionario ``{model_name: (rpm, tpm, rpd)}``.
+    Raises:
+        LlmConfigError: formato non valido o interi negativi (fail-fast R4).
+    """
+    if not raw or not raw.strip():
+        return {}
+    limits: dict[str, tuple[int, int, int]] = {}
+    for part in raw.split(","):
+        part_str = part.strip()
+        if not part_str:
+            continue
+        tokens = part_str.split(":")
+        if len(tokens) != 4:
+            raise LlmConfigError(
+                f"MODEL_LIMITS entry {part_str!r} must be format 'model:rpm:tpm:rpd'"
+            )
+        model_name, rpm_s, tpm_s, rpd_s = tokens
+        model_name = model_name.strip()
+        if not model_name:
+            raise LlmConfigError(f"MODEL_LIMITS entry {part_str!r} has empty model name")
+        try:
+            rpm = int(rpm_s.strip())
+            tpm = int(tpm_s.strip())
+            rpd = int(rpd_s.strip())
+        except ValueError as exc:
+            raise LlmConfigError(
+                f"MODEL_LIMITS entry {part_str!r} contains non-integer limits"
+            ) from exc
+        if rpm < 0 or tpm < 0 or rpd < 0:
+            raise LlmConfigError(
+                f"MODEL_LIMITS entry {part_str!r} limits must be >= 0"
+            )
+        limits[model_name] = (rpm, tpm, rpd)
+    return limits
 
 
 def normalize_provider(raw: str | None, *, default: str) -> str:
@@ -422,6 +474,9 @@ def load_lane(
         _csv_models(fallbacks_raw) if fallbacks_raw is not None else fallbacks_default
     )
 
+    model_limits_raw = _env_raw(f"{prefix}_MODEL_LIMITS")
+    model_limits = parse_model_limits(model_limits_raw)
+
     return LlmLaneConfig(
         lane=lane,
         provider=provider,
@@ -436,6 +491,7 @@ def load_lane(
         timeout=timeout,
         reasoning_effort=effort,
         fallbacks=fallbacks,
+        model_limits=model_limits,
     )
 
 

@@ -20,16 +20,8 @@ version: 2.3.1
 
 `LLM_RPM` / `DEEPSEEK_RPM` = **legacy alias** (default se il campo lane e assente). Non sono un tetto globale shared.
 
-Worker soft-trim usa solo `LLM_SIMPLE.rpd` (se > 0) — indipendente dal provider della lane SIMPLE.
-
-| Tipo | Vincolo | Semantica |
-|------|---------|-----------|
-| Free (es. Gemini Studio) | RPM + RPD (+ TPM se >0) | `*_RPM` / `*_TPM` / `*_RPD` > 0 |
-| Paid (es. DeepSeek) | Credito / soft-cap | `*_RPM`/`*_RPD` = 0 + `*_BUDGET_USD_DAY` |
-
-RPM/TPM pieni → attesa sulla **stessa** lane (no cross). **RPD esaurita** → `QuotaDailyExceeded` → cooldown + residual cross-lane.
-
-- Gemini same-provider `LLM_SIMPLE_FALLBACKS` condividono i contatori `LLM_SIMPLE_*` (lane ledger). Free tier Studio **per modello** ≠ RPD Radar per lane.
+- Ciascun modello della catena (primary e FALLBACKS) eredita il default di lane `LLM_SIMPLE_*` (o override `LLM_SIMPLE_MODEL_LIMITS`) con contatori e pool RPD **indipendenti per modello**.
+- Soft-trim worker: calcola il residuo RPD di ciascun modello gestito nella catena SIMPLE. Ibberna il ciclo solo se **tutti** i modelli SIMPLE gestiti sono esausti e non c'è residual COMPLEX.
 
 Residual cross-lane fattura `ref.quota_lane` (SIMPLE↔COMPLEX se identity diversa).
 

@@ -775,11 +775,31 @@ async def _entry_consumer(
             queue.task_done()
 
 
-async def _ledger_simple_rpd_used(pool: asyncpg.Pool) -> int:
-    """Conta righe ledger attive della lane SIMPLE nel giorno half-open ``RADAR_TIME_ZONE``.
+async def _ledger_model_rpd_used(pool: asyncpg.Pool, model: str) -> int:
+    """Conta righe ledger attive per un modello specifico nel giorno half-open RADAR_TIME_ZONE."""
+    day_start, day_end = compute_day_window(datetime.now(timezone.utc), RADAR_TIME_ZONE)
+    async with pool.acquire() as conn:
+        used = await conn.fetchval(
+            """
+            SELECT COUNT(*)::INT
+            FROM llm_request_ledger
+            WHERE created_at >= $1
+              AND created_at < $2
+              AND status = ANY($3::text[])
+              AND model = $4
+            """,
+            day_start,
+            day_end,
+            ["reserved", "completed", "failed"],
+            model,
+        )
+    return int(used or 0)
 
-    Preferisce ``purpose=classify:simple``; fallback legacy su model non-DeepSeek
-    (ledger pre-generalizzazione). Non usa ``COUNT(*)`` su ``articles``.
+
+async def _ledger_simple_rpd_used(pool: asyncpg.Pool) -> int:
+    """Conta righe ledger attive della lane SIMPLE nel giorno half-open RADAR_TIME_ZONE.
+
+    Mantenuto per retrocompatibilità e patch nei test.
     """
     day_start, day_end = compute_day_window(datetime.now(timezone.utc), RADAR_TIME_ZONE)
     async with pool.acquire() as conn:
@@ -806,11 +826,12 @@ async def _ledger_simple_rpd_used(pool: asyncpg.Pool) -> int:
 
 
 async def run_pipeline_cycle(state: WorkerState) -> None:
-    """Un ciclo ingest: reconcile → soft-trim SIMPLE.rpd → fetch → coda + N consumer.
+    """Un ciclo ingest: reconcile → soft-trim catena SIMPLE → fetch → coda + N consumer.
 
     Mai ``TaskGroup`` su tutte le entry. Hard RPM/TPM/RPD restano in
-    ``QuotaLedger.reserve`` per-lane. Soft-trim: ``simple_rpd==0`` = off;
-    pieno senza residual COMPLEX → iberna ciclo; con residual → bypass failover.
+    ``QuotaLedger.reserve`` per-model. Soft-trim: ``rpd==0`` = unmanaged (off);
+    tutti i modelli SIMPLE esauriti senza residual COMPLEX → iberna ciclo;
+    con residual → bypass failover. Lot reduction usa la somma dei residui catena.
     """
     assert state.db_pool is not None
     assert state.miniflux_client is not None
@@ -819,12 +840,31 @@ async def run_pipeline_cycle(state: WorkerState) -> None:
 
     await reconcile_outbox(state.db_pool, state.miniflux_client)
 
-    # Soft-trim solo sulla lane SIMPLE (LLM_SIMPLE_RPD). 0 = nessun soft-trim.
-    # Hard RPM/TPM/RPD restano in QuotaLedger.reserve(lane=...) per entrambe le lane.
-    # Se esiste residual COMPLEX distinto, NON ibernare: per-articolo QuotaDailyExceeded
-    # / cooldown fa failover sull'altra lane (entrambi i modelli restano utilizzabili).
-    simple_rpd = LLM_SIMPLE.rpd
-    processed_today = await _ledger_simple_rpd_used(state.db_pool)
+    # Soft-trim per-model sulla catena SIMPLE (LLM_SIMPLE.models).
+    # RPD=0 su un modello = unmanaged (soft-trim off per quel modello).
+    from app.core.llm_lanes import limits_for_model
+
+    simple_models = LLM_SIMPLE.models
+    model_caps: dict[str, int] = {}
+    model_used: dict[str, int] = {}
+    model_residuals: dict[str, int] = {}
+    any_unmanaged = False
+    total_simple_residual = 0
+
+    for m in simple_models:
+        _rpm_cap, _tpm_cap, rpd_cap = limits_for_model(LLM_SIMPLE, m)
+        model_caps[m] = rpd_cap
+        if rpd_cap == 0:
+            any_unmanaged = True
+        else:
+            used = await _ledger_model_rpd_used(state.db_pool, m)
+            model_used[m] = used
+            res = max(0, rpd_cap - used)
+            model_residuals[m] = res
+            total_simple_residual += res
+
+    simple_has_residual = any_unmanaged or (total_simple_residual > 0)
+
     has_complex_residual = (
         LLM_ROUTING_MODE == "complexity"
         and (
@@ -833,20 +873,26 @@ async def run_pipeline_cycle(state: WorkerState) -> None:
             or LLM_SIMPLE.reasoning_effort != LLM_COMPLEX.reasoning_effort
         )
     )
-    if simple_rpd > 0 and processed_today >= simple_rpd and not has_complex_residual:
+
+    if not simple_has_residual and not has_complex_residual:
+        summary_str = ", ".join(
+            f"{m}:{model_used.get(m, 0)}/{model_caps.get(m, 0)}" for m in simple_models
+        )
         logger.warning(
-            "LIMITE RPD LANE SIMPLE RAGGIUNTO (ledger): %s/%s tentativi oggi (tz window). "
+            "LIMITE RPD CATENA SIMPLE RAGGIUNTO (ledger): tutti i modelli SIMPLE esauriti (%s). "
             "Ciclo in ibernazione (nessun residual COMPLEX distinto).",
-            processed_today,
-            simple_rpd,
+            summary_str,
         )
         return
-    if simple_rpd > 0 and processed_today >= simple_rpd and has_complex_residual:
+
+    if not simple_has_residual and has_complex_residual:
+        summary_str = ", ".join(
+            f"{m}:{model_used.get(m, 0)}/{model_caps.get(m, 0)}" for m in simple_models
+        )
         logger.warning(
-            "LIMITE RPD LANE SIMPLE RAGGIUNTO (ledger): %s/%s — soft-trim bypass: "
-            "residual COMPLEX disponibile (%s/%s); ciclo prosegue per failover.",
-            processed_today,
-            simple_rpd,
+            "LIMITE RPD CATENA SIMPLE RAGGIUNTO (ledger): tutti i modelli SIMPLE esauriti (%s) — "
+            "soft-trim bypass: residual COMPLEX disponibile (%s/%s); ciclo prosegue per failover.",
+            summary_str,
             LLM_COMPLEX.provider,
             LLM_COMPLEX.model,
         )
@@ -856,15 +902,15 @@ async def run_pipeline_cycle(state: WorkerState) -> None:
         logger.info("Nessun articolo non letto presente in Miniflux.")
         return
 
-    if simple_rpd > 0 and not has_complex_residual:
-        remaining_rpd = simple_rpd - processed_today
-        if remaining_rpd > 0 and len(entries) > remaining_rpd:
+    if not any_unmanaged and not has_complex_residual and total_simple_residual > 0:
+        if len(entries) > total_simple_residual:
             logger.info(
-                "Riduzione lotto da %d a %d per soft-trim RPD lane SIMPLE.",
+                "Riduzione lotto da %d a %d per soft-trim RPD catena SIMPLE (residuo catena: %d).",
                 len(entries),
-                remaining_rpd,
+                total_simple_residual,
+                total_simple_residual,
             )
-            entries = entries[:remaining_rpd]
+            entries = entries[:total_simple_residual]
 
     queue: asyncio.Queue = asyncio.Queue(maxsize=WORKER_QUEUE_DEPTH)
     results: dict[str, int] = {"success": 0, "failure": 0}

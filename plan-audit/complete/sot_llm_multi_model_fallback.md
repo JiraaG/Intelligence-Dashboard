@@ -129,7 +129,7 @@ Probe su **2492** articoli post-classificazione (`radar/vault/**/*.md`):
 | C5 | “Alzare budget char” su DeepSeek | **Vietato in v1** — stesso `content[:4000]` su tutte le lane |
 | C6 | Escalate BORDERLINE al *primo* ValidationError | **Dopo 1 correction fallita** (evita pagare glitch JSON transienti) |
 | C7 | XX=fallimento assoluto | XX KPI secondario; pezzi internazionali legittimi restano XX |
-| C8 | `LLM_RPD` globale vs Lite~1000 | v1: globale **1400**; soft-trim non deve spingere Lite oltre RPD Studio VERIFY; fase 2: cap per-model |
+| C8 | `LLM_RPD` globale vs Lite~1000 | **Implementato**: contatori per-modello RPM/TPM/RPD con pool separati, default lane + `MODEL_LIMITS` CSV, 0=unmanaged |
 | C9 | Groq in shortlist esterna | **Fuori catena v1** (TPM 6–30K stretto); opzionale fase 2 |
 | C10 | Documenti multipli divergenti | Questo file = SoT unica |
 
