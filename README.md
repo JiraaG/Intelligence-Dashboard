@@ -31,7 +31,7 @@ Knobs LLM / Profili A–F: [`radar/.env.example`](radar/.env.example) + SoT [`so
 **Profilo F (Local-Hybrid):** Ollama host + overlay [`radar/docker-compose.ollama-host.yml`](radar/docker-compose.ollama-host.yml) — runbook [`radar/docs/runbook.md`](radar/docs/runbook.md) § Local-Hybrid (VRAM: unload a idle via `OLLAMA_*` / `ops/verify-ollama-vram.sh`).  
 **Limiti lane:** RPM/TPM pieni → attesa stessa lane; RPD/cooldown → residual cross-lane (es. Flash Lite → DeepSeek). Dettaglio: SoT §0 + skill `radar-quota-ledger`.
 
-**Routing LLM:** `.env.example` ops tipico = **Profilo B** + `LLM_ROUTING_MODE=complexity`. Default codice boot-safe (senza env) = `LLM_ROUTING_MODE=off` + `LLM_ROUTING_SHADOW=true` — non confondere i due. Local-Hybrid = **Profilo F** (SIMPLE Ollama / COMPLEX cloud).
+**Routing LLM:** `.env.example` ops tipico = **Profilo B** + `LLM_ROUTING_MODE=complexity`. Effort BORDERLINE configurabile via `LLM_BORDERLINE_REASONING_EFFORT` (default safe `high`, target ops `none` con escalate `high` su `ValidationError`). Default codice boot-safe (senza env) = `LLM_ROUTING_MODE=off` + `LLM_ROUTING_SHADOW=true` — non confondere i due. Local-Hybrid = **Profilo F** (SIMPLE Ollama / COMPLEX cloud).
 
 **Miniflux / PC nuovo / backup:** seed in [`radar/config/`](radar/config/); dettaglio §6 [docs/01_getting_started.md](docs/01_getting_started.md) + [radar/ops/README.md](radar/ops/README.md). Backup config-first: `./ops/backup-postgres.sh` (senza vault di default).
 

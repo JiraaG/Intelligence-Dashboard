@@ -108,7 +108,7 @@ L'algoritmo **Heuristic Complexity v2.2** determina la lane corretta analizzando
    * Se famiglia $N$ attiva e nessuna altra: `lane = SIMPLE`.
    * Se l'unica famiglia attiva è $L$: `lane = SIMPLE` (la sola lunghezza non rappresenta un rischio di rottura dello schema).
    * Se sono attive $\ge 2$ famiglie qualsiasi tra $\{G, E, L, X\}$: `lane = COMPLEX`.
-   * Se è attiva esattamente 1 famiglia forte tra $\{G, E, X\}$: `lane = BORDERLINE` (che esegue la catena `LLM_COMPLEX` con effort high).
+   * Se è attiva esattamente 1 famiglia forte tra $\{G, E, X\}$: `lane = BORDERLINE` (che esegue la catena `LLM_COMPLEX` con effort da `LLM_BORDERLINE_REASONING_EFFORT`, default `high`, target ops `none`).
    * Altrimenti: `lane = SIMPLE`.
 
 ```mermaid

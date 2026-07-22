@@ -200,3 +200,24 @@ def test_load_lane_openai(clean_lane_env: None, monkeypatch: pytest.MonkeyPatch)
     assert lane.provider == "openai"
     assert lane.api_dialect == API_DIALECT_OPENAI
     assert lane.model == "gpt-4.1-mini"
+
+
+def test_client_build_payload_effort_override() -> None:
+    """R1 check: DeepSeekClient.build_payload accepts per-call effort parameter."""
+    ds_client = DeepSeekClient(
+        api_key="sk-test",
+        base_url="https://api.deepseek.com",
+        model="deepseek-v4-flash",
+        effort="high",
+        api_dialect="deepseek",
+    )
+    body_default = ds_client.build_payload(model="deepseek-v4-flash", system="s", user="u")
+    assert body_default["thinking"] == {"type": "enabled"}
+    assert body_default["reasoning_effort"] == "high"
+
+    body_none = ds_client.build_payload(
+        model="deepseek-v4-flash", system="s", user="u", effort="none"
+    )
+    assert body_none["thinking"] == {"type": "disabled"}
+    assert "reasoning_effort" not in body_none
+    assert body_none["max_tokens"] == 2048

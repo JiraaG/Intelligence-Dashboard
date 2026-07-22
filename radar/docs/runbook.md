@@ -68,7 +68,10 @@ Sintomi: log worker con wait/`429`/`Retry-After`; pochi articoli nuovi; ready pu
 - Cooldown 24h hard-fail: tabella `llm_model_cooldown` (`LLM_MODEL_COOLDOWN_HOURS`) — **non** per 429 brevi con Retry-After
 - Routing: `LLM_ROUTING_MODE=complexity` + lane env:
   - `LLM_SIMPLE_PROVIDER` / `LLM_SIMPLE_MODEL` (lane SIMPLE only — effort tipico `none`)
-  - `LLM_COMPLEX_PROVIDER` / `LLM_COMPLEX_MODEL` (BORDERLINE + COMPLEX + escalate — effort tipico `high`)
+  - `LLM_COMPLEX_PROVIDER` / `LLM_COMPLEX_MODEL` (BORDERLINE + COMPLEX + escalate — effort `LLM_BORDERLINE_REASONING_EFFORT` su BL, `LLM_COMPLEX_REASONING_EFFORT` su COMPLEX)
+  - `LLM_BORDERLINE_REASONING_EFFORT` (effort dedicato per heuristic BORDERLINE sulla catena COMPLEX; default safe `high`; target ops post dual-run `none`. Valori: `none` | `high` | `max`; alias `off`/`disabled` → `none`; `low`/`medium` → `high` + warning log)
+  - Escalate: `ValidationError` esaurita su BORDERLINE `none` → tentata con primary COMPLEX a effort `high` (`escalate_ref`). Caveat: escalate su ValidationError **non** corregge `country_code` errato ma schema-valido (es. `XX`). Dual-run su campione ≥30 obbligatorio prima di confermare `none`.
+  - Rollback immediato: se KPI dual-run degradano (XX rate > +5pp o escalate rate ≥25%), impostare `LLM_BORDERLINE_REASONING_EFFORT=high` e restartare `radar-worker`.
   - Residual SIMPLE↔COMPLEX se identity diversa (**eccezione:** SIMPLE Ollama-think → **niente** residual/escalate verso cloud)
   - Complessità = rischio estrazione schema (G/E/X); **L sola → SIMPLE** (non eleva)
   - Swap provider: cambiare `PROVIDER`+`MODEL`+`API_KEY`+`BASE_URL`+limiti/budget; restart `radar-worker`; **un solo** blocco profilo attivo
@@ -116,7 +119,7 @@ docker compose restart radar-worker
 
 Il worker fetch unread filtra già `published_after` ≈ 48h (`MINIFLUX` client). Entry unread più vecchie restano in coda Miniflux ma non entrano nel ciclo finché non rientrano nella finestra.
 
-Poi nei log: `route lane=SIMPLE … effort=none` e/o `COMPLEX|BORDERLINE … effort=high`; gate: `Ciclo … 0 errori`.
+Poi nei log: `route lane=SIMPLE … effort=none`, `BORDERLINE … effort=<LLM_BORDERLINE_REASONING_EFFORT>` (ops tipico `none`), e `COMPLEX … effort=high`; gate: `Ciclo … 0 errori`.
 
 ---
 

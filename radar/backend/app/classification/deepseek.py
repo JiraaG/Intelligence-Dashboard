@@ -119,13 +119,22 @@ class DeepSeekClient:
         model: str,
         system: str,
         user: str,
+        effort: str | None = None,
     ) -> dict[str, Any]:
         """Builder pubblico per test e chiamanti che servono il body della request."""
+        use_effort = self.effort if effort is None else effort
+        effort_raw = (use_effort or "high").lower()
+        if effort_raw in {"none", "off", "disabled"}:
+            eff = "none"
+        elif effort_raw in {"low", "medium", "high", "max"}:
+            eff = effort_raw
+        else:
+            eff = "high"
         return build_chat_completions_payload(
             model=model,
             system=system,
             user=user,
-            effort=self.effort,
+            effort=eff,
             api_dialect=self.api_dialect,
         )
 
@@ -138,6 +147,7 @@ class DeepSeekClient:
         date: str,
         correction: str | None = None,
         model: str | None = None,
+        effort: str | None = None,
     ) -> tuple[str, int | None]:
         """Chiama il provider e restituisce ``(json_text, usage_total_tokens|None)``.
 
@@ -211,6 +221,7 @@ class DeepSeekClient:
             model=use_model,
             system=SYSTEM_PROMPT,
             user=user_message,
+            effort=effort,
         )
 
         headers = {
@@ -316,11 +327,12 @@ class DeepSeekClient:
         except (TypeError, ValueError):
             tokens = None
 
+        use_effort = self.effort if effort is None else effort
         logger.info(
             "%s ok model=%s effort=%s ollama_think=%s tokens=%s",
             label,
             use_model,
-            self.effort,
+            use_effort,
             uses_ollama_think_protocol(use_model),
             tokens,
         )

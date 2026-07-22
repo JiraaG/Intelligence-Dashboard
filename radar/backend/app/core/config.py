@@ -266,6 +266,29 @@ LLM_ROUTING_STRICT = _env_bool("LLM_ROUTING_STRICT", False)
 LLM_COMPLEXITY_ESCALATE_ON_VALIDATION = _env_bool("LLM_COMPLEXITY_ESCALATE_ON_VALIDATION", True)
 LLM_MODEL_COOLDOWN_HOURS = _env_int("LLM_MODEL_COOLDOWN_HOURS", 24, min_value=1, max_value=168)
 
+# Effort reasoning dedicato per la fascia heuristic BORDERLINE sulla catena COMPLEX.
+# Default codice se unset/vuoto = "high" (backward compatible, zero regressione al boot).
+# Target ops post dual-run GATE = "none".
+_raw_bl_effort = (_env_str("LLM_BORDERLINE_REASONING_EFFORT", "high") or "high").lower()
+if _raw_bl_effort in {"none", "off", "disabled"}:
+    LLM_BORDERLINE_REASONING_EFFORT = "none"
+elif _raw_bl_effort in {"high", "max"}:
+    LLM_BORDERLINE_REASONING_EFFORT = _raw_bl_effort
+elif _raw_bl_effort in {"low", "medium"}:
+    import logging
+    logging.getLogger("radar.core.config").warning(
+        "LLM_BORDERLINE_REASONING_EFFORT=%r rimappato a 'high' (DeepSeek dialect supporta none|high|max)",
+        _raw_bl_effort,
+    )
+    LLM_BORDERLINE_REASONING_EFFORT = "high"
+else:
+    import logging
+    logging.getLogger("radar.core.config").warning(
+        "LLM_BORDERLINE_REASONING_EFFORT=%r non valido, default 'high'",
+        _raw_bl_effort,
+    )
+    LLM_BORDERLINE_REASONING_EFFORT = "high"
+
 LLM_SIMPLE_PROVIDER = LLM_SIMPLE.provider
 LLM_SIMPLE_MODEL = LLM_SIMPLE.model
 LLM_COMPLEX_PROVIDER = LLM_COMPLEX.provider

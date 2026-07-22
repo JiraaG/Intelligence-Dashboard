@@ -29,8 +29,7 @@ Residual cross-lane fattura `ref.quota_lane` (SIMPLE↔COMPLEX se identity diver
 
 ## Complexity routing (v2.2)
 
-- SIMPLE → reserve `lane=simple`
-- BORDERLINE / COMPLEX → reserve `lane=complex`
+- BORDERLINE / COMPLEX → reserve `lane=complex` (`purpose=classify:complex`). Nota effort BORDERLINE: BORDERLINE usa effort da `LLM_BORDERLINE_REASONING_EFFORT` (default safe `high`, target ops `none` con escalate `high` su `ValidationError`), mantenendo `purpose=classify:complex`.
 - quality:compare (Fase C near-dup) → reserve `lane=complex`, `purpose=quality:compare`
 
 ## Protocollo

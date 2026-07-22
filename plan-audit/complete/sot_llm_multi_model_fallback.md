@@ -253,7 +253,7 @@ else:
 | Lane | Catena (via env) | Escalation validation |
 |------|------------------|------------------------|
 | **SIMPLE** | `LLM_SIMPLE_*` (tipico `effort=none`; **Profilo F** = think/`high`) | Cloud/Gemini: dopo `_MAX_ATTEMPTS` → **1×** `LLM_COMPLEX_*`. **Ollama think** (`uses_ollama_think_protocol`): correction fino a `_MAX_ATTEMPTS_LOCAL` (6); **nessun** escalate a COMPLEX |
-| **BORDERLINE** | **`LLM_COMPLEX_*`** (tipico `effort=high`) — v2.2 | Dopo **1 correction fallita** resta su COMPLEX (già high); escalate legacy se identity diversa |
+| **BORDERLINE** | **`LLM_COMPLEX_*`** (effort da `LLM_BORDERLINE_REASONING_EFFORT`; default safe `high`; target ops `none`) | `quota_lane=complex` (`purpose=classify:complex`). Con effort `none`: dopo 1 correction fallita → escalate a primary COMPLEX con effort `high` (`escalate_ref`). Con effort `high`: escalate no-op AS-IS |
 | **COMPLEX** | `LLM_COMPLEX_*` → residuale SIMPLE | Se COMPLEX down / no key → SIMPLE; poi fallback article |
 
 Provider ammessi: `gemini` \| `deepseek` \| `openai` \| `glm` \| `grok` \| `claude` (claude stub).
@@ -310,9 +310,11 @@ flowchart TD
   H -->|1 di G/E/X| B[BORDERLINE]
   H -->|≥2 famiglie| C[COMPLEX]
   S --> P1[LLM_SIMPLE effort none]
-  B --> P2[LLM_COMPLEX effort high]
-  C --> P2
+  B --> P2B[LLM_COMPLEX + LLM_BORDERLINE_REASONING_EFFORT]
+  C --> P2[LLM_COMPLEX effort high]
   P1 -->|ok| OK[Commit]
+  P2B -->|ok| OK
+  P2B -->|validation×N (se none)| P2
   P2 -->|ok| OK
   S -->|validation×N| P2
   P2 -->|down| R[SIMPLE residual]
@@ -515,7 +517,7 @@ Ops: edit `.env` → `docker compose up -d --build radar-worker` (o restart) →
 - solo L lungo mono-US → **SIMPLE** (v2.2; non BORDERLINE/COMPLEX)  
 - geo_marker su body corto (&lt;1500) → **non** G  
 - titolo mono + body multi → G dal body  
-- `_chain_for(BORDERLINE)` → refs `LLM_COMPLEX` effort high  
+- `_chain_for(BORDERLINE)` → refs `LLM_COMPLEX` (effort da `LLM_BORDERLINE_REASONING_EFFORT`; + escalate `high` se `none`)  
 - BORDERLINE escalate rules; SIMPLE cloud escalate dopo N fail; **Ollama think: no escalate**  
 - `complexity` + no key → off+WARN o fail se strict  
 - 402 → cooldown; 429 short → no cooldown  
@@ -619,7 +621,7 @@ flowchart LR
 | `classification/complexity.py` | **nuovo** | Famiglie G/E/L/X/N → lane **v2.2** (L-sola→SIMPLE; G marker body≥1500) |
 | `classification/cooldown.py` | **nuovo** | SQL + memory fallback test |
 | `classification/deepseek.py` | **nuovo** | httpx; thinking none\|high via `LLM_*_REASONING_EFFORT` |
-| `classification/client.py` | `classify_article` | Outer loop; BORDERLINE→COMPLEX chain; escalate; shadow |
+| `classification/client.py` | `classify_article` | Outer loop; BORDERLINE→COMPLEX chain (effort da `LLM_BORDERLINE_REASONING_EFFORT`); escalate; shadow |
 | `migrations/009_llm_model_cooldown.sql` | **nuovo** | PK (provider, model) |
 | `tests/test_complexity.py` | **nuovo** | Quorum lane |
 | `tests/test_cooldown.py` | **nuovo** | set/skip/expire |

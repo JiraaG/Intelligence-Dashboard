@@ -14,12 +14,13 @@ Cartella di audit, prompt orchestratore e SoT del modulo Radar.
 * Fase I MapLibre 3D-primary — [`active/plan_impl_map_3d_globe.md`](active/plan_impl_map_3d_globe.md)
 * §3.J globo — [`active/plan_impl_map_globe_projection.md`](active/plan_impl_map_globe_projection.md)
 * Prompt ECC in `prompts/active/`
+* **BORDERLINE effort split** — COMPLETE / GATE VERDE → [`complete/plan_impl_borderline_effort_split.md`](complete/plan_impl_borderline_effort_split.md)
 * **Quote per-modello** — COMPLETE / GATE VERDE → [`complete/plan_impl_per_model_quota.md`](complete/plan_impl_per_model_quota.md) (prompt in `prompts/done/`)
 * **Metrics 013 FinOps** — COMPLETE / GATE VERDE → [`complete/plan_impl_fase_metrics_013.md`](complete/plan_impl_fase_metrics_013.md) (prompt verify-fix in `prompts/done/`)
 
 ## `complete/` — chiusi
 
-Vedi [`complete/README.md`](complete/README.md) (**Quote per-modello**, **Metrics 013 FinOps**, Phase 0–6, SoT LLM, Fase A Ollama, audit lane env, Fase B/H, archi UI, **W1 filtro nazioni Relazioni**, **Fase C semantic dedup**, Final Release, commenti, Notizie Salvate, playbook, ticket status, monorepo check).
+Vedi [`complete/README.md`](complete/README.md) (**BORDERLINE effort split**, **Quote per-modello**, **Metrics 013 FinOps**, Phase 0–6, SoT LLM, Fase A Ollama, audit lane env, Fase B/H, archi UI, **W1 filtro nazioni Relazioni**, **Fase C semantic dedup**, Final Release, commenti, Notizie Salvate, playbook, ticket status, monorepo check).
 
 ## Layout
 
@@ -42,6 +43,10 @@ plan-audit/
 
 ## Prompt done (recente)
 
+* [agent_prompt_borderline_effort_final_polish.md](prompts/done/agent_prompt_borderline_effort_final_polish.md) — polish C3/C6/C7
+* [agent_prompt_borderline_effort_split_closeout.md](prompts/done/agent_prompt_borderline_effort_split_closeout.md) — closeout C1–C12
+* [agent_prompt_borderline_effort_split.md](prompts/done/agent_prompt_borderline_effort_split.md) — **BORDERLINE effort none + escalate high** GATE VERDE
+* [plan_prompt_borderline_cost_routing.md](prompts/done/plan_prompt_borderline_cost_routing.md) — **Analisi BORDERLINE costi** (chiusa 2026-07-22; esito → effort-split)
 * [agent_prompt_per_model_quota.md](prompts/done/agent_prompt_per_model_quota.md) — **Quote per-modello** (failover L1 pool separati; GATE live 3.5 vs 3.1 2026-07-22)
 
 * [agent_prompt_fase_metrics_013_verify_fix.md](prompts/done/agent_prompt_fase_metrics_013_verify_fix.md) — **Metrics 013 micro-fix** (verify ledger scoped + rebuild + STATUS → GREEN onesto)

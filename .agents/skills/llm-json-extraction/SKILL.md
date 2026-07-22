@@ -55,7 +55,7 @@ lane via `LLM_SIMPLE_*` / `LLM_COMPLEX_*`; OpenAI-compat `classify_json(model=re
 | Condizione | Lane | Catena |
 |------------|------|--------|
 | 0 famiglie forti, o solo L | SIMPLE | `LLM_SIMPLE` (tipico effort=`none`) |
-| 1 di {G, E, X} | BORDERLINE | `LLM_COMPLEX` (tipico effort=`high`) |
+| 1 di {G, E, X} | BORDERLINE | `LLM_COMPLEX` (effort da `LLM_BORDERLINE_REASONING_EFFORT`; default `high`, target ops `none`) |
 | ≥2 famiglie (L solo in combo) | COMPLEX | `LLM_COMPLEX` (tipico effort=`high`) |
 
 `geo_marker` da solo: solo se `body_len ≥ 1500`. ≥2 country → G sempre.

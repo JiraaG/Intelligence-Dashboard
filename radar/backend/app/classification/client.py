@@ -37,6 +37,7 @@ from app.core.config import (
     GEMINI_MODEL,
     GEMINI_REQUEST_TIMEOUT,
     LLM_API_KEY,
+    LLM_BORDERLINE_REASONING_EFFORT,
     LLM_COMPLEX,
     LLM_COMPLEXITY_ESCALATE_ON_VALIDATION,
     LLM_MODEL_COOLDOWN_HOURS,
@@ -649,13 +650,41 @@ class ClassificationClient:
             out.append(ref)
         return out
 
+    def _borderline_chain(self) -> list[_ModelRef]:
+        """Catena lane BORDERLINE: stessi provider/model di LLM_COMPLEX ma effort BORDERLINE (+ residual SIMPLE)."""
+        effort = LLM_BORDERLINE_REASONING_EFFORT
+        primary: list[_ModelRef] = []
+        if self._complex.provider != _PROVIDER_CLAUDE:
+            if self._complex.provider in OPENAI_COMPAT_PROVIDERS:
+                primary = [
+                    _ModelRef(self._complex.provider, m, self._complex.lane, effort)
+                    for m in self._complex.models
+                ]
+            else:
+                primary = [
+                    _ModelRef(_PROVIDER_GEMINI, m, self._complex.lane, effort)
+                    for m in self._complex.models
+                ]
+        residual = self._provider_refs(self._simple)
+        out: list[_ModelRef] = []
+        seen: set[tuple[str, str, str]] = set()
+        for ref in [*primary, *residual]:
+            if ref.identity in seen:
+                continue
+            seen.add(ref.identity)
+            out.append(ref)
+        return out
+
     def _chain_for(self, lane: Lane, *, force_simple: bool) -> list[_ModelRef]:
-        """Sceglie catena: force_simple/off → SIMPLE; BORDERLINE|COMPLEX → COMPLEX (v2.2)."""
+        """Sceglie catena: force_simple/off → SIMPLE; BORDERLINE → BORDERLINE chain; COMPLEX → COMPLEX chain."""
         if force_simple or self._routing_mode != "complexity":
             return self._simple_chain()
-        # BORDERLINE = rischio schema (geo/entity/script) → lane thinking-capable.
-        if lane in (Lane.COMPLEX, Lane.BORDERLINE) and not self._complex_unavailable:
+        if self._complex_unavailable:
+            return self._simple_chain()
+        if lane == Lane.COMPLEX:
             return self._complex_chain()
+        if lane == Lane.BORDERLINE:
+            return self._borderline_chain()
         return self._simple_chain()
 
     async def _eligible(self, refs: list[_ModelRef]) -> list[_ModelRef]:
@@ -935,6 +964,7 @@ class ClassificationClient:
                             date=date,
                             correction=correction,
                             model=ref.model,
+                            effort=ref.reasoning_effort,
                         )
 
                     if self._gemini_sem is not None:

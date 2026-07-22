@@ -557,8 +557,154 @@ def test_chain_for_borderline_uses_complex_lane() -> None:
     simple = client._chain_for(Lane.SIMPLE, force_simple=False)
     complex_chain = client._chain_for(Lane.COMPLEX, force_simple=False)
 
-    assert border[0].reasoning_effort == "high"
     assert border[0].quota_lane == "complex"
     assert simple[0].reasoning_effort == "none"
     assert simple[0].quota_lane == "simple"
     assert complex_chain[0].reasoning_effort == "high"
+
+
+def test_chain_for_borderline_effort_split_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When LLM_BORDERLINE_REASONING_EFFORT=none, BORDERLINE chain uses effort 'none' while COMPLEX uses 'high'."""
+    from app.classification.complexity import Lane
+    from app.core.llm_lanes import LlmLaneConfig
+
+    monkeypatch.setattr("app.classification.client.LLM_BORDERLINE_REASONING_EFFORT", "none")
+
+    client, _quota = _client_with_mock_quota()
+    client._routing_mode = "complexity"
+    client._complex_unavailable = False
+    client._simple = LlmLaneConfig(
+        lane="simple",
+        provider="deepseek",
+        model="deepseek-v4-flash",
+        api_key="sk-test",
+        base_url="https://api.deepseek.com",
+        rpm=0,
+        tpm=0,
+        rpd=0,
+        budget_usd_day=0.0,
+        usd_per_1m_tokens=0.28,
+        timeout=60.0,
+        reasoning_effort="none",
+        fallbacks=(),
+    )
+    client._complex = LlmLaneConfig(
+        lane="complex",
+        provider="deepseek",
+        model="deepseek-v4-flash",
+        api_key="sk-test",
+        base_url="https://api.deepseek.com",
+        rpm=0,
+        tpm=0,
+        rpd=0,
+        budget_usd_day=0.0,
+        usd_per_1m_tokens=0.28,
+        timeout=60.0,
+        reasoning_effort="high",
+        fallbacks=(),
+    )
+    client._simple_provider = "deepseek"
+    client._simple_model = "deepseek-v4-flash"
+    client._complex_provider = "deepseek"
+    client._complex_model = "deepseek-v4-flash"
+
+    border = client._chain_for(Lane.BORDERLINE, force_simple=False)
+    complex_chain = client._chain_for(Lane.COMPLEX, force_simple=False)
+
+    assert border[0].reasoning_effort == "none"
+    assert border[0].quota_lane == "complex"
+    assert border[0].identity == ("deepseek", "deepseek-v4-flash", "none")
+    assert complex_chain[0].reasoning_effort == "high"
+    assert complex_chain[0].quota_lane == "complex"
+    assert complex_chain[0].identity == ("deepseek", "deepseek-v4-flash", "high")
+
+
+@pytest.mark.asyncio
+async def test_borderline_escalation_triggers_high_effort(monkeypatch: pytest.MonkeyPatch) -> None:
+    """C1: Escalation on BORDERLINE effort 'none' triggers a second run with escalate_ref effort 'high'."""
+    from app.classification.complexity import Lane
+    from app.classification.client import ClassificationResult
+    from app.classification.validator import get_fallback_article
+    from app.core.llm_lanes import LlmLaneConfig
+
+    monkeypatch.setattr("app.classification.client.LLM_BORDERLINE_REASONING_EFFORT", "none")
+
+    client, _quota = _client_with_mock_quota()
+    client._routing_mode = "complexity"
+    client._complex_unavailable = False
+    client._escalate = True
+    client._shadow = False
+    client._simple = LlmLaneConfig(
+        lane="simple", provider="deepseek", model="deepseek-v4-flash", api_key="sk-test",
+        base_url="https://api.deepseek.com", rpm=0, tpm=0, rpd=0, budget_usd_day=0.0,
+        usd_per_1m_tokens=0.28, timeout=60.0, reasoning_effort="none", fallbacks=(),
+    )
+    client._complex = LlmLaneConfig(
+        lane="complex", provider="deepseek", model="deepseek-v4-flash", api_key="sk-test",
+        base_url="https://api.deepseek.com", rpm=0, tpm=0, rpd=0, budget_usd_day=0.0,
+        usd_per_1m_tokens=0.28, timeout=60.0, reasoning_effort="high", fallbacks=(),
+    )
+
+    recorded_runs: list[tuple[str, str, str, bool]] = []
+
+    async def mock_run(ref, *, title, content, url, date, lane, max_attempts=None, miniflux_entry_id=None, was_escalated=False):
+        recorded_runs.append((ref.provider, ref.model, ref.reasoning_effort, was_escalated))
+        if not was_escalated:
+            # First attempt fails with escalate outcome (validation fails >= 2)
+            return None, "escalate"
+        else:
+            # Escalated attempt succeeds
+            good = get_fallback_article(title, url, date)
+            return ClassificationResult(
+                article=good,
+                classification_lane=ref.quota_lane,
+                classified_by_model=ref.model,
+                classified_by_provider=ref.provider,
+                was_escalated=True,
+            ), "ok"
+
+    monkeypatch.setattr(client, "_run_model_attempts", mock_run)
+    monkeypatch.setattr("app.classification.client.score_complexity", lambda title, content: type("C", (), {"lane": Lane.BORDERLINE, "families": {"G"}, "score": 25})())
+
+    res = await client.classify_article(
+        title="Multi-country crisis in Berlin and Paris",
+        content="Long body content",
+        url="https://example.com/borderline",
+        date="2026-07-22",
+    )
+
+    assert res.was_escalated is True
+    assert res.classified_by_model == "deepseek-v4-flash"
+    assert len(recorded_runs) == 2
+    # 1st attempt: BORDERLINE effort none, was_escalated=False
+    assert recorded_runs[0] == ("deepseek", "deepseek-v4-flash", "none", False)
+    # 2nd attempt: Escalated primary COMPLEX effort high, was_escalated=True
+    assert recorded_runs[1] == ("deepseek", "deepseek-v4-flash", "high", True)
+
+
+def test_borderline_default_unset_effort(monkeypatch: pytest.MonkeyPatch) -> None:
+    """C2: Default BORDERLINE effort is 'high' when unset/default, matching COMPLEX effort."""
+    from app.classification.complexity import Lane
+    from app.core.llm_lanes import LlmLaneConfig
+
+    monkeypatch.setattr("app.classification.client.LLM_BORDERLINE_REASONING_EFFORT", "high")
+
+    client, _quota = _client_with_mock_quota()
+    client._routing_mode = "complexity"
+    client._complex_unavailable = False
+    client._simple = LlmLaneConfig(
+        lane="simple", provider="deepseek", model="deepseek-v4-flash", api_key="sk-test",
+        base_url="https://api.deepseek.com", rpm=0, tpm=0, rpd=0, budget_usd_day=0.0,
+        usd_per_1m_tokens=0.28, timeout=60.0, reasoning_effort="none", fallbacks=(),
+    )
+    client._complex = LlmLaneConfig(
+        lane="complex", provider="deepseek", model="deepseek-v4-flash", api_key="sk-test",
+        base_url="https://api.deepseek.com", rpm=0, tpm=0, rpd=0, budget_usd_day=0.0,
+        usd_per_1m_tokens=0.28, timeout=60.0, reasoning_effort="high", fallbacks=(),
+    )
+
+    border = client._chain_for(Lane.BORDERLINE, force_simple=False)
+    complex_chain = client._chain_for(Lane.COMPLEX, force_simple=False)
+
+    assert border[0].reasoning_effort == "high"
+    assert border[0].identity == complex_chain[0].identity
