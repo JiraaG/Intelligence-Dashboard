@@ -6,6 +6,7 @@ Questa directory contiene i piani di progettazione e di implementazione attualme
 
 **Attivo**
 
+- **Metrics 013 — FinOps / diagnostica** — [`plan_impl_fase_metrics_013.md`](plan_impl_fase_metrics_013.md) (**ACTIVE** — W0 docs DONE 2026-07-22; impl W1–W4 pending). Prompt Agent: [`../prompts/active/agent_prompt_fase_metrics_013.md`](../prompts/active/agent_prompt_fase_metrics_013.md).
 - **Relazioni Wave 2 — archi elevati 3D** — [`plan_impl_map_relations_arcs_3d.md`](plan_impl_map_relations_arcs_3d.md) (**spike**; prerequisito W1 = [`../complete/plan_impl_map_relations_nation_filter.md`](../complete/plan_impl_map_relations_nation_filter.md) **GATE VERDE**).
 - **Fase I — Mappa 3D-primary (MapLibre)** — [`plan_impl_map_3d_globe.md`](plan_impl_map_3d_globe.md) (**codice + docs shipped** 2026-07-20; follow-up isole/anti-bleed **COMPLETE** → [`../complete/plan_impl_map_category_fills_islands.md`](../complete/plan_impl_map_category_fills_islands.md)). Follow-up globo: sempre [`plan_impl_map_globe_projection.md`](plan_impl_map_globe_projection.md) (§3.J).
 - **Fase J — Upgrade globo vero** — [`plan_impl_map_globe_projection.md`](plan_impl_map_globe_projection.md) (**Futuro / BACKLOG**).

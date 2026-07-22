@@ -489,14 +489,14 @@ async def test_four_retry_attempts_consume_four_rpd_reservations() -> None:
         patch("asyncio.sleep", new_callable=AsyncMock),
     ):
         mock_gen.side_effect = TimeoutError("provider timeout")
-        article = await client.classify_article(
+        res = await client.classify_article(
             title="Retry burn",
             content="body",
             url="https://example.com/r",
             date="2026-07-14",
         )
 
-    assert article.country_code == "XX"
+        assert res.article.country_code == "XX"
     assert mock_gen.await_count == 4
     gemini_rows = [r for r in store.rows.values() if not _is_deepseek_model(r.model)]
     assert len(gemini_rows) == 4

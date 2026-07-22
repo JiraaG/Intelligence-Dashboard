@@ -7,7 +7,18 @@ from app.classification.validator import GeopoliticalArticleSchema
 from app.commit.router import slugify_title, get_article_file_path
 from app.commit.factory import generate_markdown_content
 from app.commit.lock import write_file_with_lock
-from app.commit.db_commit import commit_article_to_db
+from app.commit.db_commit import commit_article_to_db, _dedupe_csv_values
+
+
+def test_dedupe_csv_values_preserves_order() -> None:
+    """Tag/company ripetuti dall'LLM devono essere unici prima degli INSERT in-TX."""
+    assert _dedupe_csv_values("Economia, Mercati Finanziari, Mercati Finanziari, NOW") == [
+        "Economia",
+        "Mercati Finanziari",
+        "NOW",
+    ]
+    assert _dedupe_csv_values("Nessuno") == []
+
 
 # ─── Tests per la Slugificazione ed il Routing del Vault ─────────────────────
 
@@ -151,6 +162,11 @@ async def test_commit_article_to_db_success() -> None:
         outbox_target_path="/app/vault/Tecnologia/DE/2026-06-24_tsmc.md",
         outbox_payload="---\ntitle: TSMC\n---\n",
         miniflux_entry_id=42,
+        feed_id=12,
+        classification_lane="simple",
+        classified_by_model="gemini-2.5-flash",
+        dedup_kind="none",
+        dedup_action="inserted_new",
     )
 
     assert art_id == 100
@@ -162,6 +178,10 @@ async def test_commit_article_to_db_success() -> None:
     assert insert_call_args[9] == "Positivo"
     assert insert_call_args[10] == 3
     assert insert_call_args[13] == ["FR", "US"]
+    assert insert_call_args[15] == 12  # feed_id ($15)
+    assert insert_call_args[17] == "simple"  # classification_lane ($17)
+    assert insert_call_args[21] == "none"  # dedup_kind ($21)
+    assert insert_call_args[23] == "inserted_new"  # dedup_action ($23)
 
     exec_calls = [call[0][0] for call in mock_conn.execute.call_args_list]
     assert any("INSERT INTO article_companies" in c for c in exec_calls)
@@ -212,3 +232,67 @@ async def test_commit_article_to_db_conflict_fallback() -> None:
     select_call_args = mock_conn.fetchval.call_args_list[1][0]
     assert "SELECT id FROM articles WHERE source_url = $1" in select_call_args[0]
     assert select_call_args[1] == "https://example.com/tsmc"
+
+
+@pytest.mark.asyncio
+async def test_commit_article_dedupes_repeated_tags() -> None:
+    """Tag CSV ripetuti non devono generare due INSERT sullo stesso name in-TX."""
+    mock_conn = MagicMock(spec=asyncpg.Connection)
+    mock_transaction = MagicMock()
+    mock_conn.transaction.return_value = mock_transaction
+    mock_transaction.__aenter__ = AsyncMock()
+    mock_transaction.__aexit__ = AsyncMock()
+
+    # article → company ServiceNow → tag Economia → SELECT skip → tag Mercati → SELECT skip
+    # Pattern: INSERT DO NOTHING RETURNING None when already exists → SELECT id
+    async def _fetchval(query, *args):
+        q = query if isinstance(query, str) else ""
+        if "INSERT INTO articles" in q:
+            return 501
+        if "INSERT INTO companies" in q:
+            return 601
+        if "INSERT INTO tags" in q:
+            return None  # already exists → fallback SELECT
+        if "SELECT id FROM tags" in q:
+            return 701 if args and args[0] == "Economia" else 702
+        if "SELECT id FROM companies" in q:
+            return 601
+        return None
+
+    mock_conn.fetchval = AsyncMock(side_effect=_fetchval)
+    mock_conn.execute = AsyncMock()
+
+    article = GeopoliticalArticleSchema(
+        title="Should You Buy ServiceNow (NOW) Before Earnings?",
+        summary="Analisi pre-earnings.",
+        published_at="2026-07-22",
+        source_url="https://example.com/now-earnings",
+        country_code="US",
+        latitude=40.7,
+        longitude=-74.0,
+        companies_involved="ServiceNow, ServiceNow",
+        tags="Economia, Mercati Finanziari, Mercati Finanziari",
+        primary_category="Economia",
+        sentiment="Neutrale",
+        infrastructural_entities="Nessuno",
+        related_countries="Nessuno",
+        relevance_level=3,
+    )
+
+    art_id = await commit_article_to_db(
+        mock_conn,
+        article,
+        feed_title="Yahoo Finance",
+        outbox_target_path="/app/vault/Economia/US/now.md",
+        outbox_payload="payload",
+        miniflux_entry_id=99,
+    )
+
+    assert art_id == 501
+    tag_inserts = [
+        c
+        for c in mock_conn.fetchval.call_args_list
+        if isinstance(c[0][0], str) and "INSERT INTO tags" in c[0][0]
+    ]
+    assert len(tag_inserts) == 2  # Economia + Mercati Finanziari (una sola volta)
+    assert {c[0][1] for c in tag_inserts} == {"Economia", "Mercati Finanziari"}

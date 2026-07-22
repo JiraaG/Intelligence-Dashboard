@@ -26,6 +26,46 @@ from app.extraction.entry_validation import normalize_source_url
 logger = logging.getLogger("radar.commit.db_commit")
 
 
+def _dedupe_csv_values(raw: str) -> list[str]:
+    """CSV → lista unica (ordine preservato) per evitare UniqueViolation in-TX su tags/companies."""
+    return list(dict.fromkeys(parse_csv_list(raw)))
+
+
+async def _upsert_name_returning_id(
+    conn: asyncpg.Connection,
+    *,
+    table: str,
+    name: str,
+) -> int | None:
+    """INSERT name con ON CONFLICT; se race concorrente, SELECT fallback.
+
+    ``ON CONFLICT DO UPDATE … RETURNING`` può ancora sollevare UniqueViolation
+    sotto insert concorrenti multi-worker; DO NOTHING + SELECT è più robusto.
+    """
+    if table not in {"tags", "companies"}:
+        raise ValueError(f"tabella non supportata per upsert name: {table}")
+
+    try:
+        row_id = await conn.fetchval(
+            f"""
+            INSERT INTO {table} (name) VALUES ($1)
+            ON CONFLICT (name) DO NOTHING
+            RETURNING id
+            """,
+            name,
+        )
+    except asyncpg.UniqueViolationError:
+        logger.debug("Race UniqueViolation su %s.name=%r — fallback SELECT", table, name)
+        row_id = None
+
+    if row_id is None:
+        row_id = await conn.fetchval(
+            f"SELECT id FROM {table} WHERE name = $1",
+            name,
+        )
+    return int(row_id) if row_id is not None else None
+
+
 async def commit_article_to_db(
     conn: asyncpg.Connection,
     article: GeopoliticalArticleSchema,
@@ -36,6 +76,20 @@ async def commit_article_to_db(
     miniflux_entry_id: int | None = None,
     body_excerpt: str = "",
     embedding: list[float] | None = None,
+    feed_id: int | None = None,
+    feed_domain: str | None = None,
+    classification_lane: str | None = None,
+    classified_by_model: str | None = None,
+    classified_by_provider: str | None = None,
+    was_escalated: bool = False,
+    dedup_kind: str | None = None,
+    dedup_match_article_id: int | None = None,
+    dedup_action: str | None = None,
+    clean_text_chars: int | None = None,
+    clean_text_words: int | None = None,
+    embedding_time_ms: int | None = None,
+    pipeline_latency_ms: int | None = None,
+    geo_resolution_method: str | None = None,
 ) -> Any:
     """Inserisce articolo + relazioni + outbox + embedding in **una** transazione.
 
@@ -53,6 +107,10 @@ async def commit_article_to_db(
         miniflux_entry_id: Id entry per mark-read differito; può essere ``None``.
         body_excerpt: Estratto del testo sanitizzato (max 8000 char).
         embedding: Vettore di 384 float generato dall'embedder.
+        feed_id, feed_domain: Metadati feed Miniflux.
+        classification_lane, classified_by_model, classified_by_provider, was_escalated: Metadati LLM.
+        dedup_kind, dedup_match_article_id, dedup_action: Metadati deduplicazione.
+        clean_text_chars, clean_text_words, embedding_time_ms, pipeline_latency_ms, geo_resolution_method: Metadati FinOps/diagnostica.
     Returns:
         ``articles.id`` (nuovo o già esistente).
     Raises:
@@ -66,10 +124,10 @@ async def commit_article_to_db(
     """
     logger.info("Salvataggio relazionale nel DB per l'articolo: '%s'", article.title[:50])
 
-    entities_list = parse_csv_list(article.infrastructural_entities)
-    companies_list = parse_csv_list(article.companies_involved)
-    tags_list = parse_csv_list(article.tags)
-    related_countries_list = parse_csv_list(article.related_countries)
+    entities_list = _dedupe_csv_values(article.infrastructural_entities)
+    companies_list = _dedupe_csv_values(article.companies_involved)
+    tags_list = _dedupe_csv_values(article.tags)
+    related_countries_list = _dedupe_csv_values(article.related_countries)
 
     normalized_url = normalize_source_url(article.source_url)
     clean_body_excerpt = (body_excerpt or "")[:8000]
@@ -79,8 +137,13 @@ async def commit_article_to_db(
             INSERT INTO articles
                 (title, summary, published_at, source_url, country_code,
                  latitude, longitude, primary_category, sentiment, relevance_level,
-                 infrastructural_entities, feed_title, related_countries, body_excerpt)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                 infrastructural_entities, feed_title, related_countries, body_excerpt,
+                 feed_id, feed_domain, classification_lane, classified_by_model,
+                 classified_by_provider, was_escalated, dedup_kind, dedup_match_article_id,
+                 dedup_action, clean_text_chars, clean_text_words, embedding_time_ms,
+                 pipeline_latency_ms, geo_resolution_method)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+                    $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
             ON CONFLICT (source_url) DO NOTHING
             RETURNING id
         """
@@ -106,6 +169,20 @@ async def commit_article_to_db(
             feed_title,
             related_countries_list,
             clean_body_excerpt,
+            feed_id,
+            feed_domain,
+            classification_lane,
+            classified_by_model,
+            classified_by_provider,
+            was_escalated,
+            dedup_kind,
+            dedup_match_article_id,
+            dedup_action,
+            clean_text_chars,
+            clean_text_words,
+            embedding_time_ms,
+            pipeline_latency_ms,
+            geo_resolution_method,
         )
 
         if article_id is None:
@@ -126,13 +203,8 @@ async def commit_article_to_db(
             clean_company = company.strip()
             if not clean_company:
                 continue
-            company_id = await conn.fetchval(
-                """
-                INSERT INTO companies (name) VALUES ($1)
-                ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-                RETURNING id
-                """,
-                clean_company,
+            company_id = await _upsert_name_returning_id(
+                conn, table="companies", name=clean_company
             )
             if company_id is None:
                 logger.warning("Skip junction company senza id: %r", clean_company)
@@ -147,14 +219,7 @@ async def commit_article_to_db(
             clean_tag = tag.strip()
             if not clean_tag:
                 continue
-            tag_id = await conn.fetchval(
-                """
-                INSERT INTO tags (name) VALUES ($1)
-                ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-                RETURNING id
-                """,
-                clean_tag,
-            )
+            tag_id = await _upsert_name_returning_id(conn, table="tags", name=clean_tag)
             if tag_id is None:
                 logger.warning("Skip junction tag senza id: %r", clean_tag)
                 continue
@@ -169,18 +234,20 @@ async def commit_article_to_db(
             text_hash = hashlib.sha256(f"{article.title} {article.summary}".encode("utf-8")).hexdigest()
             await conn.execute(
                 """
-                INSERT INTO article_embeddings (article_id, embedding, model_id, text_hash)
-                VALUES ($1, $2::vector, $3, $4)
+                INSERT INTO article_embeddings (article_id, embedding, model_id, text_hash, embedding_time_ms)
+                VALUES ($1, $2::vector, $3, $4, $5)
                 ON CONFLICT (article_id) DO UPDATE SET
                     embedding = EXCLUDED.embedding,
                     model_id = EXCLUDED.model_id,
                     text_hash = EXCLUDED.text_hash,
+                    embedding_time_ms = EXCLUDED.embedding_time_ms,
                     created_at = NOW()
                 """,
                 article_id,
                 vector_str,
                 SEMANTIC_EMBEDDING_MODEL,
                 text_hash,
+                embedding_time_ms,
             )
 
         await enqueue_outbox_row(
@@ -206,6 +273,20 @@ async def replace_article_in_place(
     miniflux_entry_id: int | None = None,
     body_excerpt: str = "",
     embedding: list[float] | None = None,
+    feed_id: int | None = None,
+    feed_domain: str | None = None,
+    classification_lane: str | None = None,
+    classified_by_model: str | None = None,
+    classified_by_provider: str | None = None,
+    was_escalated: bool = False,
+    dedup_kind: str | None = None,
+    dedup_match_article_id: int | None = None,
+    dedup_action: str | None = None,
+    clean_text_chars: int | None = None,
+    clean_text_words: int | None = None,
+    embedding_time_ms: int | None = None,
+    pipeline_latency_ms: int | None = None,
+    geo_resolution_method: str | None = None,
 ) -> Any:
     """Sostituisce un articolo esistente nel DB con un nuovo articolo di qualità migliore (stesso ID).
 
@@ -217,10 +298,10 @@ async def replace_article_in_place(
     """
     logger.info("Sostituzione in-place per l'articolo [ID=%s]: '%s'", existing_article_id, article.title[:50])
 
-    entities_list = parse_csv_list(article.infrastructural_entities)
-    companies_list = parse_csv_list(article.companies_involved)
-    tags_list = parse_csv_list(article.tags)
-    related_countries_list = parse_csv_list(article.related_countries)
+    entities_list = _dedupe_csv_values(article.infrastructural_entities)
+    companies_list = _dedupe_csv_values(article.companies_involved)
+    tags_list = _dedupe_csv_values(article.tags)
+    related_countries_list = _dedupe_csv_values(article.related_countries)
 
     normalized_url = normalize_source_url(article.source_url)
     clean_body_excerpt = (body_excerpt or "")[:8000]
@@ -263,8 +344,22 @@ async def replace_article_in_place(
                 feed_title = $12,
                 related_countries = $13,
                 body_excerpt = $14,
+                feed_id = $15,
+                feed_domain = $16,
+                classification_lane = $17,
+                classified_by_model = $18,
+                classified_by_provider = $19,
+                was_escalated = $20,
+                dedup_kind = $21,
+                dedup_match_article_id = $22,
+                dedup_action = $23,
+                clean_text_chars = $24,
+                clean_text_words = $25,
+                embedding_time_ms = $26,
+                pipeline_latency_ms = $27,
+                geo_resolution_method = $28,
                 updated_at = NOW()
-            WHERE id = $15
+            WHERE id = $29
             """,
             article.title,
             article.summary,
@@ -280,6 +375,20 @@ async def replace_article_in_place(
             feed_title,
             related_countries_list,
             clean_body_excerpt,
+            feed_id,
+            feed_domain,
+            classification_lane,
+            classified_by_model,
+            classified_by_provider,
+            was_escalated,
+            dedup_kind,
+            dedup_match_article_id,
+            dedup_action,
+            clean_text_chars,
+            clean_text_words,
+            embedding_time_ms,
+            pipeline_latency_ms,
+            geo_resolution_method,
             existing_article_id,
         )
 
@@ -289,13 +398,8 @@ async def replace_article_in_place(
             clean_company = company.strip()
             if not clean_company:
                 continue
-            company_id = await conn.fetchval(
-                """
-                INSERT INTO companies (name) VALUES ($1)
-                ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-                RETURNING id
-                """,
-                clean_company,
+            company_id = await _upsert_name_returning_id(
+                conn, table="companies", name=clean_company
             )
             if company_id is None:
                 logger.warning("Skip junction company senza id (replace): %r", clean_company)
@@ -311,14 +415,7 @@ async def replace_article_in_place(
             clean_tag = tag.strip()
             if not clean_tag:
                 continue
-            tag_id = await conn.fetchval(
-                """
-                INSERT INTO tags (name) VALUES ($1)
-                ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-                RETURNING id
-                """,
-                clean_tag,
-            )
+            tag_id = await _upsert_name_returning_id(conn, table="tags", name=clean_tag)
             if tag_id is None:
                 logger.warning("Skip junction tag senza id (replace): %r", clean_tag)
                 continue
@@ -334,18 +431,20 @@ async def replace_article_in_place(
             text_hash = hashlib.sha256(f"{article.title} {article.summary}".encode("utf-8")).hexdigest()
             await conn.execute(
                 """
-                INSERT INTO article_embeddings (article_id, embedding, model_id, text_hash)
-                VALUES ($1, $2::vector, $3, $4)
+                INSERT INTO article_embeddings (article_id, embedding, model_id, text_hash, embedding_time_ms)
+                VALUES ($1, $2::vector, $3, $4, $5)
                 ON CONFLICT (article_id) DO UPDATE SET
                     embedding = EXCLUDED.embedding,
                     model_id = EXCLUDED.model_id,
                     text_hash = EXCLUDED.text_hash,
+                    embedding_time_ms = EXCLUDED.embedding_time_ms,
                     created_at = NOW()
                 """,
                 existing_article_id,
                 vector_str,
                 SEMANTIC_EMBEDDING_MODEL,
                 text_hash,
+                embedding_time_ms,
             )
 
         # 5. Riapertura outbox

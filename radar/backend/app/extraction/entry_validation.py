@@ -37,6 +37,8 @@ class ValidatedMinifluxEntry:
     content: str
     published_at: str
     feed_title: str
+    feed_id: int | None = None
+    feed_domain: str | None = None
 
 
 class EntryValidationError(ValueError):
@@ -159,6 +161,37 @@ def _validate_feed_title(raw_feed: object) -> str:
     return cleaned
 
 
+def _extract_feed_id(raw_feed: object) -> int | None:
+    """Estrae ID numerico feed da Miniflux ``feed.id`` se presente."""
+    if isinstance(raw_feed, dict):
+        fid = raw_feed.get("id")
+        if isinstance(fid, int) and not isinstance(fid, bool) and fid > 0:
+            return fid
+    return None
+
+
+def _extract_feed_domain(raw_feed: object, source_url: str) -> str | None:
+    """Estrae dominio host da ``feed.site_url`` / ``feed.feed_url`` o fallback su ``source_url``."""
+    if isinstance(raw_feed, dict):
+        for candidate_key in ("site_url", "feed_url"):
+            url_val = raw_feed.get(candidate_key)
+            if isinstance(url_val, str) and url_val.strip():
+                try:
+                    parts = urlsplit(url_val.strip())
+                    if parts.netloc:
+                        return parts.netloc.lower()
+                except Exception:
+                    pass
+    if source_url:
+        try:
+            parts = urlsplit(source_url)
+            if parts.netloc:
+                return parts.netloc.lower()
+        except Exception:
+            pass
+    return None
+
+
 def _validate_content(raw_entry: dict) -> str:
     """Corpo entry: ``content``, altrimenti ``summary``, altrimenti stringa vuota.
 
@@ -191,7 +224,7 @@ def validate_miniflux_entry(raw: object) -> ValidatedMinifluxEntry:
         ``ValidatedMinifluxEntry`` pronto per dedup/sanitize/LLM.
     Raises:
         EntryValidationError: payload malformato — il chiamante deve isolare
-            l'entry e continuare con le sorelle.
+            l'entry me continuare con le sorelle.
     SoT:
         docs/01 §6; llm-json-extraction (confine input non fidato).
     """
@@ -202,7 +235,10 @@ def validate_miniflux_entry(raw: object) -> ValidatedMinifluxEntry:
     source_url = normalize_source_url(raw.get("url", ""))
     title = _validate_title(raw.get("title"))
     published_at = _parse_published_date(raw.get("published_at"))
-    feed_title = _validate_feed_title(raw.get("feed"))
+    raw_feed = raw.get("feed")
+    feed_title = _validate_feed_title(raw_feed)
+    feed_id = _extract_feed_id(raw_feed)
+    feed_domain = _extract_feed_domain(raw_feed, source_url)
     content = _validate_content(raw)
 
     return ValidatedMinifluxEntry(
@@ -212,6 +248,8 @@ def validate_miniflux_entry(raw: object) -> ValidatedMinifluxEntry:
         content=content,
         published_at=published_at,
         feed_title=feed_title,
+        feed_id=feed_id,
+        feed_domain=feed_domain,
     )
 
 

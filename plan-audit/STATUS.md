@@ -1,6 +1,6 @@
 # plan-audit — STATUS (fatto vs da fare)
 
-Quadro operativo aggiornato **2026-07-21** (MapLibre hatching isole/anti-bleed **GATE VERDE**; Wave 1 Relazioni nazioni **GATE VERDE**; Fase A LLM locale **COMPLETE**; audit LLM env `c9ef842`; Profilo F `54c8038` + VRAM `2996625`).  
+Quadro operativo aggiornato **2026-07-22** (Fase C semantic dedup **GATE VERDE**; Metrics 013 **ACTIVE docs** / impl pending; MapLibre hatching isole/anti-bleed **GATE VERDE**; Wave 1 Relazioni nazioni **GATE VERDE**; Fase A LLM locale **COMPLETE**).  
 Indice cartelle: [`README.md`](README.md).  
 Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`](remediation/audit_remediation_final_release_handoff.md).
 
@@ -10,6 +10,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 
 | Area | Dove | Note |
 |------|------|------|
+| Metrics 013 — FinOps / diagnostica | [`complete/plan_impl_fase_metrics_013.md`](complete/plan_impl_fase_metrics_013.md) | **COMPLETE / GATE VERDE** 2026-07-22 — Migrazione `013_metrics_and_feed_tracking.sql`, denorm 14 campi, ledger article linkage, dedup events exact URL (`url_exact_count` >= 1), endpoints `/api/metrics/*`, verify script superato. |
 | Relazioni — archi elevati 3D (Wave 2) | [`active/plan_impl_map_relations_arcs_3d.md`](active/plan_impl_map_relations_arcs_3d.md) | **ACTIVE (spike)** — prerequisito W1 **DONE**. MapLibre `line` flat; no `line-z-offset`; CustomLayer vs deck.gl. |
 | Mappa 3D-primary (Phase I) | [`active/plan_impl_map_3d_globe.md`](active/plan_impl_map_3d_globe.md) | Codice + docs shipped; post-ship hatching soft + archi macro solidi; follow-up isole/anti-bleed **COMPLETE** |
 | Upgrade globo §3.J | [`active/plan_impl_map_globe_projection.md`](active/plan_impl_map_globe_projection.md) | Futuro / BACKLOG |
@@ -67,7 +68,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 | Pin zoom soglia + isteresi globo | **DONE** | `MAP_ZOOM_PIN_THRESHOLD=4`, `MAP_ZOOM_PIN_HYSTERESIS=0.4`, `resolvePinMode` / `pinModeActive` — anti-flicker pan MapLibre globe. |
 | Hatching isole + anti-bleed MapLibre | **DONE** | [`complete/plan_impl_map_category_fills_islands.md`](complete/plan_impl_map_category_fills_islands.md) — GATE 2026-07-21. |
 
-**Nessun residuo operativo obbligatorio sulla Fase A / B / C / H / archi UI / W1 filtri / hatching isole / classification refine / map anchors / Profilo F core / audit env.** Branch di riferimento feature: `feature/upgrades`. Candidata immediata relazioni: **Wave 2 archi elevati**. **§3.C pgvector** = **COMPLETE / GATE VERDE** ([`complete/plan_impl_fase_C_semantic_dedup.md`](complete/plan_impl_fase_C_semantic_dedup.md)).
+**Nessun residuo operativo obbligatorio sulla Fase A / B / C / H / archi UI / W1 filtri / hatching isole / classification refine / map anchors / Profilo F core / audit env.** Branch di riferimento feature: `feature/upgrades`. Candidata dati: **Metrics 013** ([`active/plan_impl_fase_metrics_013.md`](active/plan_impl_fase_metrics_013.md) — impl pending). Candidata relazioni: **Wave 2 archi elevati**. **§3.C pgvector** = **COMPLETE / GATE VERDE** ([`complete/plan_impl_fase_C_semantic_dedup.md`](complete/plan_impl_fase_C_semantic_dedup.md)).
 
 **Restore points (catena `feature/upgrades`):** Fase C semantic dedup **`f1e1de0`**; hatching isole/anti-bleed **`32203c9`**; pin threshold+hysteresis **`7a2bfc9`**; toolbar unify Sentiment/Tipologia `33c348e`; W1 filtri nazioni **`ec771b1`**; archi MapLibre solidi `0d942ed`; docs LLM env `c9ef842`; Profilo F + VRAM `2996625`; Local-Hybrid `54c8038`; map anchors `a240b3c`; click hatching `911463a`; classification/geo `f7cf83d`; archi UI Leaflet `5c74e57`.
 

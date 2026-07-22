@@ -36,15 +36,17 @@ def _make_state() -> WorkerState:
 
 
 @pytest.mark.asyncio
+@patch("app.worker.record_dedup_event", new_callable=AsyncMock)
 @patch("app.worker.is_article_duplicate", new_callable=AsyncMock)
-async def test_duplicate_gate_completed(mock_is_dup) -> None:
-    """If the outbox status is 'completed', the article is marked as read."""
+async def test_duplicate_gate_completed(mock_is_dup, mock_record_dedup) -> None:
+    """If the outbox status is 'completed', the article is marked as read and url_exact dedup event is recorded."""
     mock_is_dup.return_value = True
     state = _make_state()
     entry = _make_entry(100)
 
     mock_conn = AsyncMock()
     mock_conn.fetchrow.return_value = {
+        "id": 42,
         "outbox_status": "completed",
         "primary_category": "Geopolitica",
         "country_code": "US",
@@ -59,6 +61,17 @@ async def test_duplicate_gate_completed(mock_is_dup) -> None:
 
     assert ok is True
     state.miniflux_client.mark_as_read.assert_awaited_once_with([100])
+    mock_record_dedup.assert_awaited_once_with(
+        mock_conn,
+        incoming_url=entry.source_url,
+        existing_article_id=42,
+        winner="existing",
+        cosine_distance=None,
+        dedup_kind="url_exact",
+        action_taken="kept_existing",
+        feed_id=entry.feed_id,
+        incoming_miniflux_entry_id=entry.id,
+    )
 
 
 @pytest.mark.asyncio

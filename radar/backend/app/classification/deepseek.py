@@ -309,7 +309,7 @@ class DeepSeekClient:
                 body=(text or str(data))[:500],
             )
 
-        usage = data.get("usage") or {}
+        usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
         total = usage.get("total_tokens")
         try:
             tokens = int(total) if total is not None else None
@@ -324,7 +324,7 @@ class DeepSeekClient:
             uses_ollama_think_protocol(use_model),
             tokens,
         )
-        return text, tokens
+        return text, usage
 
 
 # Nome descrittivo per nuovi call-site (stesso client).

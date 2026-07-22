@@ -45,10 +45,11 @@ class LockSimulatingConnection:
 
     async def _mock_fetchrow(self, query: str, *args: Any) -> dict[str, Any] | None:
         query_clean = " ".join(query.split())
-        if "SELECT o.status" in query_clean:
+        if "outbox_status" in query_clean or "o.status" in query_clean:
             url = args[0]
             if url in self.db_articles:
                 return {
+                    "id": 123,
                     "outbox_status": "completed",
                     "primary_category": "Geopolitica",
                     "country_code": "US",
@@ -108,9 +109,10 @@ async def test_concurrent_same_url_serialization(mock_commit) -> None:
     state.classification_client = AsyncMock()
     
     # Configure Gemini mock with a sleep to ensure overlap
-    async def slow_classify(*args: Any, **kwargs: Any) -> GeopoliticalArticleSchema:
+    async def slow_classify(*args: Any, **kwargs: Any) -> ClassificationResult:
+        from app.classification.client import ClassificationResult
         await asyncio.sleep(0.1)
-        return GeopoliticalArticleSchema(
+        art = GeopoliticalArticleSchema(
             title="Concurrent Title",
             summary="summary",
             published_at="2026-07-14",
@@ -125,6 +127,13 @@ async def test_concurrent_same_url_serialization(mock_commit) -> None:
             infrastructural_entities="Nessuno",
             related_countries="Nessuno",
             relevance_level=3,
+        )
+        return ClassificationResult(
+            article=art,
+            classification_lane="simple",
+            classified_by_model="test",
+            classified_by_provider="test",
+            was_escalated=False,
         )
     state.classification_client.classify_article.side_effect = slow_classify
 

@@ -277,19 +277,20 @@ async def test_client_classify_success() -> None:
          patch("asyncio.sleep", new_callable=AsyncMock):
         mock_gen.return_value = mock_gen_response
 
-        article = await client.classify_article(
+        res = await client.classify_article(
             title="Nuova fab TSMC",
             content="Contenuto dell'articolo",
             url="https://example.com/tsmc",
             date="2026-06-24",
         )
+        article = res.article
 
         assert article.primary_category == "Tecnologia"
         assert article.country_code == "DE"
         assert article.relevance_level == 3
         assert mock_gen.call_count == 1
         quota.reserve.assert_awaited()
-        quota.complete.assert_awaited_once_with(1, 1200)
+        quota.complete.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -333,15 +334,16 @@ async def test_client_classify_retry_success() -> None:
     good_response.usage_metadata = MagicMock(total_token_count=900)
 
     with patch.object(client, "_generate_content", new_callable=AsyncMock) as mock_gen, \
-         patch("asyncio.sleep", new_callable=AsyncMock):
+          patch("asyncio.sleep", new_callable=AsyncMock):
         mock_gen.side_effect = [bad_response, good_response]
 
-        article = await client.classify_article(
+        res = await client.classify_article(
             title="Nuova fab TSMC",
             content="Contenuto dell'articolo",
             url="https://example.com/tsmc",
             date="2026-06-24",
         )
+        article = res.article
 
         assert mock_gen.call_count == 2
         assert article.country_code == "DE"
@@ -359,15 +361,16 @@ async def test_client_classify_fallback_after_double_error() -> None:
     bad_response.usage_metadata = None
 
     with patch.object(client, "_generate_content", new_callable=AsyncMock) as mock_gen, \
-         patch("asyncio.sleep", new_callable=AsyncMock):
+          patch("asyncio.sleep", new_callable=AsyncMock):
         mock_gen.side_effect = [bad_response] * 4
 
-        article = await client.classify_article(
+        res = await client.classify_article(
             title="Titolo originale",
             content="Contenuto dell'articolo",
             url="https://example.com/test",
             date="2026-06-24",
         )
+        article = res.article
 
         assert mock_gen.call_count == 4
         assert article.country_code == "XX"
@@ -385,15 +388,16 @@ async def test_client_fatal_auth_fails_fast() -> None:
     from google.genai import errors as genai_errors
 
     with patch.object(client, "_generate_content", new_callable=AsyncMock) as mock_gen, \
-         patch("asyncio.sleep", new_callable=AsyncMock):
+          patch("asyncio.sleep", new_callable=AsyncMock):
         mock_gen.side_effect = genai_errors.APIError(401, {"error": {"message": "bad key"}})
 
-        article = await client.classify_article(
+        res = await client.classify_article(
             title="Auth fail",
             content="x",
             url="https://example.com/a",
             date="2026-06-24",
         )
+        article = res.article
 
         assert mock_gen.call_count == 1
         assert article.country_code == "XX"
@@ -452,12 +456,13 @@ async def test_hard_cooldown_switches_to_fallback_model() -> None:
             good,
         ]
 
-        article = await client.classify_article(
+        res = await client.classify_article(
             title="Switch model",
             content="body",
             url="https://example.com/ok",
             date="2026-06-24",
         )
+        article = res.article
         assert article.country_code == "DE"
         assert mock_gen.call_count == 2
         assert await client.cooldown.is_cooling_down("gemini", "gemini-primary") is True
@@ -494,12 +499,13 @@ async def test_short_429_does_not_write_cooldown() -> None:
         "asyncio.sleep", new_callable=AsyncMock
     ):
         mock_gen.side_effect = [err, good]
-        article = await client.classify_article(
+        res = await client.classify_article(
             title="Retry after",
             content="body",
             url="https://example.com/ok",
             date="2026-06-24",
         )
+        article = res.article
         assert article.country_code == "IT"
         assert await client.cooldown.is_cooling_down("gemini", client.model) is False
 

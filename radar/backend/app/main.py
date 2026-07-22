@@ -580,3 +580,223 @@ async def articles_events() -> StreamingResponse:
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 013 — Metrics & Diagnostics Endpoints (Read-Only)
+# ---------------------------------------------------------------------------
+
+from datetime import date, datetime, time as time_type, timedelta, timezone
+from zoneinfo import ZoneInfo
+from fastapi import Query
+
+
+def _parse_metrics_date_range(
+    from_str: str | None, to_str: str | None
+) -> tuple[datetime, datetime, str, str]:
+    """Valida e converte date YYYY-MM-DD nella finestra half-open in RADAR_TIME_ZONE."""
+    try:
+        tz = ZoneInfo(RADAR_TIME_ZONE)
+    except Exception:
+        tz = timezone.utc
+
+    today = datetime.now(tz).date()
+
+    if from_str:
+        try:
+            d_from = date.fromisoformat(from_str.strip())
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400, detail="Invalid 'from' date format. Expected YYYY-MM-DD."
+            ) from exc
+    else:
+        d_from = today
+
+    if to_str:
+        try:
+            d_to = date.fromisoformat(to_str.strip())
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400, detail="Invalid 'to' date format. Expected YYYY-MM-DD."
+            ) from exc
+    else:
+        d_to = today
+
+    if d_from > d_to:
+        raise HTTPException(
+            status_code=400, detail="'from' date cannot be after 'to' date."
+        )
+
+    start_dt = datetime.combine(d_from, time_type.min, tzinfo=tz)
+    end_dt = datetime.combine(d_to + timedelta(days=1), time_type.min, tzinfo=tz)
+    return start_dt, end_dt, d_from.isoformat(), d_to.isoformat()
+
+
+@app.get("/api/metrics/summary")
+async def get_metrics_summary(
+    from_date: str | None = Query(default=None, alias="from"),
+    to_date: str | None = Query(default=None, alias="to"),
+) -> dict[str, Any]:
+    """Riepilogo metriche globali FinOps, latenza e deduplicazione nel periodo specificato."""
+    start_dt, end_dt, from_str, to_str = _parse_metrics_date_range(from_date, to_date)
+
+    if state.db_pool is None:
+        raise HTTPException(status_code=503, detail="database_unavailable")
+
+    async with state.db_pool.acquire() as conn:
+        art_row = await conn.fetchrow(
+            """
+            SELECT
+                COUNT(*)::INT AS total_articles,
+                COALESCE(SUM(clean_text_chars), 0)::BIGINT AS total_clean_chars,
+                COALESCE(SUM(clean_text_words), 0)::BIGINT AS total_clean_words,
+                AVG(pipeline_latency_ms)::FLOAT AS avg_pipeline_latency_ms,
+                AVG(embedding_time_ms)::FLOAT AS avg_embedding_time_ms
+            FROM articles
+            WHERE created_at >= $1 AND created_at < $2
+            """,
+            start_dt,
+            end_dt,
+        )
+
+        llm_row = await conn.fetchrow(
+            """
+            SELECT
+                COUNT(*)::INT AS total_requests,
+                COALESCE(SUM(prompt_tokens), 0)::BIGINT AS total_prompt_tokens,
+                COALESCE(SUM(completion_tokens), 0)::BIGINT AS total_completion_tokens,
+                COALESCE(SUM(cached_prompt_tokens), 0)::BIGINT AS total_cached_tokens,
+                AVG(execution_time_ms)::FLOAT AS avg_execution_time_ms
+            FROM llm_request_ledger
+            WHERE created_at >= $1 AND created_at < $2
+            """,
+            start_dt,
+            end_dt,
+        )
+
+        dedup_row = await conn.fetchrow(
+            """
+            SELECT
+                COUNT(*)::INT AS total_events,
+                COUNT(*) FILTER (WHERE dedup_kind = 'url_exact')::INT AS url_exact_count,
+                COUNT(*) FILTER (WHERE dedup_kind = 'semantic_vector')::INT AS semantic_count
+            FROM article_dedup_events
+            WHERE created_at >= $1 AND created_at < $2
+            """,
+            start_dt,
+            end_dt,
+        )
+
+    return {
+        "from": from_str,
+        "to": to_str,
+        "total_articles": art_row["total_articles"] if art_row else 0,
+        "total_clean_chars": art_row["total_clean_chars"] if art_row else 0,
+        "total_clean_words": art_row["total_clean_words"] if art_row else 0,
+        "avg_pipeline_latency_ms": round(art_row["avg_pipeline_latency_ms"], 2) if art_row and art_row["avg_pipeline_latency_ms"] is not None else None,
+        "avg_embedding_time_ms": round(art_row["avg_embedding_time_ms"], 2) if art_row and art_row["avg_embedding_time_ms"] is not None else None,
+        "llm": {
+            "total_requests": llm_row["total_requests"] if llm_row else 0,
+            "total_prompt_tokens": llm_row["total_prompt_tokens"] if llm_row else 0,
+            "total_completion_tokens": llm_row["total_completion_tokens"] if llm_row else 0,
+            "total_cached_prompt_tokens": llm_row["total_cached_tokens"] if llm_row else 0,
+            "avg_execution_time_ms": round(llm_row["avg_execution_time_ms"], 2) if llm_row and llm_row["avg_execution_time_ms"] is not None else None,
+        },
+        "dedup": {
+            "total_events": dedup_row["total_events"] if dedup_row else 0,
+            "url_exact_count": dedup_row["url_exact_count"] if dedup_row else 0,
+            "semantic_vector_count": dedup_row["semantic_count"] if dedup_row else 0,
+        },
+    }
+
+
+@app.get("/api/metrics/by-feed")
+async def get_metrics_by_feed(
+    from_date: str | None = Query(default=None, alias="from"),
+    to_date: str | None = Query(default=None, alias="to"),
+) -> dict[str, Any]:
+    """Metriche raggruppate per feed Miniflux."""
+    start_dt, end_dt, from_str, to_str = _parse_metrics_date_range(from_date, to_date)
+
+    if state.db_pool is None:
+        raise HTTPException(status_code=503, detail="database_unavailable")
+
+    async with state.db_pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT
+                feed_id,
+                feed_domain,
+                feed_title,
+                COUNT(*)::INT AS article_count,
+                COALESCE(SUM(clean_text_chars), 0)::BIGINT AS total_clean_chars,
+                AVG(clean_text_chars)::FLOAT AS avg_clean_chars,
+                AVG(pipeline_latency_ms)::FLOAT AS avg_pipeline_latency_ms,
+                AVG(embedding_time_ms)::FLOAT AS avg_embedding_time_ms
+            FROM articles
+            WHERE created_at >= $1 AND created_at < $2
+            GROUP BY feed_id, feed_domain, feed_title
+            ORDER BY article_count DESC
+            """,
+            start_dt,
+            end_dt,
+        )
+
+    items = [
+        {
+            "feed_id": r["feed_id"],
+            "feed_domain": r["feed_domain"],
+            "feed_title": r["feed_title"],
+            "article_count": r["article_count"],
+            "total_clean_chars": r["total_clean_chars"],
+            "avg_clean_chars": round(r["avg_clean_chars"], 2) if r["avg_clean_chars"] is not None else None,
+            "avg_pipeline_latency_ms": round(r["avg_pipeline_latency_ms"], 2) if r["avg_pipeline_latency_ms"] is not None else None,
+            "avg_embedding_time_ms": round(r["avg_embedding_time_ms"], 2) if r["avg_embedding_time_ms"] is not None else None,
+        }
+        for r in rows
+    ]
+
+    return {"from": from_str, "to": to_str, "items": items}
+
+
+@app.get("/api/metrics/dedup")
+async def get_metrics_dedup(
+    from_date: str | None = Query(default=None, alias="from"),
+    to_date: str | None = Query(default=None, alias="to"),
+) -> dict[str, Any]:
+    """Metriche raggruppate per tipo di evento di deduplicazione e azione intrapresa."""
+    start_dt, end_dt, from_str, to_str = _parse_metrics_date_range(from_date, to_date)
+
+    if state.db_pool is None:
+        raise HTTPException(status_code=503, detail="database_unavailable")
+
+    async with state.db_pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT
+                dedup_kind,
+                action_taken,
+                COUNT(*)::INT AS event_count,
+                AVG(cosine_distance)::FLOAT AS avg_cosine_distance,
+                AVG(confidence)::FLOAT AS avg_confidence
+            FROM article_dedup_events
+            WHERE created_at >= $1 AND created_at < $2
+            GROUP BY dedup_kind, action_taken
+            ORDER BY event_count DESC
+            """,
+            start_dt,
+            end_dt,
+        )
+
+    items = [
+        {
+            "dedup_kind": r["dedup_kind"],
+            "action_taken": r["action_taken"],
+            "event_count": r["event_count"],
+            "avg_cosine_distance": round(r["avg_cosine_distance"], 4) if r["avg_cosine_distance"] is not None else None,
+            "avg_confidence": round(r["avg_confidence"], 4) if r["avg_confidence"] is not None else None,
+        }
+        for r in rows
+    ]
+
+    return {"from": from_str, "to": to_str, "items": items}

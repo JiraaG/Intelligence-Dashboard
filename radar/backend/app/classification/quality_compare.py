@@ -139,6 +139,7 @@ async def compare_articles_quality(
     incoming_text: str,
     incoming_url: str,
     prefilter_ratio: float = SEMANTIC_PREFILTER_LEN_RATIO,
+    miniflux_entry_id: int | None = None,
 ) -> QualityCompareResult:
     """Esegue lo scontro di qualità tra due articoli near-duplicate.
 
@@ -147,6 +148,9 @@ async def compare_articles_quality(
     3. Rispetta QuotaLedger con purpose="quality:compare", lane="complex".
     4. Emette un risultato validato oppure fail-safe keep su errore.
     """
+    import time
+    from app.classification.client import extract_usage_tokens
+
     # 1. Prefilter: keep existing solo se l'incoming è chiaramente più corto
     # (D15: len_new < len_existing * ratio). Se l'incoming è più lungo → LLM.
     len_exist = len(existing_text.strip())
@@ -191,6 +195,7 @@ async def compare_articles_quality(
     model = LLM_COMPLEX.model
 
     reservation_id = None
+    t_start = time.monotonic()
     try:
         reservation_id = await quota.reserve(
             estimated_tokens=1500,
@@ -198,6 +203,7 @@ async def compare_articles_quality(
             purpose="quality:compare",
             provider=provider,
             lane="complex",
+            miniflux_entry_id=miniflux_entry_id,
         )
     except (QuotaBudgetExceeded, QuotaDailyExceeded) as exc:
         logger.warning(
@@ -221,7 +227,7 @@ async def compare_articles_quality(
         )
 
     json_text: str | None = None
-    actual_tokens: int | None = None
+    raw_response_obj: Any = None
 
     try:
         if provider == "gemini":
@@ -242,10 +248,8 @@ async def compare_articles_quality(
                 )
 
             res = await asyncio.to_thread(_call_gemini)
+            raw_response_obj = res
             json_text = getattr(res, "text", None)
-            usage = getattr(res, "usage_metadata", None)
-            if usage:
-                actual_tokens = getattr(usage, "total_token_count", None)
 
         elif provider in OPENAI_COMPAT_PROVIDERS:
             # OpenAI-compat via httpx (DeepSeek / OpenAI / GLM / Grok)
@@ -276,6 +280,7 @@ async def compare_articles_quality(
                 resp.raise_for_status()
 
                 body = resp.json()
+                raw_response_obj = body
                 try:
                     message = body["choices"][0]["message"]
                     if not isinstance(message, dict):
@@ -283,13 +288,11 @@ async def compare_articles_quality(
                     json_text = extract_assistant_json_text(message)
                 except (KeyError, IndexError, TypeError) as exc:
                     raise ValueError(f"quality:compare response shape: {exc}") from exc
-                usage_dict = body.get("usage")
-                if isinstance(usage_dict, dict):
-                    actual_tokens = usage_dict.get("total_tokens")
 
         else:
             logger.error("Provider non supportato per quality:compare: %s", provider)
-            await quota.fail(reservation_id)
+            exec_time_ms = int((time.monotonic() - t_start) * 1000)
+            await quota.fail(reservation_id, execution_time_ms=exec_time_ms, error_code="UnsupportedProvider")
             return QualityCompareResult(
                 same_story=True,
                 winner="existing",
@@ -301,7 +304,16 @@ async def compare_articles_quality(
             raise ValueError("Risposta LLM vuota o non decodificabile")
 
         result = QualityCompareResult.model_validate_json(json_text)
-        await quota.complete(reservation_id, actual_tokens or 1500)
+        exec_time_ms = int((time.monotonic() - t_start) * 1000)
+        p_tok, c_tok, cached_tok = extract_usage_tokens(raw_response_obj, provider)
+        await quota.complete(
+            reservation_id,
+            prompt_tokens=p_tok,
+            completion_tokens=c_tok,
+            cached_prompt_tokens=cached_tok,
+            execution_time_ms=exec_time_ms,
+            http_status=200,
+        )
 
         logger.info(
             "Quality compare OK per '%s': same_story=%s winner=%s conf=%.2f reason='%s'",
@@ -319,8 +331,13 @@ async def compare_articles_quality(
             incoming_title[:40],
             err,
         )
+        exec_time_ms = int((time.monotonic() - t_start) * 1000)
         if reservation_id is not None:
-            await quota.fail(reservation_id, actual_tokens=actual_tokens)
+            await quota.fail(
+                reservation_id,
+                execution_time_ms=exec_time_ms,
+                error_code=err.__class__.__name__,
+            )
 
         return QualityCompareResult(
             same_story=True,

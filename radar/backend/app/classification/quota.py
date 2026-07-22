@@ -261,6 +261,7 @@ class QuotaLedger:
         purpose: str | None = None,
         provider: str | None = None,
         lane: str | None = None,
+        miniflux_entry_id: int | None = None,
     ) -> int:
         """Riserva capacità sulla lane **prima** di una chiamata provider.
 
@@ -274,6 +275,7 @@ class QuotaLedger:
             purpose: Ignorato per i limiti — ricalcolato da ``purpose_for_lane``.
             provider: Solo se ``lane`` assente (mapping legacy).
             lane: Lane dei contatori RPM/TPM/RPD/budget.
+            miniflux_entry_id: ID entry Miniflux correlata pre-commit.
         Returns:
             ``reservation_id`` da ``complete`` / ``fail`` / ``release``.
         Raises:
@@ -314,6 +316,7 @@ class QuotaLedger:
                 purpose=purpose_value,
                 provider=provider,
                 lane=quota_lane,
+                miniflux_entry_id=miniflux_entry_id,
             )
             if outcome.reservation_id is not None:
                 async with self._spacing_lock:
@@ -330,31 +333,60 @@ class QuotaLedger:
             )
             await self._sleep(wait)
 
-    async def complete(self, reservation_id: int, actual_tokens: int) -> None:
-        """Chiude una reservation con successo: status ``completed`` + token reali.
+    async def complete(
+        self,
+        reservation_id: int,
+        actual_tokens: int | None = None,
+        *,
+        prompt_tokens: int | None = None,
+        completion_tokens: int | None = None,
+        cached_prompt_tokens: int | None = None,
+        execution_time_ms: int | None = None,
+        http_status: int | None = None,
+        error_code: str | None = None,
+    ) -> None:
+        """Chiude una reservation con successo: status ``completed`` + token reali e FinOps.
 
         No-op warning se la riga non è più ``reserved`` (già chiusa / id errato).
         """
-        tokens = max(0, int(actual_tokens))
+        if prompt_tokens is not None or completion_tokens is not None:
+            tokens: int | None = (prompt_tokens or 0) + (completion_tokens or 0)
+        elif actual_tokens is not None:
+            tokens = max(0, int(actual_tokens))
+        else:
+            tokens = None
+
         row = await self._pool.fetchrow(
             "SELECT lane FROM llm_request_ledger WHERE id = $1",
             reservation_id,
         )
         lane = row["lane"] if row and row["lane"] else LANE_SIMPLE
         limits = self._limits.get(_normalize_lane(lane), self._limits[LANE_SIMPLE])
-        cost = estimate_usd(tokens, limits.usd_per_1m_tokens)
+        cost = estimate_usd(tokens or 0, limits.usd_per_1m_tokens)
 
         result = await self._pool.execute(
             """
             UPDATE llm_request_ledger
-            SET actual_tokens = $2,
-                estimated_cost_usd = $3,
+            SET actual_tokens = COALESCE($2, actual_tokens),
+                prompt_tokens = $3,
+                completion_tokens = $4,
+                cached_prompt_tokens = $5,
+                execution_time_ms = $6,
+                http_status = $7,
+                error_code = $8,
+                estimated_cost_usd = $9,
                 status = 'completed'
             WHERE id = $1
               AND status = 'reserved'
             """,
             reservation_id,
             tokens,
+            prompt_tokens,
+            completion_tokens,
+            cached_prompt_tokens,
+            execution_time_ms,
+            http_status,
+            error_code,
             cost,
         )
         if result == "UPDATE 0":
@@ -388,22 +420,46 @@ class QuotaLedger:
         reservation_id: int,
         *,
         actual_tokens: int | None = None,
+        prompt_tokens: int | None = None,
+        completion_tokens: int | None = None,
+        cached_prompt_tokens: int | None = None,
+        execution_time_ms: int | None = None,
+        http_status: int | None = None,
+        error_code: str | None = None,
     ) -> None:
         """Marca tentativo fallito: status ``failed`` (occupa ancora RPM/TPM/RPD del giorno).
 
         Usato dopo errore provider o ValidationError con chiamata già avviata.
         """
-        tokens = None if actual_tokens is None else max(0, int(actual_tokens))
+        if prompt_tokens is not None or completion_tokens is not None:
+            tokens: int | None = (prompt_tokens or 0) + (completion_tokens or 0)
+        elif actual_tokens is not None:
+            tokens = max(0, int(actual_tokens))
+        else:
+            tokens = None
+
         result = await self._pool.execute(
             """
             UPDATE llm_request_ledger
             SET status = 'failed',
-                actual_tokens = COALESCE($2, actual_tokens)
+                actual_tokens = COALESCE($2, actual_tokens),
+                prompt_tokens = $3,
+                completion_tokens = $4,
+                cached_prompt_tokens = $5,
+                execution_time_ms = $6,
+                http_status = $7,
+                error_code = $8
             WHERE id = $1
               AND status = 'reserved'
             """,
             reservation_id,
             tokens,
+            prompt_tokens,
+            completion_tokens,
+            cached_prompt_tokens,
+            execution_time_ms,
+            http_status,
+            error_code,
         )
         if result == "UPDATE 0":
             logger.warning(
@@ -433,6 +489,7 @@ class QuotaLedger:
         purpose: str,
         provider: str | None = None,
         lane: str,
+        miniflux_entry_id: int | None = None,
     ) -> _ReserveOutcome:
         """Un tentativo sotto ``pg_advisory_xact_lock``: budget → RPM → TPM → RPD → INSERT.
 
@@ -584,9 +641,10 @@ class QuotaLedger:
                         purpose,
                         lane,
                         provider,
-                        estimated_cost_usd
+                        estimated_cost_usd,
+                        miniflux_entry_id
                     )
-                    VALUES ($1, 'reserved', $2, $3, $4, $5, $6)
+                    VALUES ($1, 'reserved', $2, $3, $4, $5, $6, $7)
                     RETURNING id
                     """,
                     estimated_tokens,
@@ -595,6 +653,7 @@ class QuotaLedger:
                     lane,
                     provider,
                     cost_est,
+                    miniflux_entry_id,
                 )
                 if reservation_id is None:
                     raise RuntimeError("INSERT llm_request_ledger non ha restituito id")

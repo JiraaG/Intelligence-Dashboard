@@ -21,6 +21,7 @@ import json
 import logging
 import signal
 import struct
+import time
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -272,6 +273,16 @@ async def stop_postgres_trigger_listener(state: WorkerState) -> None:
     state._trigger_callback = None
 
 
+def resolve_geo_method(article: GeopoliticalArticleSchema) -> str:
+    """Determina il metodo di risoluzione geografica (C4).
+
+    Valori ammessi: 'llm_extracted' | 'centroid_fallback' | 'unchanged'.
+    """
+    if article.country_code == "XX" or (article.latitude == 0.0 and article.longitude == 0.0):
+        return "centroid_fallback"
+    return "llm_extracted"
+
+
 async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry) -> bool:
     """Pipeline per-entry: lock URL → dedup → sanitize → classify → commit+outbox → vault.
 
@@ -285,6 +296,7 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
     assert state.db_sem is not None
     assert state.gemini_sem is not None
 
+    pipeline_start = time.monotonic()
     entry_id = entry.id
     source_url = entry.source_url
     title = entry.title
@@ -317,6 +329,7 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                         row = await conn.fetchrow(
                             """
                             SELECT
+                                a.id,
                                 o.status AS outbox_status,
                                 a.primary_category,
                                 a.country_code,
@@ -336,6 +349,19 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                                 title[:50],
                             )
                             return True
+
+                        # Registra evento dedup URL exact (C3)
+                        await record_dedup_event(
+                            conn,
+                            incoming_url=source_url,
+                            existing_article_id=row.get("id"),
+                            winner="existing",
+                            cosine_distance=None,
+                            dedup_kind="url_exact",
+                            action_taken="kept_existing",
+                            feed_id=entry.feed_id,
+                            incoming_miniflux_entry_id=entry.id,
+                        )
 
                         outbox_status = row["outbox_status"]
 
@@ -415,11 +441,14 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                         clean_content = strip_html_tags(entry.content)
 
                     # 1. Deduplicazione semantica pre-LLM (embeddings + pgvector)
+                    embed_start = time.monotonic()
                     embedding = (
                         await asyncio.to_thread(generate_embedding, title, clean_content)
                         if SEMANTIC_DEDUP_ENABLED
                         else None
                     )
+                    embed_time_ms = int((time.monotonic() - embed_start) * 1000) if embedding is not None else None
+
                     candidate = (
                         await find_near_duplicate(conn, embedding)
                         if embedding
@@ -435,6 +464,7 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                             incoming_title=title,
                             incoming_text=clean_content,
                             incoming_url=source_url,
+                            miniflux_entry_id=entry_id,
                         )
 
                         if cmp_result.same_story and cmp_result.winner == "existing":
@@ -448,6 +478,10 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                                 same_story=True,
                                 confidence=cmp_result.confidence,
                                 reason=cmp_result.reason,
+                                dedup_kind="semantic_vector",
+                                action_taken="kept_existing",
+                                feed_id=entry.feed_id,
+                                incoming_miniflux_entry_id=entry.id,
                             )
                             logger.info(
                                 "Semantic dedup: keep existing per '%s' (vs '%s')",
@@ -459,13 +493,14 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
 
                         elif cmp_result.same_story and cmp_result.winner == "incoming":
                             # Articolo incoming vince: classify incoming + replace in-place stesso ID
-                            extracted_article = await state.classification_client.classify_article(
+                            cls_res = await state.classification_client.classify_article(
                                 title=title,
                                 content=clean_content,
                                 url=source_url,
                                 date=published_date,
+                                miniflux_entry_id=entry_id,
                             )
-                            extracted_article = extracted_article.model_copy(
+                            extracted_article = cls_res.article.model_copy(
                                 update={
                                     "source_url": source_url,
                                     "published_at": published_date,
@@ -473,6 +508,11 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                             )
                             md_content = generate_markdown_content(extracted_article)
                             file_path = get_article_file_path(extracted_article, vault_path=OBSIDIAN_VAULT_PATH)
+
+                            clean_chars = len(clean_content)
+                            clean_words = len(clean_content.split())
+                            pipeline_lat_ms = int((time.monotonic() - pipeline_start) * 1000)
+                            geo_method = resolve_geo_method(extracted_article)
 
                             await replace_article_in_place(
                                 conn,
@@ -484,6 +524,27 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                                 miniflux_entry_id=entry_id,
                                 body_excerpt=clean_content[:8000],
                                 embedding=embedding,
+                                feed_id=entry.feed_id,
+                                feed_domain=entry.feed_domain,
+                                classification_lane=cls_res.classification_lane,
+                                classified_by_model=cls_res.classified_by_model,
+                                classified_by_provider=cls_res.classified_by_provider,
+                                was_escalated=cls_res.was_escalated,
+                                dedup_kind="semantic_vector",
+                                dedup_match_article_id=candidate.id,
+                                dedup_action="replaced_in_place",
+                                clean_text_chars=clean_chars,
+                                clean_text_words=clean_words,
+                                embedding_time_ms=embed_time_ms,
+                                pipeline_latency_ms=pipeline_lat_ms,
+                                geo_resolution_method=geo_method,
+                            )
+
+                            # Post-commit ledger link (C2)
+                            await conn.execute(
+                                "UPDATE llm_request_ledger SET article_id = $1 WHERE miniflux_entry_id = $2 AND article_id IS NULL",
+                                candidate.id,
+                                entry_id,
                             )
 
                             await record_dedup_event(
@@ -495,6 +556,10 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                                 same_story=True,
                                 confidence=cmp_result.confidence,
                                 reason=cmp_result.reason,
+                                dedup_kind="semantic_vector",
+                                action_taken="replaced_in_place",
+                                feed_id=entry.feed_id,
+                                incoming_miniflux_entry_id=entry.id,
                             )
 
                             notify_payload = json.dumps(
@@ -551,18 +616,23 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                                 same_story=False,
                                 confidence=cmp_result.confidence,
                                 reason=cmp_result.reason,
+                                dedup_kind="semantic_vector",
+                                action_taken="kept_new",
+                                feed_id=entry.feed_id,
+                                incoming_miniflux_entry_id=entry.id,
                             )
 
                     # Nessun near-dup (o same_story==False): classificazione standard
-                    extracted_article = await state.classification_client.classify_article(
+                    cls_res = await state.classification_client.classify_article(
                         title=title,
                         content=clean_content,
                         url=source_url,
                         date=published_date,
+                        miniflux_entry_id=entry_id,
                     )
 
                     # Ground truth Miniflux: URL/data non fidati all'LLM.
-                    extracted_article = extracted_article.model_copy(
+                    extracted_article = cls_res.article.model_copy(
                         update={
                             "source_url": source_url,
                             "published_at": published_date,
@@ -571,6 +641,15 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
 
                     md_content = generate_markdown_content(extracted_article)
                     file_path = get_article_file_path(extracted_article, vault_path=OBSIDIAN_VAULT_PATH)
+
+                    clean_chars = len(clean_content)
+                    clean_words = len(clean_content.split())
+                    pipeline_lat_ms = int((time.monotonic() - pipeline_start) * 1000)
+                    geo_method = resolve_geo_method(extracted_article)
+
+                    dedup_k = "semantic_vector" if candidate is not None else "none"
+                    dedup_m = candidate.id if candidate is not None else None
+                    dedup_act = "kept_new" if candidate is not None else "inserted_new"
 
                     article_id = await commit_article_to_db(
                         conn,
@@ -581,6 +660,27 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                         miniflux_entry_id=entry_id,
                         body_excerpt=clean_content[:8000],
                         embedding=embedding,
+                        feed_id=entry.feed_id,
+                        feed_domain=entry.feed_domain,
+                        classification_lane=cls_res.classification_lane,
+                        classified_by_model=cls_res.classified_by_model,
+                        classified_by_provider=cls_res.classified_by_provider,
+                        was_escalated=cls_res.was_escalated,
+                        dedup_kind=dedup_k,
+                        dedup_match_article_id=dedup_m,
+                        dedup_action=dedup_act,
+                        clean_text_chars=clean_chars,
+                        clean_text_words=clean_words,
+                        embedding_time_ms=embed_time_ms,
+                        pipeline_latency_ms=pipeline_lat_ms,
+                        geo_resolution_method=geo_method,
+                    )
+
+                    # Post-commit ledger link (C2)
+                    await conn.execute(
+                        "UPDATE llm_request_ledger SET article_id = $1 WHERE miniflux_entry_id = $2 AND article_id IS NULL",
+                        article_id,
+                        entry_id,
                     )
 
                     # Fase B: Notifica processed per lo streaming SSE del frontend

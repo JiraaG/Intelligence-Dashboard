@@ -119,19 +119,24 @@ async def record_dedup_event(
     incoming_url: str,
     existing_article_id: Optional[Any],
     winner: str,
-    cosine_distance: float,
+    cosine_distance: Optional[float] = None,
     same_story: Optional[bool] = None,
     confidence: Optional[float] = None,
     reason: Optional[str] = None,
+    dedup_kind: str = "semantic_vector",
+    action_taken: Optional[str] = None,
+    feed_id: Optional[int] = None,
+    incoming_miniflux_entry_id: Optional[int] = None,
 ) -> int:
     """Inserisce un record di audit append-only nella tabella ``article_dedup_events``."""
     event_id = await conn.fetchval(
         """
         INSERT INTO article_dedup_events (
             incoming_url, existing_article_id, winner, cosine_distance,
-            same_story, confidence, reason
+            same_story, confidence, reason, dedup_kind, action_taken,
+            feed_id, incoming_miniflux_entry_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING id
         """,
         incoming_url,
@@ -141,5 +146,9 @@ async def record_dedup_event(
         same_story,
         confidence,
         reason,
+        dedup_kind,
+        action_taken,
+        feed_id,
+        incoming_miniflux_entry_id,
     )
-    return int(event_id)
+    return int(event_id) if event_id is not None else 0

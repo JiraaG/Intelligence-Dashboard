@@ -333,6 +333,63 @@ def _usage_token_count(response: Any) -> int | None:
 
 
 @dataclass(frozen=True, slots=True)
+class ClassificationResult:
+    """Risultato classificazione strutturata con metadati FinOps e diagnostici (C1)."""
+
+    article: GeopoliticalArticleSchema
+    classification_lane: str
+    classified_by_model: str
+    classified_by_provider: str
+    was_escalated: bool
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    cached_prompt_tokens: int | None = None
+    execution_time_ms: int | None = None
+    http_status: int | None = None
+    error_code: str | None = None
+
+
+def extract_usage_tokens(response_or_usage: Any, provider: str) -> tuple[int | None, int | None, int | None]:
+    """Estrae (prompt_tokens, completion_tokens, cached_prompt_tokens) da Gemini o OpenAI-compat (C6)."""
+    if response_or_usage is None:
+        return None, None, None
+    if provider == _PROVIDER_GEMINI:
+        meta = getattr(response_or_usage, "usage_metadata", None)
+        if meta is None and isinstance(response_or_usage, dict):
+            meta = response_or_usage.get("usage_metadata")
+        if meta is not None:
+            p = getattr(meta, "prompt_token_count", None)
+            if p is None and isinstance(meta, dict):
+                p = meta.get("prompt_token_count")
+            c = getattr(meta, "candidates_token_count", None)
+            if c is None and isinstance(meta, dict):
+                c = meta.get("candidates_token_count")
+            cached = getattr(meta, "cached_content_token_count", None)
+            if cached is None and isinstance(meta, dict):
+                cached = meta.get("cached_content_token_count")
+            return (
+                int(p) if p is not None else None,
+                int(c) if c is not None else None,
+                int(cached) if cached is not None else None,
+            )
+    else:  # OpenAI-compat / dict
+        usage = response_or_usage
+        if isinstance(response_or_usage, dict) and "usage" in response_or_usage:
+            usage = response_or_usage.get("usage")
+        if isinstance(usage, dict):
+            p = usage.get("prompt_tokens")
+            c = usage.get("completion_tokens")
+            details = usage.get("prompt_tokens_details")
+            cached = details.get("cached_tokens") if isinstance(details, dict) else None
+            return (
+                int(p) if p is not None else None,
+                int(c) if c is not None else None,
+                int(cached) if cached is not None else None,
+            )
+    return None, None, None
+
+
+@dataclass(frozen=True, slots=True)
 class _ModelRef:
     """Riferimento tentativo: adapter + modello + **quota_lane** (non Lane heuristic)."""
 
@@ -624,8 +681,9 @@ class ClassificationClient:
         content: str,
         url: str,
         date: str,
-    ) -> GeopoliticalArticleSchema:
-        """Estrae geopolitica strutturata; cascade/escalate secondo routing mode.
+        miniflux_entry_id: int | None = None,
+    ) -> ClassificationResult:
+        """Estrae geopolitica strutturata + metadati FinOps (C1); cascade/escalate secondo routing mode.
 
         Trunca ``content`` a 4000 (invariante tutte le lane). ``force_simple`` se
         mode≠complexity, shadow, o COMPLEX unavailable su BORDERLINE/COMPLEX.
@@ -669,7 +727,14 @@ class ClassificationClient:
             )
         if not chain:
             logger.error("Nessun modello eleggibile (tutti in cooldown). Fallback.")
-            return get_fallback_article(title, url, date)
+            fallback = get_fallback_article(title, url, date)
+            return ClassificationResult(
+                article=fallback,
+                classification_lane=LANE_SIMPLE,
+                classified_by_model="fallback",
+                classified_by_provider="fallback",
+                was_escalated=False,
+            )
 
         escalate_ref = _ModelRef(
             self._complex_provider,
@@ -679,15 +744,17 @@ class ClassificationClient:
         )
         escalated = False
         for ref in chain:
-            article, outcome = await self._run_model_attempts(
+            res, outcome = await self._run_model_attempts(
                 ref,
                 title=title,
                 content=truncated,
                 url=url,
                 date=date,
                 lane=lane,
+                miniflux_entry_id=miniflux_entry_id,
+                was_escalated=escalated,
             )
-            if article is not None:
+            if res is not None:
                 logger.info(
                     "OK model=%s/%s effort=%s lane=%s escalated=%s",
                     ref.provider,
@@ -696,10 +763,17 @@ class ClassificationClient:
                     lane.value,
                     escalated,
                 )
-                return article
+                return res
 
             if outcome == "fatal_auth":
-                return get_fallback_article(title, url, date)
+                fallback = get_fallback_article(title, url, date)
+                return ClassificationResult(
+                    article=fallback,
+                    classification_lane=ref.quota_lane,
+                    classified_by_model="fallback",
+                    classified_by_provider="fallback",
+                    was_escalated=escalated,
+                )
 
             # Escalate una volta verso primary COMPLEX se identity diversa e disponibile.
             can_escalate = (
@@ -719,7 +793,7 @@ class ClassificationClient:
                 can_escalate = False
             if can_escalate:
                 escalated = True
-                article, _ = await self._run_model_attempts(
+                res_esc, _ = await self._run_model_attempts(
                     escalate_ref,
                     title=title,
                     content=truncated,
@@ -727,21 +801,30 @@ class ClassificationClient:
                     date=date,
                     lane=lane,
                     max_attempts=2,
+                    miniflux_entry_id=miniflux_entry_id,
+                    was_escalated=True,
                 )
-                if article is not None:
+                if res_esc is not None:
                     logger.info(
                         "Escalation %s/%s OK per '%s'",
                         escalate_ref.provider,
                         escalate_ref.model,
                         title[:50],
                     )
-                    return article
+                    return res_esc
                 continue
 
             continue
 
         logger.error("Tutti i modelli esauriti per '%s'. Fallback.", title[:50])
-        return get_fallback_article(title, url, date)
+        fallback = get_fallback_article(title, url, date)
+        return ClassificationResult(
+            article=fallback,
+            classification_lane=LANE_SIMPLE,
+            classified_by_model="fallback",
+            classified_by_provider="fallback",
+            was_escalated=escalated,
+        )
 
     async def _run_model_attempts(
         self,
@@ -753,16 +836,20 @@ class ClassificationClient:
         date: str,
         lane: Lane,
         max_attempts: int | None = None,
-    ) -> tuple[GeopoliticalArticleSchema | None, str]:
+        miniflux_entry_id: int | None = None,
+        was_escalated: bool = False,
+    ) -> tuple[ClassificationResult | None, str]:
         """Loop tentativi su un ``_ModelRef``: reserve → call → validate → retry/cooldown.
 
         Returns:
-            ``(article|None, outcome)`` con outcome in
+            ``(ClassificationResult|None, outcome)`` con outcome in
             ``ok | exhausted | escalate | fatal_auth | hard_cooldown``.
         Side-effects:
             Ledger reserve/complete/fail/release; eventuale ``set_cooldown``;
             sleep Retry-After o backoff.
         """
+        import time
+
         is_local_ollama = uses_ollama_think_protocol(ref.model)
         attempts = max_attempts if max_attempts is not None else (
             _MAX_ATTEMPTS_LOCAL if is_local_ollama else _MAX_ATTEMPTS
@@ -784,6 +871,7 @@ class ClassificationClient:
             self.model = ref.model
 
         for attempt in range(attempts):
+            t_call_start = time.monotonic()
             try:
                 # Invariante SoT: reserve **prima** di ogni tentativo (anche retry).
                 reservation_id = await self.quota.reserve(
@@ -791,6 +879,7 @@ class ClassificationClient:
                     model=ref.model,
                     lane=ref.quota_lane,
                     provider=ref.provider,
+                    miniflux_entry_id=miniflux_entry_id,
                 )
             except QuotaBudgetExceeded as budget_err:
                 logger.warning(
@@ -799,7 +888,6 @@ class ClassificationClient:
                     ref.model,
                     budget_err,
                 )
-                # Soft-cap USD: skip provider per questo articolo — no cooldown 24h.
                 return None, "exhausted"
             except QuotaDailyExceeded as rpd_err:
                 logger.warning(
@@ -808,8 +896,6 @@ class ClassificationClient:
                     ref.model,
                     rpd_err,
                 )
-                # Cooldown così i prossimi articoli saltano questo modello;
-                # il residual (altra lane) resta nella chain.
                 await self.cooldown.set_cooldown(
                     ref.provider,
                     ref.model,
@@ -817,6 +903,7 @@ class ClassificationClient:
                 )
                 return None, "hard_cooldown"
             response_text: str | None = None
+            raw_response: Any = None
             provider_started = False
             try:
                 if attempt == 0:
@@ -840,7 +927,7 @@ class ClassificationClient:
                 if ref.provider in OPENAI_COMPAT_PROVIDERS:
                     compat = self._compat_client(ref.quota_lane)
 
-                    async def _compat_call() -> tuple[str, int | None]:
+                    async def _compat_call() -> tuple[str, Any]:
                         return await compat.classify_json(
                             title=title,
                             content=content,
@@ -850,35 +937,31 @@ class ClassificationClient:
                             model=ref.model,
                         )
 
-                    # Stesso sem di Gemini: serializza Ollama locale (Profilo F).
                     if self._gemini_sem is not None:
                         async with self._gemini_sem:
-                            response_text, tokens = await _compat_call()
+                            response_text, raw_response = await _compat_call()
                     else:
-                        response_text, tokens = await _compat_call()
-                    actual = tokens if tokens is not None else self._estimated_tokens
-                    await self.quota.complete(reservation_id, actual)
-                    reservation_id = -1  # già chiusa: evita double fail
-                    extracted = parse_llm_article_json(
-                        response_text,
-                        source_url=url,
-                        published_at=date,
-                        title=title,
-                    )
-                    return extracted, "ok"
-
-                if ref.provider == _PROVIDER_CLAUDE:
+                        response_text, raw_response = await _compat_call()
+                elif ref.provider == _PROVIDER_GEMINI:
+                    contents = history if attempt > 0 else user_message
+                    raw_response = await self._generate_content(contents=contents, model=ref.model)
+                    response_text = _extract_gemini_text(raw_response)
+                elif ref.provider == _PROVIDER_CLAUDE:
                     raise ConfigError("Provider claude non ancora supportato")
 
-                contents = history if attempt > 0 else user_message
-                response = await self._generate_content(contents=contents, model=ref.model)
-                actual_tokens = _usage_token_count(response)
+                exec_time_ms = int((time.monotonic() - t_call_start) * 1000)
+                p_tok, c_tok, cached_tok = extract_usage_tokens(raw_response, ref.provider)
+
                 await self.quota.complete(
                     reservation_id,
-                    actual_tokens if actual_tokens is not None else self._estimated_tokens,
+                    prompt_tokens=p_tok,
+                    completion_tokens=c_tok,
+                    cached_prompt_tokens=cached_tok,
+                    execution_time_ms=exec_time_ms,
+                    http_status=200,
                 )
-                reservation_id = -1  # già chiusa: evita double fail
-                response_text = _extract_gemini_text(response)
+                reservation_id = -1  # già chiusa
+
                 extracted = parse_llm_article_json(
                     response_text,
                     source_url=url,
@@ -891,14 +974,27 @@ class ClassificationClient:
                         attempt + 1,
                         title[:50],
                     )
-                return extracted, "ok"
+                res = ClassificationResult(
+                    article=extracted,
+                    classification_lane=ref.quota_lane,
+                    classified_by_model=ref.model,
+                    classified_by_provider=ref.provider,
+                    was_escalated=was_escalated,
+                    prompt_tokens=p_tok,
+                    completion_tokens=c_tok,
+                    cached_prompt_tokens=cached_tok,
+                    execution_time_ms=exec_time_ms,
+                    http_status=200,
+                    error_code=None,
+                )
+                return res, "ok"
 
             except asyncio.CancelledError:
-                # Pre-call → release; mid-call → fail (tentativo consumato).
+                exec_time_ms = int((time.monotonic() - t_call_start) * 1000)
                 if reservation_id >= 0:
                     try:
                         if provider_started:
-                            await self.quota.fail(reservation_id)
+                            await self.quota.fail(reservation_id, execution_time_ms=exec_time_ms, error_code="CancelledError")
                         else:
                             await self.quota.release(reservation_id)
                     except Exception as cleanup_err:
@@ -910,6 +1006,7 @@ class ClassificationClient:
                 raise
 
             except ValidationError as e:
+                exec_time_ms = int((time.monotonic() - t_call_start) * 1000)
                 error_msg = _exc_msg(e, 400)
                 validation_fails += 1
                 logger.error(
@@ -921,18 +1018,20 @@ class ClassificationClient:
                     error_msg[:200],
                 )
                 if reservation_id >= 0:
-                    await self.quota.fail(reservation_id)
+                    await self.quota.fail(
+                        reservation_id,
+                        execution_time_ms=exec_time_ms,
+                        http_status=200 if provider_started else None,
+                        error_code="ValidationError",
+                    )
 
-                # Cattura testo grezzo Gemini se validate fallisce dopo generate.
                 if (
                     ref.provider == _PROVIDER_GEMINI
                     and response_text is None
-                    and "response" in locals()
+                    and raw_response is not None
                 ):
-                    response_text = _extract_gemini_text(response)
+                    response_text = _extract_gemini_text(raw_response)
 
-                # BORDERLINE: escalate dopo la prima correction fallita (validation_fails≥2).
-                # SIMPLE Ollama: NESSUN escalate early — correction fino a esaurimento tentativi.
                 if (
                     self._escalate
                     and validation_fails >= 2
@@ -981,9 +1080,18 @@ class ClassificationClient:
                 raise
 
             except Exception as e:
+                exec_time_ms = int((time.monotonic() - t_call_start) * 1000)
                 kind = classify_provider_error(e)
+                http_code = getattr(e, "status_code", None) or getattr(e, "code", None)
+                err_code_str = e.__class__.__name__
+
                 if reservation_id >= 0:
-                    await self.quota.fail(reservation_id)
+                    await self.quota.fail(
+                        reservation_id,
+                        execution_time_ms=exec_time_ms,
+                        http_status=int(http_code) if isinstance(http_code, int) else None,
+                        error_code=err_code_str,
+                    )
 
                 if kind == ErrorClass.FATAL:
                     logger.error(
@@ -1008,7 +1116,6 @@ class ClassificationClient:
                         )
                     return None, "hard_cooldown"
 
-                # Locale SIMPLE: retry/correzione, mai escalate early verso DeepSeek.
                 is_local_simple = (
                     lane == Lane.SIMPLE
                     and uses_ollama_think_protocol(ref.model)
@@ -1048,7 +1155,6 @@ class ClassificationClient:
                     or (isinstance(e, DeepSeekError) and e.status_code == 429)
                 )
                 if is_429:
-                    # Floor evita Retry-After=0 thundering herd contro Studio RPM.
                     delay = 5.0 if retry_after is None else max(float(retry_after), 5.0)
                     delay = min(delay, _RETRY_AFTER_MAX_SECONDS)
                     logger.warning(
@@ -1071,7 +1177,6 @@ class ClassificationClient:
                     )
                     await asyncio.sleep(backoff)
                 else:
-                    # Esauriti i retry su questo modello — cooldown su 5xx Gemini ripetuti.
                     if isinstance(e, genai_errors.APIError) and getattr(e, "code", None) is not None:
                         code = getattr(e, "code", None)
                         if isinstance(code, int) and code >= 500:
@@ -1089,8 +1194,6 @@ class ClassificationClient:
                         _exc_msg(e),
                     )
 
-        # Validation esaurita sulla primary SIMPLE → escalate una volta a COMPLEX
-        # (solo se NON è Ollama locale: Profilo F deve restare sul modello locale).
         if (
             lane == Lane.SIMPLE
             and self._escalate

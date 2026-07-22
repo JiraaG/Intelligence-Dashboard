@@ -84,17 +84,22 @@ Schema applicato da `core/migrations.py` + SQL ordinati in `radar/backend/migrat
 | `009_llm_model_cooldown.sql` | cooldown durable (provider, model) |
 | `010_articles_is_saved.sql` | `articles.is_saved` + indice parziale (vault Notizie Salvate) |
 | `011_articles_related_countries.sql` | Aggiunta campo related_countries per grafo geospaziale |
+| `012_pgvector_article_embeddings.sql` | Estensione pgvector + embeddings 384d per dedup semantica |
+| `013_metrics_and_feed_tracking.sql` | Metriche denormalizzate articles, FinOps llm_request_ledger, tracciamento feed e dedup_events |
 
 Commit: transazione DB + riga outbox → reconcile vault → mark-read Miniflux **solo** se outbox `completed`.
 
 ### Ops scripts
 
-Solo `app/scripts/requeue_articles.py`. Comando canonico (da `radar/`, stack up):
+Solo `app/scripts/requeue_articles.py` e `verify_metrics_013.py`. Comando canonico (da `radar/`, stack up):
 
 ```bash
 docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20 --dry-run
 docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20
 docker compose restart radar-worker
+
+# Verification script GATE 013
+docker compose exec -T radar-worker python -m app.scripts.verify_metrics_013
 ```
 
 Effetti collaterali e prerequisiti: [runbook](../radar/docs/runbook.md).
@@ -122,6 +127,9 @@ CORS: middleware solo se `CORS_ALLOW_ORIGINS` non vuoto; metodi `GET`, `PATCH`, 
 | GET | `/api/map-relations` | `date`, `sentiment?`, `relevance_level?` | Righe undirected `source_country ↔ target_country` per categoria (+ volume). Semantica **star** v1: un arco per ogni coppia `(country_code, related)` via `LEAST/GREATEST` — **non** clique tra soli `related_countries` (es. US+IT+FR → US–IT e US–FR, non IT–FR). `XX` escluso. |
 | GET | `/api/saved-summary` | `sentiment?`, `relevance_level?` | Stessa shape di map-summary; solo `is_saved=true`; **senza date** |
 | GET | `/api/countries` | `date`, filtri opzionali | Rollup paese (`categories`, `article_count`) |
+| GET | `/api/metrics/summary` | `from?`, `to?` | Metrics globali FinOps, latenza pipeline/embedding, token LLM split e dedup events |
+| GET | `/api/metrics/by-feed` | `from?`, `to?` | Aggregazione per feed Miniflux (`feed_id`, `feed_domain`, `feed_title`, `clean_chars`, latenze) |
+| GET | `/api/metrics/dedup` | `from?`, `to?` | Aggregazione per tipo evento dedup (`dedup_kind`, `action_taken`, count, avg_cosine, avg_confidence) |
 | PATCH | `/api/articles/{id}/read_status` | `{ "is_read": bool }` | `{ "status", "is_read", "is_saved"? }` — unread ⇒ `is_saved=false` |
 | PATCH | `/api/articles/{id}/saved_status` | `{ "is_saved": bool }` | `{ "status", "is_saved", "is_read"? }` — save ⇒ `is_read=true` |
 

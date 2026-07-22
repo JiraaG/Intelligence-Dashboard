@@ -265,6 +265,18 @@ docker compose exec -T radar-worker python -m app.scripts.verify_semantic_dedup 
 docker compose exec -T radar-worker python -m app.scripts.verify_semantic_dedup
 ```
 
+### Verifica Metriche FinOps & Diagnostica (Fase 013)
+
+```bash
+# Script di verifica live DB e tabelle metriche/ledger/dedup (GATE 013)
+docker compose exec -T radar-worker python -m app.scripts.verify_metrics_013
+
+# Test live degli endpoint REST di diagnostica
+curl -s http://localhost/api/metrics/summary
+curl -s http://localhost/api/metrics/by-feed
+curl -s http://localhost/api/metrics/dedup
+```
+
 
 ### Forzare Leaflet legacy (ops / debug)
 
