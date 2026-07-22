@@ -373,15 +373,32 @@ def extract_usage_tokens(response_or_usage: Any, provider: str) -> tuple[int | N
                 int(c) if c is not None else None,
                 int(cached) if cached is not None else None,
             )
-    else:  # OpenAI-compat / dict
+    else:  # OpenAI-compat / dict / SDK object
         usage = response_or_usage
         if isinstance(response_or_usage, dict) and "usage" in response_or_usage:
             usage = response_or_usage.get("usage")
         if isinstance(usage, dict):
             p = usage.get("prompt_tokens")
             c = usage.get("completion_tokens")
-            details = usage.get("prompt_tokens_details")
-            cached = details.get("cached_tokens") if isinstance(details, dict) else None
+            cached = usage.get("prompt_cache_hit_tokens")
+            if cached is None:
+                details = usage.get("prompt_tokens_details")
+                cached = details.get("cached_tokens") if isinstance(details, dict) else None
+            return (
+                int(p) if p is not None else None,
+                int(c) if c is not None else None,
+                int(cached) if cached is not None else None,
+            )
+        elif usage is not None:
+            p = getattr(usage, "prompt_tokens", None)
+            c = getattr(usage, "completion_tokens", None)
+            cached = getattr(usage, "prompt_cache_hit_tokens", None)
+            if cached is None:
+                details = getattr(usage, "prompt_tokens_details", None)
+                if details is not None:
+                    cached = getattr(details, "cached_tokens", None)
+                    if cached is None and isinstance(details, dict):
+                        cached = details.get("cached_tokens")
             return (
                 int(p) if p is not None else None,
                 int(c) if c is not None else None,

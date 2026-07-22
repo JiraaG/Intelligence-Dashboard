@@ -9,7 +9,9 @@ SoT:
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import re
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -22,6 +24,30 @@ from app.core.config import (
 )
 
 logger = logging.getLogger("radar.extraction.semantic_dedup")
+
+
+def title_token_jaccard(title1: str, title2: str) -> float:
+    """Calcola la similarità Jaccard sui token dei titoli (lowercase, alfanumerici)."""
+    tokens1 = set(re.findall(r"\w+", (title1 or "").lower()))
+    tokens2 = set(re.findall(r"\w+", (title2 or "").lower()))
+    if not tokens1 or not tokens2:
+        return 0.0
+    intersection = tokens1 & tokens2
+    union = tokens1 | tokens2
+    return len(intersection) / len(union)
+
+
+def normalize_text_for_hash(title: str, body: str) -> str:
+    """Normalizza titolo e testo per SHA-256 (collapse whitespace, lowercase)."""
+    raw = f"{title or ''}\n{body or ''}"
+    return re.sub(r"\s+", " ", raw).strip().lower()
+
+
+def compute_content_sha256(title: str, body: str) -> str:
+    """Calcola l'hash SHA-256 (64 char hex) del testo normalizzato."""
+    norm = normalize_text_for_hash(title, body)
+    return hashlib.sha256(norm.encode("utf-8")).hexdigest()
+
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,3 +178,47 @@ async def record_dedup_event(
         incoming_miniflux_entry_id,
     )
     return int(event_id) if event_id is not None else 0
+
+
+async def find_article_by_content_hash(
+    conn: asyncpg.Connection,
+    content_sha256: str,
+    *,
+    lookback_hours: int = 24,
+) -> Optional[CandidateArticle]:
+    """Cerca un articolo esistente con lo stesso content_sha256 nelle ultime lookback_hours."""
+    if not content_sha256:
+        return None
+
+    row = await conn.fetchrow(
+        """
+        SELECT id, title, summary, published_at::text, source_url, country_code,
+               primary_category, COALESCE(body_excerpt, '') AS body_excerpt,
+               is_read, is_saved, 0.0 AS distance
+        FROM articles
+        WHERE content_sha256 = $1
+          AND created_at >= NOW() - make_interval(hours => $2::int)
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        content_sha256,
+        int(lookback_hours),
+    )
+
+    if row is None:
+        return None
+
+    return CandidateArticle(
+        id=row["id"],
+        title=row["title"],
+        summary=row["summary"],
+        published_at=str(row["published_at"]),
+        source_url=row["source_url"],
+        country_code=row["country_code"],
+        primary_category=row["primary_category"],
+        body_excerpt=row["body_excerpt"],
+        is_read=bool(row["is_read"]),
+        is_saved=bool(row["is_saved"]),
+        distance=0.0,
+    )
+

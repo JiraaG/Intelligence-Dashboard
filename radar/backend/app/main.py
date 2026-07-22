@@ -679,13 +679,18 @@ async def get_metrics_summary(
             SELECT
                 COUNT(*)::INT AS total_events,
                 COUNT(*) FILTER (WHERE dedup_kind = 'url_exact')::INT AS url_exact_count,
-                COUNT(*) FILTER (WHERE dedup_kind = 'semantic_vector')::INT AS semantic_count
+                COUNT(*) FILTER (WHERE dedup_kind = 'semantic_vector')::INT AS semantic_count,
+                COUNT(*) FILTER (WHERE dedup_kind = 'content_hash')::INT AS content_hash_count
             FROM article_dedup_events
             WHERE created_at >= $1 AND created_at < $2
             """,
             start_dt,
             end_dt,
         )
+
+    total_prompt = llm_row["total_prompt_tokens"] if llm_row else 0
+    total_cached = llm_row["total_cached_tokens"] if llm_row else 0
+    cache_hit_rate_pct = round((float(total_cached) / float(total_prompt)) * 100.0, 2) if total_prompt > 0 else 0.0
 
     return {
         "from": from_str,
@@ -700,12 +705,14 @@ async def get_metrics_summary(
             "total_prompt_tokens": llm_row["total_prompt_tokens"] if llm_row else 0,
             "total_completion_tokens": llm_row["total_completion_tokens"] if llm_row else 0,
             "total_cached_prompt_tokens": llm_row["total_cached_tokens"] if llm_row else 0,
+            "cache_hit_rate_pct": cache_hit_rate_pct,
             "avg_execution_time_ms": round(llm_row["avg_execution_time_ms"], 2) if llm_row and llm_row["avg_execution_time_ms"] is not None else None,
         },
         "dedup": {
             "total_events": dedup_row["total_events"] if dedup_row else 0,
             "url_exact_count": dedup_row["url_exact_count"] if dedup_row else 0,
             "semantic_vector_count": dedup_row["semantic_count"] if dedup_row else 0,
+            "content_hash_count": dedup_row["content_hash_count"] if dedup_row else 0,
         },
     }
 

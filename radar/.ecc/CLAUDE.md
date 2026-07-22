@@ -18,8 +18,9 @@ Leaflet resta dormiente (LEGACY FREEZE) dietro `MAP_RENDERER`.
 - **Phase 0–5 DONE**; Phase **6 DONE / GATE VERDE**. Vedi `plan-audit/complete/plan_impl_phase_0_6.md` / `plan-audit/complete/plan_impl_phase_0_6_execution.md`.
 - **Phase B (Real-Time Ingestion & Soft Refresh) DONE / GATE VERDE**: Webhook HMAC (`POST /api/webhooks/miniflux`), streaming SSE (`GET /api/articles/events`), dedicated Postgres LISTEN connections (no pool), Angular zone-isolated soft refresh with reference-preserving merge, and pending mutation protection.
 - **Fase C (Dedup semantica + quality balanced) DONE / GATE VERDE** (2026-07-22): `pgvector` + migration `012_pgvector_article_embeddings`, embedder CPU `all-MiniLM-L6-v2`, threshold sim ≥ **0.80**, 1× `quality:compare` COMPLEX, replace in-place. SoT: `plan-audit/complete/plan_impl_fase_C_semantic_dedup.md`.
+- **FinOps Wave A COMPLETE / GATE VERDE (condizionato)** (2026-07-22; soak OK): M1–M6 token saving/caching; SoT `plan-audit/complete/plan_impl_llm_finops_token_caching.md` + twin `plan-audit/complete/plan_impl_llm_finops_token_caching_verification.md`; migrations `013`+`014`.
 - **Final Release F0–F4 COMPLETE** (2026-07-18): PR #1 `refactor/testing` → `develop` merged 2026-07-17; F1–F4 PASS. Fase 5 (digest pin / drop `--legacy-peer-deps`) = **DEFERRED ACCETTATO**, non richiesto. Quadro: `plan-audit/STATUS.md`.
-- **Presenti (Phase 1–5 + follow-up):** migrazioni `001`–`012` (incluso `008_outbox_miniflux_marked_at`, `009_llm_model_cooldown`, `010_articles_is_saved`, `011_articles_related_countries`, `012_pgvector_article_embeddings`), outbox, ledger quote, cooldown modelli, `radar-worker`, reti `radar-edge`/`radar-data`, `/health/live`+`/ready`, CSP Nginx, `ops/` backup, Gemini `build_gemini_response_schema()`, FE `MOCK_MODE` / DestroyRef / XSS-safe markers / read-unread senza rebuild cluster / **`detailError` nation-fetch → banner toolbar (T-P1-04)** / **Notizie Salvate** (`is_saved`, saved-summary, toolbar vault).
+- **Presenti (Phase 1–5 + follow-up):** migrazioni `001`–`014` (incluso `008_outbox_miniflux_marked_at`, `009_llm_model_cooldown`, `010_articles_is_saved`, `011_articles_related_countries`, `012_pgvector_article_embeddings`, `013_metrics_and_feed_tracking`, `014_articles_content_sha256`), outbox, ledger quote, cooldown modelli, `radar-worker`, reti `radar-edge`/`radar-data`, `/health/live`+`/ready`, CSP Nginx, `ops/` backup, Gemini `build_gemini_response_schema()`, FE `MOCK_MODE` / DestroyRef / XSS-safe markers / read-unread senza rebuild cluster / **`detailError` nation-fetch → banner toolbar (T-P1-04)** / **Notizie Salvate** (`is_saved`, saved-summary, toolbar vault).
 - **Phase 5 API/FE:** `GET /api/map-summary` (`country×category`); `GET /api/map-relations` (archi MapLibre great-circle default; FE **RELAZIONI ATTIVE** → `visibleMapRelations` default OFF; legacy Leaflet `relationsPane` z550; hover/click → `loadRelationArticles`); `GET /api/saved-summary` (vault, no date); `GET /api/articles` → `{items,next_cursor,total}` (keyset `id`, limit≤100, LATERAL; `saved=true` cross-day); `PATCH read_status` / `saved_status` (unread⇒unsave; save⇒read); `backend/app/api/articles_query.py`; migrazioni `007`+. FE: giorno da summary + **pin nazione** sul centroide paese (`getCountryCentroid`; US/RU mainland — non media lat/lng pezzo); hatching click latch hatching via `pickCountryCodeAt`; nazione = hub disco + spiderfy categoria attiva; vault salvati = tooltip + spiderfy parity LETTE/TROVATE. **Vietato** `article-list`. Sidebar freeze resta (due eccezioni mirate: toggle Salva e chip `related_countries`). Restore tip map/summary: `a240b3c`; archi solidi MapLibre: `0d942ed`; W1 filtri nazioni: `ec771b1`.
 - **Phase I MapLibre GATE:** renderer default MapLibre GL 5.24 — facade `radar-map.component.ts` + host `maplibre/`; Leaflet host `leaflet/` LEGACY FREEZE via `MAP_RENDERER`. Gate: `npm run verify-map-renderer`. Spiderfy: spirale n≥9 (pixel); hatching MapLibre = fasce soft 1 colore × tipologia (isole ≥0.5% largest; `polygon-clipping` terra∩strip; no barcode); archi MapLibre = macro multicolore solida (tutti gli zoom); globe senza `maxBounds`; CSP apex Carto. SoT: `plan-audit/active/plan_impl_map_3d_globe.md` (+ J: `plan_impl_map_globe_projection.md`).
 - Pipeline ingest in `backend/app/worker.py`; `main.py` è API-only. Compose: 5 servizi su edge+data.
@@ -36,7 +37,7 @@ Leaflet resta dormiente (LEGACY FREEZE) dietro `MAP_RENDERER`.
 | Backend     | Python 3.12-slim (Docker) / 3.14 (locale) | Demone asincrono; poll `WORKER_POLL_INTERVAL_SECONDS` (default 900) |
 | LLM         | google-genai (Gemini) + httpx OpenAI-compat (`deepseek`/`openai`/`glm`/`grok`; no package `openai`) | Lane env: `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (limiti per-lane + contatori per-model; `0`=unmanaged; override `*_MODEL_LIMITS`). BORDERLINE reasoning effort da `LLM_BORDERLINE_REASONING_EFFORT` (default safe `high`, target ops `none` con escalate `high` su `ValidationError`). Soft-trim = residuo catena SIMPLE (bypass ibernazione se residual COMPLEX). RPM/TPM=attesa stessa lane; RPD/cooldown=`QuotaDailyExceeded`→cross-lane. Free=RPM/RPD(+TPM); paid=budget. Caps Flash Lite tipici: RPM≤12/TPM=250K/RPD=500 per modello. Dialect: deepseek=`thinking`; openai/glm/grok=stock. Complexity **v2.2**. Ops: Profili **A–F** in `.env.example` (F = Local-Hybrid Ollama host via `PROVIDER=openai` + `BASE_URL`; VRAM unload `ollama_lifecycle`/`OLLAMA_*`; **vietato** `ollama.chat` / package `ollama`). Non hardcodare segreti. |
 | Database    | PostgreSQL 15                            | Tabelle articles, companies, tags + sentiment, relevance + indici |
-| Feed Source | Miniflux REST API                       | Articoli non letti; dedup URL + semantica (`pgvector`) |
+| Feed Source | Miniflux REST API                       | Articoli non letti; dedup URL + content hash + semantica (`pgvector`) |
 | Frontend    | Angular 21 (Standalone Components)      | Signals, lazy loading                       |
 | UI Library  | PrimeNG 17+                             | p-sidebar, p-carousel, p-calendar           |
 | Mappa       | MapLibre GL 5.24 (default) + Leaflet legacy dormiente | Facade `radar-map/`; host `maplibre/` / `leaflet/`; token `MAP_RENDERER`; GeoJSON locale in assets/data/ |
@@ -69,7 +70,9 @@ radar/
 │   │   ├── 009_llm_model_cooldown.sql
 │   │   ├── 010_articles_is_saved.sql
 │   │   ├── 011_articles_related_countries.sql
-│   │   └── 012_pgvector_article_embeddings.sql
+│   │   ├── 012_pgvector_article_embeddings.sql
+│   │   ├── 013_metrics_and_feed_tracking.sql
+│   │   └── 014_articles_content_sha256.sql
 │   └── app/
 │       ├── __init__.py
 │       ├── main.py                # FastAPI API-only (pool + migrations + REST)
@@ -231,10 +234,10 @@ cd frontend && npm run verify-map-renderer
 Miniflux API (`WORKER_POLL_INTERVAL_SECONDS`, default 900)
         │
         ▼ [asyncio.sleep(WORKER_POLL_INTERVAL_SECONDS) loop in worker.py]
-  Validate entry → sanitize HTML → dedup URL
-        │ (se non duplicato URL)
+  Validate entry → sanitize HTML → dedup URL → content hash (M6 lookback 24h)
+        │ (se non duplicato URL/hash)
         ▼
-  Embed + semantic dedup (pgvector) → optional quality:compare (COMPLEX)
+  Embed + semantic dedup (pgvector) → M5 high-sim direct bypass OR optional quality:compare (COMPLEX)
         │ (keep / replace / proceed)
         ▼
   LLM lane (Gemini SDK e/o OpenAI-compat httpx)

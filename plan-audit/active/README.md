@@ -14,10 +14,11 @@ Questa directory contiene i piani di progettazione e di implementazione attualme
 
 **Completati di recente (riferimento)**
 
-- **Quote per-modello (FALLBACKS pool separati)** — [`../complete/plan_impl_per_model_quota.md`](../complete/plan_impl_per_model_quota.md) (**GATE VERDE** 2026-07-22; prompt in `../prompts/done/`).
+- **FinOps LLM — Token Saving & Prompt Caching (Wave A)** — [`../complete/plan_impl_llm_finops_token_caching.md`](../complete/plan_impl_llm_finops_token_caching.md) (**GATE VERDE condizionato** 2026-07-22; M1–M6). Twin: [`../complete/plan_impl_llm_finops_token_caching_verification.md`](../complete/plan_impl_llm_finops_token_caching_verification.md). Prompt: [`../prompts/done/agent_prompt_llm_finops_token_caching.md`](../prompts/done/agent_prompt_llm_finops_token_caching.md).
+- **BORDERLINE effort split (none→escalate high)** — [`../complete/plan_impl_borderline_effort_split.md`](../complete/plan_impl_borderline_effort_split.md) (**GATE VERDE** 2026-07-22).
+- **Quote per-modello (FALLBACKS pool separati)** — [`../complete/plan_impl_per_model_quota.md`](../complete/plan_impl_per_model_quota.md) (**GATE VERDE** 2026-07-22).
 - **Metrics 013 — FinOps / diagnostica** — [`../complete/plan_impl_fase_metrics_013.md`](../complete/plan_impl_fase_metrics_013.md) (**GATE VERDE** 2026-07-22).
 - **Fase C — Dedup semantica + quality balanced** — [`../complete/plan_impl_fase_C_semantic_dedup.md`](../complete/plan_impl_fase_C_semantic_dedup.md) (**GATE VERDE** 2026-07-22).
-- **Fix fasce tipologia (isole + anti-bleed)** — [`../complete/plan_impl_map_category_fills_islands.md`](../complete/plan_impl_map_category_fills_islands.md) (GATE VERDE 2026-07-21).
-- **Relazioni Wave 1 — filtro nazioni** — [`../complete/plan_impl_map_relations_nation_filter.md`](../complete/plan_impl_map_relations_nation_filter.md) (GATE VERDE 2026-07-20).
 
 Quadro globale: [`../STATUS.md`](../STATUS.md).
+

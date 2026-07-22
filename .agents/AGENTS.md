@@ -58,7 +58,7 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
    * Il loop di monitoraggio vive in `worker.py` (`while True` + `asyncio.sleep(WORKER_POLL_INTERVAL_SECONDS)`), cattura eccezioni a livello di ciclo/articolo, e **re-raise** `CancelledError`. Lo sleep di polling non sta in un `finally` di shutdown.
 3. **Deduplicazione Pre-LLM:**
    * Controllare sempre l'esistenza dell'URL dell'articolo nel DB via query SQL prima di effettuare la chiamata all'LLM per ottimizzare i costi API.
-   * In aggiunta: dedup **semantica** via embeddings + `pgvector` (`SEMANTIC_DEDUP_*`); su near-dup, **1×** `quality:compare` su lane **COMPLEX** (effort `none`) decide keep vs replace in-place.
+   * In aggiunta: (1) content hash pre-embed (`CONTENT_HASH_DEDUP_*`, `articles.content_sha256` / migrazione `014`); (2) dedup **semantica** via embeddings + `pgvector` (`SEMANTIC_DEDUP_*`); (3) high-sim direct bypass (`SEMANTIC_DEDUP_DIRECT_*`) keep/replace senza compare; (4) near-dup residuo → **1×** `quality:compare` su lane **COMPLEX** (effort `none`) decide keep vs replace in-place.
 4. **Gestione Errori a Tre Livelli:**
    * *Livello 1:* Demone principale (non deve morire).
    * *Livello 2:* Ciclo completo della pipeline (se fallisce un ciclo, il successivo parte).

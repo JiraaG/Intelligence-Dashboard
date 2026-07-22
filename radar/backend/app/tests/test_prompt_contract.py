@@ -82,3 +82,32 @@ def test_build_user_prompt_wraps_untrusted_article() -> None:
     assert "https://example.com/a" in out
     assert "2026-07-18" in out
     assert "Corpo" in out
+
+
+def test_system_prompt_wire_format_instructions() -> None:
+    """M3: Verifica presenza delle istruzioni wire format in SYSTEM_PROMPT."""
+    assert "FORMATO E STRUTTURA WIRE (OBBLIGATORIO):" in SYSTEM_PROMPT
+    assert "singolo oggetto JSON valido" in SYSTEM_PROMPT
+    assert "latitude' e 'longitude' devono essere numeri float top-level" in SYSTEM_PROMPT
+    assert "stringhe CSV (mai array JSON)" in SYSTEM_PROMPT
+
+
+def test_deepseek_user_message_micro_suffix_no_taxonomy_duplication() -> None:
+    """M3: Verifica che deepseek assemble user message contenga il micro-suffisso 'json' e non la tassonomia duplicata."""
+    from app.classification.deepseek import DeepSeekClient
+
+    ds = DeepSeekClient(api_key="sk-dummy")
+    msg = ds._build_user_message(
+        title="Titolo",
+        content="Corpo dell'articolo",
+        url="https://example.com",
+        date="2026-07-22",
+        correction=None,
+        model="deepseek-v4-flash",
+    )
+    assert "Return a single valid JSON object strictly adhering to the system instructions." in msg
+    assert "json" in msg.lower()
+    # Non deve più contenere l'elenco duplicato delle 10 categorie nel messaggio user
+    assert "primary_category MUST be exactly one of: Nucleare, Energia" not in msg
+    assert "Philosophy / abstract essays" not in msg
+

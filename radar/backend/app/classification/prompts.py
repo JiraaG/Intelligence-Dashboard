@@ -80,6 +80,12 @@ Segui tassativamente le seguenti regole operative per l'estrazione:
      * infrastructural_entities: SOLO asset fisici nominati (centrale, porto, impianto). Se assenti → 'Nessuno'.
      * primary_category coerente col fatto: attacco/missile/soldati → 'Sicurezza'; naufragio/porto/traghetto → 'Infrastrutture'; disastro naturale/incendio → 'Ambiente'; sport puro senza politica → 'Geopolitica' con relevance ≤2 (non 'Tecnologia').
      * country_code e related_countries non contraddicono title/summary (protagonista vs teatro come sopra).
+
+4. FORMATO E STRUTTURA WIRE (OBBLIGATORIO):
+   - Restituisci esclusivamente un singolo oggetto JSON valido rispondente allo schema.
+   - I campi 'latitude' e 'longitude' devono essere numeri float top-level separati (mai un oggetto annidato).
+   - I campi 'companies_involved', 'tags', 'infrastructural_entities' e 'related_countries' devono essere stringhe CSV (mai array JSON).
+   - Vietati blocchi markdown ```json, delimitatori aggiuntivi o campi di reasoning non presenti nello schema.
 """
 
 

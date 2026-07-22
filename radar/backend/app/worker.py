@@ -47,6 +47,8 @@ from app.core.config import (
     LLM_SIMPLE,
     MAX_MINIFLUX_RESPONSE_BYTES,
     MINIFLUX_API_KEY,
+    CONTENT_HASH_DEDUP_ENABLED,
+    CONTENT_HASH_LOOKBACK_HOURS,
     MINIFLUX_API_URL,
     MINIFLUX_CONNECT_TIMEOUT,
     MINIFLUX_LIMIT,
@@ -54,7 +56,12 @@ from app.core.config import (
     OBSIDIAN_VAULT_PATH,
     OLLAMA_UNLOAD_DEBOUNCE_SECONDS,
     RADAR_TIME_ZONE,
+    SEMANTIC_DEDUP_DIRECT_DISTANCE,
+    SEMANTIC_DEDUP_DIRECT_MIN_WORDS,
+    SEMANTIC_DEDUP_DIRECT_TITLE_SIM,
+    SEMANTIC_DEDUP_DIRECT_SHADOW,
     SEMANTIC_DEDUP_ENABLED,
+    SEMANTIC_QUALITY_REPLACE_HINT_RATIO,
     WORKER_ADVISORY_LOCK_BACKOFF_SECONDS,
     WORKER_ADVISORY_LOCK_KEY,
     WORKER_DB_CONCURRENCY,
@@ -73,7 +80,13 @@ from app.extraction.client import MinifluxClient
 from app.extraction.embedder import generate_embedding
 from app.extraction.entry_validation import ValidatedMinifluxEntry
 from app.extraction.parser import strip_html_tags
-from app.extraction.semantic_dedup import find_near_duplicate, record_dedup_event
+from app.extraction.semantic_dedup import (
+    compute_content_sha256,
+    find_article_by_content_hash,
+    find_near_duplicate,
+    record_dedup_event,
+    title_token_jaccard,
+)
 from app.extraction.state import is_article_duplicate
 
 logger = logging.getLogger("radar.worker")
@@ -440,6 +453,35 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                     async with state.parse_sem:
                         clean_content = strip_html_tags(entry.content)
 
+                    # M6. Deduplicazione per Content Hash SHA-256 (0 embed, 0 LLM)
+                    content_sha256 = compute_content_sha256(title, clean_content)
+                    if CONTENT_HASH_DEDUP_ENABLED:
+                        hash_match = await find_article_by_content_hash(
+                            conn, content_sha256, lookback_hours=CONTENT_HASH_LOOKBACK_HOURS
+                        )
+                        if hash_match is not None:
+                            await record_dedup_event(
+                                conn,
+                                incoming_url=source_url,
+                                existing_article_id=hash_match.id,
+                                winner="existing",
+                                cosine_distance=0.0,
+                                same_story=True,
+                                confidence=1.0,
+                                reason="Content hash SHA-256 match",
+                                dedup_kind="content_hash",
+                                action_taken="kept_existing_content_hash",
+                                feed_id=entry.feed_id,
+                                incoming_miniflux_entry_id=entry.id,
+                            )
+                            logger.info(
+                                "Content hash dedup: kept_existing_content_hash per '%s' (vs '%s')",
+                                title[:40],
+                                hash_match.title[:40],
+                            )
+                            await state.miniflux_client.mark_as_read([entry_id])
+                            return True
+
                     # 1. Deduplicazione semantica pre-LLM (embeddings + pgvector)
                     embed_start = time.monotonic()
                     embedding = (
@@ -456,7 +498,171 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                     )
 
                     if candidate is not None:
-                        # Near-dup rilevato: 1x scontro di qualità su lane COMPLEX
+                        # M5 Direct Bypass High-Sim check
+                        clean_words_count = len(clean_content.split())
+                        t_jaccard = title_token_jaccard(title, candidate.title)
+                        is_high_sim = (
+                            candidate.distance <= SEMANTIC_DEDUP_DIRECT_DISTANCE
+                            and clean_words_count >= SEMANTIC_DEDUP_DIRECT_MIN_WORDS
+                            and t_jaccard >= SEMANTIC_DEDUP_DIRECT_TITLE_SIM
+                        )
+
+                        if is_high_sim and SEMANTIC_DEDUP_DIRECT_SHADOW:
+                            logger.info(
+                                "M5 Direct Bypass SHADOW: candidate dist=%.4f, words=%d, title_jaccard=%.4f (would bypass quality compare)",
+                                candidate.distance,
+                                clean_words_count,
+                                t_jaccard,
+                            )
+                        elif is_high_sim:
+                            len_existing = len(candidate.body_excerpt or candidate.summary or "")
+                            len_incoming = len(clean_content)
+                            is_much_longer = len_incoming > (len_existing * SEMANTIC_QUALITY_REPLACE_HINT_RATIO)
+
+                            if is_much_longer:
+                                logger.info(
+                                    "M5 Direct Bypass: replace incoming (len_inc=%d > len_exist=%d * %.2f) per '%s'",
+                                    len_incoming,
+                                    len_existing,
+                                    SEMANTIC_QUALITY_REPLACE_HINT_RATIO,
+                                    title[:40],
+                                )
+                                cls_res = await state.classification_client.classify_article(
+                                    title=title,
+                                    content=clean_content,
+                                    url=source_url,
+                                    date=published_date,
+                                    miniflux_entry_id=entry_id,
+                                )
+                                extracted_article = cls_res.article.model_copy(
+                                    update={
+                                        "source_url": source_url,
+                                        "published_at": published_date,
+                                    }
+                                )
+                                md_content = generate_markdown_content(extracted_article)
+                                file_path = get_article_file_path(extracted_article, vault_path=OBSIDIAN_VAULT_PATH)
+
+                                clean_chars = len(clean_content)
+                                clean_words = clean_words_count
+                                pipeline_lat_ms = int((time.monotonic() - pipeline_start) * 1000)
+                                geo_method = resolve_geo_method(extracted_article)
+
+                                await replace_article_in_place(
+                                    conn,
+                                    existing_article_id=candidate.id,
+                                    article=extracted_article,
+                                    feed_title=feed_title,
+                                    outbox_target_path=file_path,
+                                    outbox_payload=md_content,
+                                    miniflux_entry_id=entry_id,
+                                    body_excerpt=clean_content[:8000],
+                                    embedding=embedding,
+                                    feed_id=entry.feed_id,
+                                    feed_domain=entry.feed_domain,
+                                    classification_lane=cls_res.classification_lane,
+                                    classified_by_model=cls_res.classified_by_model,
+                                    classified_by_provider=cls_res.classified_by_provider,
+                                    was_escalated=cls_res.was_escalated,
+                                    dedup_kind="semantic_vector",
+                                    dedup_match_article_id=candidate.id,
+                                    dedup_action="replaced_direct_vector",
+                                    clean_text_chars=clean_chars,
+                                    clean_text_words=clean_words,
+                                    embedding_time_ms=embed_time_ms,
+                                    pipeline_latency_ms=pipeline_lat_ms,
+                                    geo_resolution_method=geo_method,
+                                    content_sha256=content_sha256,
+                                )
+
+                                await conn.execute(
+                                    "UPDATE llm_request_ledger SET article_id = $1 WHERE miniflux_entry_id = $2 AND article_id IS NULL",
+                                    candidate.id,
+                                    entry_id,
+                                )
+
+                                await record_dedup_event(
+                                    conn,
+                                    incoming_url=source_url,
+                                    existing_article_id=candidate.id,
+                                    winner="incoming",
+                                    cosine_distance=candidate.distance,
+                                    same_story=True,
+                                    confidence=1.0,
+                                    reason="M5 direct bypass replace (longer text)",
+                                    dedup_kind="semantic_vector",
+                                    action_taken="replaced_direct_vector",
+                                    feed_id=entry.feed_id,
+                                    incoming_miniflux_entry_id=entry.id,
+                                )
+
+                                notify_payload = json.dumps(
+                                    {
+                                        "article_id": str(candidate.id),
+                                        "country_code": extracted_article.country_code,
+                                        "primary_category": extracted_article.primary_category,
+                                        "published_at": extracted_article.published_at,
+                                    },
+                                    separators=(",", ":"),
+                                )
+                                await conn.execute(
+                                    "SELECT pg_notify($1, $2)",
+                                    "radar_article_processed",
+                                    notify_payload,
+                                )
+
+                                outbox_row = await conn.fetchrow(
+                                    """
+                                    SELECT id, article_id, target_path, payload, payload_checksum,
+                                           attempt_count, miniflux_entry_id, status
+                                    FROM article_outbox
+                                    WHERE article_id = $1
+                                      AND status IN ('pending', 'failed')
+                                    """,
+                                    candidate.id,
+                                )
+                                if outbox_row is not None:
+                                    ok = await process_outbox_row(
+                                        state.db_pool, outbox_row, state.miniflux_client
+                                    )
+                                    if not ok:
+                                        logger.error(
+                                            "Replace in-place M5 bypass riuscito ma Vault/outbox fallito per article_id=%s",
+                                            candidate.id,
+                                        )
+                                        return False
+
+                                logger.info(
+                                    "M5 Direct Bypass: articolo sostituito in-place [ID=%s]: '%s'",
+                                    candidate.id,
+                                    extracted_article.title[:50],
+                                )
+                                return True
+                            else:
+                                logger.info(
+                                    "M5 Direct Bypass: keep existing per '%s' (dist=%.4f, title_jaccard=%.4f)",
+                                    title[:40],
+                                    candidate.distance,
+                                    t_jaccard,
+                                )
+                                await record_dedup_event(
+                                    conn,
+                                    incoming_url=source_url,
+                                    existing_article_id=candidate.id,
+                                    winner="existing",
+                                    cosine_distance=candidate.distance,
+                                    same_story=True,
+                                    confidence=1.0,
+                                    reason="M5 direct bypass keep",
+                                    dedup_kind="semantic_vector",
+                                    action_taken="kept_existing_direct_vector",
+                                    feed_id=entry.feed_id,
+                                    incoming_miniflux_entry_id=entry.id,
+                                )
+                                await state.miniflux_client.mark_as_read([entry_id])
+                                return True
+
+                        # Near-dup rilevato (non bypassed): 1x scontro di qualità su lane COMPLEX
                         cmp_result = await compare_articles_quality(
                             state.db_pool,
                             existing_title=candidate.title,
@@ -538,6 +744,7 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                                 embedding_time_ms=embed_time_ms,
                                 pipeline_latency_ms=pipeline_lat_ms,
                                 geo_resolution_method=geo_method,
+                                content_sha256=content_sha256,
                             )
 
                             # Post-commit ledger link (C2)
@@ -674,6 +881,7 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                         embedding_time_ms=embed_time_ms,
                         pipeline_latency_ms=pipeline_lat_ms,
                         geo_resolution_method=geo_method,
+                        content_sha256=content_sha256,
                     )
 
                     # Post-commit ledger link (C2)

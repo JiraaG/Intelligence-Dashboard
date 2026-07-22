@@ -32,7 +32,7 @@ Lavori su FastAPI REST, query articoli, o servizi Angular che chiamano l’API.
 | Save | `PATCH /api/articles/{id}/saved_status` | `{ is_saved }` → `{ status, is_saved, is_read? }`; save ⇒ `is_read=true` |
 | Webhook ingest | `POST /api/webhooks/miniflux` | Header `X-Miniflux-Signature` (HMAC-SHA256 hex sul raw body); event utile `new_entries`. Risposta `202` accepted / `401` firma / `ignored` altri eventi. **Trigger-only** → `NOTIFY radar_worker_trigger`. Nessuna classificazione in `main.py`. |
 | SSE real-time | `GET /api/articles/events` | `text/event-stream`; event `article_processed` + data JSON `{article_id,country_code,primary_category,published_at}`; commenti `: ping` ogni 30s; header `X-Accel-Buffering: no`. |
-| Metrics Summary | `GET /api/metrics/summary?from=&to=` | JSON `{from, to, total_articles, total_clean_chars, total_clean_words, avg_pipeline_latency_ms, avg_embedding_time_ms, llm: {...}, dedup: {...}}` |
+| Metrics Summary | `GET /api/metrics/summary?from=&to=` | JSON `{from, to, total_articles, total_clean_chars, total_clean_words, avg_pipeline_latency_ms, avg_embedding_time_ms, llm: {total_requests, total_prompt_tokens, total_completion_tokens, total_cached_prompt_tokens, cache_hit_rate_pct, avg_execution_time_ms}, dedup: {total_events, url_exact_count, semantic_vector_count, content_hash_count}}` |
 | Metrics by-feed | `GET /api/metrics/by-feed?from=&to=` | JSON `{from, to, items: [{feed_id, feed_domain, feed_title, article_count, total_clean_chars, avg_clean_chars, avg_pipeline_latency_ms, avg_embedding_time_ms}]}` |
 | Metrics dedup | `GET /api/metrics/dedup?from=&to=` | JSON `{from, to, items: [{dedup_kind, action_taken, event_count, avg_cosine_distance, avg_confidence}]}` |
 

@@ -6,7 +6,7 @@ Cartella di audit, prompt orchestratore e SoT del modulo Radar.
 **Quadro fatto vs da fare:** [`STATUS.md`](STATUS.md)  
 **Product docs:** root [`README.md`](../README.md) + [`docs/01–04`](../docs/).
 
-**Anti-drift:** autorità runtime = product docs + Compose (`80:8080`, migrazioni `001–011`) + SoT LLM. Claim storici nei piani in `complete/` possono essere datati.
+**Anti-drift:** autorità runtime = product docs + Compose (`80:8080`, migrazioni `001–014`) + SoT LLM. Claim storici nei piani in `complete/` possono essere datati.
 
 ## `active/` — vivi
 
@@ -14,13 +14,14 @@ Cartella di audit, prompt orchestratore e SoT del modulo Radar.
 * Fase I MapLibre 3D-primary — [`active/plan_impl_map_3d_globe.md`](active/plan_impl_map_3d_globe.md)
 * §3.J globo — [`active/plan_impl_map_globe_projection.md`](active/plan_impl_map_globe_projection.md)
 * Prompt ECC in `prompts/active/`
+* **FinOps LLM Wave A** — COMPLETE / GATE VERDE (condizionato) → [`complete/plan_impl_llm_finops_token_caching.md`](complete/plan_impl_llm_finops_token_caching.md) (verifica [`complete/plan_impl_llm_finops_token_caching_verification.md`](complete/plan_impl_llm_finops_token_caching_verification.md); prompt in `prompts/done/`)
 * **BORDERLINE effort split** — COMPLETE / GATE VERDE → [`complete/plan_impl_borderline_effort_split.md`](complete/plan_impl_borderline_effort_split.md)
 * **Quote per-modello** — COMPLETE / GATE VERDE → [`complete/plan_impl_per_model_quota.md`](complete/plan_impl_per_model_quota.md) (prompt in `prompts/done/`)
 * **Metrics 013 FinOps** — COMPLETE / GATE VERDE → [`complete/plan_impl_fase_metrics_013.md`](complete/plan_impl_fase_metrics_013.md) (prompt verify-fix in `prompts/done/`)
 
 ## `complete/` — chiusi
 
-Vedi [`complete/README.md`](complete/README.md) (**BORDERLINE effort split**, **Quote per-modello**, **Metrics 013 FinOps**, Phase 0–6, SoT LLM, Fase A Ollama, audit lane env, Fase B/H, archi UI, **W1 filtro nazioni Relazioni**, **Fase C semantic dedup**, Final Release, commenti, Notizie Salvate, playbook, ticket status, monorepo check).
+Vedi [`complete/README.md`](complete/README.md) (**FinOps LLM Wave A**, **BORDERLINE effort split**, **Quote per-modello**, **Metrics 013 FinOps**, Phase 0–6, SoT LLM, Fase A Ollama, audit lane env, Fase B/H, archi UI, **W1 filtro nazioni Relazioni**, **Fase C semantic dedup**, Final Release, commenti, Notizie Salvate, playbook, ticket status, monorepo check).
 
 ## Layout
 
@@ -28,7 +29,7 @@ Vedi [`complete/README.md`](complete/README.md) (**BORDERLINE effort split**, **
 plan-audit/
   STATUS.md                 ← fatto vs da fare (leggere per primo)
   README.md                 ← questo indice
-  active/                   Vuoto di piani (vedi README in cartella)
+  active/                   Piani e spike attivi
   complete/                 Piani e checklist COMPLETATI
   prompts/active/           Prompt non ancora eseguiti (ECC manual/expansion)
   prompts/done/             Prompt eseguiti (storico)
@@ -42,6 +43,10 @@ plan-audit/
 * [plan_prompt_map_3d_globe.md](prompts/active/plan_prompt_map_3d_globe.md) — mappa 3D / switch vs 3D-only (non eseguito)
 
 ## Prompt done (recente)
+
+* [agent_prompt_llm_finops_token_caching.md](prompts/done/agent_prompt_llm_finops_token_caching.md) — **FinOps LLM Wave A (M1–M6 + verifica)** — GATE VERDE (condizionato)
+* [agent_prompt_finops_wave_a_soak_verify.md](prompts/done/agent_prompt_finops_wave_a_soak_verify.md) — **FinOps Wave A soak/requeue verify** — eseguito 2026-07-22 (soak OK)
+
 
 * [agent_prompt_borderline_effort_final_polish.md](prompts/done/agent_prompt_borderline_effort_final_polish.md) — polish C3/C6/C7
 * [agent_prompt_borderline_effort_split_closeout.md](prompts/done/agent_prompt_borderline_effort_split_closeout.md) — closeout C1–C12

@@ -165,3 +165,5 @@ async def test_replace_article_in_place(mock_force_reopen) -> None:
     assert "is_read" not in update_sql
     assert "is_saved" not in update_sql
     assert "body_excerpt" in update_sql
+    assert "content_sha256" in update_sql
+

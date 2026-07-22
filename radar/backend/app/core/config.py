@@ -377,6 +377,31 @@ SEMANTIC_QUALITY_REPLACE_HINT_RATIO = _env_float(
     max_value=5.0,
 )
 
+# M5 Direct Bypass High-Sim (FinOps Wave A)
+SEMANTIC_DEDUP_DIRECT_DISTANCE = _env_float(
+    "SEMANTIC_DEDUP_DIRECT_DISTANCE",
+    0.05,
+    min_value=0.0,
+    max_value=0.2,
+)
+SEMANTIC_DEDUP_DIRECT_MIN_WORDS = _env_int(
+    "SEMANTIC_DEDUP_DIRECT_MIN_WORDS",
+    70,
+    min_value=1,
+    max_value=1000,
+)
+SEMANTIC_DEDUP_DIRECT_TITLE_SIM = _env_float(
+    "SEMANTIC_DEDUP_DIRECT_TITLE_SIM",
+    0.90,
+    min_value=0.5,
+    max_value=1.0,
+)
+SEMANTIC_DEDUP_DIRECT_SHADOW = _env_bool("SEMANTIC_DEDUP_DIRECT_SHADOW", False)
+
+# M6 Content Hash Pre-Embed (FinOps Wave A)
+CONTENT_HASH_DEDUP_ENABLED = _env_bool("CONTENT_HASH_DEDUP_ENABLED", True)
+CONTENT_HASH_LOOKBACK_HOURS = _env_int("CONTENT_HASH_LOOKBACK_HOURS", 24, min_value=1, max_value=168)
+
 _raw_tz = _env_str("RADAR_TIME_ZONE", "UTC") or "UTC"
 RADAR_TIME_ZONE, RADAR_TIME_ZONE_NAME = _resolve_time_zone(_raw_tz)
 

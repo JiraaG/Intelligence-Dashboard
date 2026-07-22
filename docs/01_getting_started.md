@@ -38,7 +38,7 @@ Categorie principali (dettaglio in `.env.example`):
 | Worker | coda/concorrenza, `WORKER_POLL_INTERVAL_SECONDS` (default 900), heartbeat |
 | Miniflux | URL interno, API key, `MINIFLUX_LIMIT` (tipico **50**; `100` può superare `MAX_MINIFLUX_RESPONSE_BYTES=5MB`), timeout/byte caps |
 | Postgres | user/password/db, `DATABASE_URL` (Compose la costruisce in container con image `pgvector/pgvector:0.8.0-pg15`) |
-| Semantic Dedup | `SEMANTIC_DEDUP_ENABLED=true`, `SEMANTIC_DEDUP_SIMILARITY_THRESHOLD=0.80`, `SEMANTIC_DEDUP_LOOKBACK_HOURS=24`, `SEMANTIC_PREFILTER_LEN_RATIO=0.7`, `SEMANTIC_QUALITY_REPLACE_HINT_RATIO=1.25` |
+| Semantic Dedup | `SEMANTIC_DEDUP_ENABLED=true`, `SEMANTIC_DEDUP_SIMILARITY_THRESHOLD=0.80`, `SEMANTIC_DEDUP_LOOKBACK_HOURS=24`, `SEMANTIC_PREFILTER_LEN_RATIO=0.7`, `SEMANTIC_QUALITY_REPLACE_HINT_RATIO=1.25`, `SEMANTIC_DEDUP_DIRECT_SHADOW=false`, `CONTENT_HASH_DEDUP_ENABLED=true` |
 
 
 ---

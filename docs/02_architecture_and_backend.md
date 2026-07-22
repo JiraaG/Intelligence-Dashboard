@@ -86,6 +86,7 @@ Schema applicato da `core/migrations.py` + SQL ordinati in `radar/backend/migrat
 | `011_articles_related_countries.sql` | Aggiunta campo related_countries per grafo geospaziale |
 | `012_pgvector_article_embeddings.sql` | Estensione pgvector + embeddings 384d per dedup semantica |
 | `013_metrics_and_feed_tracking.sql` | Metriche denormalizzate articles, FinOps llm_request_ledger, tracciamento feed e dedup_events |
+| `014_articles_content_sha256.sql` | `articles.content_sha256` + indice lookback (FinOps Wave A / M6 content-hash dedup) |
 
 Commit: transazione DB + riga outbox → reconcile vault → mark-read Miniflux **solo** se outbox `completed`.
 
@@ -127,7 +128,7 @@ CORS: middleware solo se `CORS_ALLOW_ORIGINS` non vuoto; metodi `GET`, `PATCH`, 
 | GET | `/api/map-relations` | `date`, `sentiment?`, `relevance_level?` | Righe undirected `source_country ↔ target_country` per categoria (+ volume). Semantica **star** v1: un arco per ogni coppia `(country_code, related)` via `LEAST/GREATEST` — **non** clique tra soli `related_countries` (es. US+IT+FR → US–IT e US–FR, non IT–FR). `XX` escluso. |
 | GET | `/api/saved-summary` | `sentiment?`, `relevance_level?` | Stessa shape di map-summary; solo `is_saved=true`; **senza date** |
 | GET | `/api/countries` | `date`, filtri opzionali | Rollup paese (`categories`, `article_count`) |
-| GET | `/api/metrics/summary` | `from?`, `to?` | Metrics globali FinOps, latenza pipeline/embedding, token LLM split e dedup events |
+| GET | `/api/metrics/summary` | `from?`, `to?` | Metrics FinOps: latenze, token LLM (`cache_hit_rate_pct`, cached/prompt/completion), dedup (`url_exact_count`, `semantic_vector_count`, `content_hash_count`) |
 | GET | `/api/metrics/by-feed` | `from?`, `to?` | Aggregazione per feed Miniflux (`feed_id`, `feed_domain`, `feed_title`, `clean_chars`, latenze) |
 | GET | `/api/metrics/dedup` | `from?`, `to?` | Aggregazione per tipo evento dedup (`dedup_kind`, `action_taken`, count, avg_cosine, avg_confidence) |
 | PATCH | `/api/articles/{id}/read_status` | `{ "is_read": bool }` | `{ "status", "is_read", "is_saved"? }` — unread ⇒ `is_saved=false` |

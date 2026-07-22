@@ -90,38 +90,9 @@ async def commit_article_to_db(
     embedding_time_ms: int | None = None,
     pipeline_latency_ms: int | None = None,
     geo_resolution_method: str | None = None,
+    content_sha256: str | None = None,
 ) -> Any:
-    """Inserisce articolo + relazioni + outbox + embedding in **una** transazione.
-
-    CSV schema → liste Python via ``parse_csv_list``; companies/tags diventano
-    junction ``ON CONFLICT DO NOTHING``. Se ``source_url`` già presente
-    (``ON CONFLICT DO NOTHING``), recupera l'id esistente e aggiorna comunque
-    l'outbox (pending, salvo già ``completed`` — vedi ``enqueue_outbox_row``).
-
-    Args:
-        conn: Connessione asyncpg (transazione aperta qui).
-        article: Schema Pydantic già validato.
-        feed_title: Titolo feed Miniflux.
-        outbox_target_path: Path vault assoluto (da ``get_article_file_path``).
-        outbox_payload: Markdown da proiettare sul vault.
-        miniflux_entry_id: Id entry per mark-read differito; può essere ``None``.
-        body_excerpt: Estratto del testo sanitizzato (max 8000 char).
-        embedding: Vettore di 384 float generato dall'embedder.
-        feed_id, feed_domain: Metadati feed Miniflux.
-        classification_lane, classified_by_model, classified_by_provider, was_escalated: Metadati LLM.
-        dedup_kind, dedup_match_article_id, dedup_action: Metadati deduplicazione.
-        clean_text_chars, clean_text_words, embedding_time_ms, pipeline_latency_ms, geo_resolution_method: Metadati FinOps/diagnostica.
-    Returns:
-        ``articles.id`` (nuovo o già esistente).
-    Raises:
-        RuntimeError: impossibile risolvere id dopo conflict URL.
-        EntryValidationError: URL non normalizzabile.
-    Side-effects:
-        Scrive tabelle relazionali + ``article_outbox``; **non** tocca il vault
-        né Miniflux (compito di ``reconcile_outbox``).
-    SoT:
-        docs/02 persistence; runbook (mark-read solo post-completed).
-    """
+    """Inserisce articolo + relazioni + outbox + embedding in **una** transazione."""
     logger.info("Salvataggio relazionale nel DB per l'articolo: '%s'", article.title[:50])
 
     entities_list = _dedupe_csv_values(article.infrastructural_entities)
@@ -141,9 +112,9 @@ async def commit_article_to_db(
                  feed_id, feed_domain, classification_lane, classified_by_model,
                  classified_by_provider, was_escalated, dedup_kind, dedup_match_article_id,
                  dedup_action, clean_text_chars, clean_text_words, embedding_time_ms,
-                 pipeline_latency_ms, geo_resolution_method)
+                 pipeline_latency_ms, geo_resolution_method, content_sha256)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-                    $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
+                    $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)
             ON CONFLICT (source_url) DO NOTHING
             RETURNING id
         """
@@ -183,6 +154,7 @@ async def commit_article_to_db(
             embedding_time_ms,
             pipeline_latency_ms,
             geo_resolution_method,
+            content_sha256,
         )
 
         if article_id is None:
@@ -287,15 +259,9 @@ async def replace_article_in_place(
     embedding_time_ms: int | None = None,
     pipeline_latency_ms: int | None = None,
     geo_resolution_method: str | None = None,
+    content_sha256: str | None = None,
 ) -> Any:
-    """Sostituisce un articolo esistente nel DB con un nuovo articolo di qualità migliore (stesso ID).
-
-    1. Rimuove il vecchio file Markdown dal vault se il percorso di destinazione è cambiato.
-    2. Aggiorna i campi dell'articolo in ``articles``.
-    3. Ricostruisce le associazioni (companies, tags).
-    4. Aggiorna il vettore in ``article_embeddings``.
-    5. Riapre l'outbox forzando lo stato a 'pending' tramite ``force_reopen_outbox_row``.
-    """
+    """Sostituisce un articolo esistente nel DB con un nuovo articolo di qualità migliore (stesso ID)."""
     logger.info("Sostituzione in-place per l'articolo [ID=%s]: '%s'", existing_article_id, article.title[:50])
 
     entities_list = _dedupe_csv_values(article.infrastructural_entities)
@@ -358,8 +324,9 @@ async def replace_article_in_place(
                 embedding_time_ms = $26,
                 pipeline_latency_ms = $27,
                 geo_resolution_method = $28,
+                content_sha256 = $29,
                 updated_at = NOW()
-            WHERE id = $29
+            WHERE id = $30
             """,
             article.title,
             article.summary,
@@ -389,6 +356,7 @@ async def replace_article_in_place(
             embedding_time_ms,
             pipeline_latency_ms,
             geo_resolution_method,
+            content_sha256,
             existing_article_id,
         )
 

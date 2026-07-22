@@ -15,7 +15,7 @@ when_to_use:
   - Swap provider via LLM_SIMPLE_* / LLM_COMPLEX_* (Profili A–F)
   - Lifecycle VRAM Ollama (ollama_lifecycle, OLLAMA_*, unload fine-ciclo)
   - Aggiunta di nuovi campi al contratto di estrazione
-version: 1.9.1
+version: 1.9.2
 ---
 
 ## Quando Usare Questa Skill
@@ -36,10 +36,11 @@ Carica questa skill ogni volta che:
 
 ```
 1. Worker (radar-worker): advisory lock → reconcile outbox → fetch Miniflux (coda bounded)
-2. Per entry: URL-dedup → sanitize → embed + semantic dedup (pgvector)
-   → optional quality:compare (purpose=quality:compare, lane=complex, effort=none)
+2. Per entry: URL-dedup → sanitize → content_sha256 lookback 24h (M6 keep → 0 embed/LLM)
+   → embed + semantic dedup (pgvector)
+   → high-sim direct bypass (M5 keep/replace, no quality:compare) OR optional quality:compare
    → complexity lane v2.2 → QuotaLedger.reserve(model=, lane=)
-   → Gemini (google-genai) e/o OpenAI-compat httpx (deepseek/openai/glm/grok; no package openai)
+   → Gemini / OpenAI-compat httpx
 3. Parsing/validazione Pydantic strict; complete(reservation_id) con usage reale
 4. Hard-fail → llm_model_cooldown 24h + next model; 429 breve → Retry-After same model
 5. Overwrite source_url + published_at da Miniflux
@@ -49,6 +50,7 @@ Carica questa skill ogni volta che:
 
 **Invarianti:** schema/prompt immutabili; `content[:4000]` su tutte le lane; package `openai` vietato;
 lane via `LLM_SIMPLE_*` / `LLM_COMPLEX_*`; OpenAI-compat `classify_json(model=ref.model)`.
+DeepSeek `prompt_cache_hit_tokens` → `cached_prompt_tokens` via `extract_usage_tokens` (never invent 0).
 
 ### Complexity → modello (v2.2)
 
@@ -247,6 +249,12 @@ Segui tassativamente le seguenti regole operative per l'estrazione:
      * infrastructural_entities: SOLO asset fisici nominati (centrale, porto, impianto). Se assenti → 'Nessuno'.
      * primary_category coerente col fatto: attacco/missile/soldati → 'Sicurezza'; naufragio/porto/traghetto → 'Infrastrutture'; disastro naturale/incendio → 'Ambiente'; sport puro senza politica → 'Geopolitica' con relevance ≤2 (non 'Tecnologia').
      * country_code e related_countries non contraddicono title/summary (protagonista vs teatro come sopra).
+
+4. FORMATO E STRUTTURA WIRE (OBBLIGATORIO):
+   - Restituisci esclusivamente un singolo oggetto JSON valido rispondente allo schema.
+   - I campi 'latitude' e 'longitude' devono essere numeri float top-level separati (mai un oggetto annidato).
+   - I campi 'companies_involved', 'tags', 'infrastructural_entities' e 'related_countries' devono essere stringhe CSV (mai array JSON).
+   - Vietati blocchi markdown ```json, delimitatori aggiuntivi o campi di reasoning non presenti nello schema.
 """
 ```
 

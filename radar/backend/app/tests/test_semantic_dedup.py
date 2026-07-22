@@ -94,3 +94,64 @@ async def test_record_dedup_event() -> None:
 
     assert event_id == 42
     mock_conn.fetchval.assert_awaited_once()
+
+
+def test_title_token_jaccard() -> None:
+    """M5: Test calcolo similarità Jaccard sui titoli."""
+    from app.extraction.semantic_dedup import title_token_jaccard
+
+    # Titoli quasi identici (con stop-word minori)
+    t1 = "TSMC inaugura nuova fab a Dresda in Germania"
+    t2 = "TSMC inaugura la nuova fab a Dresda, Germania"
+    sim = title_token_jaccard(t1, t2)
+    assert sim >= 0.75
+
+    # Titoli diversi
+    t3 = "L'Iran dichiara nuovi test su vettori balistici"
+    assert title_token_jaccard(t1, t3) < 0.2
+
+    # Titoli vuoti
+    assert title_token_jaccard("", "") == 0.0
+
+
+def test_compute_content_sha256_collapse_whitespace() -> None:
+    """M6: Test normalizzazione e calcolo SHA-256 con collapse dei whitespace."""
+    from app.extraction.semantic_dedup import compute_content_sha256, normalize_text_for_hash
+
+    title = "  Titolo   con   spazi  "
+    body = "Testo   del   corpo\n\n con   nuove   righe. "
+    norm = normalize_text_for_hash(title, body)
+    assert norm == "titolo con spazi testo del corpo con nuove righe."
+
+    # Test che due testi con formattazioni/spaziature diverse producano lo stesso hash SHA-256
+    hash1 = compute_content_sha256("Titolo con spazi", "Testo del corpo con nuove righe.")
+    hash2 = compute_content_sha256("  TITOLO   CON   SPAZI  ", "\nTesto  del  corpo \n con nuove  righe.\n")
+    assert hash1 == hash2
+
+
+@pytest.mark.asyncio
+async def test_find_article_by_content_hash_hit() -> None:
+    """M6: Test ricerca per content_sha256."""
+    from app.extraction.semantic_dedup import find_article_by_content_hash
+
+    mock_conn = AsyncMock()
+    mock_conn.fetchrow.return_value = {
+        "id": 202,
+        "title": "Match Title",
+        "summary": "Match Summary",
+        "published_at": "2026-07-22",
+        "source_url": "https://example.com/match",
+        "country_code": "DE",
+        "primary_category": "Tecnologia",
+        "body_excerpt": "Match Body",
+        "is_read": False,
+        "is_saved": False,
+    }
+
+    dummy_hash = "a" * 64
+    candidate = await find_article_by_content_hash(mock_conn, dummy_hash)
+
+    assert candidate is not None
+    assert candidate.id == 202
+    assert candidate.distance == 0.0
+

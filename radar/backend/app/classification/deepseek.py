@@ -170,52 +170,14 @@ class DeepSeekClient:
             raise DeepSeekError("OpenAI-compat API key mancante", status_code=401)
 
         use_model = model or self.model
-        user_message = build_user_prompt(
+        user_message = self._build_user_message(
             title=title,
+            content=content,
             url=url,
             date=date,
-            content=content[:4000],
+            correction=correction,
+            model=use_model,
         )
-        user_message = (
-            f"{user_message}\n\n"
-            "Output requirement: return a single valid JSON object (the word json is required).\n"
-            "Use ONLY these top-level keys (no nested coordinates/coordinate object, no 'category'):\n"
-            "title, summary, published_at, source_url, country_code, latitude, longitude,\n"
-            "companies_involved, tags, primary_category, sentiment, infrastructural_entities,\n"
-            "related_countries, relevance_level.\n"
-            "latitude and longitude MUST be separate top-level numbers (floats).\n"
-            "companies_involved, tags, infrastructural_entities, related_countries MUST be "
-            "CSV strings (e.g. 'NASA, JPL'), NEVER JSON arrays.\n"
-            "primary_category MUST be exactly one of: Nucleare, Energia, Infrastrutture, "
-            "Geopolitica, Economia, Tecnologia, Spazio, Ambiente, Salute, Sicurezza.\n"
-            "sentiment MUST be exactly one of: Positivo, Neutrale, Negativo.\n"
-            "country_code = protagonista/attore del pezzo (not the mere target/theater).\n"
-            "Example: US–Iran reciprocal strikes after American soldiers killed in Jordan "
-            "→ country_code US, related_countries IR,JO,KW (never IR or JO as primary).\n"
-            "Coherence: first tag = primary_category; companies_involved = firm names only "
-            "or 'Nessuno'; kinetic attack → Sicurezza; ferry wreck → Infrastrutture; "
-            "sport-only → Geopolitica with relevance_level <= 2.\n"
-            "Game/software/videogame reviews and entertainment products → Tecnologia "
-            "(never Geopolitica, Sicurezza, or Infrastrutture).\n"
-            "Philosophy / abstract essays / explicit no-geopolitical-content fluff → "
-            "Tecnologia + relevance_level 1 + country_code XX (never Geopolitica).\n"
-            "No markdown fences, no reasoning field."
-        )
-        if correction:
-            user_message = (
-                f"{user_message}\n\nCORREZIONE OBBLIGATORIA:\n{correction}\n"
-                "Correggi e restituisci SOLO un JSON valido secondo lo schema "
-                "(senza campo reasoning)."
-            )
-
-        if uses_ollama_think_protocol(use_model):
-            # Thinking OK, ma la risposta finale deve essere solo JSON (Profilo F).
-            user_message = (
-                f"{user_message}\n\n"
-                "THINKING MODE: reason privately if needed, then your FINAL message "
-                "must be ONLY one JSON object starting with '{' and ending with '}'. "
-                "Do not echo the system prompt. Do not use markdown. Do not wrap in ```."
-            )
 
         payload = self.build_payload(
             model=use_model,
@@ -337,6 +299,46 @@ class DeepSeekClient:
             tokens,
         )
         return text, usage
+
+    def _build_user_message(
+        self,
+        *,
+        title: str,
+        content: str,
+        url: str,
+        date: str,
+        correction: str | None = None,
+        model: str | None = None,
+    ) -> str:
+        """Costruisce il messaggio user con micro-suffisso JSON e opzionali CORREZIONE/THINKING."""
+        use_model = model or self.model
+        user_msg = build_user_prompt(
+            title=title,
+            url=url,
+            date=date,
+            content=content[:4000],
+        )
+        user_msg = (
+            f"{user_msg}\n\n"
+            "Return a single valid JSON object strictly adhering to the system instructions. "
+            "Do not include markdown code blocks or any reasoning text."
+        )
+        if correction:
+            user_msg = (
+                f"{user_msg}\n\nCORREZIONE OBBLIGATORIA:\n{correction}\n"
+                "Correggi e restituisci SOLO un JSON valido secondo lo schema "
+                "(senza campo reasoning)."
+            )
+
+        if uses_ollama_think_protocol(use_model):
+            user_msg = (
+                f"{user_msg}\n\n"
+                "THINKING MODE: reason privately if needed, then your FINAL message "
+                "must be ONLY one JSON object starting with '{' and ending with '}'. "
+                "Do not echo the system prompt. Do not use markdown. Do not wrap in ```."
+            )
+        return user_msg
+
 
 
 # Nome descrittivo per nuovi call-site (stesso client).

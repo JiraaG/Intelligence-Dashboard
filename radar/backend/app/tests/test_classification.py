@@ -708,3 +708,45 @@ def test_borderline_default_unset_effort(monkeypatch: pytest.MonkeyPatch) -> Non
 
     assert border[0].reasoning_effort == "high"
     assert border[0].identity == complex_chain[0].identity
+
+
+def test_extract_usage_tokens_deepseek_and_openai() -> None:
+    """M1: Test estrazione token usage con prompt_cache_hit_tokens per DeepSeek e fallback OpenAI."""
+    from app.classification.client import extract_usage_tokens
+
+    # DeepSeek top-level prompt_cache_hit_tokens
+    deepseek_usage = {
+        "prompt_tokens": 1200,
+        "completion_tokens": 150,
+        "prompt_cache_hit_tokens": 1024,
+        "prompt_cache_miss_tokens": 176,
+    }
+    p, c, cached = extract_usage_tokens(deepseek_usage, "deepseek")
+    assert p == 1200
+    assert c == 150
+    assert cached == 1024
+
+    # OpenAI-shaped details
+    openai_usage = {
+        "prompt_tokens": 1000,
+        "completion_tokens": 200,
+        "prompt_tokens_details": {"cached_tokens": 512},
+    }
+    p, c, cached = extract_usage_tokens(openai_usage, "openai")
+    assert p == 1000
+    assert c == 200
+    assert cached == 512
+
+    # Usage senza cache (cached deve essere None, NON 0)
+    nocache_usage = {
+        "prompt_tokens": 800,
+        "completion_tokens": 100,
+    }
+    p, c, cached = extract_usage_tokens(nocache_usage, "deepseek")
+    assert p == 800
+    assert c == 100
+    assert cached is None
+
+    # Response vuoto
+    assert extract_usage_tokens(None, "deepseek") == (None, None, None)
+
