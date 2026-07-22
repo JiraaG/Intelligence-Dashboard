@@ -93,7 +93,7 @@ Il database PostgreSQL utilizza driver `asyncpg` asincroni puri senza ORM per ma
 ### C. LLM Multi-Provider & Heuristic Complexity Routing v2.2
 
 La configurazione del motore LLM supporta canali (Lanes) indipendenti per la classificazione:
-* **SIMPLE Lane (`LLM_SIMPLE_*`):** Destinata a pezzi semplici, tipicamente appoggiata a modelli di base ed economici (es. `gemini-3.1-flash-lite`, `deepseek-v4-flash` con `effort=none`).
+* **SIMPLE Lane (`LLM_SIMPLE_*`):** Destinata a pezzi semplici, tipicamente appoggiata a modelli di base ed economici (es. Profilo A: `gemini-3.5-flash-lite` con L1 `gemini-3.1-flash-lite`; altri: `deepseek-v4-flash` con `effort=none`).
 * **COMPLEX Lane (`LLM_COMPLEX_*`):** Destinata ad articoli complessi o escalation, tipicamente associata ad alta capacità di reasoning (es. `deepseek-v4-flash` con `effort=high`, `gemini-3.5-flash`).
 
 L'algoritmo **Heuristic Complexity v2.2** determina la lane corretta analizzando il testo sanitizzato (titolo + body):
@@ -295,10 +295,12 @@ LLM_ROUTING_MODE=complexity
 LLM_ROUTING_SHADOW=false
 
 LLM_SIMPLE_PROVIDER=gemini
-LLM_SIMPLE_MODEL=gemini-3.1-flash-lite
+LLM_SIMPLE_MODEL=gemini-3.5-flash-lite
+LLM_SIMPLE_FALLBACKS=gemini-3.1-flash-lite
 LLM_SIMPLE_API_KEY=TUA_GEMINI_API_KEY
-LLM_SIMPLE_RPM=10
-LLM_SIMPLE_RPD=1000
+LLM_SIMPLE_RPM=12
+LLM_SIMPLE_TPM=250000
+LLM_SIMPLE_RPD=500
 
 LLM_COMPLEX_PROVIDER=openai
 LLM_COMPLEX_MODEL=gemma4:12b

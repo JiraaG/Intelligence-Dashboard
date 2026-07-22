@@ -1,14 +1,16 @@
-﻿# Optional override: Gemini 3.1 Flash Lite SIMPLE (Studio caps, RPM capped at 12).
+﻿# Optional override: Gemini 3.5 Flash Lite SIMPLE + 3.1 L1 fallback (Studio caps, RPM capped at 12).
 # Usage: docker compose -f docker-compose.yml -f docker-compose.gemini-simple.yml up -d radar-worker
 # Relies on GEMINI_API_KEY in .env. COMPLEX stays DeepSeek from .env.
 services:
   radar-worker:
     environment:
       LLM_SIMPLE_PROVIDER: gemini
-      LLM_SIMPLE_MODEL: gemini-3.1-flash-lite
+      LLM_SIMPLE_MODEL: gemini-3.5-flash-lite
       LLM_SIMPLE_RPM: "12"
       LLM_SIMPLE_TPM: "250000"
       LLM_SIMPLE_RPD: "500"
       LLM_SIMPLE_BUDGET_USD_DAY: "0"
       LLM_SIMPLE_BASE_URL: ""
-      GEMINI_MODEL: gemini-3.1-flash-lite
+      LLM_SIMPLE_FALLBACKS: gemini-3.1-flash-lite
+      GEMINI_MODEL_FALLBACKS: gemini-3.1-flash-lite
+      GEMINI_MODEL: gemini-3.5-flash-lite

@@ -29,11 +29,11 @@ LLM_ROUTING_MODE=complexity
 LLM_ROUTING_SHADOW=false
 # SIMPLE bulk free (Studio VERIFY)
 LLM_SIMPLE_PROVIDER=gemini
-LLM_SIMPLE_MODEL=gemini-3.1-flash-lite
+LLM_SIMPLE_MODEL=gemini-3.5-flash-lite
 LLM_SIMPLE_RPM=12          # Studio 15 — cap ops ≤12
 LLM_SIMPLE_TPM=250000      # Studio 250K
 LLM_SIMPLE_RPD=500         # Studio 500
-LLM_SIMPLE_FALLBACKS=      # VUOTO — L1 off; sostituto cross-provider = residual L2 COMPLEX
+LLM_SIMPLE_FALLBACKS=gemini-3.1-flash-lite  # L1 same-provider; L2 residual = COMPLEX DeepSeek
 # BORDERLINE + COMPLEX + escalate (paid)
 LLM_COMPLEX_PROVIDER=deepseek
 LLM_COMPLEX_MODEL=deepseek-v4-flash
@@ -152,7 +152,8 @@ Quote RPM/RPD Google: **VERIFY_IN_STUDIO** sul progetto della `GOOGLE_API_KEY` (
 |------|----------|-------|------|
 | 1 | `gemini-3.5-flash` | Primary free | Free, stable, 1M, structured, qualità max free |
 | 2 | `gemini-2.5-flash` | Secondary | Free, stable, Flash pieno |
-| 3 | `gemini-3.1-flash-lite` | Tertiary | Throughput; AA **25 &lt; Gemma 29** → mai primary |
+| **A1** | `gemini-3.5-flash-lite` | **SIMPLE primary (Profilo A ops)** | Throughput attuale; RPM=12 TPM=250K RPD=500 (VERIFY_IN_STUDIO) |
+| **A2** | `gemini-3.1-flash-lite` | **L1 same-provider fallback** | Dopo primary SIMPLE; AA **25 &lt; Gemma 29** → non primary |
 | L | `gemma-4-31b-it` | Legacy opt-in | 256K OK; ops HTTP 500 → fuori default |
 | OUT | `gemini-2.0-*` | — | Shut down 2026-06-01 |
 | OUT | Pro free tipico | — | RPD ≪1000 |
@@ -373,9 +374,11 @@ DEEPSEEK_BUDGET_USD_DAY=0            # legacy alias → COMPLEX budget se lane u
 ```text
 # Free Gemini → RPM/RPD > 0 (VERIFY_IN_STUDIO); paid DeepSeek → RPM/RPD=0 + BUDGET
 LLM_SIMPLE_PROVIDER=gemini
-LLM_SIMPLE_MODEL=gemini-3.1-flash-lite
-LLM_SIMPLE_RPM=10                    # VERIFY_IN_STUDIO
-LLM_SIMPLE_RPD=1000                  # VERIFY_IN_STUDIO — soft-trim usa questo se > 0
+LLM_SIMPLE_MODEL=gemini-3.5-flash-lite
+LLM_SIMPLE_FALLBACKS=gemini-3.1-flash-lite
+LLM_SIMPLE_RPM=12                    # Studio cap ops ≤12
+LLM_SIMPLE_TPM=250000
+LLM_SIMPLE_RPD=500                   # soft-trim usa questo se > 0
 LLM_COMPLEX_PROVIDER=deepseek
 LLM_COMPLEX_MODEL=deepseek-v4-flash
 LLM_COMPLEX_RPM=0
