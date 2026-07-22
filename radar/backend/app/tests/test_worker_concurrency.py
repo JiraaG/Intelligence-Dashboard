@@ -26,7 +26,7 @@ class LockSimulatingConnection:
         self.fetchrow = AsyncMock(side_effect=self._mock_fetchrow)
         self.fetchval = AsyncMock(side_effect=self._mock_fetchval)
 
-    async def _mock_execute(self, query: str, *args: Any) -> None:
+    async def _mock_execute(self, query: str, *args: Any, **kwargs: Any) -> None:
         query_clean = " ".join(query.split())
         if "pg_advisory_lock" in query_clean:
             ns, key = args[0], args[1]

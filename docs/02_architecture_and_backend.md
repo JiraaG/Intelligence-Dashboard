@@ -36,12 +36,12 @@ flowchart TD
 
 Moduli sotto `radar/backend/app/`:
 
-1. **`core/`** — config bounded, pool asyncpg, `migrations.py`, logging, heartbeat, **`llm_lanes.py`** (provider/dialect/lane)
-2. **`extraction/`** — client Miniflux (httpx, byte limits, retry), parser HTML, dedup
-3. **`classification/`** — client Gemini (`google-genai`) + OpenAI-compat httpx (`deepseek`/`openai`/`glm`/`grok`; dialect); `claude` = stub; **`openai_compat_payload`/`_response`** (think Ollama); **`ollama_lifecycle`** (VRAM unload Profilo F); **`complexity.py`** v2.2; **`cooldown.py`**; `quota.py` per-lane; prompts (no CoT); validator Pydantic strict
-4. **`commit/`** — commit atomico, outbox, vault `yaml.safe_dump` + write atomica
+1. **`core/`** — config bounded, pool asyncpg, `migrations.py` (012 pgvector), logging, heartbeat, **`llm_lanes.py`** (provider/dialect/lane)
+2. **`extraction/`** — client Miniflux, parser HTML, dedup URL + semantica pre-LLM, **`embedder.py`** (`all-MiniLM-L6-v2`), **`semantic_dedup.py`** (`pgvector` `<=>`, sim ≥ **0.80**)
+3. **`classification/`** — client Gemini + OpenAI-compat httpx; **`quality_compare.py`** (1x scontro di qualità lane COMPLEX); `complexity.py` v2.2; `cooldown.py`; `quota.py` per-lane; prompts; validator Pydantic strict
+4. **`commit/`** — commit atomico, **`replace_article_in_place`**, outbox (`force_reopen_outbox_row`), vault `yaml.safe_dump` + write atomica
 5. **`api/`** — query helpers Phase 5 (`articles_query.py`)
-6. **`scripts/`** — ops `requeue_articles.py` — dettaglio [runbook](../radar/docs/runbook.md)
+6. **`scripts/`** — ops `requeue_articles.py`, **`verify_semantic_dedup.py`** — dettaglio [runbook](../radar/docs/runbook.md)
 
 ---
 

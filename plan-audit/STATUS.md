@@ -22,6 +22,8 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 
 | Area | Dove | Note |
 |------|------|------|
+| Fase C — dedup semantica (`pgvector`) | [`complete/plan_impl_fase_C_semantic_dedup.md`](complete/plan_impl_fase_C_semantic_dedup.md) | **COMPLETE / GATE VERDE** 2026-07-22 — `pgvector/pgvector:0.8.0-pg15`, migration `012_pgvector_article_embeddings`, embedder CPU `all-MiniLM-L6-v2`, 1x quality compare COMPLEX lane, replace in-place, audit log `article_dedup_events`. Prompt: [`prompts/done/agent_prompt_fase_C_semantic_dedup.md`](prompts/done/agent_prompt_fase_C_semantic_dedup.md). |
+
 | Fix fasce tipologia (isole + anti-bleed) | [`complete/plan_impl_map_category_fills_islands.md`](complete/plan_impl_map_category_fills_islands.md) | **COMPLETE / GATE VERDE** 2026-07-21 — `extractPaintPolygons` + `polygon-clipping` terra∩strip; sweep MultiPolygon; **Restore point:** `32203c9` su `feature/upgrades`. Prompt [`prompts/done/plan_prompt_map_category_fills_islands.md`](prompts/done/plan_prompt_map_category_fills_islands.md). |
 | Relazioni — filtro nazioni (Wave 1) | [`complete/plan_impl_map_relations_nation_filter.md`](complete/plan_impl_map_relations_nation_filter.md) | **COMPLETE / GATE VERDE** 2026-07-20 — toolbar **RELAZIONI ATTIVE** (default OFF, OR stella, toggle iOS); `visibleMapRelations`; paint/hover invariati. **Restore point:** `ec771b1` su `feature/upgrades` (pre-W1 archi: `0d942ed`). |
 | Fase A — LLM locale AMD/Ollama | [`complete/plan_impl_fase_A_local_amd_ollama.md`](complete/plan_impl_fase_A_local_amd_ollama.md) | **COMPLETE** — W1–W4 + VRAM unload **DONE** (`54c8038` / `2996625`). Scorecard fixture formale = **opz. non bloccante**. |
@@ -57,7 +59,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 | Fase 0 — PR `refactor/testing` → `develop` | **DONE** | [PR #1](https://github.com/JiraaG/Dashboard-finance/pull/1) merged 2026-07-17; tip `develop` include Notizie Salvate (`b08fd7e`) oltre al branch |
 | Fase 5 — digest pin + drop `--legacy-peer-deps` | **DEFERRED ACCETTATO** | Hardening opzionale; **non** da fare per release. Vedi piano §7 |
 | Commenti codice P1/P2 | **Chiuso (P2-01)** | Altri P2 in inventario senza `batch_id` — solo se emerge gap reale |
-| Fase C — Dedup semantica `pgvector` | **BACKLOG** | Vedi `radar_overview_and_upgrades.md` §3.C; non iniziata; indipendente da H / A |
+| Fase C — Dedup semantica `pgvector` | **COMPLETE / GATE VERDE** | [`complete/plan_impl_fase_C_semantic_dedup.md`](complete/plan_impl_fase_C_semantic_dedup.md); migrazione `012`, embedder CPU, quality compare COMPLEX, replace in-place. |
 | Fase A — LLM locale AMD/Ollama | **COMPLETE** | Impl + VRAM **DONE**. Scorecard fixture = opz. Piano [`complete/plan_impl_fase_A_local_amd_ollama.md`](complete/plan_impl_fase_A_local_amd_ollama.md). |
 | Fase H — Grafo geospaziale | **DONE** | related_countries + GET /api/map-relations + archi mappa + chip carosello (2026-07-18). |
 | Archi UI (multicolore + click) | **DONE** | Piano [`complete/plan_archi_hatching_multicolor.md`](complete/plan_archi_hatching_multicolor.md). **MapLibre:** residuo opzionale “multicolore anche ≥5” **chiuso** (`0d942ed`). Leaflet legacy: dash+fan su latch pin (`MAP_ZOOM_PIN_THRESHOLD=4` + isteresi). |
@@ -65,9 +67,9 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 | Pin zoom soglia + isteresi globo | **DONE** | `MAP_ZOOM_PIN_THRESHOLD=4`, `MAP_ZOOM_PIN_HYSTERESIS=0.4`, `resolvePinMode` / `pinModeActive` — anti-flicker pan MapLibre globe. |
 | Hatching isole + anti-bleed MapLibre | **DONE** | [`complete/plan_impl_map_category_fills_islands.md`](complete/plan_impl_map_category_fills_islands.md) — GATE 2026-07-21. |
 
-**Nessun residuo operativo obbligatorio sulla Fase A / B / H / archi UI / W1 filtri / hatching isole / classification refine / map anchors / Profilo F core / audit env.** Branch di riferimento feature: `feature/upgrades`. Candidata immediata relazioni: **Wave 2 archi elevati**. Blueprint parallelo: **§3.C pgvector**.
+**Nessun residuo operativo obbligatorio sulla Fase A / B / C / H / archi UI / W1 filtri / hatching isole / classification refine / map anchors / Profilo F core / audit env.** Branch di riferimento feature: `feature/upgrades`. Candidata immediata relazioni: **Wave 2 archi elevati**. **§3.C pgvector** = **COMPLETE / GATE VERDE** ([`complete/plan_impl_fase_C_semantic_dedup.md`](complete/plan_impl_fase_C_semantic_dedup.md)).
 
-**Restore points (catena `feature/upgrades`):** hatching isole/anti-bleed **`32203c9`**; pin threshold+hysteresis **`7a2bfc9`**; toolbar unify Sentiment/Tipologia `33c348e`; W1 filtri nazioni **`ec771b1`**; archi MapLibre solidi `0d942ed`; docs LLM env `c9ef842`; Profilo F + VRAM `2996625`; Local-Hybrid `54c8038`; map anchors `a240b3c`; click hatching `911463a`; classification/geo `f7cf83d`; archi UI Leaflet `5c74e57`.
+**Restore points (catena `feature/upgrades`):** Fase C semantic dedup **`9680e7e`**; hatching isole/anti-bleed **`32203c9`**; pin threshold+hysteresis **`7a2bfc9`**; toolbar unify Sentiment/Tipologia `33c348e`; W1 filtri nazioni **`ec771b1`**; archi MapLibre solidi `0d942ed`; docs LLM env `c9ef842`; Profilo F + VRAM `2996625`; Local-Hybrid `54c8038`; map anchors `a240b3c`; click hatching `911463a`; classification/geo `f7cf83d`; archi UI Leaflet `5c74e57`.
 
 Prompt Final Release: [`prompts/done/audit_prompt_final_release_gate.md`](prompts/done/audit_prompt_final_release_gate.md) — **non rieseguire** (F0–F4 chiusi).  
 Prompt isole fills: [`prompts/done/plan_prompt_map_category_fills_islands.md`](prompts/done/plan_prompt_map_category_fills_islands.md) — **non rieseguire**.

@@ -322,6 +322,38 @@ OUTBOX_STALE_WRITING_SECONDS = _env_int(
     max_value=86_400,
 )
 
+# ── Deduplicazione Semantica (Fase C) ─────────────────────────────────────────
+SEMANTIC_DEDUP_ENABLED = _env_bool("SEMANTIC_DEDUP_ENABLED", True)
+SEMANTIC_DEDUP_SIMILARITY_THRESHOLD = _env_float(
+    "SEMANTIC_DEDUP_SIMILARITY_THRESHOLD",
+    0.80,
+    min_value=0.5,
+    max_value=1.0,
+)
+SEMANTIC_DEDUP_LOOKBACK_HOURS = _env_int(
+    "SEMANTIC_DEDUP_LOOKBACK_HOURS",
+    24,
+    min_value=1,
+    max_value=168,
+)
+SEMANTIC_EMBEDDING_MODEL = (
+    _env_str("SEMANTIC_EMBEDDING_MODEL", "all-MiniLM-L6-v2") or "all-MiniLM-L6-v2"
+)
+SEMANTIC_PREFILTER_LEN_RATIO = _env_float(
+    "SEMANTIC_PREFILTER_LEN_RATIO",
+    0.7,
+    min_value=0.1,
+    max_value=1.0,
+)
+
+# Soft hint nel prompt quality se len_incoming > len_existing * ratio (D15/§3.6).
+SEMANTIC_QUALITY_REPLACE_HINT_RATIO = _env_float(
+    "SEMANTIC_QUALITY_REPLACE_HINT_RATIO",
+    1.25,
+    min_value=1.0,
+    max_value=5.0,
+)
+
 _raw_tz = _env_str("RADAR_TIME_ZONE", "UTC") or "UTC"
 RADAR_TIME_ZONE, RADAR_TIME_ZONE_NAME = _resolve_time_zone(_raw_tz)
 

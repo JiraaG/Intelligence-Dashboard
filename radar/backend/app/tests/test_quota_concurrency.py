@@ -89,11 +89,19 @@ class FakeConnection:
     async def fetchval(self, query: str, *args: Any) -> Any:
         return await self._dispatch(query, args, returning=True)
 
+    async def fetchrow(self, query: str, *args: Any) -> Any:
+        return await self._dispatch(query, args, returning=True)
+
     async def _dispatch(self, query: str, args: tuple[Any, ...], *, returning: bool) -> Any:
         q = " ".join(query.split())
 
         if "pg_advisory_xact_lock" in q:
             return None
+
+        if "SELECT lane FROM llm_request_ledger" in q:
+            rid = int(args[0])
+            row = self._store.rows.get(rid)
+            return {"lane": "simple"} if row else None
 
         if "INSERT INTO llm_request_ledger" in q:
             rid = self._store.next_id
@@ -147,16 +155,12 @@ class FakeConnection:
             return "UPDATE 1"
 
         if "SUM(COALESCE" in q:
-            purpose_filter = args[-1] if "purpose =" in q and isinstance(args[-1], str) else None
-            status_arg = args[-2] if purpose_filter is not None else args[-1]
-            statuses = set(status_arg) if isinstance(status_arg, (list, tuple)) else set(args[1])
+            statuses = set(next((a for a in args if isinstance(a, (list, tuple, set))), ["reserved", "completed", "failed"]))
             total = 0
             if "created_at >=" in q and "created_at <" in q:
                 day_start, day_end = args[0], args[1]
                 for row in self._store.rows.values():
                     if not (day_start <= row.created_at < day_end and row.status in statuses):
-                        continue
-                    if purpose_filter is not None and row.purpose != purpose_filter:
                         continue
                     total += (
                         row.actual_tokens
@@ -168,8 +172,6 @@ class FakeConnection:
             for row in self._store.rows.values():
                 if not (row.created_at > window_start and row.status in statuses):
                     continue
-                if purpose_filter is not None and row.purpose != purpose_filter:
-                    continue
                 total += (
                     row.actual_tokens
                     if row.actual_tokens is not None
@@ -178,30 +180,21 @@ class FakeConnection:
             return total
 
         if "MIN(created_at)" in q:
-            purpose_filter = args[-1] if "purpose =" in q and isinstance(args[-1], str) else None
-            status_arg = args[-2] if purpose_filter is not None else args[1]
-            statuses = set(status_arg)
+            statuses = set(next((a for a in args if isinstance(a, (list, tuple, set))), ["reserved", "completed", "failed"]))
             window_start = args[0]
             times = [
                 row.created_at
                 for row in self._store.rows.values()
                 if row.created_at > window_start
                 and row.status in statuses
-                and (purpose_filter is None or row.purpose == purpose_filter)
             ]
             return min(times) if times else None
 
         if "COUNT(*)" in q:
-            purpose_filter = args[-1] if "purpose =" in q and isinstance(args[-1], str) else None
-            status_arg = args[-2] if purpose_filter is not None else args[-1]
-            statuses = set(status_arg)
+            statuses = set(next((a for a in args if isinstance(a, (list, tuple, set))), ["reserved", "completed", "failed"]))
 
             def _match(row: _Row) -> bool:
-                if row.status not in statuses:
-                    return False
-                if purpose_filter is not None and row.purpose != purpose_filter:
-                    return False
-                return True
+                return row.status in statuses
 
             if "created_at >=" in q and "created_at <" in q:
                 day_start, day_end = args[0], args[1]
@@ -239,6 +232,13 @@ class FakePool:
 
     def acquire(self) -> _AcquireCM:
         return _AcquireCM(FakeConnection(self._store))
+
+    async def execute(self, query: str, *args: Any) -> str:
+        return await FakeConnection(self._store).execute(query, *args)
+
+    async def fetchrow(self, query: str, *args: Any) -> Any:
+        return await FakeConnection(self._store).fetchrow(query, *args)
+
 
     async def execute(self, query: str, *args: Any) -> str:
         return await FakeConnection(self._store).execute(query, *args)

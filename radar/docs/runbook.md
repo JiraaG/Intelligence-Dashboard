@@ -248,10 +248,23 @@ Windows: Git Bash / WSL. Preferire drill su stack usa-e-getta prima del restore 
 
 1. Aggiorna codice; rivedi `.env.example` per nuovi knobs.
 2. `docker compose up -d --build`.
-3. Ricrea **`radar-backend`** per applicare migrazioni (`schema_migrations` — abort su checksum mismatch).
+3. Ricrea **`radar-backend`** per applicare migrazioni (`schema_migrations` — abort su checksum mismatch; include `012_pgvector_article_embeddings.sql`).
 4. Ricrea **`radar-worker`** (uno solo); ready 503 breve fino a heartbeat.
 5. Ricrea **`radar-frontend`** (depends on live).
 6. Smoke: live, ready, `GET /api/articles?date=YYYY-MM-DD`, `GET /api/map-summary?date=…`, `GET /api/map-relations?date=…`, `GET /api/saved-summary`, `GET /api/articles?saved=true`, `PATCH /api/articles/{id}/saved_status` (save⇒read), UI mappa **MapLibre** (default) + toolbar **NOTIZIE SALVATE** (tooltip → zoom + spiderfy). Verifica renderer: confini + pin/archi su MapLibre; `npm run verify-map-renderer` in `radar/frontend` se rebuild FE.
+
+### Verifica Deduplicazione Semantica (pgvector)
+
+```bash
+# Test embedder all-MiniLM-L6-v2 in isolamento (dry-run)
+Soglia default: `SEMANTIC_DEDUP_SIMILARITY_THRESHOLD=0.80` (distanza ≤ 0.20).
+
+docker compose exec -T radar-worker python -m app.scripts.verify_semantic_dedup --dry-run
+
+# Test live DB (estensione pgvector, tabella article_embeddings, cerca vicino-duplicato)
+docker compose exec -T radar-worker python -m app.scripts.verify_semantic_dedup
+```
+
 
 ### Forzare Leaflet legacy (ops / debug)
 

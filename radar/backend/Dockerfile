@@ -13,7 +13,10 @@ WORKDIR /build
 # NOTA: il build context è ./backend, quindi requirements.txt è in app/
 # pytest* vive in app/requirements-dev.txt e NON entra nell'immagine production.
 COPY app/requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+# Torch CPU-only: evita wheel CUDA multi-GB inutili (embedder ST gira su CPU).
+RUN pip install --no-cache-dir --prefix=/install \
+    --extra-index-url https://download.pytorch.org/whl/cpu \
+    -r requirements.txt
 
 
 # ─── Stage 2: Production ─────────────────────────────────────────────────────
@@ -43,6 +46,9 @@ ENV PYTHONPATH=/app
 
 # Esegui come utente non-root
 USER radar
+
+# Pre-download del modello di embedding per utilizzo offline in container
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
 
 # Porta API FastAPI (il servizio radar-worker override il CMD e non espone HTTP)
 EXPOSE 8000

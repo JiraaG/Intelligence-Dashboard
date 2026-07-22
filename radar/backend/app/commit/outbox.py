@@ -79,6 +79,45 @@ async def enqueue_outbox_row(
     )
 
 
+async def force_reopen_outbox_row(
+    conn: asyncpg.Connection,
+    *,
+    article_id: Any,
+    target_path: str,
+    payload: str,
+    miniflux_entry_id: int | None,
+) -> None:
+    """Forza il ripristino a 'pending' di una riga outbox esistente anche se era 'completed'.
+
+    Usato quando un articolo viene sostituito in-place da un articolo incoming di qualità migliore.
+    """
+    checksum = payload_checksum(payload)
+    await conn.execute(
+        """
+        INSERT INTO article_outbox (
+            article_id, target_path, payload, payload_checksum,
+            status, attempt_count, last_error, miniflux_entry_id
+        )
+        VALUES ($1, $2, $3, $4, 'pending', 0, NULL, $5)
+        ON CONFLICT (article_id) DO UPDATE SET
+            target_path = EXCLUDED.target_path,
+            payload = EXCLUDED.payload,
+            payload_checksum = EXCLUDED.payload_checksum,
+            status = 'pending',
+            attempt_count = 0,
+            last_error = NULL,
+            miniflux_marked_at = NULL,
+            miniflux_entry_id = COALESCE(EXCLUDED.miniflux_entry_id, article_outbox.miniflux_entry_id),
+            updated_at = NOW()
+        """,
+        article_id,
+        target_path,
+        payload,
+        checksum,
+        miniflux_entry_id,
+    )
+
+
 async def _reset_stale_writing(conn: asyncpg.Connection) -> int:
     """``writing`` più vecchie della soglia → ``pending`` (crash mid-write).
 

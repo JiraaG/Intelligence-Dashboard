@@ -38,7 +38,7 @@ Non rinominarli senza aggiornare anche le variabili d'ambiente e il codice Pytho
 
 | Nome Servizio     | Immagine Base          | Funzione                              |
 |-------------------|------------------------|---------------------------------------|
-| `radar-db`        | `postgres:15-alpine`   | Database PostgreSQL persistente       |
+| `radar-db`        | `pgvector/pgvector:0.8.0-pg15` | Database PostgreSQL 15 con extension `pgvector` |
 | `radar-backend`   | Custom Python 3.12     | API REST FastAPI (no ingest)          |
 | `radar-worker`    | Stessa immagine backend | Ingest Miniflux→LLM→DB/Vault (`python -m app.worker`) |
 | `radar-frontend`  | Custom Node + Nginx    | Build Angular 21 + web server Nginx   |

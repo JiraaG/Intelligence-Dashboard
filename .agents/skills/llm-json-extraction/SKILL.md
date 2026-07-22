@@ -15,13 +15,13 @@ when_to_use:
   - Swap provider via LLM_SIMPLE_* / LLM_COMPLEX_* (Profili A–F)
   - Lifecycle VRAM Ollama (ollama_lifecycle, OLLAMA_*, unload fine-ciclo)
   - Aggiunta di nuovi campi al contratto di estrazione
-version: 1.9.0
+version: 1.9.1
 ---
 
 ## Quando Usare Questa Skill
 
 Carica questa skill ogni volta che:
-- Modifichi `backend/app/worker.py` o `classification/` (client, prompts, validator, quota, complexity, cooldown, deepseek, `openai_compat_*`, `ollama_lifecycle`)
+- Modifichi `backend/app/worker.py` o `classification/` (client, prompts, validator, quota, complexity, cooldown, deepseek, `openai_compat_*`, `ollama_lifecycle`, `quality_compare`)
 - Ricevi errori del tipo `ValidationError` da Pydantic
 - Gemini/DeepSeek restituisce un JSON incompleto o con campi non presenti nello schema
 - Devi ottimizzare il System Prompt per ridurre le allucinazioni geografiche
@@ -32,16 +32,18 @@ Carica questa skill ogni volta che:
 
 ## Come Funziona
 
-### Flusso di Esecuzione (Phase 2)
+### Flusso di Esecuzione (Phase 2 + Fase C)
 
 ```
 1. Worker (radar-worker): advisory lock → reconcile outbox → fetch Miniflux (coda bounded)
-2. Per entry: dedup → sanitize → complexity lane v2.2 → QuotaLedger.reserve(model=, lane=)
+2. Per entry: URL-dedup → sanitize → embed + semantic dedup (pgvector)
+   → optional quality:compare (purpose=quality:compare, lane=complex, effort=none)
+   → complexity lane v2.2 → QuotaLedger.reserve(model=, lane=)
    → Gemini (google-genai) e/o OpenAI-compat httpx (deepseek/openai/glm/grok; no package openai)
 3. Parsing/validazione Pydantic strict; complete(reservation_id) con usage reale
 4. Hard-fail → llm_model_cooldown 24h + next model; 429 breve → Retry-After same model
 5. Overwrite source_url + published_at da Miniflux
-6. Commit atomico DB + article_outbox
+6. Commit atomico DB + article_outbox (o replace in-place se quality winner=incoming)
 7. Reconcile vault → mark-read Miniflux solo se durable completed
 ```
 

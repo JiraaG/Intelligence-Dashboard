@@ -7,7 +7,7 @@ description: >
   Complexity v2.2: BORDERLINE → purpose classify:complex.
 when_to_use:
   - classification/quota.py, cooldown.py, llm_request_ledger, client cascade/retry
-version: 2.3.0
+version: 2.3.1
 ---
 
 ## Limiti (obbligatorio)
@@ -15,7 +15,7 @@ version: 2.3.0
 | Env | Uso |
 |-----|-----|
 | `LLM_SIMPLE_RPM/TPM/RPD` | Tentativi catena SIMPLE (`purpose=classify:simple`) |
-| `LLM_COMPLEX_RPM/TPM/RPD` | Tentativi catena COMPLEX — include **BORDERLINE + COMPLEX** (`purpose=classify:complex`) |
+| `LLM_COMPLEX_RPM/TPM/RPD` | Tentativi catena COMPLEX — include **BORDERLINE + COMPLEX** (`purpose=classify:complex`) e custom **`quality:compare`** |
 | `0` | Quella dimensione **non** e enforced su quella lane |
 
 `LLM_RPM` / `DEEPSEEK_RPM` = **legacy alias** (default se il campo lane e assente). Non sono un tetto globale shared.
@@ -31,10 +31,13 @@ RPM/TPM pieni → attesa sulla **stessa** lane (no cross). **RPD esaurita** → 
 
 Residual cross-lane fattura `ref.quota_lane` (SIMPLE↔COMPLEX se identity diversa).
 
+**Custom purpose `quality:compare`:** usa contatori lane=`complex`; il campo `purpose` è memorizzato **as-is** nel ledger (non overwrite a `classify:complex`).
+
 ## Complexity routing (v2.2)
 
 - SIMPLE → reserve `lane=simple`
 - BORDERLINE / COMPLEX → reserve `lane=complex`
+- quality:compare (Fase C near-dup) → reserve `lane=complex`, `purpose=quality:compare`
 
 ## Protocollo
 

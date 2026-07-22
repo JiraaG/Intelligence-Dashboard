@@ -150,7 +150,7 @@ Sezioni sotto = blueprint (architettura + ricette). Stato prodotto aggiornato **
 |---------|------|--------|
 | **A** | LLM locale AMD / Ollama (Profilo F) | **DONE** — core `54c8038`, VRAM `2996625`; scorecard fixture **opz.** |
 | **B** | Real-time webhook / SSE / soft-refresh | **DONE / GATE VERDE** (2026-07-18) |
-| **C** | Dedup semantica `pgvector` | **BACKLOG** (prossima candidata; indipendente da I/J) |
+| **C** | Dedup semantica `pgvector` | **DONE / GATE VERDE** — SoT [`plan-audit/complete/plan_impl_fase_C_semantic_dedup.md`](plan-audit/complete/plan_impl_fase_C_semantic_dedup.md) |
 | **D** | Mappe offline air-gapped | **Futuro** — target FE = MapLibre `style` → `/tiles/` (non solo Leaflet PNG) |
 | **G** | Obsidian wiki-links bidirezionali | Futuro |
 | **H** | Grafo geospaziale / archi mappa | **DONE / GATE VERDE** (2026-07-18) |
@@ -429,11 +429,13 @@ export class RealTimeStateService {
 
 ### C. Deduplicazione Semantica tramite Embeddings (`pgvector`)
 
-> **Stato: BACKLOG** — non iniziata; indipendente da A/B/H. Candidata naturale per il prossimo ciclo di sviluppo.
+> **Stato: DONE / GATE VERDE.** SoT: [`plan-audit/complete/plan_impl_fase_C_semantic_dedup.md`](plan-audit/complete/plan_impl_fase_C_semantic_dedup.md). Migrazione `012_pgvector_article_embeddings.sql`.
 
 Invece di limitarsi a una deduplica basata sull'URL esatto (inadeguata se feed diversi pubblicano lo stesso articolo con domini o parametri UTM differenti), l'introduzione di `pgvector` consente di calcolare un embedding del titolo o del sommario per rilevare la similarità semantica prima di invocare il processo di classificazione LLM.
 
-#### 1. Modifiche al Database: Script di Migrazione (`011_pgvector_dedup.sql`)
+#### 1. Modifiche al Database: Script di Migrazione (`012_pgvector_article_embeddings.sql`)
+
+> **Design shipped (SoT completo):** near-dup → **quality:compare** su lane **COMPLEX** (`reasoning_effort=none`) → keep oppure **replace in-place** (stesso `article_id`). Vedi [`plan-audit/complete/plan_impl_fase_C_semantic_dedup.md`](plan-audit/complete/plan_impl_fase_C_semantic_dedup.md).
 
 ```sql
 -- Abilita l'estensione pgvector nel database PostgreSQL
@@ -466,7 +468,7 @@ embed_model = SentenceTransformer("all-MiniLM-L6-v2")
 async def get_semantic_duplicate(
     conn: asyncpg.Connection,
     title: str,
-    threshold: float = 0.85
+    threshold: float = 0.80
 ) -> int | None:
     """Verifica la similarità semantica del titolo contro il DB.
     
@@ -475,7 +477,7 @@ async def get_semantic_duplicate(
     # Calcolo embedding del titolo
     embedding = embed_model.encode(title).tolist()
     
-    # Ricerca coseno in SQL (distanza coseno <= 0.15 equivale a similarità >= 85%)
+    # Ricerca coseno in SQL (distanza coseno <= 0.20 equivale a similarità >= 80%)
     row = await conn.fetchrow(
         """
         SELECT article_id, (embedding <=> $1) as distance

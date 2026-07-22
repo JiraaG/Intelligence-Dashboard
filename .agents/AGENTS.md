@@ -12,13 +12,14 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 ### Stack Tecnologico Ufficiale
 * **Backend:** Python 3.12-slim (Docker) / 3.14 (locale). Demone asincrono con polling `WORKER_POLL_INTERVAL_SECONDS` (default 900).
 * **LLM:** `google-genai` SDK + OpenAI-compat via httpx (`deepseek`/`openai`/`glm`/`grok`; no package `openai`); lane `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (limiti per-lane; soft-trim = `LLM_SIMPLE.rpd` se >0). **RPM/TPM pieni → attesa stessa lane; RPD/cooldown → residual cross-lane** (`QuotaDailyExceeded`). Dialect: deepseek=`thinking`; openai/glm/grok=stock (**Profilo F / Ollama reasoner:** `think=true` via `openai_compat_payload`; VRAM unload `ollama_lifecycle` + `OLLAMA_*`; **vietato** SDK `ollama` / `ollama.chat`). `claude` = stub. Caps Studio Flash Lite tipici: RPM≤12 / TPM=250K / RPD=500. Ops: Profili **A–F** in `.env.example` (F = Local-Hybrid overlay `docker-compose.ollama-host.yml`) — non hardcodare chiavi.
-* **Database:** PostgreSQL 15 (`radar-db`). Accesso tramite driver asincrono `asyncpg` puro.
+* **Database:** PostgreSQL 15 con estensione `pgvector` (`pgvector/pgvector:0.8.0-pg15`). Accesso tramite driver asincrono `asyncpg` puro.
 * **Feed Source:** Miniflux REST API.
 * **Frontend:** Angular 21 (Standalone Components).
 * **Mappa:** MapLibre GL 5.24 (default) — facade `radar-map.component.ts` + host `maplibre/`; Leaflet 1.9 + MarkerCluster solo path legacy (`MAP_RENDERER=leaflet`, host `leaflet/`, LEGACY FREEZE). Token `services/map-renderer.token.ts`. Proiezione: `localStorage` `radar.mapProjection` = `globe`|`mercator`. Gate: `npm run verify-map-renderer`.
 * **Container:** Docker + docker-compose (servizi: `radar-db`, `radar-backend`, `radar-worker`, `radar-frontend`, `radar-miniflux`) su reti `radar-edge` + `radar-data` (Phase 3). Ingestione solo in `radar-worker`.
 * **Web Server:** Nginx (Alpine) per servire Angular e proxying `/api/`.
-* **Piani operativi:** [`plan_impl_phase_0_6.md`](../plan-audit/complete/plan_impl_phase_0_6.md) + [`plan_impl_phase_0_6_execution.md`](../plan-audit/complete/plan_impl_phase_0_6_execution.md). Post–branch restore (2026-07-15): **Phase 0–5 DONE**; Phase **6 DONE / GATE VERDE**. Final Release **F0–F4 COMPLETE** (2026-07-18; PR #1 merged); Fase 5 hardening **DEFERRED ACCETTATO** (non richiesto) — [`STATUS.md`](../plan-audit/STATUS.md). MapLibre 3D-primary: [`plan_impl_map_3d_globe.md`](../plan-audit/active/plan_impl_map_3d_globe.md) (+ globo J: [`plan_impl_map_globe_projection.md`](../plan-audit/active/plan_impl_map_globe_projection.md)).
+* **Piani operativi:** [`plan_impl_phase_0_6.md`](../plan-audit/complete/plan_impl_phase_0_6.md) + [`plan_impl_phase_0_6_execution.md`](../plan-audit/complete/plan_impl_phase_0_6_execution.md). Post–branch restore (2026-07-15): **Phase 0–5 DONE**; Phase **6 DONE / GATE VERDE**. Final Release **F0–F4 COMPLETE** (2026-07-18; PR #1 merged); Fase C Deduplicazione Semantica **DONE / GATE VERDE** (2026-07-22; `012_pgvector_article_embeddings.sql`); Fase 5 hardening **DEFERRED ACCETTATO** (non richiesto) — [`STATUS.md`](../plan-audit/STATUS.md). MapLibre 3D-primary: [`plan_impl_map_3d_globe.md`](../plan-audit/active/plan_impl_map_3d_globe.md) (+ globo J: [`plan_impl_map_globe_projection.md`](../plan-audit/active/plan_impl_map_globe_projection.md)).
+
 
 ---
 
@@ -57,6 +58,7 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
    * Il loop di monitoraggio vive in `worker.py` (`while True` + `asyncio.sleep(WORKER_POLL_INTERVAL_SECONDS)`), cattura eccezioni a livello di ciclo/articolo, e **re-raise** `CancelledError`. Lo sleep di polling non sta in un `finally` di shutdown.
 3. **Deduplicazione Pre-LLM:**
    * Controllare sempre l'esistenza dell'URL dell'articolo nel DB via query SQL prima di effettuare la chiamata all'LLM per ottimizzare i costi API.
+   * In aggiunta: dedup **semantica** via embeddings + `pgvector` (`SEMANTIC_DEDUP_*`); su near-dup, **1×** `quality:compare` su lane **COMPLEX** (effort `none`) decide keep vs replace in-place.
 4. **Gestione Errori a Tre Livelli:**
    * *Livello 1:* Demone principale (non deve morire).
    * *Livello 2:* Ciclo completo della pipeline (se fallisce un ciclo, il successivo parte).

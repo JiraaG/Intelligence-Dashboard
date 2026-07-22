@@ -23,7 +23,7 @@ services:
 
   # ─── 1. DATABASE POSTGRESQL ─────────────────────────────────────────────────
   radar-db:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:0.8.0-pg15
     container_name: radar-db
     restart: unless-stopped
     environment:

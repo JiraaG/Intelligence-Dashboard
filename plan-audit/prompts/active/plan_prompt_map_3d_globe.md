@@ -2,7 +2,7 @@
 
 > **Stato: ACTIVE (non eseguito)** — incollare in **Plan mode** in una chat nuova.  
 > **Output atteso:** analisi + piano (e draft blueprint da inserire in `radar_overview_and_upgrades.md` §3 nuova lettera, es. **I**). **Nessun codice** finché non approvato.  
-> **Roadmap:** A/B/H DONE; C `pgvector` BACKLOG; questo upgrade è **indipendente** da C.  
+> **Roadmap:** A/B/H DONE; C `pgvector` **DONE** (GATE VERDE 2026-07-22); questo upgrade è **indipendente** da C.  
 > **Data prompt:** 2026-07-20.
 
 ---
@@ -61,7 +61,7 @@ Preferenza product owner (da pesare, non da assumere come decisione):
 LETTURE OBBLIGATORIE PRIMA DI CONCLUDERE
 ════════════════════════════════════════
 Product / FE
-- radar_overview_and_upgrades.md §1–2 AS-IS FE mappa; §3 tabella stati (A/B/H DONE, C BACKLOG, D/G future); §3.H archi AS-IS GATE; §3.D tiles offline (vincolo air-gap su scelta 3D)
+- radar_overview_and_upgrades.md §1–2 AS-IS FE mappa; §3 tabella stati (A/B/H DONE, C DONE, D/G future); §3.H archi AS-IS GATE; §3.D tiles offline (vincolo air-gap su scelta 3D)
 - docs/03_frontend_and_ui.md (Leaflet, day-view, spiderfy, relationsPane, saved parity)
 - README.md (stack FE, porte)
 - plan-audit/STATUS.md (restore rilevanti: archi UI, map anchors a240b3c)

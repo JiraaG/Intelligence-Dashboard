@@ -32,8 +32,9 @@ from app.classification.ollama_lifecycle import (
     maybe_unload_simple_ollama,
     should_manage_ollama_vram,
 )
+from app.classification.quality_compare import compare_articles_quality
 from app.classification.quota import compute_day_window
-from app.commit.db_commit import commit_article_to_db
+from app.commit.db_commit import commit_article_to_db, replace_article_in_place
 from app.commit.factory import generate_markdown_content
 from app.commit.outbox import process_outbox_row, reconcile_outbox
 from app.commit.router import get_article_file_path, initialize_vault_directories
@@ -52,6 +53,7 @@ from app.core.config import (
     OBSIDIAN_VAULT_PATH,
     OLLAMA_UNLOAD_DEBOUNCE_SECONDS,
     RADAR_TIME_ZONE,
+    SEMANTIC_DEDUP_ENABLED,
     WORKER_ADVISORY_LOCK_BACKOFF_SECONDS,
     WORKER_ADVISORY_LOCK_KEY,
     WORKER_DB_CONCURRENCY,
@@ -67,8 +69,10 @@ from app.core.database import bootstrap_database, init_pool
 from app.core.heartbeat import upsert_worker_heartbeat
 from app.core.logging import setup_logging
 from app.extraction.client import MinifluxClient
+from app.extraction.embedder import generate_embedding
 from app.extraction.entry_validation import ValidatedMinifluxEntry
 from app.extraction.parser import strip_html_tags
+from app.extraction.semantic_dedup import find_near_duplicate, record_dedup_event
 from app.extraction.state import is_article_duplicate
 
 logger = logging.getLogger("radar.worker")
@@ -410,8 +414,146 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                     async with state.parse_sem:
                         clean_content = strip_html_tags(entry.content)
 
-                    # Cap Gemini-SDK dentro ClassificationClient._generate_content:
-                    # così il lavoro OpenAI-compat (COMPLEX) non resta dietro i sleep 429 Gemini.
+                    # 1. Deduplicazione semantica pre-LLM (embeddings + pgvector)
+                    embedding = (
+                        await asyncio.to_thread(generate_embedding, title, clean_content)
+                        if SEMANTIC_DEDUP_ENABLED
+                        else None
+                    )
+                    candidate = (
+                        await find_near_duplicate(conn, embedding)
+                        if embedding
+                        else None
+                    )
+
+                    if candidate is not None:
+                        # Near-dup rilevato: 1x scontro di qualità su lane COMPLEX
+                        cmp_result = await compare_articles_quality(
+                            state.db_pool,
+                            existing_title=candidate.title,
+                            existing_text=candidate.body_excerpt or candidate.summary,
+                            incoming_title=title,
+                            incoming_text=clean_content,
+                            incoming_url=source_url,
+                        )
+
+                        if cmp_result.same_story and cmp_result.winner == "existing":
+                            # Articolo esistente vince: keep existing, mark-read incoming
+                            await record_dedup_event(
+                                conn,
+                                incoming_url=source_url,
+                                existing_article_id=candidate.id,
+                                winner="existing",
+                                cosine_distance=candidate.distance,
+                                same_story=True,
+                                confidence=cmp_result.confidence,
+                                reason=cmp_result.reason,
+                            )
+                            logger.info(
+                                "Semantic dedup: keep existing per '%s' (vs '%s')",
+                                title[:40],
+                                candidate.title[:40],
+                            )
+                            await state.miniflux_client.mark_as_read([entry_id])
+                            return True
+
+                        elif cmp_result.same_story and cmp_result.winner == "incoming":
+                            # Articolo incoming vince: classify incoming + replace in-place stesso ID
+                            extracted_article = await state.classification_client.classify_article(
+                                title=title,
+                                content=clean_content,
+                                url=source_url,
+                                date=published_date,
+                            )
+                            extracted_article = extracted_article.model_copy(
+                                update={
+                                    "source_url": source_url,
+                                    "published_at": published_date,
+                                }
+                            )
+                            md_content = generate_markdown_content(extracted_article)
+                            file_path = get_article_file_path(extracted_article, vault_path=OBSIDIAN_VAULT_PATH)
+
+                            await replace_article_in_place(
+                                conn,
+                                existing_article_id=candidate.id,
+                                article=extracted_article,
+                                feed_title=feed_title,
+                                outbox_target_path=file_path,
+                                outbox_payload=md_content,
+                                miniflux_entry_id=entry_id,
+                                body_excerpt=clean_content[:8000],
+                                embedding=embedding,
+                            )
+
+                            await record_dedup_event(
+                                conn,
+                                incoming_url=source_url,
+                                existing_article_id=candidate.id,
+                                winner="incoming",
+                                cosine_distance=candidate.distance,
+                                same_story=True,
+                                confidence=cmp_result.confidence,
+                                reason=cmp_result.reason,
+                            )
+
+                            notify_payload = json.dumps(
+                                {
+                                    "article_id": str(candidate.id),
+                                    "country_code": extracted_article.country_code,
+                                    "primary_category": extracted_article.primary_category,
+                                    "published_at": extracted_article.published_at,
+                                },
+                                separators=(",", ":"),
+                            )
+                            await conn.execute(
+                                "SELECT pg_notify($1, $2)",
+                                "radar_article_processed",
+                                notify_payload,
+                            )
+
+                            outbox_row = await conn.fetchrow(
+                                """
+                                SELECT id, article_id, target_path, payload, payload_checksum,
+                                       attempt_count, miniflux_entry_id, status
+                                FROM article_outbox
+                                WHERE article_id = $1
+                                  AND status IN ('pending', 'failed')
+                                """,
+                                candidate.id,
+                            )
+                            if outbox_row is not None:
+                                ok = await process_outbox_row(
+                                    state.db_pool, outbox_row, state.miniflux_client
+                                )
+                                if not ok:
+                                    logger.error(
+                                        "Replace in-place riuscito ma Vault/outbox fallito per article_id=%s",
+                                        candidate.id,
+                                    )
+                                    return False
+
+                            logger.info(
+                                "Articolo sostituito in-place con successo [ID=%s]: '%s'",
+                                candidate.id,
+                                extracted_article.title[:50],
+                            )
+                            return True
+
+                        else:
+                            # same_story == False: storie diverse, registra evento e procedi a classify normale
+                            await record_dedup_event(
+                                conn,
+                                incoming_url=source_url,
+                                existing_article_id=candidate.id,
+                                winner="keep_new",
+                                cosine_distance=candidate.distance,
+                                same_story=False,
+                                confidence=cmp_result.confidence,
+                                reason=cmp_result.reason,
+                            )
+
+                    # Nessun near-dup (o same_story==False): classificazione standard
                     extracted_article = await state.classification_client.classify_article(
                         title=title,
                         content=clean_content,
@@ -437,12 +579,14 @@ async def process_single_entry(state: WorkerState, entry: ValidatedMinifluxEntry
                         outbox_target_path=file_path,
                         outbox_payload=md_content,
                         miniflux_entry_id=entry_id,
+                        body_excerpt=clean_content[:8000],
+                        embedding=embedding,
                     )
 
                     # Fase B: Notifica processed per lo streaming SSE del frontend
                     notify_payload = json.dumps(
                         {
-                            "article_id": article_id,
+                            "article_id": str(article_id),
                             "country_code": extracted_article.country_code,
                             "primary_category": extracted_article.primary_category,
                             "published_at": extracted_article.published_at,

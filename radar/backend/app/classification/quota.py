@@ -300,7 +300,7 @@ class QuotaLedger:
             if estimated_tokens is None
             else max(0, int(estimated_tokens))
         )
-        purpose_value = purpose_for_lane(quota_lane)
+        purpose_value = purpose if purpose is not None else purpose_for_lane(quota_lane)
 
         while True:
             local_wait = await self._in_process_spacing_wait(quota_lane)
@@ -312,6 +312,7 @@ class QuotaLedger:
                 estimated_tokens=tokens,
                 model=model,
                 purpose=purpose_value,
+                provider=provider,
                 lane=quota_lane,
             )
             if outcome.reservation_id is not None:
@@ -335,16 +336,26 @@ class QuotaLedger:
         No-op warning se la riga non è più ``reserved`` (già chiusa / id errato).
         """
         tokens = max(0, int(actual_tokens))
+        row = await self._pool.fetchrow(
+            "SELECT lane FROM llm_request_ledger WHERE id = $1",
+            reservation_id,
+        )
+        lane = row["lane"] if row and row["lane"] else LANE_SIMPLE
+        limits = self._limits.get(_normalize_lane(lane), self._limits[LANE_SIMPLE])
+        cost = estimate_usd(tokens, limits.usd_per_1m_tokens)
+
         result = await self._pool.execute(
             """
             UPDATE llm_request_ledger
             SET actual_tokens = $2,
+                estimated_cost_usd = $3,
                 status = 'completed'
             WHERE id = $1
               AND status = 'reserved'
             """,
             reservation_id,
             tokens,
+            cost,
         )
         if result == "UPDATE 0":
             logger.warning(
@@ -420,6 +431,7 @@ class QuotaLedger:
         estimated_tokens: int,
         model: str | None,
         purpose: str,
+        provider: str | None = None,
         lane: str,
     ) -> _ReserveOutcome:
         """Un tentativo sotto ``pg_advisory_xact_lock``: budget → RPM → TPM → RPD → INSERT.
@@ -431,6 +443,7 @@ class QuotaLedger:
         """
         limits = self._limits[lane]
         purpose_exact = purpose_for_lane(lane)
+        cost_est = estimate_usd(estimated_tokens, limits.usd_per_1m_tokens)
 
         async with self._pool.acquire() as conn:
             async with conn.transaction():
@@ -456,9 +469,7 @@ class QuotaLedger:
                         day_end=day_end,
                         usd_per_1m=limits.usd_per_1m_tokens,
                     )
-                    projected = spent + estimate_usd(
-                        estimated_tokens, limits.usd_per_1m_tokens
-                    )
+                    projected = spent + cost_est
                     if projected > limits.budget_usd_day:
                         raise QuotaBudgetExceeded(
                             f"lane={lane} budget ${limits.budget_usd_day:.2f}/day exceeded "
@@ -472,10 +483,11 @@ class QuotaLedger:
                         FROM llm_request_ledger
                         WHERE created_at > $1
                           AND status = ANY($2::text[])
-                          AND purpose = $3
+                          AND (lane = $3 OR (lane IS NULL AND purpose = $4))
                         """,
                         window_start,
                         list(_ACTIVE_STATUSES),
+                        lane,
                         purpose_exact,
                     )
                     if int(rpm_count or 0) >= limits.rpm:
@@ -485,10 +497,11 @@ class QuotaLedger:
                             FROM llm_request_ledger
                             WHERE created_at > $1
                               AND status = ANY($2::text[])
-                              AND purpose = $3
+                              AND (lane = $3 OR (lane IS NULL AND purpose = $4))
                             """,
                             window_start,
                             list(_ACTIVE_STATUSES),
+                            lane,
                             purpose_exact,
                         )
                         wait = 0.5
@@ -509,10 +522,11 @@ class QuotaLedger:
                         FROM llm_request_ledger
                         WHERE created_at > $1
                           AND status = ANY($2::text[])
-                          AND purpose = $3
+                          AND (lane = $3 OR (lane IS NULL AND purpose = $4))
                         """,
                         window_start,
                         list(_ACTIVE_STATUSES),
+                        lane,
                         purpose_exact,
                     )
                     if int(token_sum or 0) + estimated_tokens > limits.tpm:
@@ -522,10 +536,11 @@ class QuotaLedger:
                             FROM llm_request_ledger
                             WHERE created_at > $1
                               AND status = ANY($2::text[])
-                              AND purpose = $3
+                              AND (lane = $3 OR (lane IS NULL AND purpose = $4))
                             """,
                             window_start,
                             list(_ACTIVE_STATUSES),
+                            lane,
                             purpose_exact,
                         )
                         wait = 0.5
@@ -544,11 +559,12 @@ class QuotaLedger:
                         WHERE created_at >= $1
                           AND created_at < $2
                           AND status = ANY($3::text[])
-                          AND purpose = $4
+                          AND (lane = $4 OR (lane IS NULL AND purpose = $5))
                         """,
                         day_start,
                         day_end,
                         list(_ACTIVE_STATUSES),
+                        lane,
                         purpose_exact,
                     )
                     if int(rpd_count or 0) >= limits.rpd:
@@ -565,14 +581,20 @@ class QuotaLedger:
                         reserved_tokens,
                         status,
                         model,
-                        purpose
+                        purpose,
+                        lane,
+                        provider,
+                        estimated_cost_usd
                     )
-                    VALUES ($1, 'reserved', $2, $3)
+                    VALUES ($1, 'reserved', $2, $3, $4, $5, $6)
                     RETURNING id
                     """,
                     estimated_tokens,
                     model,
                     purpose,
+                    lane,
+                    provider,
+                    cost_est,
                 )
                 if reservation_id is None:
                     raise RuntimeError("INSERT llm_request_ledger non ha restituito id")
@@ -599,11 +621,12 @@ class QuotaLedger:
             WHERE created_at >= $1
               AND created_at < $2
               AND status = ANY($3::text[])
-              AND purpose = $4
+              AND (lane = $4 OR (lane IS NULL AND purpose = $5))
             """,
             day_start,
             day_end,
             list(_ACTIVE_STATUSES),
+            lane,
             purpose_exact,
         )
         return estimate_usd(int(tokens or 0), usd_per_1m)

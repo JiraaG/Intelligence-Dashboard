@@ -13,7 +13,11 @@ import json
 import math
 import re
 from datetime import date
-from typing import Any, Literal, Self
+from typing import Any, Literal
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 

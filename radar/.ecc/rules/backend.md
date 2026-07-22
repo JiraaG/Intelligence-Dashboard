@@ -103,6 +103,8 @@ if exists:
     continue  # Skip immediato, zero token sprecati
 ```
 
+In aggiunta alla dedup URL: dedup **semantica** via embeddings + `pgvector` (migrazione `012`); su near-dup, `quality:compare` su lane COMPLEX decide keep vs replace in-place.
+
 **VIETATO:**
 ```python
 # NO: Chiamata Gemini senza controllo duplicati
