@@ -6,7 +6,6 @@ Questa directory contiene i piani di progettazione e di implementazione attualme
 
 **Attivo**
 
-- **Metrics 013 — FinOps / diagnostica** — [`plan_impl_fase_metrics_013.md`](plan_impl_fase_metrics_013.md) (**ACTIVE** — W0 docs DONE 2026-07-22; impl W1–W4 pending). Prompt Agent: [`../prompts/active/agent_prompt_fase_metrics_013.md`](../prompts/active/agent_prompt_fase_metrics_013.md).
 - **Relazioni Wave 2 — archi elevati 3D** — [`plan_impl_map_relations_arcs_3d.md`](plan_impl_map_relations_arcs_3d.md) (**spike**; prerequisito W1 = [`../complete/plan_impl_map_relations_nation_filter.md`](../complete/plan_impl_map_relations_nation_filter.md) **GATE VERDE**).
 - **Fase I — Mappa 3D-primary (MapLibre)** — [`plan_impl_map_3d_globe.md`](plan_impl_map_3d_globe.md) (**codice + docs shipped** 2026-07-20; follow-up isole/anti-bleed **COMPLETE** → [`../complete/plan_impl_map_category_fills_islands.md`](../complete/plan_impl_map_category_fills_islands.md)). Follow-up globo: sempre [`plan_impl_map_globe_projection.md`](plan_impl_map_globe_projection.md) (§3.J).
 - **Fase J — Upgrade globo vero** — [`plan_impl_map_globe_projection.md`](plan_impl_map_globe_projection.md) (**Futuro / BACKLOG**).
@@ -15,6 +14,7 @@ Questa directory contiene i piani di progettazione e di implementazione attualme
 
 **Completati di recente (riferimento)**
 
+- **Metrics 013 — FinOps / diagnostica** — [`../complete/plan_impl_fase_metrics_013.md`](../complete/plan_impl_fase_metrics_013.md) (**GATE VERDE** 2026-07-22; strict verify scoped 48h, denorm 14 campi, ledger linkage, API metrics).
 - **Fase C — Dedup semantica + quality balanced** — [`../complete/plan_impl_fase_C_semantic_dedup.md`](../complete/plan_impl_fase_C_semantic_dedup.md) (**GATE VERDE** 2026-07-22; prompts: [`../prompts/done/plan_prompt_fase_C_semantic_dedup.md`](../prompts/done/plan_prompt_fase_C_semantic_dedup.md), [`../prompts/done/agent_prompt_fase_C_semantic_dedup.md`](../prompts/done/agent_prompt_fase_C_semantic_dedup.md)).
 - **Fix fasce tipologia (isole + anti-bleed)** — [`../complete/plan_impl_map_category_fills_islands.md`](../complete/plan_impl_map_category_fills_islands.md) (GATE VERDE 2026-07-21; `polygon-clipping` terra∩strip).
 - **Relazioni Wave 1 — filtro nazioni** — [`../complete/plan_impl_map_relations_nation_filter.md`](../complete/plan_impl_map_relations_nation_filter.md) (GATE VERDE 2026-07-20; toolbar **RELAZIONI ATTIVE**).

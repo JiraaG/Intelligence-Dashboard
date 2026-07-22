@@ -10,7 +10,6 @@ Cartella di audit, prompt orchestratore e SoT del modulo Radar.
 
 ## `active/` — vivi
 
-* **Metrics 013 FinOps** — [`active/plan_impl_fase_metrics_013.md`](active/plan_impl_fase_metrics_013.md) (W0 docs DONE; impl W1–W4 pending). Prompt: [`prompts/active/agent_prompt_fase_metrics_013.md`](prompts/active/agent_prompt_fase_metrics_013.md)
 * Relazioni Wave 2 elevate 3D — [`active/plan_impl_map_relations_arcs_3d.md`](active/plan_impl_map_relations_arcs_3d.md) (spike; W1 DONE)
 * Fase I MapLibre 3D-primary — [`active/plan_impl_map_3d_globe.md`](active/plan_impl_map_3d_globe.md)
 * §3.J globo — [`active/plan_impl_map_globe_projection.md`](active/plan_impl_map_globe_projection.md)
@@ -18,7 +17,7 @@ Cartella di audit, prompt orchestratore e SoT del modulo Radar.
 
 ## `complete/` — chiusi
 
-Vedi [`complete/README.md`](complete/README.md) (Phase 0–6, SoT LLM, Fase A Ollama, audit lane env, Fase B/H, archi UI, **W1 filtro nazioni Relazioni**, **Fase C semantic dedup**, Final Release, commenti, Notizie Salvate, playbook, ticket status, monorepo check).
+Vedi [`complete/README.md`](complete/README.md) (**Metrics 013 FinOps**, Phase 0–6, SoT LLM, Fase A Ollama, audit lane env, Fase B/H, archi UI, **W1 filtro nazioni Relazioni**, **Fase C semantic dedup**, Final Release, commenti, Notizie Salvate, playbook, ticket status, monorepo check).
 
 ## Layout
 
@@ -36,13 +35,14 @@ plan-audit/
 
 ## Prompt attivi
 
-* [agent_prompt_fase_metrics_013_gate_closeout.md](prompts/active/agent_prompt_fase_metrics_013_gate_closeout.md) — **Metrics 013 GATE closeout** (YELLOW→GREEN; test scripting + requeue)
-* [agent_prompt_fase_metrics_013.md](prompts/active/agent_prompt_fase_metrics_013.md) — Metrics 013 impl (base shipped; closeout separato)
+* [agent_prompt_fase_metrics_013_verify_fix.md](prompts/active/agent_prompt_fase_metrics_013_verify_fix.md) — **Metrics 013 micro-fix** (verify ledger scoped + rebuild + STATUS → GREEN onesto)
 * [plan_prompt_ecc_manual_and_expansion.md](prompts/active/plan_prompt_ecc_manual_and_expansion.md) — non ancora eseguito
 * [plan_prompt_map_3d_globe.md](prompts/active/plan_prompt_map_3d_globe.md) — mappa 3D / switch vs 3D-only (non eseguito)
 
 ## Prompt done (recente)
 
+* [agent_prompt_fase_metrics_013_gate_closeout.md](prompts/done/agent_prompt_fase_metrics_013_gate_closeout.md) — closeout YELLOW→GREEN (funzionale; verify ancora da scoped)
+* [agent_prompt_fase_metrics_013.md](prompts/done/agent_prompt_fase_metrics_013.md) — Metrics 013 impl
 * [agent_prompt_fase_C_semantic_dedup.md](prompts/done/agent_prompt_fase_C_semantic_dedup.md) — Fase C semantic dedup GATE (2026-07-22)
 * [plan_prompt_fase_A_local_amd_ollama.md](prompts/done/plan_prompt_fase_A_local_amd_ollama.md) — Fase A Ollama (archiviato 2026-07-19)
 * [plan_prompt_phase_H_wave3_carousel_docs_gate.md](prompts/done/plan_prompt_phase_H_wave3_carousel_docs_gate.md) — H5+H6 chip + docs/ECC GATE (2026-07-18)

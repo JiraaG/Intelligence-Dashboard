@@ -175,25 +175,36 @@ async def run_verification() -> bool:
         else:
             print(f"  ✅ Eventi 'url_exact' trovati: {url_exact_events} >= 1.")
 
-        # 6. Controllo linkage ledger ↔ article_id
-        print("\n6. Controllo linkage ledger ↔ article_id...")
+        # 6. Controllo linkage ledger ↔ article_id (scoped a righe post-013 con miniflux_entry_id nella finestra recente 48h)
+        print("\n6. Controllo linkage ledger ↔ article_id (finestra recente 48h / post-013)...")
         linked_ledger = await conn.fetchval(
-            "SELECT COUNT(*)::INT FROM llm_request_ledger WHERE article_id IS NOT NULL"
+            """
+            SELECT COUNT(*)::INT FROM llm_request_ledger
+            WHERE article_id IS NOT NULL
+              AND miniflux_entry_id IS NOT NULL
+              AND created_at > NOW() - INTERVAL '48 hours'
+            """
         )
         unlinked_ledger = await conn.fetchval(
-            "SELECT COUNT(*)::INT FROM llm_request_ledger WHERE article_id IS NULL AND status = 'completed'"
+            """
+            SELECT COUNT(*)::INT FROM llm_request_ledger
+            WHERE article_id IS NULL
+              AND miniflux_entry_id IS NOT NULL
+              AND status IN ('completed', 'failed')
+              AND created_at > NOW() - INTERVAL '48 hours'
+            """
         )
-        total_completed_ledger = linked_ledger + unlinked_ledger
-        ledger_null_rate = unlinked_ledger / total_completed_ledger if total_completed_ledger > 0 else 0.0
-        print(f"  Righe ledger collegate: {linked_ledger}, scollegate: {unlinked_ledger} (NULL-rate: {ledger_null_rate:.1%})")
+        total_recent_ledger = linked_ledger + unlinked_ledger
+        ledger_null_rate = unlinked_ledger / total_recent_ledger if total_recent_ledger > 0 else 0.0
+        print(f"  Righe ledger recenti (48h) collegate: {linked_ledger}, scollegate: {unlinked_ledger} (NULL-rate: {ledger_null_rate:.1%})")
         if linked_ledger < 1:
-            print("  ❌ Nessuna riga ledger collegata ad article_id.")
+            print("  ❌ Nessuna riga ledger recente collegata ad article_id.")
             all_ok = False
         elif ledger_null_rate > 0.05:
-            print(f"  ❌ NULL-rate elevato su linkage ledger ↔ article_id: {ledger_null_rate:.1%} (> 5%)")
+            print(f"  ❌ NULL-rate elevato su linkage ledger ↔ article_id nella finestra recente: {ledger_null_rate:.1%} (> 5%)")
             all_ok = False
         else:
-            print("  ✅ Linkage ledger ↔ article_id attivo e nei limiti NULL-rate.")
+            print("  ✅ Linkage ledger ↔ article_id attivo e nei limiti NULL-rate nella finestra recente.")
 
         # 7. Controllo enum geo_resolution_method
         print("\n7. Controllo enum geo_resolution_method...")

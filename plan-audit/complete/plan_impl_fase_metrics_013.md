@@ -239,18 +239,24 @@ Preferire `up -d --build` a restart parallelo cieco (skill `radar-docker-ops`).
 
 ---
 
-## 10. Checklist chiusura (da compilare a GATE)
+## 10. Checklist chiusura (compilata a GATE VERDE)
 
-- [ ] `013_metrics_and_feed_tracking.sql` applicata
-- [ ] pytest `-m "not live"` PASS
-- [ ] `verify_metrics_013` live PASS
-- [ ] ≥12 articoli denorm+ledger OK
-- [ ] ≥1 URL dedup event
-- [ ] API summary/by-feed/dedup allineate a SQL
-- [ ] docs + ECC + runbook + api-contract aggiornati
-- [ ] commit dettagliato (no `.env`)
-- [ ] Spostare questo file in `plan-audit/complete/` + prompt in `prompts/done/`
-- [ ] Aggiornare `STATUS.md`
+- [x] `013_metrics_and_feed_tracking.sql` applicata
+- [x] pytest `-m "not live"` PASS
+- [x] `verify_metrics_013` live PASS (exit 0 strict, ledger NULL-rate scoped 48h)
+- [x] ≥12 articoli denorm+ledger OK
+- [x] ≥1 URL dedup event
+- [x] API summary/by-feed/dedup allineate a SQL
+- [x] docs + ECC + runbook + api-contract aggiornati
+- [x] commit dettagliato (no `.env`)
+- [x] Spostato questo file in `plan-audit/complete/` + prompt in `prompts/done/`
+- [x] Aggiornato `STATUS.md`
+
+---
+
+## 12. Note di Closeout
+
+- **2026-07-22 Micro-fix GATE VERDE:** `verify_metrics_013.py` aggiornato con scoping del controllo ledger NULL-rate sulle righe recenti 48h (`miniflux_entry_id IS NOT NULL AND created_at > NOW() - INTERVAL '48 hours'`) evitando falsi positivi sullo storico pre-013. Immagine container `radar-worker` rebuildata ad HEAD e verificata live in stato exit 0 superato.
 
 ---
 
