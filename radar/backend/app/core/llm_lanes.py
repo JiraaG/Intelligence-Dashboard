@@ -308,8 +308,8 @@ def _legacy_model(provider: str, *, lane: str) -> str:
     ``lane`` è riservato per estensioni future; oggi i default dipendono dal provider.
     """
     if provider == "gemini":
-        raw = (_env_raw("GEMINI_MODEL") or "gemma-4-31b").strip() or "gemma-4-31b"
-        return "gemma-4-31b-it" if raw in ("gemma-4-31b", "gemma-4-31b-it") else raw
+        raw = (_env_raw("GEMINI_MODEL") or "gemini-3.5-flash-lite").strip() or "gemini-3.5-flash-lite"
+        return raw
     if provider == "deepseek":
         return (
             (_env_raw("DEEPSEEK_MODEL") or "deepseek-v4-flash").strip()

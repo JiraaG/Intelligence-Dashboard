@@ -83,7 +83,7 @@ Sintomi: log worker con wait/`429`/`Retry-After`; pochi articoli nuovi; ready pu
   - `LLM_ROUTING_SHADOW=true` = solo log lane (usa sempre SIMPLE)
   - Audit: [`audit_llm_lane_env_generalization.md`](../../plan-audit/complete/audit_llm_lane_env_generalization.md)
 - OpenAI-compat via httpx (`deepseek`/`openai`/`glm`/`grok`); effort: `*_REASONING_EFFORT` (DeepSeek dialect usa `thinking`)
-- Periodicità ciclo: `WORKER_POLL_INTERVAL_SECONDS` (default 900)
+- Periodicità ciclo: webhook NOTIFY (primario, URL `http://radar-backend:8000/api/webhooks/miniflux`); eager drain-until-empty all’avvio e post-wake (sosta settle `WORKER_REFRESH_SETTLE_SECONDS`, default 15s su boot/timeout); `WORKER_POLL_INTERVAL_SECONDS` (default 900) = safety net a coda vuota ("900s ≠ hang")
 - Senza `GEMINI_API_KEY`: API/FE avviano; worker degradato se tutte le lane richiedono Gemini
 - Senza key OpenAI-compat con COMPLEX=deepseek/openai/glm/grok: warning (o fail se `LLM_ROUTING_STRICT=1`); COMPLEX usa SIMPLE
 
@@ -109,7 +109,7 @@ docker compose exec -T radar-worker python -m app.scripts.requeue_articles 50 --
 
 # Re-ingest reale (ultime N read)
 docker compose exec -T radar-worker python -m app.scripts.requeue_articles 50
-docker compose restart radar-worker   # ciclo immediato (poll tipico 900s)
+docker compose restart radar-worker   # ciclo immediato (eager drain all’avvio; 900s = solo safety a coda vuota)
 
 # Prova da zero (48h / full reset locale): wipe TUTTI i .md vault + DELETE tutte le articles
 docker compose exec -T radar-worker python -m app.scripts.requeue_articles 100 --purge-all --dry-run

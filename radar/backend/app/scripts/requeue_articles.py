@@ -11,7 +11,7 @@ Con ``--purge-all`` (prova da zero):
 - ``DELETE`` di **tutte** le righe ``articles`` (CASCADE outbox/join)
 
 Ordine: sempre prima ``--dry-run`` (skill radar-requeue-ops), poi write, poi
-    ``docker compose restart radar-worker`` (poll tipico 900s).
+    ``docker compose restart radar-worker`` (eager drain all'avvio; 900s = safety a coda vuota).
 
 Eseguire **dentro** ``radar-worker`` (Miniflux + DB + mount vault)::
 

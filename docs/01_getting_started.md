@@ -35,7 +35,7 @@ Categorie principali (dettaglio in `.env.example`):
 | Runtime | `RADAR_ENV`, `RADAR_TIME_ZONE` |
 | CORS | `CORS_ALLOW_ORIGINS` (vuoto in prod dietro Nginx; es. `http://localhost:4200` per `ng serve`) |
 | LLM | Lane `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (provider=`gemini`\|`deepseek`\|`openai`\|`glm`\|`grok`\|`claude` **stub**; model/RPM/TPM/RPD/budget; `0`=unmanaged); BORDERLINE effort `LLM_BORDERLINE_REASONING_EFFORT` (default safe `high`, ops tipico `none`); dialect OpenAI-compat: deepseek=`thinking`, openai/glm/grok=stock; soft-trim = `LLM_SIMPLE.rpd` se >0; **RPM/TPM wait stessa lane**; **RPD/cooldown → residual cross-lane**; free=RPM/RPD(+TPM), paid=BUDGET; legacy fill-gap; Profili A–F in `.env.example` + SoT LLM (F = Local-Hybrid Ollama host) |
-| Worker | coda/concorrenza, `WORKER_POLL_INTERVAL_SECONDS` (default 900), heartbeat |
+| Worker | coda/concorrenza, drain eager + settle `WORKER_REFRESH_SETTLE_SECONDS` (default 15), safety poll `WORKER_POLL_INTERVAL_SECONDS` (default 900), heartbeat |
 | Miniflux | URL interno, API key, `MINIFLUX_LIMIT` (tipico **50**; `100` può superare `MAX_MINIFLUX_RESPONSE_BYTES=5MB`), timeout/byte caps |
 | Postgres | user/password/db, `DATABASE_URL` (Compose la costruisce in container con image `pgvector/pgvector:0.8.0-pg15`) |
 | Semantic Dedup | `SEMANTIC_DEDUP_ENABLED=true`, `SEMANTIC_DEDUP_SIMILARITY_THRESHOLD=0.80`, `SEMANTIC_DEDUP_LOOKBACK_HOURS=24`, `SEMANTIC_PREFILTER_LEN_RATIO=0.7`, `SEMANTIC_QUALITY_REPLACE_HINT_RATIO=1.25`, `SEMANTIC_DEDUP_DIRECT_SHADOW=false`, `CONTENT_HASH_DEDUP_ENABLED=true` |
@@ -191,7 +191,7 @@ Dettaglio script: [`radar/ops/README.md`](../radar/ops/README.md).
 ### Ciclo ingest (worker, non API)
 
 - Servizio `radar-worker` (`python -m app.worker`), leadership via advisory lock
-- Polling `WORKER_POLL_INTERVAL_SECONDS` (default **900** = 15 min); all’avvio forza `PUT /v1/feeds/refresh`
+- Webhook/NOTIFY = wake primario; drain-until-empty all’avvio (con sosta settle `WORKER_REFRESH_SETTLE_SECONDS`, default 15s) e post-wake; `WORKER_POLL_INTERVAL_SECONDS` (default **900** = 15 min) = safety net a coda vuota
 - Entry **unread** ultime ~48h (`published_after`), dedup URL in PostgreSQL; Miniflux ricontrolla i feed tipicamente ~ogni ora
 - Complexity v2.2 → QuotaLedger reserve → classificazione multi-provider (lane SIMPLE / COMPLEX) → eventuale cooldown modello → commit DB + outbox → vault atomico → mark-read Miniflux solo se completed
 - Quote durable per lane: `llm_request_ledger` (`LLM_SIMPLE_*` / `LLM_COMPLEX_*`; soft-trim = `LLM_SIMPLE.rpd` se >0; RPM/TPM=attesa stessa lane; RPD/cooldown=`QuotaDailyExceeded` → residual altra lane; free=RPM/RPD(+TPM), paid=budget)

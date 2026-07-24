@@ -4,6 +4,7 @@ Documenti **completati**. Non sono backlog. Per il quadro fatto vs da fare vedi 
 
 | File | Ruolo | Stato |
 |------|--------|-------|
+| [plan_impl_eager_drain_startup.md](plan_impl_eager_drain_startup.md) | Eager drain-until-empty all’avvio/post-wake + settle + guard success==0 | **COMPLETE / GATE VERDE** 2026-07-24 |
 | [plan_impl_llm_finops_token_caching.md](plan_impl_llm_finops_token_caching.md) | FinOps LLM Wave A (M1–M6): Token saving & prompt caching (verifica [twin](plan_impl_llm_finops_token_caching_verification.md)) | **COMPLETE / GATE VERDE (condizionato)** 2026-07-22 |
 | [plan_impl_borderline_effort_split.md](plan_impl_borderline_effort_split.md) | BORDERLINE DeepSeek effort `LLM_BORDERLINE_REASONING_EFFORT` (ops `none` + escalate `high`) | **COMPLETE / GATE VERDE** 2026-07-22 |
 | [plan_impl_per_model_quota.md](plan_impl_per_model_quota.md) | Quote RPM/TPM/RPD per-model (FALLBACKS pool separati) | **COMPLETE / GATE VERDE** 2026-07-22 |

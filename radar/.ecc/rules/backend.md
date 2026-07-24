@@ -59,16 +59,25 @@ Lo sleep di polling **non** sta in un `finally` di shutdown.
 
 **OBBLIGATORIO:**
 ```python
-async def run_pipeline_loop() -> None:
+async def run_pipeline_loop(state: WorkerState) -> None:
+    settle = True
     while True:
         try:
-            await run_pipeline_cycle()
+            await _drain_unread(state, settle=settle)
         except asyncio.CancelledError:
             raise
         except Exception as e:
-            logger.error("Errore ciclo: %s", e, exc_info=True)
-        await asyncio.sleep(WORKER_POLL_INTERVAL_SECONDS)
+            logger.error("Errore drain: %s", e, exc_info=True)
+        if state.wake_event.is_set():
+            state.wake_event.clear()
+            settle = False
+            continue
+        await maybe_unload_ollama_after_cycle(state)
+        woke_from_notify = await _wait_interval(state, float(WORKER_POLL_INTERVAL_SECONDS))
+        state.wake_event.clear()
+        settle = not woke_from_notify
 ```
+
 
 **VIETATO:**
 ```python
@@ -122,20 +131,27 @@ await save_to_db(result)
 
 ```python
 # OBBLIGATORIO: struttura a tre livelli (allineata a Regola 1 / worker.py)
-async def run_pipeline_loop():          # Livello 1
+async def run_pipeline_loop(state: WorkerState):   # Livello 1
+    settle = True
     while True:
         try:
-            await run_pipeline_cycle()  # Livello 2
+            await _drain_unread(state, settle=settle)  # Livello 2 (drain-until-empty)
         except asyncio.CancelledError:
             raise
         except Exception as e:
             logger.error(...)
-        # Sleep di polling FUORI dal finally di shutdown
-        await asyncio.sleep(WORKER_POLL_INTERVAL_SECONDS)
+        if state.wake_event.is_set():
+            state.wake_event.clear()
+            settle = False
+            continue
+        await maybe_unload_ollama_after_cycle(state)
+        woke_from_notify = await _wait_interval(state, float(WORKER_POLL_INTERVAL_SECONDS))
+        state.wake_event.clear()
+        settle = not woke_from_notify
 
-async def run_pipeline_cycle():
-    articles = await fetch_miniflux_articles()
-    for article in articles:
+async def run_pipeline_cycle(state: WorkerState) -> bool:
+    entries = await fetch_miniflux_articles()
+    for article in entries:
         try:
             await process_article(article)  # Livello 3
         except Exception as e:
@@ -301,7 +317,8 @@ Routing opzionale (`LLM_ROUTING_MODE=off|complexity`). Lane = heuristic in
 | `GEMINI_MODEL_FALLBACKS` | Cascata CSV extra **solo** se provider lane = gemini |
 | `DEEPSEEK_*` / `LLM_RPM` | Legacy key/model/effort/base + alias fill-gap quote |
 | `LLM_ROUTING_SHADOW=true` | Logga lane; chiama sempre catena SIMPLE |
-| `WORKER_POLL_INTERVAL_SECONDS` | Cadenza ciclo ingest (default 900) |
+| `WORKER_POLL_INTERVAL_SECONDS` | Safety poll a coda vuota / wake timeout (default 900); non è l’unico trigger (webhook + drain) |
+| `WORKER_REFRESH_SETTLE_SECONDS` | Sosta post-`refresh_all_feeds` su boot/timeout (default 15; `0`=off) |
 
 **Lane v2.2:** L sola → SIMPLE; 1 di {G,E,X} → BORDERLINE; ≥2 famiglie (L solo in combo) → COMPLEX.
 `geo_marker` da solo richiede `body_len ≥ 1500`; ≥2 country names → G sempre.

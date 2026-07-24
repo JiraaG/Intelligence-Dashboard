@@ -62,14 +62,16 @@ async def test_cancel_during_poll_wait_completes_quickly() -> None:
     state = _make_state()
     poll_entered = asyncio.Event()
 
-    async def fake_wait_interval(state: Any, interval: float) -> None:
+    async def fake_wait_interval(state: Any, interval: float) -> bool:
         if interval >= 10:
             poll_entered.set()
         await asyncio.Event().wait()
+        return False
 
     with (
-        patch("app.worker.run_pipeline_cycle", new_callable=AsyncMock),
+        patch("app.worker.run_pipeline_cycle", new_callable=AsyncMock, return_value=False),
         patch("app.worker.WORKER_POLL_INTERVAL_SECONDS", 900),
+        patch("app.worker.WORKER_REFRESH_SETTLE_SECONDS", 0),
         patch("app.worker._wait_interval", side_effect=fake_wait_interval),
         patch("app.worker.maybe_unload_ollama_after_cycle", new_callable=AsyncMock),
     ):
@@ -89,13 +91,15 @@ async def test_cancel_while_processing_completes_quickly() -> None:
     state = _make_state()
     processing = asyncio.Event()
 
-    async def blocking_cycle(_state: WorkerState) -> None:
+    async def blocking_cycle(_state: WorkerState) -> bool:
         processing.set()
         await asyncio.Event().wait()
+        return False
 
     with (
         patch("app.worker.run_pipeline_cycle", side_effect=blocking_cycle),
         patch("app.worker.WORKER_POLL_INTERVAL_SECONDS", 3600),
+        patch("app.worker.WORKER_REFRESH_SETTLE_SECONDS", 0),
         patch("app.worker.maybe_unload_ollama_after_cycle", new_callable=AsyncMock),
     ):
         task = asyncio.create_task(run_pipeline_loop(state))
@@ -115,20 +119,23 @@ async def test_cancel_when_idle_between_cycles() -> None:
     cycles = 0
     poll_entered = asyncio.Event()
 
-    async def empty_cycle(_state: WorkerState) -> None:
+    async def empty_cycle(_state: WorkerState) -> bool:
         nonlocal cycles
         cycles += 1
+        return False
 
-    async def fake_wait_interval(state: Any, interval: float) -> None:
+    async def fake_wait_interval(state: Any, interval: float) -> bool:
         poll_entered.set()
         try:
             await asyncio.Event().wait()
         except asyncio.CancelledError:
             raise
+        return False
 
     with (
         patch("app.worker.run_pipeline_cycle", side_effect=empty_cycle),
         patch("app.worker.WORKER_POLL_INTERVAL_SECONDS", 60),
+        patch("app.worker.WORKER_REFRESH_SETTLE_SECONDS", 0),
         patch("app.worker._wait_interval", side_effect=fake_wait_interval),
         patch("app.worker.maybe_unload_ollama_after_cycle", new_callable=AsyncMock),
     ):
@@ -146,12 +153,13 @@ async def test_cancelled_error_not_swallowed_by_cycle_handler() -> None:
     """run_pipeline_loop must re-raise CancelledError from the cycle, not log-and-continue."""
     state = _make_state()
 
-    async def cancel_cycle(_state: WorkerState) -> None:
+    async def cancel_cycle(_state: WorkerState) -> bool:
         raise asyncio.CancelledError()
 
     with (
         patch("app.worker.run_pipeline_cycle", side_effect=cancel_cycle),
         patch("app.worker.WORKER_POLL_INTERVAL_SECONDS", 60),
+        patch("app.worker.WORKER_REFRESH_SETTLE_SECONDS", 0),
         patch("app.worker.maybe_unload_ollama_after_cycle", new_callable=AsyncMock),
     ):
         task = asyncio.create_task(run_pipeline_loop(state))
@@ -161,28 +169,102 @@ async def test_cancelled_error_not_swallowed_by_cycle_handler() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_pipeline_loop_calls_unload_after_cycle() -> None:
-    """Dopo ogni ciclo (ok) chiama maybe_unload_ollama_after_cycle prima del poll."""
+async def test_pipeline_loop_calls_unload_once_per_drain_before_wait() -> None:
+    """Dopo la fase di drain, chiama maybe_unload_ollama_after_cycle 1 volta prima del wait."""
     state = _make_state()
     unload = AsyncMock()
     poll_entered = asyncio.Event()
 
-    async def fake_wait_interval(_state: Any, _interval: float) -> None:
+    async def fake_wait_interval(_state: Any, _interval: float) -> bool:
         poll_entered.set()
         await asyncio.Event().wait()
+        return False
 
     with (
-        patch("app.worker.run_pipeline_cycle", new_callable=AsyncMock),
+        patch("app.worker.run_pipeline_cycle", new_callable=AsyncMock, return_value=False),
         patch("app.worker.WORKER_POLL_INTERVAL_SECONDS", 60),
+        patch("app.worker.WORKER_REFRESH_SETTLE_SECONDS", 0),
         patch("app.worker._wait_interval", side_effect=fake_wait_interval),
         patch("app.worker.maybe_unload_ollama_after_cycle", unload),
     ):
         task = asyncio.create_task(run_pipeline_loop(state))
         await asyncio.wait_for(poll_entered.wait(), timeout=2.0)
-        unload.assert_awaited()
+        unload.assert_awaited_once()
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await asyncio.wait_for(task, timeout=2.0)
+
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_eager_drain_multiple_batches_before_single_wait() -> None:
+    """Eager drain: 2 lotti con entries poi empty -> 1 solo wait, 1 solo unload."""
+    state = _make_state()
+    poll_entered = asyncio.Event()
+    unload = AsyncMock()
+    cycle_mock = AsyncMock(side_effect=[True, True, False])
+
+    async def fake_wait_interval(_state: Any, _interval: float) -> bool:
+        poll_entered.set()
+        await asyncio.Event().wait()
+        return False
+
+    with (
+        patch("app.worker.run_pipeline_cycle", cycle_mock),
+        patch("app.worker.WORKER_POLL_INTERVAL_SECONDS", 60),
+        patch("app.worker.WORKER_REFRESH_SETTLE_SECONDS", 0),
+        patch("app.worker._wait_interval", side_effect=fake_wait_interval) as mock_wait,
+        patch("app.worker.maybe_unload_ollama_after_cycle", unload),
+    ):
+        task = asyncio.create_task(run_pipeline_loop(state))
+        await asyncio.wait_for(poll_entered.wait(), timeout=2.0)
+        assert cycle_mock.call_count == 3
+        mock_wait.assert_called_once()
+        unload.assert_called_once()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(task, timeout=2.0)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_selective_settle_boot_vs_notify_wake() -> None:
+    """R5: Boot/timeout usano settle=True; NOTIFY wake usa settle=False."""
+    state = _make_state()
+    drain_calls: list[bool] = []
+    poll_entered = asyncio.Event()
+    wait_count = 0
+
+    async def fake_drain_unread(_state: WorkerState, *, settle: bool = True) -> None:
+        drain_calls.append(settle)
+
+    async def fake_wait_interval(_state: Any, _interval: float) -> bool:
+        nonlocal wait_count
+        wait_count += 1
+        if wait_count == 1:
+            # Primo wait: svegliato da wake NOTIFY
+            return True
+        else:
+            # Secondo wait: blocca
+            poll_entered.set()
+            await asyncio.Event().wait()
+            return False
+
+    with (
+        patch("app.worker._drain_unread", side_effect=fake_drain_unread),
+        patch("app.worker.WORKER_POLL_INTERVAL_SECONDS", 60),
+        patch("app.worker._wait_interval", side_effect=fake_wait_interval),
+        patch("app.worker.maybe_unload_ollama_after_cycle", new_callable=AsyncMock),
+    ):
+        task = asyncio.create_task(run_pipeline_loop(state))
+        await asyncio.wait_for(poll_entered.wait(), timeout=2.0)
+        # 1° drain (boot) -> settle=True; 2° drain (post-wake NOTIFY) -> settle=False
+        assert drain_calls == [True, False]
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(task, timeout=2.0)
+
 
 
 @pytest.mark.unit
@@ -334,3 +416,27 @@ async def test_ten_thousand_entries_never_spawn_ten_thousand_tasks() -> None:
     assert state.consumer_tasks == []
     # Sanity: never one task per entry (would be 10_000 create_task calls).
     assert len(create_task_calls) < 100
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_run_pipeline_cycle_returns_false_when_all_entries_fail() -> None:
+    """Se tutte le entry nel lotto falliscono (success==0), run_pipeline_cycle ritorna False per evitare tight loop."""
+    state = _make_state()
+    entries = [_make_entry(1), _make_entry(2)]
+    state.miniflux_client.fetch_unread_entries = AsyncMock(return_value=entries)
+
+    async def failing_process(_state: WorkerState, _entry: ValidatedMinifluxEntry) -> bool:
+        return False
+
+    with (
+        patch("app.worker.reconcile_outbox", new_callable=AsyncMock),
+        patch("app.worker._ledger_model_rpd_used", new_callable=AsyncMock, return_value=0),
+        patch("app.core.llm_lanes.limits_for_model", return_value=(0, 0, 100)),
+        patch("app.worker.LLM_SIMPLE") as mock_simple,
+        patch("app.worker.process_single_entry", side_effect=failing_process),
+    ):
+        mock_simple.models = ["test-model"]
+        res = await run_pipeline_cycle(state)
+        assert res is False
+

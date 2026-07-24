@@ -71,6 +71,7 @@ from app.core.config import (
     WORKER_PARSE_CONCURRENCY,
     WORKER_POLL_INTERVAL_SECONDS,
     WORKER_QUEUE_DEPTH,
+    WORKER_REFRESH_SETTLE_SECONDS,
     WORKER_SHUTDOWN_TIMEOUT,
 )
 from app.core.database import bootstrap_database, init_pool
@@ -1033,13 +1034,11 @@ async def _ledger_simple_rpd_used(pool: asyncpg.Pool) -> int:
     return int(used or 0)
 
 
-async def run_pipeline_cycle(state: WorkerState) -> None:
+async def run_pipeline_cycle(state: WorkerState) -> bool:
     """Un ciclo ingest: reconcile → soft-trim catena SIMPLE → fetch → coda + N consumer.
 
-    Mai ``TaskGroup`` su tutte le entry. Hard RPM/TPM/RPD restano in
-    ``QuotaLedger.reserve`` per-model. Soft-trim: ``rpd==0`` = unmanaged (off);
-    tutti i modelli SIMPLE esauriti senza residual COMPLEX → iberna ciclo;
-    con residual → bypass failover. Lot reduction usa la somma dei residui catena.
+    Ritorna True se un lotto di articoli è stato preso in carico ed elaborato con successo (success > 0);
+    False se non vi sono unread, se il ciclo è in ibernazione per tetti RPD o se nessun articolo ha avuto successo (success == 0).
     """
     assert state.db_pool is not None
     assert state.miniflux_client is not None
@@ -1091,7 +1090,7 @@ async def run_pipeline_cycle(state: WorkerState) -> None:
             "Ciclo in ibernazione (nessun residual COMPLEX distinto).",
             summary_str,
         )
-        return
+        return False
 
     if not simple_has_residual and has_complex_residual:
         summary_str = ", ".join(
@@ -1108,7 +1107,7 @@ async def run_pipeline_cycle(state: WorkerState) -> None:
     entries = await state.miniflux_client.fetch_unread_entries(limit=MINIFLUX_LIMIT)
     if not entries:
         logger.info("Nessun articolo non letto presente in Miniflux.")
-        return
+        return False
 
     if not any_unmanaged and not has_complex_residual and total_simple_residual > 0:
         if len(entries) > total_simple_residual:
@@ -1150,6 +1149,15 @@ async def run_pipeline_cycle(state: WorkerState) -> None:
         results["success"],
         results["failure"],
     )
+    if results["success"] == 0:
+        logger.warning(
+            "Ciclo della pipeline completato senza alcun progresso utile (success=0, failure=%d). "
+            "Interruzione drain per evitare tight loop su articoli falliti.",
+            results["failure"],
+        )
+        return False
+    return True
+
 
 
 async def run_heartbeat_loop(
@@ -1180,13 +1188,60 @@ async def run_heartbeat_loop(
         await asyncio.sleep(interval_seconds)
 
 
-async def _wait_interval(state: WorkerState, interval: float) -> None:
-    """Attesa wake NOTIFY o timeout poll di sicurezza (Fase B)."""
+async def _wait_interval(state: WorkerState, interval: float) -> bool:
+    """Attesa wake NOTIFY o timeout poll di sicurezza (Fase B).
+    
+    Returns:
+        True se svegliato da NOTIFY, False se scaduto timeout.
+    """
     try:
         await asyncio.wait_for(state.wake_event.wait(), timeout=interval)
         logger.info("Risveglio da radar_worker_trigger.")
+        return True
     except asyncio.TimeoutError:
         logger.info("Timeout poll di sicurezza: avvio ciclo periodico.")
+        return False
+
+
+async def _drain_unread(state: WorkerState, *, settle: bool = True) -> None:
+    """Eager drain-until-empty: refresh feed, sosta settle (se opportuno) e loop cicli."""
+    assert state.miniflux_client is not None
+    try:
+        await state.miniflux_client.refresh_all_feeds()
+    except asyncio.CancelledError:
+        raise
+    except Exception as refresh_err:
+        logger.warning("Refresh forzato feed fallito durante drain: %s", refresh_err)
+
+    if settle and WORKER_REFRESH_SETTLE_SECONDS > 0:
+        logger.info(
+            "Attesa assestamento scraping Miniflux (%ss)...",
+            WORKER_REFRESH_SETTLE_SECONDS,
+        )
+        await asyncio.sleep(float(WORKER_REFRESH_SETTLE_SECONDS))
+
+    batch = 0
+    while True:
+        try:
+            had_entries = await run_pipeline_cycle(state)
+        except asyncio.CancelledError:
+            raise
+        except Exception as cycle_err:
+            logger.error(
+                "Errore durante l'esecuzione del ciclo di drain: %s",
+                cycle_err,
+                exc_info=True,
+            )
+            break
+
+        if not had_entries:
+            break
+
+        batch += 1
+        logger.info("Drain batch %d completato, verifico presenza di ulteriori articoli...", batch)
+
+    if batch > 0:
+        logger.info("Drain completato: %d lotti elaborati, coda unread svuotata.", batch)
 
 
 async def maybe_unload_ollama_after_cycle(state: WorkerState) -> None:
@@ -1215,37 +1270,38 @@ async def maybe_unload_ollama_after_cycle(state: WorkerState) -> None:
 
 
 async def run_pipeline_loop(state: WorkerState) -> None:
-    """Loop demone: ciclo + sleep di poll **fuori** da qualsiasi ``finally`` di shutdown.
+    """Loop demone: drain-until-empty + wake/timeout + sleep di poll fuori da shutdown.
 
     Livelli errore: demone sopravvive agli errori di ciclo; ``CancelledError`` sale.
     """
     logger.info(
-        "Demone pipeline avviato (poll=%ss, queue_depth=%s, entry_concurrency=%s).",
+        "Demone pipeline avviato (poll=%ss, settle=%ss, queue_depth=%s, entry_concurrency=%s).",
         WORKER_POLL_INTERVAL_SECONDS,
+        WORKER_REFRESH_SETTLE_SECONDS,
         WORKER_QUEUE_DEPTH,
         WORKER_ENTRY_CONCURRENCY,
     )
 
-    try:
-        await state.miniflux_client.refresh_all_feeds()
-    except asyncio.CancelledError:
-        raise
-    except Exception as refresh_err:
-        logger.warning("Refresh forzato fallito all'avvio: %s", refresh_err)
+    settle = True
 
     while True:
         try:
-            await run_pipeline_cycle(state)
+            await _drain_unread(state, settle=settle)
         except asyncio.CancelledError:
             raise
-        except Exception as cycle_err:
+        except Exception as drain_err:
             logger.error(
-                "Errore critico durante l'esecuzione del ciclo pipeline: %s",
-                cycle_err,
+                "Errore critico durante la fase di drain della pipeline: %s",
+                drain_err,
                 exc_info=True,
             )
 
-        state.wake_event.clear()
+        if state.wake_event.is_set():
+            state.wake_event.clear()
+            logger.info("NOTIFY ricevuto durante/dopo il drain: nuovo drain immediato senza safety wait.")
+            settle = False
+            continue
+
         try:
             await maybe_unload_ollama_after_cycle(state)
         except asyncio.CancelledError:
@@ -1257,7 +1313,11 @@ async def run_pipeline_loop(state: WorkerState) -> None:
             "Attesa wake NOTIFY o timeout poll (%ss)...",
             WORKER_POLL_INTERVAL_SECONDS,
         )
-        await _wait_interval(state, float(WORKER_POLL_INTERVAL_SECONDS))
+        woke_from_notify = await _wait_interval(state, float(WORKER_POLL_INTERVAL_SECONDS))
+        state.wake_event.clear()
+
+        settle = not woke_from_notify
+
 
 
 async def run_worker() -> None:

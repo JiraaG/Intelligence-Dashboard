@@ -460,7 +460,7 @@ Runbook: `radar/docs/runbook.md` § Local-Hybrid. Rollback → Profilo B senza o
 Legacy opzionale (solo fill-gap): `GEMINI_*`, `LLM_RPM`/`LLM_TPM`/`LLM_RPD`, `DEEPSEEK_*`, `OPENAI_API_KEY`, `GLM_API_KEY`/`ZHIPU_API_KEY`, `GROK_API_KEY`/`XAI_API_KEY`.  
 `off` / `shadow` = solo catena SIMPLE.  
 Default codice senza env: `LLM_ROUTING_MODE=off`, `LLM_ROUTING_SHADOW=true` (boot sicuro).  
-Periodicità ciclo: `WORKER_POLL_INTERVAL_SECONDS` (default **900**).  
+Ingest: webhook/NOTIFY + eager drain-until-empty; settle `WORKER_REFRESH_SETTLE_SECONDS` (default 15) su boot/timeout; `WORKER_POLL_INTERVAL_SECONDS` (default **900**) = safety a coda vuota.  
 Env `T_LOW`/`T_HIGH` **non** richiesti (lane = heuristic famiglie v2.2).  
 Ops: edit `.env` → `docker compose up -d --build radar-worker` (o restart) → log `route lane=` / `openai-compat/<dialect> ok`.
 

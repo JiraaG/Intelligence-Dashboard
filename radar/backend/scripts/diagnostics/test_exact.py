@@ -12,7 +12,7 @@ async def main():
     try:
         response = await asyncio.to_thread(
             client.models.generate_content,
-            model='gemma-4-31b-it',
+            model='gemini-3.1-flash-lite',
             contents=user_message,
             config=types.GenerateContentConfig(
                 system_instruction=SYSTEM_PROMPT,

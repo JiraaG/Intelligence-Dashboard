@@ -34,7 +34,7 @@ Leaflet resta dormiente (LEGACY FREEZE) dietro `MAP_RENDERER`.
 
 | Layer       | Tecnologia                              | Note                                       |
 |-------------|------------------------------------------|---------------------------------------------|
-| Backend     | Python 3.12-slim (Docker) / 3.14 (locale) | Demone asincrono; poll `WORKER_POLL_INTERVAL_SECONDS` (default 900) |
+| Backend     | Python 3.12-slim (Docker) / 3.14 (locale) | Demone asincrono; wake NOTIFY + eager drain-until-empty (settle `WORKER_REFRESH_SETTLE_SECONDS`); poll `WORKER_POLL_INTERVAL_SECONDS` (default 900) safety net |
 | LLM         | google-genai (Gemini) + httpx OpenAI-compat (`deepseek`/`openai`/`glm`/`grok`; no package `openai`) | Lane env: `LLM_SIMPLE_*` / `LLM_COMPLEX_*` (limiti per-lane + contatori per-model; `0`=unmanaged; override `*_MODEL_LIMITS`). BORDERLINE reasoning effort da `LLM_BORDERLINE_REASONING_EFFORT` (default safe `high`, target ops `none` con escalate `high` su `ValidationError`). Soft-trim = residuo catena SIMPLE (bypass ibernazione se residual COMPLEX). RPM/TPM=attesa stessa lane; RPD/cooldown=`QuotaDailyExceeded`→cross-lane. Free=RPM/RPD(+TPM); paid=budget. Caps Flash Lite tipici: RPM≤12/TPM=250K/RPD=500 per modello. Dialect: deepseek=`thinking`; openai/glm/grok=stock. Complexity **v2.2**. Ops: Profili **A–F** in `.env.example` (F = Local-Hybrid Ollama host via `PROVIDER=openai` + `BASE_URL`; VRAM unload `ollama_lifecycle`/`OLLAMA_*`; **vietato** `ollama.chat` / package `ollama`). Non hardcodare segreti. |
 | Database    | PostgreSQL 15                            | Tabelle articles, companies, tags + sentiment, relevance + indici |
 | Feed Source | Miniflux REST API                       | Articoli non letti; dedup URL + content hash + semantica (`pgvector`) |
@@ -233,7 +233,7 @@ cd frontend && npm run verify-map-renderer
 ```
 Miniflux API (`WORKER_POLL_INTERVAL_SECONDS`, default 900)
         │
-        ▼ [asyncio.sleep(WORKER_POLL_INTERVAL_SECONDS) loop in worker.py]
+        ▼ [webhook/NOTIFY wake → eager drain-until-empty; settle WORKER_REFRESH_SETTLE_SECONDS su boot/timeout; _wait_interval(WORKER_POLL_INTERVAL_SECONDS) = safety a coda vuota]
   Validate entry → sanitize HTML → dedup URL → content hash (M6 lookback 24h)
         │ (se non duplicato URL/hash)
         ▼

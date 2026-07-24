@@ -24,7 +24,7 @@
 
 | Layer | Oggi | Target Fase B |
 |-------|------|---------------|
-| Ingest trigger | Poll `asyncio.sleep(WORKER_POLL_INTERVAL_SECONDS)` (default 900) in `worker.run_pipeline_loop` | Webhook Miniflux → `NOTIFY radar_worker_trigger` → `asyncio.Event` + timeout poll di sicurezza |
+| Ingest trigger | Poll `asyncio.sleep(WORKER_POLL_INTERVAL_SECONDS)` (default 900) in `worker.run_pipeline_loop` | Webhook Miniflux → `NOTIFY radar_worker_trigger` → `asyncio.Event` + eager drain-until-empty all'avvio/post-wake (settle `WORKER_REFRESH_SETTLE_SECONDS`, default 15s su boot/timeout) + timeout poll 900s safety net |
 | IPC API ↔ worker | Nessuno (solo DB condiviso) | Canali PostgreSQL `LISTEN`/`NOTIFY` |
 | Push FE | Solo pull REST + `rxResource` su filtri | SSE `GET /api/articles/events` → soft-refresh Signals |
 | Nginx `/api/` | `proxy_read_timeout 30s`, buffering default on | Location dedicata SSE: timeout lunghi, `proxy_buffering off` |

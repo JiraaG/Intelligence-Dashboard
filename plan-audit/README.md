@@ -14,6 +14,7 @@ Cartella di audit, prompt orchestratore e SoT del modulo Radar.
 * Fase I MapLibre 3D-primary — [`active/plan_impl_map_3d_globe.md`](active/plan_impl_map_3d_globe.md)
 * §3.J globo — [`active/plan_impl_map_globe_projection.md`](active/plan_impl_map_globe_projection.md)
 * Prompt ECC in `prompts/active/`
+* **Eager drain worker** — COMPLETE / GATE VERDE → [`complete/plan_impl_eager_drain_startup.md`](complete/plan_impl_eager_drain_startup.md) (prompt in `prompts/done/`)
 * **FinOps LLM Wave A** — COMPLETE / GATE VERDE (condizionato) → [`complete/plan_impl_llm_finops_token_caching.md`](complete/plan_impl_llm_finops_token_caching.md) (verifica [`complete/plan_impl_llm_finops_token_caching_verification.md`](complete/plan_impl_llm_finops_token_caching_verification.md); prompt in `prompts/done/`)
 * **BORDERLINE effort split** — COMPLETE / GATE VERDE → [`complete/plan_impl_borderline_effort_split.md`](complete/plan_impl_borderline_effort_split.md)
 * **Quote per-modello** — COMPLETE / GATE VERDE → [`complete/plan_impl_per_model_quota.md`](complete/plan_impl_per_model_quota.md) (prompt in `prompts/done/`)
@@ -21,7 +22,7 @@ Cartella di audit, prompt orchestratore e SoT del modulo Radar.
 
 ## `complete/` — chiusi
 
-Vedi [`complete/README.md`](complete/README.md) (**FinOps LLM Wave A**, **BORDERLINE effort split**, **Quote per-modello**, **Metrics 013 FinOps**, Phase 0–6, SoT LLM, Fase A Ollama, audit lane env, Fase B/H, archi UI, **W1 filtro nazioni Relazioni**, **Fase C semantic dedup**, Final Release, commenti, Notizie Salvate, playbook, ticket status, monorepo check).
+Vedi [`complete/README.md`](complete/README.md) (**Eager drain**, **FinOps LLM Wave A**, **BORDERLINE effort split**, **Quote per-modello**, **Metrics 013 FinOps**, Phase 0–6, SoT LLM, Fase A Ollama, audit lane env, Fase B/H, archi UI, **W1 filtro nazioni Relazioni**, **Fase C semantic dedup**, Final Release, commenti, Notizie Salvate, playbook, ticket status, monorepo check).
 
 ## Layout
 
@@ -44,6 +45,8 @@ plan-audit/
 
 ## Prompt done (recente)
 
+* [agent_prompt_eager_drain_closeout.md](prompts/done/agent_prompt_eager_drain_closeout.md) — Eager drain CLOSEOUT + live verify — **GATE VERDE** 2026-07-24
+* [agent_prompt_eager_drain_startup.md](prompts/done/agent_prompt_eager_drain_startup.md) — Eager drain impl R1–R6 — **GATE VERDE** 2026-07-24
 * [agent_prompt_llm_finops_token_caching.md](prompts/done/agent_prompt_llm_finops_token_caching.md) — **FinOps LLM Wave A (M1–M6 + verifica)** — GATE VERDE (condizionato)
 * [agent_prompt_finops_wave_a_soak_verify.md](prompts/done/agent_prompt_finops_wave_a_soak_verify.md) — **FinOps Wave A soak/requeue verify** — eseguito 2026-07-22 (soak OK)
 

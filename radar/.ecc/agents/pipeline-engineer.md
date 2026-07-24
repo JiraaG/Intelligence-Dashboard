@@ -41,20 +41,28 @@ trasforma gli articoli RSS grezzi in eventi geopolitici arricchiti e persistiti 
 
 ### 1. Il Loop Asincrono è Sacro
 
-Il cuore dell'ingest è `worker.py` (non `main.py`). `CancelledError` sempre re-raised;
-lo sleep di polling non sta in un `finally` di shutdown.
+Il cuore dell'ingest è `worker.py` (non `main.py`). Esegue eager drain-until-empty all'avvio e post-wake (webhook NOTIFY), con poll `WORKER_POLL_INTERVAL_SECONDS` (default 900) safety net a coda vuota. `CancelledError` sempre re-raised; lo sleep/wait non sta in un `finally` di shutdown.
 
 ```python
 async def run_pipeline_loop(state: WorkerState) -> None:
+    settle = True
     while True:
         try:
-            await run_pipeline_cycle(state)
+            await _drain_unread(state, settle=settle)
         except asyncio.CancelledError:
             raise
         except Exception as e:
-            logger.error("Errore critico nel ciclo pipeline: %s", e, exc_info=True)
-        await asyncio.sleep(WORKER_POLL_INTERVAL_SECONDS)
+            logger.error("Errore critico nella fase di drain: %s", e, exc_info=True)
+        if state.wake_event.is_set():
+            state.wake_event.clear()
+            settle = False
+            continue
+        await maybe_unload_ollama_after_cycle(state)
+        woke_from_notify = await _wait_interval(state, float(WORKER_POLL_INTERVAL_SECONDS))
+        state.wake_event.clear()
+        settle = not woke_from_notify
 ```
+
 
 **REGOLA:** Non usare `time.sleep()`. Usa solo `asyncio.sleep()` per non bloccare l'event loop.
 Compose: esattamente un `radar-worker` + advisory lock session-level.

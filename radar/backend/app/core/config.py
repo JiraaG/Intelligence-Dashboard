@@ -418,6 +418,13 @@ WORKER_POLL_INTERVAL_SECONDS = _env_int(
     min_value=1,
     max_value=86_400,
 )
+WORKER_REFRESH_SETTLE_SECONDS = _env_int(
+    "WORKER_REFRESH_SETTLE_SECONDS",
+    15,
+    min_value=0,
+    max_value=120,
+)
+
 # Chiave fissa session-level per pg_try_advisory_lock (singleton worker).
 WORKER_ADVISORY_LOCK_KEY = _env_int(
     "WORKER_ADVISORY_LOCK_KEY",
