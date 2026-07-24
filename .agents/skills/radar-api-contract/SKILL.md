@@ -24,7 +24,7 @@ Lavori su FastAPI REST, query articoli, o servizi Angular che chiamano l’API.
 | Vista | Endpoint | Shape |
 |-------|----------|--------|
 | Day (mappa) | `GET /api/map-summary?date=` | Righe `country_code × primary_category` (+ count/read, lat/lon finite) |
-| Relations | `GET /api/map-relations?date=` | Righe undirected star `primary↔each related` (`LEAST/GREATEST` × categoria; non clique). FE: archi MapLibre great-circle (default) via `visibleMapRelations` (toolbar **RELAZIONI ATTIVE**, default 0 archi); legacy Leaflet `relationsPane`; click → `loadRelationArticles` bilaterale |
+| Relations | `GET /api/map-relations?date=` | Righe undirected star `primary↔each related` (`LEAST/GREATEST` × categoria + `article_ids`; non clique). FE: archi MapLibre great-circle (default) via `visibleMapRelations` (toolbar **RELAZIONI ATTIVE**, default 0 archi; hover evidenzia tutte le linee collegate alla medesima notizia multi-paese); legacy Leaflet `relationsPane`; click → `loadRelationArticles` bilaterale |
 | Saved vault | `GET /api/saved-summary` | Stessa shape di map-summary; filtro `is_saved=true`; **senza date** |
 | Nation open | `GET /api/articles?date=&country=` | Envelope `{ items, next_cursor, total }` — page ≤ 100; FE concatena. Items include optional FinOps denorm fields, LATERAL ledger tokens/cost (`prompt_tokens`, `completion_tokens`, `cached_prompt_tokens`, `estimated_cost_usd`, `llm_execution_time_ms`, `llm_request_count`), and resolved `feed_url` |
 | Saved open | `GET /api/articles?saved=true&country=` | Stesso envelope; **ignora date**; solo `is_saved` |

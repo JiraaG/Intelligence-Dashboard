@@ -5,4 +5,5 @@ export interface MapRelationRow {
   target_country: string;
   primary_category: PrimaryCategory;
   volume: number;
+  article_ids?: number[];
 }

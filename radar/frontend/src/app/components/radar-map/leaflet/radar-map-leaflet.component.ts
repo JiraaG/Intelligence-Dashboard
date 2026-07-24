@@ -215,6 +215,9 @@ export class RadarMapLeafletComponent implements AfterViewInit {
    * Input geometria cambiati durante flyTo/fitBounds (`isNavigating`).
    * Senza flush, MarkerCluster può tenere layer in memoria ma zero icone nel pane.
    */
+  private arcKeyToArticleIds = new Map<string, Set<number>>();
+  private articleIdToArcKeys = new Map<number, Set<string>>();
+  private arcKeyToVisualLayers = new Map<string, { layers: Leaflet.Polyline[]; baseWeight: number; baseOpacity: number }>();
   private pendingGeometryRefresh = false;
 
   constructor() {
@@ -1560,6 +1563,13 @@ export class RadarMapLeafletComponent implements AfterViewInit {
   }): void {
     if (!this.relationsLayerGroup || !this.L || !this.map || opts.points.length < 2) return;
 
+    const arcKey = `${opts.sourceCountry}|${opts.targetCountry}`;
+    this.arcKeyToVisualLayers.set(arcKey, {
+      layers: opts.visualLayers,
+      baseWeight: opts.baseWeight,
+      baseOpacity: opts.baseOpacity,
+    });
+
     const hitWeight = Math.max(18, opts.baseWeight * 4);
     const hit = this.L.polyline(opts.points, {
       color: '#ffffff',
@@ -1574,11 +1584,17 @@ export class RadarMapLeafletComponent implements AfterViewInit {
     hit.bindTooltip(opts.tooltipText, { sticky: true });
 
     hit.on('mouseover', () => {
-      for (const layer of opts.visualLayers) {
-        layer.setStyle({
-          opacity: Math.min(1, opts.baseOpacity + 0.25),
-          weight: opts.baseWeight + 1.5,
-        });
+      const highlightedKeys = this.getRelatedArcKeys(arcKey);
+      for (const k of highlightedKeys) {
+        const item = this.arcKeyToVisualLayers.get(k);
+        if (item) {
+          for (const layer of item.layers) {
+            layer.setStyle({
+              opacity: Math.min(1, item.baseOpacity + 0.25),
+              weight: item.baseWeight + 1.5,
+            });
+          }
+        }
       }
       if (typeof hit.bringToFront === 'function') {
         hit.bringToFront();
@@ -1586,11 +1602,17 @@ export class RadarMapLeafletComponent implements AfterViewInit {
     });
 
     hit.on('mouseout', () => {
-      for (const layer of opts.visualLayers) {
-        layer.setStyle({
-          opacity: opts.baseOpacity,
-          weight: opts.baseWeight,
-        });
+      const highlightedKeys = this.getRelatedArcKeys(arcKey);
+      for (const k of highlightedKeys) {
+        const item = this.arcKeyToVisualLayers.get(k);
+        if (item) {
+          for (const layer of item.layers) {
+            layer.setStyle({
+              opacity: item.baseOpacity,
+              weight: item.baseWeight,
+            });
+          }
+        }
       }
     });
 
@@ -1609,9 +1631,26 @@ export class RadarMapLeafletComponent implements AfterViewInit {
     this.relationsLayerGroup.addLayer(hit);
   }
 
+  private getRelatedArcKeys(arcKey: string): Set<string> {
+    const relatedKeys = new Set<string>([arcKey]);
+    const articleIds = this.arcKeyToArticleIds.get(arcKey);
+    if (!articleIds) return relatedKeys;
+
+    for (const artId of articleIds) {
+      const keys = this.articleIdToArcKeys.get(artId);
+      if (keys) {
+        for (const k of keys) {
+          relatedKeys.add(k);
+        }
+      }
+    }
+    return relatedKeys;
+  }
+
   private drawMacroRelations(relations: MapRelationRow[]): void {
     if (!this.relationsLayerGroup || !this.L) return;
 
+    this.arcKeyToVisualLayers.clear();
     const aggregated = this.aggregateRelations(relations);
     const docStyle = getComputedStyle(document.documentElement);
 
@@ -1719,6 +1758,9 @@ export class RadarMapLeafletComponent implements AfterViewInit {
     totalVolume: number;
     breakdown: { category: string; volume: number }[];
   }[] {
+    this.arcKeyToArticleIds.clear();
+    this.articleIdToArcKeys.clear();
+
     const map = new Map<
       string,
       {
@@ -1743,6 +1785,23 @@ export class RadarMapLeafletComponent implements AfterViewInit {
       }
       agg.totalVolume += r.volume;
       agg.breakdown.push({ category: r.primary_category, volume: r.volume });
+
+      if (r.article_ids && r.article_ids.length > 0) {
+        let arcArtSet = this.arcKeyToArticleIds.get(key);
+        if (!arcArtSet) {
+          arcArtSet = new Set<number>();
+          this.arcKeyToArticleIds.set(key, arcArtSet);
+        }
+        for (const id of r.article_ids) {
+          arcArtSet.add(id);
+          let artKeysSet = this.articleIdToArcKeys.get(id);
+          if (!artKeysSet) {
+            artKeysSet = new Set<string>();
+            this.articleIdToArcKeys.set(id, artKeysSet);
+          }
+          artKeysSet.add(key);
+        }
+      }
     }
 
     const result = Array.from(map.values());

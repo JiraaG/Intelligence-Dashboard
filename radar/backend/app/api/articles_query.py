@@ -354,7 +354,8 @@ def build_map_relations_query(
             LEAST(a.country_code, r.related) AS source_country,
             GREATEST(a.country_code, r.related) AS target_country,
             a.primary_category,
-            COUNT(*)::int AS volume
+            COUNT(*)::int AS volume,
+            ARRAY_AGG(a.id) AS article_ids
         FROM articles a
         CROSS JOIN LATERAL unnest(a.related_countries) AS r(related)
         WHERE a.published_at = $1

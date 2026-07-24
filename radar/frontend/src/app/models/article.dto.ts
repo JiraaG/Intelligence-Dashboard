@@ -179,6 +179,10 @@ export function isMapRelationRowDto(value: unknown): value is MapRelationRow {
   if (typeof row['primary_category'] !== 'string') return false;
   if (!PRIMARY_CATEGORIES.has(row['primary_category'] as PrimaryCategory)) return false;
   if (!isFiniteNumber(row['volume'])) return false;
+  if ('article_ids' in row && row['article_ids'] !== undefined) {
+    if (!Array.isArray(row['article_ids'])) return false;
+    if (!row['article_ids'].every(isFiniteNumber)) return false;
+  }
   return true;
 }
 

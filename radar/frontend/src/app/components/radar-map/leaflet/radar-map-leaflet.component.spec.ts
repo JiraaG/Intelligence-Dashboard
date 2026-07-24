@@ -973,4 +973,85 @@ describe('RadarMapLeafletComponent (Phase 4)', () => {
     expect(real.getLatLng().lat).toBeCloseTo(37.0902, 3);
     expect(real.getLatLng().lng).toBeCloseTo(-95.7129, 3);
   });
+
+  it('highlights all relation arcs sharing article_ids on mouseover', async () => {
+    const summary = [
+      {
+        country_code: 'US',
+        primary_category: 'Geopolitica' as const,
+        article_count: 1,
+        read_count: 0,
+        latitude: 37.09,
+        longitude: -95.71,
+      },
+      {
+        country_code: 'IT',
+        primary_category: 'Geopolitica' as const,
+        article_count: 1,
+        read_count: 0,
+        latitude: 41.87,
+        longitude: 12.56,
+      },
+      {
+        country_code: 'FR',
+        primary_category: 'Geopolitica' as const,
+        article_count: 1,
+        read_count: 0,
+        latitude: 46.22,
+        longitude: 2.21,
+      },
+    ];
+    const relations = [
+      {
+        source_country: 'IT',
+        target_country: 'US',
+        primary_category: 'Geopolitica' as const,
+        volume: 1,
+        article_ids: [100],
+      },
+      {
+        source_country: 'FR',
+        target_country: 'US',
+        primary_category: 'Geopolitica' as const,
+        volume: 1,
+        article_ids: [100],
+      },
+    ];
+
+    const fixture = TestBed.createComponent(MapHostComponent);
+    fixture.componentInstance.mapSummary = summary;
+    fixture.componentInstance.mapRelations = relations;
+    fixture.detectChanges();
+    flushGeoJson();
+    await fixture.whenStable();
+
+    const mapCmp = getMapCmp(fixture);
+    const mapInstance = (mapCmp as unknown as { map: StubMap }).map;
+    mapInstance.setView([45, 10], 3);
+
+    (
+      mapCmp as unknown as {
+        updateMapData: (a: Article[], c: CountrySummary[], s: typeof summary, r: typeof relations) => void;
+      }
+    ).updateMapData([], [], summary, relations);
+
+    const group = (
+      mapCmp as unknown as {
+        relationsLayerGroup: {
+          getLayers(): {
+            options: { className: string };
+            fire(event: string): void;
+          }[];
+        };
+      }
+    ).relationsLayerGroup;
+
+    const hits = group.getLayers().filter((l) => l.options.className === 'relational-arc-hit');
+    expect(hits.length).toBe(2);
+
+    const getRelatedKeys = (mapCmp as unknown as { getRelatedArcKeys(k: string): Set<string> }).getRelatedArcKeys;
+    const itUsKeys = getRelatedKeys.call(mapCmp, 'IT|US');
+    expect(itUsKeys.has('IT|US')).toBe(true);
+    expect(itUsKeys.has('FR|US')).toBe(true);
+  });
 });

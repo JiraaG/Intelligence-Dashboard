@@ -251,7 +251,7 @@ Esempio Phase 6: `git checkout 56c2eff`. Dettaglio gate Phase 0–6: [plan_impl_
 | GET | `/health` (host `:80`) | Healthcheck **Nginx FE** — risposta statica `ok`; **non** è l’API |
 | GET | `/api/articles` | Envelope `{items,next_cursor,total}` — `date` obbligatorio salvo `saved=true` (cross-day), `limit` ≤ 100 |
 | GET | `/api/map-summary` | Righe `country_code × primary_category` + count/lat/lon (day) |
-| GET | `/api/map-relations` | Righe undirected `source_country ↔ target_country` per categoria + volume. FE: archi MapLibre (great-circle macro multicolore solida, tutti gli zoom; legacy Leaflet `relationsPane` dash+fan su latch pin, soglia 4+isteresi); **filtro nazioni toolbar RELAZIONI ATTIVE** → solo `visibleMapRelations` (default 0 archi); click → carosello bilaterale |
+| GET | `/api/map-relations` | Righe undirected `source_country ↔ target_country` per categoria + volume + `article_ids`. FE: archi MapLibre (great-circle macro multicolore solida; hover evidenzia tutte le linee collegate alla medesima notizia multi-paese; legacy Leaflet `relationsPane` dash+fan su latch pin); **filtro nazioni toolbar RELAZIONI ATTIVE** → solo `visibleMapRelations` (default 0 archi); click → carosello bilaterale |
 | GET | `/api/saved-summary` | Stessa shape; solo `is_saved`; **senza date** |
 | GET | `/api/countries` | Rollup paese (compat) |
 | PATCH | `/api/articles/{id}/read_status` | Body `{is_read}`; unread ⇒ `is_saved=false` |

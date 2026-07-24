@@ -34,6 +34,7 @@ def test_build_map_relations_query_basic() -> None:
 
     assert "LEAST(a.country_code, r.related)" in sql
     assert "GREATEST(a.country_code, r.related)" in sql
+    assert "ARRAY_AGG(a.id) AS article_ids" in sql
     assert "unnest(a.related_countries)" in sql
     assert "a.country_code <> 'XX'" in sql
     assert "r.related <> 'XX'" in sql
@@ -64,12 +65,14 @@ def test_get_map_relations_api_success() -> None:
             "target_country": "US",
             "primary_category": "Tecnologia",
             "volume": 3,
+            "article_ids": [10, 11, 12],
         },
         {
             "source_country": "CN",
             "target_country": "DE",
             "primary_category": "Energia",
             "volume": 1,
+            "article_ids": [13],
         },
     ]
     mock_conn.fetch = AsyncMock(return_value=db_rows)
@@ -83,9 +86,11 @@ def test_get_map_relations_api_success() -> None:
     assert data[0]["source_country"] == "IT"
     assert data[0]["target_country"] == "US"
     assert data[0]["volume"] == 3
+    assert data[0]["article_ids"] == [10, 11, 12]
     assert data[1]["source_country"] == "CN"
     assert data[1]["target_country"] == "DE"
     assert data[1]["volume"] == 1
+    assert data[1]["article_ids"] == [13]
 
 
 def test_get_map_relations_invalid_date() -> None:

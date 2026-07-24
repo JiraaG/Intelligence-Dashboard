@@ -310,12 +310,16 @@ export class ArticleMockService {
         const existing = grouped.get(key);
         if (existing) {
           existing.volume += 1;
+          if (existing.article_ids && !existing.article_ids.includes(a.id)) {
+            existing.article_ids.push(a.id);
+          }
         } else {
           grouped.set(key, {
             source_country: source,
             target_country: target,
             primary_category: a.primary_category,
             volume: 1,
+            article_ids: [a.id],
           });
         }
       }

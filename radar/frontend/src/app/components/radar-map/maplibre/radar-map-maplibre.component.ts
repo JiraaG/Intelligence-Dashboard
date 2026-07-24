@@ -151,6 +151,8 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
   private pendingHighlightArticle: Article | null = null;
   private relationPopup: maplibregl.Popup | null = null;
   private hoveredArcKey: string | null = null;
+  private arcKeyToArticleIds = new Map<string, Set<number>>();
+  private articleIdToArcKeys = new Map<number, Set<string>>();
   private lastHatchFingerprint = '';
   /** Ignora click dopo drag/rotate (evita fitBounds nazione mentre si gira il globo). */
   private pointerDownPoint: { x: number; y: number } | null = null;
@@ -1493,6 +1495,22 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
     return features;
   }
 
+  private getRelatedArcKeys(arcKey: string): Set<string> {
+    const relatedKeys = new Set<string>([arcKey]);
+    const articleIds = this.arcKeyToArticleIds.get(arcKey);
+    if (!articleIds) return relatedKeys;
+
+    for (const artId of articleIds) {
+      const keys = this.articleIdToArcKeys.get(artId);
+      if (keys) {
+        for (const k of keys) {
+          relatedKeys.add(k);
+        }
+      }
+    }
+    return relatedKeys;
+  }
+
   private applyRelationHover(e: MapLayerMouseEvent): void {
     if (!this.map) return;
     const feat = e.features?.[0];
@@ -1503,16 +1521,17 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
 
     if (arcKey !== this.hoveredArcKey) {
       this.hoveredArcKey = arcKey;
-      // Paint by arcKey (affidabile): feature-state su GeoJSON tileati falliva spesso.
+      const highlightedKeys = Array.from(this.getRelatedArcKeys(arcKey));
+      // Paint da arcKeys correlati (se una notizia ha piu collegamenti, evidenzia tutte le sue linee)
       this.map.setPaintProperty(this.RELATIONS_LINE, 'line-width', [
         'case',
-        ['==', ['get', 'arcKey'], arcKey],
+        ['in', ['get', 'arcKey'], ['literal', highlightedKeys]],
         ['+', ['to-number', ['get', 'weight']], 3],
         ['to-number', ['get', 'weight']],
       ]);
       this.map.setPaintProperty(this.RELATIONS_LINE, 'line-opacity', [
         'case',
-        ['==', ['get', 'arcKey'], arcKey],
+        ['in', ['get', 'arcKey'], ['literal', highlightedKeys]],
         1,
         ['to-number', ['get', 'opacity']],
       ]);
@@ -1554,6 +1573,9 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
     totalVolume: number;
     breakdown: { category: string; volume: number }[];
   }[] {
+    this.arcKeyToArticleIds.clear();
+    this.articleIdToArcKeys.clear();
+
     const map = new Map<
       string,
       {
@@ -1577,6 +1599,23 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
       }
       agg.totalVolume += r.volume;
       agg.breakdown.push({ category: r.primary_category, volume: r.volume });
+
+      if (r.article_ids && r.article_ids.length > 0) {
+        let arcArtSet = this.arcKeyToArticleIds.get(key);
+        if (!arcArtSet) {
+          arcArtSet = new Set<number>();
+          this.arcKeyToArticleIds.set(key, arcArtSet);
+        }
+        for (const id of r.article_ids) {
+          arcArtSet.add(id);
+          let artKeysSet = this.articleIdToArcKeys.get(id);
+          if (!artKeysSet) {
+            artKeysSet = new Set<string>();
+            this.articleIdToArcKeys.set(id, artKeysSet);
+          }
+          artKeysSet.add(key);
+        }
+      }
     }
     const result = Array.from(map.values());
     for (const agg of result) {
