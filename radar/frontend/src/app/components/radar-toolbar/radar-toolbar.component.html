@@ -88,7 +88,7 @@
                 ></div>
               </div>
               <span class="cooldown-warning" *ngIf="m.cooling_down" [title]="'Pausa cooldown fino a: ' + (m.cooldown_until | date:'yyyy-MM-dd HH:mm:ss')">
-                ⚠️ Cooling down ({{ formatCooldownUntil(m.cooldown_until, nowTick()) }})
+                ⚠️ Cooling down: {{ formatCooldownUntil(m.cooldown_until, nowTick()) }}
               </span>
             </div>
           </div>
