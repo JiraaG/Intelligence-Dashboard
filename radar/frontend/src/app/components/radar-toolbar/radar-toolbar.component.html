@@ -87,8 +87,8 @@
                   [class.danger]="m.cooling_down || m.rpd_used >= m.rpd_limit"
                 ></div>
               </div>
-              <span class="cooldown-warning" *ngIf="m.cooling_down" title="Il modello è in pausa temporanea a causa di rate-limit (429) o errore quota provider">
-                ⚠️ Cooling down (scade: {{ m.cooldown_until | date:'HH:mm:ss' }})
+              <span class="cooldown-warning" *ngIf="m.cooling_down" [title]="'Pausa cooldown fino a: ' + (m.cooldown_until | date:'yyyy-MM-dd HH:mm:ss')">
+                ⚠️ Cooling down ({{ formatCooldownUntil(m.cooldown_until, nowTick()) }})
               </span>
             </div>
           </div>

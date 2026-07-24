@@ -1,4 +1,4 @@
-import { Component, input, output, signal, computed, inject } from '@angular/core';
+import { Component, input, output, signal, computed, inject, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CalendarModule } from 'primeng/calendar';
@@ -32,6 +32,18 @@ export interface FilterOption<T extends string = string> {
 })
 export class RadarToolbarComponent {
   private readonly state = inject(StateService);
+  private readonly destroyRef = inject(DestroyRef);
+
+  readonly nowTick = signal<number>(Date.now());
+
+  constructor() {
+    const timer = setInterval(() => {
+      if (this.isStatusTooltipVisible()) {
+        this.nowTick.set(Date.now());
+      }
+    }, 1000);
+    this.destroyRef.onDestroy(() => clearInterval(timer));
+  }
 
   countries = input<CountrySummary[]>([]);
   savedCountries = input<CountrySummary[]>([]);
@@ -155,6 +167,57 @@ export class RadarToolbarComponent {
   readonly l1BadgeTooltip = computed(() => {
     return `Fallback L1 Attivo: ${this.l1ReasonDescription()}`;
   });
+
+  formatCooldownUntil(isoString: string | null | undefined, nowMs: number): string {
+    if (!isoString) return 'In pausa';
+    const target = new Date(isoString);
+    if (isNaN(target.getTime())) return 'In pausa';
+
+    const diffMs = target.getTime() - nowMs;
+    if (diffMs <= 0) return 'In fase di sblocco...';
+
+    const now = new Date(nowMs);
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const mins = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+
+    const isToday =
+      target.getDate() === now.getDate() &&
+      target.getMonth() === now.getMonth() &&
+      target.getFullYear() === now.getFullYear();
+
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+    const isTomorrow =
+      target.getDate() === tomorrow.getDate() &&
+      target.getMonth() === tomorrow.getMonth() &&
+      target.getFullYear() === tomorrow.getFullYear();
+
+    const hh = target.getHours().toString().padStart(2, '0');
+    const mm = target.getMinutes().toString().padStart(2, '0');
+    const ss = target.getSeconds().toString().padStart(2, '0');
+    const timeStr = `${hh}:${mm}:${ss}`;
+
+    let timeDiffStr = '';
+    if (hours > 0) {
+      timeDiffStr = `tra ${hours}h ${mins}m ${secs}s`;
+    } else if (mins > 0) {
+      timeDiffStr = `tra ${mins}m ${secs}s`;
+    } else {
+      timeDiffStr = `tra ${secs}s`;
+    }
+
+    if (isToday) {
+      return `scade oggi alle ${timeStr} (${timeDiffStr})`;
+    } else if (isTomorrow) {
+      return `scade domani alle ${timeStr} (${timeDiffStr})`;
+    } else {
+      const day = target.getDate().toString().padStart(2, '0');
+      const month = (target.getMonth() + 1).toString().padStart(2, '0');
+      return `scade il ${day}/${month} alle ${timeStr} (${timeDiffStr})`;
+    }
+  }
 
   readonly relationOptions = computed(() => this.state.relationCountryOptions());
   readonly relationEnabled = computed(() => this.state.relationCountriesEnabled());
