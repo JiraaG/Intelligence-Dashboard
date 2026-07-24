@@ -32,6 +32,25 @@ export interface Article {
   related_countries:        string[];         // ISO Alpha-2 secondari
   is_read?:                 boolean;          // Stato letto/da leggere
   is_saved?:                boolean;          // Vault salvati (cross-day)
+
+  // ─── FINOPS & TRACCIAMENTO METRICHE (Phase 013 + W2) ─────────────────────────
+  feed_id?:                 number | null;
+  feed_domain?:             string | null;
+  classification_lane?:     string | null;
+  classified_by_model?:     string | null;
+  classified_by_provider?:  string | null;
+  was_escalated?:           boolean | null;
+  pipeline_latency_ms?:     number | null;
+  embedding_time_ms?:        number | null;
+  clean_text_chars?:        number | null;
+  clean_text_words?:        number | null;
+  prompt_tokens?:           number | null;
+  completion_tokens?:       number | null;
+  cached_prompt_tokens?:    number | null;
+  estimated_cost_usd?:      number | null;
+  llm_execution_time_ms?:   number | null;
+  llm_request_count?:       number | null;
+  feed_url?:                string | null;
 }
 
 /** Paginated envelope from GET /api/articles (Phase 5 breaking). */

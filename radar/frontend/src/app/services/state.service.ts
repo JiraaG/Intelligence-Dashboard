@@ -5,6 +5,7 @@ import { ArticleService } from './article.service';
 import { Article, ArticleFilters, CountrySummary, PrimaryCategory } from '../models/article.model';
 import { MapSummaryRow } from '../models/map-summary.model';
 import { MapRelationRow } from '../models/map-relation.model';
+import { MetricsSummary, MetricsStatus } from '../models/metrics.model';
 import { MOCK_MODE } from './mock-mode.token';
 
 /** Opzione nazione nel pannello filtri Relazioni (Wave 1). */
@@ -127,6 +128,8 @@ export class StateService {
           this.mapSummaryResource.reload();
           this.savedSummaryResource.reload();
           this.mapRelationsResource.reload();
+          this.metricsSummaryResource.reload();
+          this.metricsStatusResource.reload();
         });
       });
       es.onerror = () => {
@@ -199,6 +202,25 @@ export class StateService {
         sentiment: p.params.sentiment ?? null,
       }),
   });
+
+  /** Summary FinOps & latenze: `GET /api/metrics/summary` */
+  readonly metricsSummaryResource = rxResource({
+    params: () => ({ date: this.filters().date }),
+    stream: (p) =>
+      this.articleService.getMetricsSummary({
+        from: p.params.date,
+        to: p.params.date,
+      }),
+  });
+
+  /** Status quote & cooldowns: `GET /api/metrics/status` */
+  readonly metricsStatusResource = rxResource({
+    params: () => ({ date: this.filters().date }),
+    stream: () => this.articleService.getMetricsStatus(),
+  });
+
+  readonly metricsSummary = computed((): MetricsSummary | null => this.metricsSummaryResource.value() ?? null);
+  readonly metricsStatus = computed((): MetricsStatus | null => this.metricsStatusResource.value() ?? null);
 
   /** Righe summary con filtro categoria client-side (toolbar). */
   readonly filteredSummary = computed((): MapSummaryRow[] => {
@@ -525,6 +547,23 @@ export class StateService {
       existing.published_at = incoming.published_at;
       existing.source_url = incoming.source_url;
       existing.feed_title = incoming.feed_title;
+      existing.feed_id = incoming.feed_id;
+      existing.feed_domain = incoming.feed_domain;
+      existing.classification_lane = incoming.classification_lane;
+      existing.classified_by_model = incoming.classified_by_model;
+      existing.classified_by_provider = incoming.classified_by_provider;
+      existing.was_escalated = incoming.was_escalated;
+      existing.pipeline_latency_ms = incoming.pipeline_latency_ms;
+      existing.embedding_time_ms = incoming.embedding_time_ms;
+      existing.clean_text_chars = incoming.clean_text_chars;
+      existing.clean_text_words = incoming.clean_text_words;
+      existing.prompt_tokens = incoming.prompt_tokens;
+      existing.completion_tokens = incoming.completion_tokens;
+      existing.cached_prompt_tokens = incoming.cached_prompt_tokens;
+      existing.estimated_cost_usd = incoming.estimated_cost_usd;
+      existing.llm_execution_time_ms = incoming.llm_execution_time_ms;
+      existing.llm_request_count = incoming.llm_request_count;
+      existing.feed_url = incoming.feed_url;
       if (!pendingRead) {
         existing.is_read = incoming.is_read;
       }

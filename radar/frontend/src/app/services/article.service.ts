@@ -11,7 +11,8 @@ import {
 } from '../models/article.model';
 import { MapSummaryRow } from '../models/map-summary.model';
 import { MapRelationRow } from '../models/map-relation.model';
-import { parseArticlesPageDto, parseMapSummaryDto, parseMapRelationsDto } from '../models/article.dto';
+import { MetricsSummary, MetricsStatus } from '../models/metrics.model';
+import { parseArticlesPageDto, parseMapSummaryDto, parseMapRelationsDto, parseMetricsSummaryDto, parseMetricsStatusDto } from '../models/article.dto';
 import { ArticleMockService } from './article-mock.service';
 import { MOCK_MODE } from './mock-mode.token';
 
@@ -226,6 +227,27 @@ export class ArticleService {
     return this.http.patch<SavedStatusResponse>(
       `/api/articles/${articleId}/saved_status`,
       { is_saved: isSaved },
+    );
+  }
+
+  getMetricsSummary(filters: { from?: string; to?: string } = {}): Observable<MetricsSummary> {
+    if (this.mockMode) {
+      return this.mock.getMetricsSummary(filters.from, filters.to);
+    }
+    let params = new HttpParams();
+    if (filters.from) params = params.set('from', filters.from);
+    if (filters.to) params = params.set('to', filters.to);
+    return this.http.get<unknown>('/api/metrics/summary', { params }).pipe(
+      map((payload) => parseMetricsSummaryDto(payload)),
+    );
+  }
+
+  getMetricsStatus(): Observable<MetricsStatus> {
+    if (this.mockMode) {
+      return this.mock.getMetricsStatus();
+    }
+    return this.http.get<unknown>('/api/metrics/status').pipe(
+      map((payload) => parseMetricsStatusDto(payload)),
     );
   }
 }

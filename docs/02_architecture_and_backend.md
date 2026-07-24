@@ -128,13 +128,16 @@ CORS: middleware solo se `CORS_ALLOW_ORIGINS` non vuoto; metodi `GET`, `PATCH`, 
 | GET | `/api/map-relations` | `date`, `sentiment?`, `relevance_level?` | Righe undirected `source_country ↔ target_country` per categoria (+ volume). Semantica **star** v1: un arco per ogni coppia `(country_code, related)` via `LEAST/GREATEST` — **non** clique tra soli `related_countries` (es. US+IT+FR → US–IT e US–FR, non IT–FR). `XX` escluso. |
 | GET | `/api/saved-summary` | `sentiment?`, `relevance_level?` | Stessa shape di map-summary; solo `is_saved=true`; **senza date** |
 | GET | `/api/countries` | `date`, filtri opzionali | Rollup paese (`categories`, `article_count`) |
-| GET | `/api/metrics/summary` | `from?`, `to?` | Metrics FinOps: latenze, token LLM (`cache_hit_rate_pct`, cached/prompt/completion), dedup (`url_exact_count`, `semantic_vector_count`, `content_hash_count`) |
+| GET | `/api/metrics/summary` | `from?`, `to?` | Metrics FinOps: latenze, token LLM (`total_estimated_cost_usd`, `cache_hit_rate_pct`, cached/prompt/completion), dedup (`url_exact_count`, `semantic_vector_count`, `content_hash_count`) |
+| GET | `/api/metrics/status` | — | Snapshot FinOps & Health in tempo reale: `level` (`nominal` \| `fallback_or_escalation` \| `degraded`), `estimated_cost_usd_today`, `l1_likely_active`, `l1_reason`, quote RPD per modello (`role`, `lane`, `rpd_used`, `rpd_limit`, `cooling_down`), e `llm` summary odierno |
 | GET | `/api/metrics/by-feed` | `from?`, `to?` | Aggregazione per feed Miniflux (`feed_id`, `feed_domain`, `feed_title`, `clean_chars`, latenze) |
 | GET | `/api/metrics/dedup` | `from?`, `to?` | Aggregazione per tipo evento dedup (`dedup_kind`, `action_taken`, count, avg_cosine, avg_confidence) |
 | PATCH | `/api/articles/{id}/read_status` | `{ "is_read": bool }` | `{ "status", "is_read", "is_saved"? }` — unread ⇒ `is_saved=false` |
 | PATCH | `/api/articles/{id}/saved_status` | `{ "is_saved": bool }` | `{ "status", "is_saved", "is_read"? }` — save ⇒ `is_read=true` |
 
 Companies/tags sugli articoli: join **LATERAL** (no Cartesian `array_agg` classico). UI giorno: preferire **map-summary**; lista piena in nation-open day **o** vault salvati (`saved=true`, FE pagina fino a `next_cursor` null).
+
+Nota metriche FinOps: `summary.total_articles` calcola gli articoli ingestiti nel DB basandosi su `created_at` nella finestra del giorno, mentre `map-summary` calcola gli articoli presenti in mappa filtrando su `published_at`. `total_estimated_cost_usd` somma le sole chiamate di classificazione completate (`purpose LIKE 'classify:%' OR purpose='classify_article'`), escludendo il costo di comparazione qualità (`quality:compare`).
 
 ---
 

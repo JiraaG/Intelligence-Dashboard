@@ -98,10 +98,10 @@ class FakeConnection:
         if "pg_advisory_xact_lock" in q:
             return None
 
-        if "SELECT lane FROM llm_request_ledger" in q:
+        if "FROM llm_request_ledger WHERE id =" in q:
             rid = int(args[0])
             row = self._store.rows.get(rid)
-            return {"lane": "simple"} if row else None
+            return {"lane": "simple", "provider": "gemini"} if row else None
 
         if "INSERT INTO llm_request_ledger" in q:
             rid = self._store.next_id

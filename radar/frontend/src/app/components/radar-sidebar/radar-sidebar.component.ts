@@ -100,6 +100,20 @@ export class RadarSidebarComponent {
     return title.replace(/^Feed:\s*/i, '');
   }
 
+  hasFinOps(article: Article | null | undefined): boolean {
+    if (!article) return false;
+    return !!(
+      article.classified_by_model ||
+      article.classification_lane ||
+      article.was_escalated != null ||
+      article.prompt_tokens != null ||
+      article.estimated_cost_usd != null ||
+      article.pipeline_latency_ms != null ||
+      article.llm_execution_time_ms != null ||
+      article.feed_url
+    );
+  }
+
   getCountryName(code: string | undefined): string {
     if (!code) return '';
     if (code === 'XX') return 'WW';

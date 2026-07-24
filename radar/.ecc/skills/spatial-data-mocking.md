@@ -371,6 +371,13 @@ con i dati mockati prima di connettere il backend reale.
 - [ ] Zoom &lt; 4: hatching **multi-colore** — MapLibre: N fasce soft = N tipologie da `map-summary` (mainland US/RU; isole significative ≥0.5% area largest; clip terra∩strip — niente bande in mare; ordine legenda); Leaflet: SVG combo pattern — non fill solido di una sola categoria; non barcode `fill-pattern` su MapLibre
 - [ ] Path MapLibre: great-circle / LineString macro multicolore solida (tutti gli zoom) + hover thicken/tooltip; path Leaflet legacy: `relationsPane` + geometric dash ≥4
 
+### ✅ Test 8: FinOps UI & STATUS Topbar Hub
+
+- [ ] Topbar mostra il pulsante **STATUS & COSTI** con il costo totale del giorno (es. `$0.00` o `$0.0123`) e pallino tricolore status (🟢 nominal, 🟡 fallback/escalation, 🔴 degraded).
+- [ ] Cliccando su STATUS & COSTI si apre il popover aggregate con riepilogo token, latenze, dedup ed (in W5) la lista dei modelli con barre RPD usate/limite e cooldown.
+- [ ] La card sidebar mostra il blocco **"ANALISI FINOPS & FONTE RSS"** dopo i Tag con: modello LLM, lane, token in/out/cached, latenza, costo stimato e link al feed XML.
+- [ ] In MOCK_MODE: fixture restituite per summary, status e campi articolo FinOps.
+
 ---
 
 ## Dati Mock per Scenari di Test Aggiuntivi

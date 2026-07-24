@@ -89,6 +89,37 @@ export class RadarToolbarComponent {
     () => this.isCategoryTooltipHovered() || this.isCategoryTooltipClicked(),
   );
 
+  isCostiTooltipHovered = signal(false);
+  isCostiTooltipClicked = signal(false);
+  isCostiTooltipVisible = computed(
+    () => this.isCostiTooltipHovered() || this.isCostiTooltipClicked(),
+  );
+
+  isStatusTooltipHovered = signal(false);
+  isStatusTooltipClicked = signal(false);
+  isStatusTooltipVisible = computed(
+    () => this.isStatusTooltipHovered() || this.isStatusTooltipClicked(),
+  );
+
+  readonly metricsSummary = computed(() => this.state.metricsSummary());
+  readonly metricsStatus = computed(() => this.state.metricsStatus());
+  readonly statusLevel = computed(() => this.metricsStatus()?.level ?? 'nominal');
+  readonly totalCostUsd = computed(() => {
+    return this.metricsSummary()?.llm?.total_estimated_cost_usd ?? 0;
+  });
+  readonly statusDotEmoji = computed(() => {
+    const lvl = this.statusLevel();
+    if (lvl === 'nominal') return '🟢';
+    if (lvl === 'fallback_or_escalation') return '🟡';
+    return '🔴';
+  });
+  readonly statusLevelLabel = computed(() => {
+    const lvl = this.statusLevel();
+    if (lvl === 'nominal') return 'OPERATIVO (Catena Simple OK)';
+    if (lvl === 'fallback_or_escalation') return 'FALLBACK / ESCALATION ATTIVA';
+    return 'RISORSE LIMITATE / DEGRADATO';
+  });
+
   readonly relationOptions = computed(() => this.state.relationCountryOptions());
   readonly relationEnabled = computed(() => this.state.relationCountriesEnabled());
   readonly relationEnabledCount = computed(() => this.relationEnabled().size);
@@ -179,13 +210,47 @@ export class RadarToolbarComponent {
   };
 
   private closeAllPanelsExcept(
-    keep: 'nations' | 'saved' | 'relations' | 'sentiment' | 'category' | null,
+    keep: 'nations' | 'saved' | 'relations' | 'sentiment' | 'category' | 'status' | 'costi' | null,
   ): void {
     if (keep !== 'nations') this.isTooltipClicked.set(false);
     if (keep !== 'saved') this.isSavedTooltipClicked.set(false);
     if (keep !== 'relations') this.isRelationsTooltipClicked.set(false);
     if (keep !== 'sentiment') this.isSentimentTooltipClicked.set(false);
     if (keep !== 'category') this.isCategoryTooltipClicked.set(false);
+    if (keep !== 'status') this.isStatusTooltipClicked.set(false);
+    if (keep !== 'costi') this.isCostiTooltipClicked.set(false);
+  }
+
+  toggleCostiTooltip(event: Event): void {
+    event.stopPropagation();
+    const next = !this.isCostiTooltipClicked();
+    this.closeAllPanelsExcept(next ? 'costi' : null);
+    this.isCostiTooltipClicked.set(next);
+    if (next) {
+      this.state.metricsSummaryResource.reload();
+    }
+  }
+
+  closeCostiTooltip(event: Event): void {
+    event.stopPropagation();
+    this.isCostiTooltipClicked.set(false);
+    this.isCostiTooltipHovered.set(false);
+  }
+
+  toggleStatusTooltip(event: Event): void {
+    event.stopPropagation();
+    const next = !this.isStatusTooltipClicked();
+    this.closeAllPanelsExcept(next ? 'status' : null);
+    this.isStatusTooltipClicked.set(next);
+    if (next) {
+      this.state.metricsStatusResource.reload();
+    }
+  }
+
+  closeStatusTooltip(event: Event): void {
+    event.stopPropagation();
+    this.isStatusTooltipClicked.set(false);
+    this.isStatusTooltipHovered.set(false);
   }
 
   toggleTooltip(event: Event): void {

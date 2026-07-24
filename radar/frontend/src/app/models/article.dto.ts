@@ -69,6 +69,25 @@ export function isArticleDto(value: unknown): value is Article {
   if (row['is_read'] !== undefined && typeof row['is_read'] !== 'boolean') return false;
   if (row['is_saved'] !== undefined && typeof row['is_saved'] !== 'boolean') return false;
 
+  // Optional FinOps checks
+  if (row['feed_id'] !== undefined && row['feed_id'] !== null && typeof row['feed_id'] !== 'number') return false;
+  if (row['feed_domain'] !== undefined && row['feed_domain'] !== null && typeof row['feed_domain'] !== 'string') return false;
+  if (row['classification_lane'] !== undefined && row['classification_lane'] !== null && typeof row['classification_lane'] !== 'string') return false;
+  if (row['classified_by_model'] !== undefined && row['classified_by_model'] !== null && typeof row['classified_by_model'] !== 'string') return false;
+  if (row['classified_by_provider'] !== undefined && row['classified_by_provider'] !== null && typeof row['classified_by_provider'] !== 'string') return false;
+  if (row['was_escalated'] !== undefined && row['was_escalated'] !== null && typeof row['was_escalated'] !== 'boolean') return false;
+  if (row['pipeline_latency_ms'] !== undefined && row['pipeline_latency_ms'] !== null && !isFiniteNumber(row['pipeline_latency_ms'])) return false;
+  if (row['embedding_time_ms'] !== undefined && row['embedding_time_ms'] !== null && !isFiniteNumber(row['embedding_time_ms'])) return false;
+  if (row['clean_text_chars'] !== undefined && row['clean_text_chars'] !== null && typeof row['clean_text_chars'] !== 'number') return false;
+  if (row['clean_text_words'] !== undefined && row['clean_text_words'] !== null && typeof row['clean_text_words'] !== 'number') return false;
+  if (row['prompt_tokens'] !== undefined && row['prompt_tokens'] !== null && typeof row['prompt_tokens'] !== 'number') return false;
+  if (row['completion_tokens'] !== undefined && row['completion_tokens'] !== null && typeof row['completion_tokens'] !== 'number') return false;
+  if (row['cached_prompt_tokens'] !== undefined && row['cached_prompt_tokens'] !== null && typeof row['cached_prompt_tokens'] !== 'number') return false;
+  if (row['estimated_cost_usd'] !== undefined && row['estimated_cost_usd'] !== null && !isFiniteNumber(row['estimated_cost_usd'])) return false;
+  if (row['llm_execution_time_ms'] !== undefined && row['llm_execution_time_ms'] !== null && !isFiniteNumber(row['llm_execution_time_ms'])) return false;
+  if (row['llm_request_count'] !== undefined && row['llm_request_count'] !== null && typeof row['llm_request_count'] !== 'number') return false;
+  if (row['feed_url'] !== undefined && row['feed_url'] !== null && typeof row['feed_url'] !== 'string') return false;
+
   return true;
 }
 
@@ -175,4 +194,18 @@ export function parseMapRelationsDto(payload: unknown): MapRelationRow[] {
     rows.push(item);
   }
   return rows;
+}
+
+export function parseMetricsSummaryDto(payload: unknown): any {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Metrics summary payload must be an object');
+  }
+  return payload;
+}
+
+export function parseMetricsStatusDto(payload: unknown): any {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Metrics status payload must be an object');
+  }
+  return payload;
 }

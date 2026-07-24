@@ -148,3 +148,40 @@ class ModelCooldownStore:
             return int(str(result).split()[-1])
         except (ValueError, IndexError):
             return 0
+
+    async def list_active(self) -> list[dict[str, Any]]:
+        """Restituisce le entry di cooldown correntemente attive."""
+        now = self._now()
+        if self.pool is None:
+            active: list[dict[str, Any]] = []
+            for (provider, model), (until, reason) in self._memory.items():
+                if until > now:
+                    active.append({
+                        "provider": provider,
+                        "model": model,
+                        "until_ts": until,
+                        "reason": reason,
+                    })
+            return active
+
+        rows = await self.pool.fetch(
+            """
+            SELECT provider, model, until_ts, reason
+            FROM llm_model_cooldown
+            WHERE until_ts > $1
+            ORDER BY until_ts DESC
+            """,
+            now,
+        )
+        result: list[dict[str, Any]] = []
+        for r in rows:
+            until = r["until_ts"]
+            if until.tzinfo is None:
+                until = until.replace(tzinfo=timezone.utc)
+            result.append({
+                "provider": r["provider"],
+                "model": r["model"],
+                "until_ts": until,
+                "reason": r["reason"],
+            })
+        return result

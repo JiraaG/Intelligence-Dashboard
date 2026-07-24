@@ -31,7 +31,7 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 > Conservare `p-carousel` e `updateCarouselHeight` con `document.getElementById('article-card-' + id)`.
 > Vietato introdurre `app-article-list`, infinite scroll o ResizeObserver “migliorativi” sul carosello.
 > Bug **letta/non letta** (`.marker-read`) e logica **save**: fix in `state.service.ts` + `radar-map.component.ts` (sidebar solo delega click).
-> **Eccezione mirata:** toggle **Salva / Rimuovi dai salvati** sulle card (binding `is_saved`) + sezione chip dei **paesi correlati** (`related_countries`) — vedi skill `radar-sidebar-freeze`.
+> **Eccezione mirata:** toggle **Salva / Rimuovi dai salvati** sulle card (binding `is_saved`) + sezione chip dei **paesi correlati** (`related_countries`) + blocco **ANALISI FINOPS & FONTE RSS** dopo Tag — vedi skill `radar-sidebar-freeze`.
 > **Phase 4 DONE:** `MOCK_MODE` esplicito (no fallback silenzioso), marker XSS-safe, DestroyRef, fingerprint geometry (no rebuild cluster su solo `is_read`).
 > **Notizie Salvate:** vault cross-day (`is_saved`, `/api/saved-summary`, `GET /api/articles?saved=true`); save ⇒ read; unread ⇒ unsave; click nazione = fitBounds + flyTo 6 + spiderfy (parity LETTE/TROVATE).
 

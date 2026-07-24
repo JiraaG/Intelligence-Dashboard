@@ -271,7 +271,7 @@ docker compose exec -T radar-worker python -m app.scripts.verify_semantic_dedup
 
 ### Verifica Metriche FinOps & Diagnostica (Fase 013)
 
-Wave A (M1–M6) espone su `GET /api/metrics/summary` i campi `llm.cache_hit_rate_pct` e `dedup.content_hash_count` (migrazioni `013`+`014`). Twin completo: `plan-audit/complete/plan_impl_llm_finops_token_caching_verification.md` (soak OK).
+Wave A (M1–M6) espone su `GET /api/metrics/summary` i campi `llm.cache_hit_rate_pct`, `llm.models_breakdown` (`[{model, provider, requests_count, total_tokens}]`) e `dedup.content_hash_count` (migrazioni `013`+`014`). Twin completo: `plan-audit/complete/plan_impl_llm_finops_token_caching_verification.md` (soak OK).
 
 
 ```bash

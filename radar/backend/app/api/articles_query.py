@@ -178,9 +178,27 @@ def build_articles_page_query(
             a.country_code, a.latitude, a.longitude, a.primary_category,
             a.sentiment, a.relevance_level, a.infrastructural_entities, a.feed_title,
             a.is_read, a.is_saved, a.related_countries,
+            a.feed_id, a.feed_domain, a.classification_lane, a.classified_by_model,
+            a.classified_by_provider, a.was_escalated, a.pipeline_latency_ms,
+            a.embedding_time_ms, a.clean_text_chars, a.clean_text_words,
+            llm.prompt_tokens, llm.completion_tokens, llm.cached_prompt_tokens,
+            llm.estimated_cost_usd, llm.llm_execution_time_ms, llm.llm_request_count,
             COALESCE(companies.names, '{}') AS companies_involved,
             COALESCE(tags.names, '{}') AS tags
         FROM articles a
+        LEFT JOIN LATERAL (
+            SELECT
+                COALESCE(SUM(l.prompt_tokens), 0)::BIGINT AS prompt_tokens,
+                COALESCE(SUM(l.completion_tokens), 0)::BIGINT AS completion_tokens,
+                COALESCE(SUM(l.cached_prompt_tokens), 0)::BIGINT AS cached_prompt_tokens,
+                COALESCE(SUM(l.estimated_cost_usd), 0)::NUMERIC AS estimated_cost_usd,
+                AVG(l.execution_time_ms)::FLOAT AS llm_execution_time_ms,
+                COUNT(*)::INT AS llm_request_count
+            FROM llm_request_ledger l
+            WHERE l.article_id = a.id
+              AND l.status = 'completed'
+              AND (l.purpose LIKE 'classify:%' OR l.purpose = 'classify_article')
+        ) llm ON TRUE
         LEFT JOIN LATERAL (
             SELECT COALESCE(array_agg(c.name ORDER BY c.name), '{}'::text[]) AS names
             FROM article_companies ac

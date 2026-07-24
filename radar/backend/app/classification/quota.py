@@ -106,6 +106,39 @@ def estimate_usd(tokens: int, usd_per_1m: float) -> float:
     return (float(tokens) / 1_000_000.0) * float(usd_per_1m)
 
 
+def estimate_tiered_usd(
+    *,
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    cached_prompt_tokens: int = 0,
+    provider: str | None = None,
+    usd_per_1m: float = 0.28,
+) -> float:
+    """Stima costo USD supportando la struttura a scaglioni dei provider (DeepSeek: cache hit/miss/output)."""
+    prov = (provider or "").lower()
+    if prov == "deepseek" or (usd_per_1m <= 0.35 and usd_per_1m > 0):
+        # Pricing ufficiale DeepSeek V4 Flash:
+        # Cache Hit Input: $0.0028 per 1M token
+        # Cache Miss Input: $0.14 per 1M token
+        # Output Completion: $0.28 per 1M token
+        out_rate = usd_per_1m if usd_per_1m > 0 else 0.28
+        miss_rate = out_rate * 0.5
+        hit_rate = out_rate * 0.01
+
+        cached = max(0, cached_prompt_tokens)
+        prompt = max(0, prompt_tokens)
+        miss = max(0, prompt - cached)
+        comp = max(0, completion_tokens)
+
+        cost = (cached / 1_000_000.0 * hit_rate) + (miss / 1_000_000.0 * miss_rate) + (comp / 1_000_000.0 * out_rate)
+        return round(cost, 6)
+
+    total = max(0, prompt_tokens + completion_tokens)
+    if total <= 0 or usd_per_1m <= 0:
+        return 0.0
+    return (float(total) / 1_000_000.0) * float(usd_per_1m)
+
+
 @dataclass(frozen=True, slots=True)
 class _ReserveOutcome:
     """Esito di un tentativo di reserve sotto lock: id oppure wait RPM/TPM."""
@@ -377,12 +410,19 @@ class QuotaLedger:
             tokens = None
 
         row = await self._pool.fetchrow(
-            "SELECT lane FROM llm_request_ledger WHERE id = $1",
+            "SELECT lane, provider FROM llm_request_ledger WHERE id = $1",
             reservation_id,
         )
         lane = row["lane"] if row and row["lane"] else LANE_SIMPLE
+        prov = row["provider"] if row and row["provider"] else None
         limits = self._limits.get(_normalize_lane(lane), self._limits[LANE_SIMPLE])
-        cost = estimate_usd(tokens or 0, limits.usd_per_1m_tokens)
+        cost = estimate_tiered_usd(
+            prompt_tokens=prompt_tokens or 0,
+            completion_tokens=completion_tokens or 0,
+            cached_prompt_tokens=cached_prompt_tokens or 0,
+            provider=prov,
+            usd_per_1m=limits.usd_per_1m_tokens,
+        )
 
         result = await self._pool.execute(
             """
@@ -719,3 +759,32 @@ class QuotaLedger:
             purpose_exact,
         )
         return estimate_usd(int(tokens or 0), usd_per_1m)
+
+
+async def get_model_rpd_used(
+    conn: asyncpg.Connection | asyncpg.Pool,
+    model: str,
+    lane: str,
+    day_start: datetime,
+    day_end: datetime,
+) -> int:
+    """Helper pubblico per contare RPD usate da un modello nella finestra giorno."""
+    purpose_exact = purpose_for_lane(lane)
+    count = await conn.fetchval(
+        """
+        SELECT COUNT(*)::INT
+        FROM llm_request_ledger
+        WHERE created_at >= $1
+          AND created_at < $2
+          AND status = ANY($3::text[])
+          AND (lane = $4 OR (lane IS NULL AND purpose = $5))
+          AND model = $6
+        """,
+        day_start,
+        day_end,
+        list(_ACTIVE_STATUSES),
+        lane,
+        purpose_exact,
+        model,
+    )
+    return int(count or 0)

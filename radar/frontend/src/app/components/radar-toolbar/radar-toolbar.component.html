@@ -1,174 +1,252 @@
 <div class="radar-toolbar">
-  <!-- Calendario PrimeNG -->
-  <p-calendar
-    [(ngModel)]="selectedDate"
-    (onSelect)="onFiltersChange()"
-    [maxDate]="today"
-    dateFormat="yy-mm-dd"
-    [showIcon]="true"
-    placeholder="Seleziona Data"
-  >
-  </p-calendar>
-
-  <!-- Sentiment (pattern Relazioni Attive) -->
-  <div
-    class="article-count-container"
-    (mouseenter)="isSentimentTooltipHovered.set(true)"
-    (mouseleave)="isSentimentTooltipHovered.set(false)"
-  >
-    <button
-      type="button"
-      class="article-count"
-      [class.is-active]="selectedSentiment().length > 0"
-      (click)="toggleSentimentTooltip($event)"
-      [attr.aria-expanded]="isSentimentTooltipVisible()"
-      aria-haspopup="true"
-    >
-      Sentiment
-      @if (selectedSentiment().length > 0) {
-        <strong>{{ selectedSentiment().length }}/{{ sentimentOptions.length }}</strong>
-      }
-    </button>
-
+  <div class="toolbar-left">
+    <!-- STATUS (Tutto a sinistra della topbar) -->
     <div
-      class="countries-tooltip filter-tooltip"
-      *ngIf="isSentimentTooltipVisible()"
-      role="listbox"
-      (click)="$event.stopPropagation()"
+      class="article-count-container"
+      (mouseenter)="isStatusTooltipHovered.set(true)"
+      (mouseleave)="isStatusTooltipHovered.set(false)"
     >
-      <div class="tooltip-header">
-        <span class="tooltip-title">Sentiment</span>
-        <button
-          type="button"
-          class="tooltip-close-btn"
-          (click)="closeSentimentTooltip($event)"
-          aria-label="Chiudi"
-        >
-          ✕
-        </button>
-      </div>
-      <div class="tooltip-actions">
-        <button
-          type="button"
-          class="tooltip-action-btn"
-          (click)="onToggleSelectAllSentiment($event)"
-        >
-          {{ sentimentAllSelected() ? 'Deseleziona tutto' : 'Seleziona tutto' }}
-        </button>
-      </div>
-      <div class="tooltip-filter-wrap">
-        <input
-          type="search"
-          class="tooltip-filter"
-          [value]="sentimentFilter()"
-          (input)="onSentimentFilterInput($event)"
-          placeholder="Filtra sentiment…"
-          aria-label="Filtra sentiment"
-        />
-      </div>
-      <div class="tooltip-list">
-        <div
-          class="tooltip-row tooltip-row--switch"
-          *ngFor="let opt of filteredSentimentOptions()"
-          role="option"
-        >
-          <span class="country-name">{{ opt.label }}</span>
+      <button
+        type="button"
+        class="article-count status-count-btn"
+        (click)="toggleStatusTooltip($event)"
+        [attr.aria-expanded]="isStatusTooltipVisible()"
+        aria-haspopup="true"
+      >
+        STATUS
+        <span class="status-dot-icon" [title]="'Stato: ' + statusLevel()">{{ statusDotEmoji() }}</span>
+      </button>
+
+      <div
+        #statusPopover
+        class="countries-tooltip status-popover status-popover-left"
+        *ngIf="isStatusTooltipVisible()"
+        role="dialog"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="tooltip-header">
+          <span class="tooltip-title">STATUS OPERATIVO SISTEMA</span>
           <button
             type="button"
-            class="ios-switch"
-            role="switch"
-            [attr.aria-checked]="isSentimentOn(opt.value)"
-            [attr.aria-label]="'Attiva ' + opt.value"
-            [class.is-on]="isSentimentOn(opt.value)"
-            (click)="onToggleSentiment(opt.value, $event)"
+            class="tooltip-close-btn"
+            (click)="closeStatusTooltip($event)"
+            aria-label="Chiudi"
           >
-            <span class="ios-switch__thumb" aria-hidden="true"></span>
+            ✕
           </button>
         </div>
-        <div class="tooltip-empty" *ngIf="filteredSentimentOptions().length === 0">
-          Nessun sentiment corrisponde al filtro
+
+        <div class="popover-content">
+          <!-- Sezione 1 — Banner Stato Sistema -->
+          <div class="status-level-banner" [class]="'level-' + statusLevel()">
+            <span class="level-dot">{{ statusDotEmoji() }}</span>
+            <span class="level-label">Stato sistema: <strong>{{ statusLevelLabel() }}</strong></span>
+            <span class="l1-badge" *ngIf="metricsStatus()?.l1_likely_active">L1 Fallback ({{ metricsStatus()?.l1_reason }})</span>
+          </div>
+
+          <!-- Sezione 2 — Modelli & Quote RPD attuali -->
+          <div class="popover-section" *ngIf="metricsStatus()?.models?.length">
+            <span class="section-label">🤖 Modelli & Quote RPD attuali</span>
+            <div class="model-item" *ngFor="let m of metricsStatus()!.models">
+              <div class="model-info">
+                <span class="model-name">
+                  <span class="role-tag" [class]="'role-' + m.role">{{ m.role | uppercase }}</span>
+                  {{ m.model }}
+                </span>
+                <span class="rpd-count" *ngIf="m.rpd_limit > 0">{{ m.rpd_used }} / {{ m.rpd_limit }} RPD</span>
+                <span class="rpd-count" *ngIf="m.rpd_limit === 0">{{ m.rpd_used }} RPD (unmanaged)</span>
+              </div>
+              <div class="rpd-bar-wrapper" *ngIf="m.rpd_limit > 0">
+                <div
+                  class="rpd-bar-fill"
+                  [style.width.%]="(m.rpd_used / m.rpd_limit) * 100"
+                  [class.warning]="(m.rpd_used / m.rpd_limit) >= 0.8"
+                  [class.danger]="m.cooling_down || m.rpd_used >= m.rpd_limit"
+                ></div>
+              </div>
+              <span class="cooldown-warning" *ngIf="m.cooling_down">
+                ⚠️ Cooling down (scade: {{ m.cooldown_until | date:'HH:mm:ss' }})
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Tipologia (pattern Relazioni Attive) -->
-  <div
-    class="article-count-container"
-    (mouseenter)="isCategoryTooltipHovered.set(true)"
-    (mouseleave)="isCategoryTooltipHovered.set(false)"
-  >
-    <button
-      type="button"
-      class="article-count"
-      [class.is-active]="selectedCategories().length > 0"
-      (click)="toggleCategoryTooltip($event)"
-      [attr.aria-expanded]="isCategoryTooltipVisible()"
-      aria-haspopup="true"
+    <!-- Separatore dopo STATUS -->
+    <div class="divider"></div>
+
+    <!-- Calendario PrimeNG -->
+    <p-calendar
+      [(ngModel)]="selectedDate"
+      (onSelect)="onFiltersChange()"
+      [maxDate]="today"
+      dateFormat="yy-mm-dd"
+      [showIcon]="true"
+      placeholder="Seleziona Data"
     >
-      Tipologia
-      @if (selectedCategories().length > 0) {
-        <strong>{{ selectedCategories().length }}/{{ categoryOptions.length }}</strong>
-      }
-    </button>
+    </p-calendar>
 
+    <!-- Sentiment (pattern Relazioni Attive) -->
     <div
-      class="countries-tooltip filter-tooltip"
-      *ngIf="isCategoryTooltipVisible()"
-      role="listbox"
-      (click)="$event.stopPropagation()"
+      class="article-count-container"
+      (mouseenter)="isSentimentTooltipHovered.set(true)"
+      (mouseleave)="isSentimentTooltipHovered.set(false)"
     >
-      <div class="tooltip-header">
-        <span class="tooltip-title">Tipologia</span>
-        <button
-          type="button"
-          class="tooltip-close-btn"
-          (click)="closeCategoryTooltip($event)"
-          aria-label="Chiudi"
-        >
-          ✕
-        </button>
-      </div>
-      <div class="tooltip-actions">
-        <button
-          type="button"
-          class="tooltip-action-btn"
-          (click)="onToggleSelectAllCategories($event)"
-        >
-          {{ categoryAllSelected() ? 'Deseleziona tutto' : 'Seleziona tutto' }}
-        </button>
-      </div>
-      <div class="tooltip-filter-wrap">
-        <input
-          type="search"
-          class="tooltip-filter"
-          [value]="categoryFilter()"
-          (input)="onCategoryFilterInput($event)"
-          placeholder="Filtra tipologia…"
-          aria-label="Filtra tipologia"
-        />
-      </div>
-      <div class="tooltip-list">
-        <div
-          class="tooltip-row tooltip-row--switch"
-          *ngFor="let opt of filteredCategoryOptions()"
-          role="option"
-        >
-          <span class="country-name">{{ opt.label }}</span>
+      <button
+        type="button"
+        class="article-count"
+        [class.is-active]="selectedSentiment().length > 0"
+        (click)="toggleSentimentTooltip($event)"
+        [attr.aria-expanded]="isSentimentTooltipVisible()"
+        aria-haspopup="true"
+      >
+        Sentiment
+        @if (selectedSentiment().length > 0) {
+          <strong>{{ selectedSentiment().length }}/{{ sentimentOptions.length }}</strong>
+        }
+      </button>
+
+      <div
+        class="countries-tooltip filter-tooltip"
+        *ngIf="isSentimentTooltipVisible()"
+        role="listbox"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="tooltip-header">
+          <span class="tooltip-title">Sentiment</span>
           <button
             type="button"
-            class="ios-switch"
-            role="switch"
-            [attr.aria-checked]="isCategoryOn(opt.value)"
-            [attr.aria-label]="'Attiva ' + opt.value"
-            [class.is-on]="isCategoryOn(opt.value)"
-            (click)="onToggleCategory(opt.value, $event)"
+            class="tooltip-close-btn"
+            (click)="closeSentimentTooltip($event)"
+            aria-label="Chiudi"
           >
-            <span class="ios-switch__thumb" aria-hidden="true"></span>
+            ✕
           </button>
         </div>
-        <div class="tooltip-empty" *ngIf="filteredCategoryOptions().length === 0">
-          Nessuna tipologia corrisponde al filtro
+        <div class="tooltip-actions">
+          <button
+            type="button"
+            class="tooltip-action-btn"
+            (click)="onToggleSelectAllSentiment($event)"
+          >
+            {{ sentimentAllSelected() ? 'Deseleziona tutto' : 'Seleziona tutto' }}
+          </button>
+        </div>
+        <div class="tooltip-filter-wrap">
+          <input
+            type="search"
+            class="tooltip-filter"
+            [value]="sentimentFilter()"
+            (input)="onSentimentFilterInput($event)"
+            placeholder="Filtra sentiment…"
+            aria-label="Filtra sentiment"
+          />
+        </div>
+        <div class="tooltip-list">
+          <div
+            class="tooltip-row tooltip-row--switch"
+            *ngFor="let opt of filteredSentimentOptions()"
+            role="option"
+          >
+            <span class="country-name">{{ opt.label }}</span>
+            <button
+              type="button"
+              class="ios-switch"
+              role="switch"
+              [attr.aria-checked]="isSentimentOn(opt.value)"
+              [attr.aria-label]="'Attiva ' + opt.value"
+              [class.is-on]="isSentimentOn(opt.value)"
+              (click)="onToggleSentiment(opt.value, $event)"
+            >
+              <span class="ios-switch__thumb" aria-hidden="true"></span>
+            </button>
+          </div>
+          <div class="tooltip-empty" *ngIf="filteredSentimentOptions().length === 0">
+            Nessun sentiment corrisponde al filtro
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tipologia (pattern Relazioni Attive) -->
+    <div
+      class="article-count-container"
+      (mouseenter)="isCategoryTooltipHovered.set(true)"
+      (mouseleave)="isCategoryTooltipHovered.set(false)"
+    >
+      <button
+        type="button"
+        class="article-count"
+        [class.is-active]="selectedCategories().length > 0"
+        (click)="toggleCategoryTooltip($event)"
+        [attr.aria-expanded]="isCategoryTooltipVisible()"
+        aria-haspopup="true"
+      >
+        Tipologia
+        @if (selectedCategories().length > 0) {
+          <strong>{{ selectedCategories().length }}/{{ categoryOptions.length }}</strong>
+        }
+      </button>
+
+      <div
+        class="countries-tooltip filter-tooltip"
+        *ngIf="isCategoryTooltipVisible()"
+        role="listbox"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="tooltip-header">
+          <span class="tooltip-title">Tipologia</span>
+          <button
+            type="button"
+            class="tooltip-close-btn"
+            (click)="closeCategoryTooltip($event)"
+            aria-label="Chiudi"
+          >
+            ✕
+          </button>
+        </div>
+        <div class="tooltip-actions">
+          <button
+            type="button"
+            class="tooltip-action-btn"
+            (click)="onToggleSelectAllCategories($event)"
+          >
+            {{ categoryAllSelected() ? 'Deseleziona tutto' : 'Seleziona tutto' }}
+          </button>
+        </div>
+        <div class="tooltip-filter-wrap">
+          <input
+            type="search"
+            class="tooltip-filter"
+            [value]="categoryFilter()"
+            (input)="onCategoryFilterInput($event)"
+            placeholder="Filtra tipologia…"
+            aria-label="Filtra tipologia"
+          />
+        </div>
+        <div class="tooltip-list">
+          <div
+            class="tooltip-row tooltip-row--switch"
+            *ngFor="let opt of filteredCategoryOptions()"
+            role="option"
+          >
+            <span class="country-name">{{ opt.label }}</span>
+            <button
+              type="button"
+              class="ios-switch"
+              role="switch"
+              [attr.aria-checked]="isCategoryOn(opt.value)"
+              [attr.aria-label]="'Attiva ' + opt.value"
+              [class.is-on]="isCategoryOn(opt.value)"
+              (click)="onToggleCategory(opt.value, $event)"
+            >
+              <span class="ios-switch__thumb" aria-hidden="true"></span>
+            </button>
+          </div>
+          <div class="tooltip-empty" *ngIf="filteredCategoryOptions().length === 0">
+            Nessuna tipologia corrisponde al filtro
+          </div>
         </div>
       </div>
     </div>
@@ -176,207 +254,373 @@
 
   <div class="divider"></div>
 
-  <div
-    class="article-count-container"
-    (mouseenter)="isTooltipHovered.set(true)"
-    (mouseleave)="isTooltipHovered.set(false)"
-  >
-    <button
-      type="button"
-      class="article-count"
-      (click)="toggleTooltip($event)"
-      [attr.aria-expanded]="isTooltipVisible()"
-      aria-haspopup="true"
-    >
-      NOTIZIE LETTE/TROVATE: <strong>{{ readCount() }}/{{ articleCount() }}</strong>
-    </button>
-
+  <div class="toolbar-right">
+    <!-- NOTIZIE LETTE/TROVATE -->
     <div
-      class="countries-tooltip"
-      *ngIf="isTooltipVisible() && countriesList().length > 0"
-      role="listbox"
+      class="article-count-container"
+      (mouseenter)="isTooltipHovered.set(true)"
+      (mouseleave)="isTooltipHovered.set(false)"
     >
-      <div class="tooltip-header">
-        <span class="tooltip-title">Nazioni Coinvolte</span>
-        <button
-          type="button"
-          class="tooltip-close-btn"
-          (click)="closeTooltip($event)"
-          aria-label="Chiudi"
-        >
-          ✕
-        </button>
-      </div>
-      <div class="tooltip-filter-wrap" (click)="$event.stopPropagation()">
-        <input
-          type="search"
-          class="tooltip-filter"
-          [value]="nationsFilter()"
-          (input)="onNationsFilterInput($event)"
-          placeholder="Filtra nazione…"
-          aria-label="Filtra nazioni coinvolte"
-        />
-      </div>
-      <div class="tooltip-list">
-        <button
-          type="button"
-          class="tooltip-row clickable"
-          *ngFor="let c of filteredCountriesList()"
-          (click)="selectCountry(c.code, $event)"
-          role="option"
-        >
-          <span class="country-flag">{{ getFlagEmoji(c.code) }}</span>
-          <span class="country-name">{{ c.name }}</span>
-          <span class="country-badge">{{ c.readCount }}/{{ c.count }}</span>
-        </button>
-        <div class="tooltip-empty" *ngIf="filteredCountriesList().length === 0">
-          Nessuna nazione corrisponde al filtro
-        </div>
-      </div>
-    </div>
-  </div>
+      <button
+        type="button"
+        class="article-count"
+        (click)="toggleTooltip($event)"
+        [attr.aria-expanded]="isTooltipVisible()"
+        aria-haspopup="true"
+      >
+        NOTIZIE LETTE/TROVATE: <strong>{{ readCount() }}/{{ articleCount() }}</strong>
+      </button>
 
-  <div
-    class="article-count-container"
-    (mouseenter)="isSavedTooltipHovered.set(true)"
-    (mouseleave)="isSavedTooltipHovered.set(false)"
-  >
-    <button
-      type="button"
-      class="article-count"
-      (click)="toggleSavedTooltip($event)"
-      [attr.aria-expanded]="isSavedTooltipVisible()"
-      aria-haspopup="true"
-    >
-      NOTIZIE SALVATE: <strong>{{ savedCount() }}</strong>
-    </button>
-
-    <div
-      class="countries-tooltip"
-      *ngIf="isSavedTooltipVisible() && savedCountriesList().length > 0"
-      role="listbox"
-    >
-      <div class="tooltip-header">
-        <span class="tooltip-title">Nazioni Salvate</span>
-        <button
-          type="button"
-          class="tooltip-close-btn"
-          (click)="closeSavedTooltip($event)"
-          aria-label="Chiudi"
-        >
-          ✕
-        </button>
-      </div>
-      <div class="tooltip-filter-wrap" (click)="$event.stopPropagation()">
-        <input
-          type="search"
-          class="tooltip-filter"
-          [value]="savedNationsFilter()"
-          (input)="onSavedNationsFilterInput($event)"
-          placeholder="Filtra nazione…"
-          aria-label="Filtra nazioni salvate"
-        />
-      </div>
-      <div class="tooltip-list">
-        <button
-          type="button"
-          class="tooltip-row clickable"
-          *ngFor="let c of filteredSavedCountriesList()"
-          (click)="selectSavedCountry(c.code, $event)"
-          role="option"
-        >
-          <span class="country-flag">{{ getFlagEmoji(c.code) }}</span>
-          <span class="country-name">{{ c.name }}</span>
-          <span class="country-badge">{{ c.count }}</span>
-        </button>
-        <div class="tooltip-empty" *ngIf="filteredSavedCountriesList().length === 0">
-          Nessuna nazione corrisponde al filtro
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div
-    class="article-count-container"
-    (mouseenter)="isRelationsTooltipHovered.set(true)"
-    (mouseleave)="isRelationsTooltipHovered.set(false)"
-  >
-    <button
-      type="button"
-      class="article-count"
-      (click)="toggleRelationsTooltip($event)"
-      [attr.aria-expanded]="isRelationsTooltipVisible()"
-      aria-haspopup="true"
-    >
-      RELAZIONI ATTIVE:
-      <strong>{{ relationEnabledCount() }}/{{ relationTotalCount() }}</strong>
-    </button>
-
-    <div
-      class="countries-tooltip relations-tooltip"
-      *ngIf="isRelationsTooltipVisible()"
-      role="listbox"
-      (click)="$event.stopPropagation()"
-    >
-      <div class="tooltip-header">
-        <span class="tooltip-title">Relazioni Attive</span>
-        <button
-          type="button"
-          class="tooltip-close-btn"
-          (click)="closeRelationsTooltip($event)"
-          aria-label="Chiudi"
-        >
-          ✕
-        </button>
-      </div>
-      <div class="tooltip-actions">
-        <button
-          type="button"
-          class="tooltip-action-btn"
-          (click)="onToggleSelectAllRelations($event)"
-          [disabled]="relationTotalCount() === 0"
-        >
-          {{ relationsAllSelected() ? 'Deseleziona tutto' : 'Seleziona tutto' }}
-        </button>
-      </div>
-      <div class="tooltip-filter-wrap">
-        <input
-          type="search"
-          class="tooltip-filter"
-          [value]="relationsFilter()"
-          (input)="onRelationsFilterInput($event)"
-          placeholder="Filtra nazione…"
-          aria-label="Filtra nazioni relazioni"
-        />
-      </div>
-      <div class="tooltip-list">
-        <div
-          class="tooltip-row tooltip-row--switch"
-          *ngFor="let opt of filteredRelationOptions()"
-          role="option"
-        >
-          <span class="country-flag">{{ getFlagEmoji(opt.code) }}</span>
-          <span class="country-name">{{ opt.name }}</span>
+      <div
+        class="countries-tooltip"
+        *ngIf="isTooltipVisible() && countriesList().length > 0"
+        role="listbox"
+      >
+        <div class="tooltip-header">
+          <span class="tooltip-title">Nazioni Coinvolte</span>
           <button
             type="button"
-            class="ios-switch"
-            role="switch"
-            [attr.aria-checked]="isRelationEnabled(opt.code)"
-            [attr.aria-label]="'Attiva relazioni per ' + opt.name"
-            [class.is-on]="isRelationEnabled(opt.code)"
-            (click)="onToggleRelation(opt.code, $event)"
+            class="tooltip-close-btn"
+            (click)="closeTooltip($event)"
+            aria-label="Chiudi"
           >
-            <span class="ios-switch__thumb" aria-hidden="true"></span>
+            ✕
           </button>
         </div>
-        <div class="tooltip-empty" *ngIf="filteredRelationOptions().length === 0">
-          {{
-            relationOptions().length === 0
-              ? 'Nessuna relazione nel giorno'
-              : 'Nessuna nazione corrisponde al filtro'
-          }}
+        <div class="tooltip-filter-wrap" (click)="$event.stopPropagation()">
+          <input
+            type="search"
+            class="tooltip-filter"
+            [value]="nationsFilter()"
+            (input)="onNationsFilterInput($event)"
+            placeholder="Filtra nazione…"
+            aria-label="Filtra nazioni coinvolte"
+          />
+        </div>
+        <div class="tooltip-list">
+          <button
+            type="button"
+            class="tooltip-row clickable"
+            *ngFor="let c of filteredCountriesList()"
+            (click)="selectCountry(c.code, $event)"
+            role="option"
+          >
+            <span class="country-flag">{{ getFlagEmoji(c.code) }}</span>
+            <span class="country-name">{{ c.name }}</span>
+            <span class="country-badge">{{ c.readCount }}/{{ c.count }}</span>
+          </button>
+          <div class="tooltip-empty" *ngIf="filteredCountriesList().length === 0">
+            Nessuna nazione corrisponde al filtro
+          </div>
         </div>
       </div>
+    </div>
+
+    <!-- NOTIZIE SALVATE -->
+    <div
+      class="article-count-container"
+      (mouseenter)="isSavedTooltipHovered.set(true)"
+      (mouseleave)="isSavedTooltipHovered.set(false)"
+    >
+      <button
+        type="button"
+        class="article-count"
+        (click)="toggleSavedTooltip($event)"
+        [attr.aria-expanded]="isSavedTooltipVisible()"
+        aria-haspopup="true"
+      >
+        NOTIZIE SALVATE: <strong>{{ savedCount() }}</strong>
+      </button>
+
+      <div
+        class="countries-tooltip"
+        *ngIf="isSavedTooltipVisible() && savedCountriesList().length > 0"
+        role="listbox"
+      >
+        <div class="tooltip-header">
+          <span class="tooltip-title">Nazioni Salvate</span>
+          <button
+            type="button"
+            class="tooltip-close-btn"
+            (click)="closeSavedTooltip($event)"
+            aria-label="Chiudi"
+          >
+            ✕
+          </button>
+        </div>
+        <div class="tooltip-filter-wrap" (click)="$event.stopPropagation()">
+          <input
+            type="search"
+            class="tooltip-filter"
+            [value]="savedNationsFilter()"
+            (input)="onSavedNationsFilterInput($event)"
+            placeholder="Filtra nazione…"
+            aria-label="Filtra nazioni salvate"
+          />
+        </div>
+        <div class="tooltip-list">
+          <button
+            type="button"
+            class="tooltip-row clickable"
+            *ngFor="let c of filteredSavedCountriesList()"
+            (click)="selectSavedCountry(c.code, $event)"
+            role="option"
+          >
+            <span class="country-flag">{{ getFlagEmoji(c.code) }}</span>
+            <span class="country-name">{{ c.name }}</span>
+            <span class="country-badge">{{ c.count }}</span>
+          </button>
+          <div class="tooltip-empty" *ngIf="filteredSavedCountriesList().length === 0">
+            Nessuna nazione corrisponde al filtro
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RELAZIONI ATTIVE -->
+    <div
+      class="article-count-container"
+      (mouseenter)="isRelationsTooltipHovered.set(true)"
+      (mouseleave)="isRelationsTooltipHovered.set(false)"
+    >
+      <button
+        type="button"
+        class="article-count"
+        (click)="toggleRelationsTooltip($event)"
+        [attr.aria-expanded]="isRelationsTooltipVisible()"
+        aria-haspopup="true"
+      >
+        RELAZIONI ATTIVE:
+        <strong>{{ relationEnabledCount() }}/{{ relationTotalCount() }}</strong>
+      </button>
+
+      <div
+        class="countries-tooltip relations-tooltip"
+        *ngIf="isRelationsTooltipVisible()"
+        role="listbox"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="tooltip-header">
+          <span class="tooltip-title">Relazioni Attive</span>
+          <button
+            type="button"
+            class="tooltip-close-btn"
+            (click)="closeRelationsTooltip($event)"
+            aria-label="Chiudi"
+          >
+            ✕
+          </button>
+        </div>
+        <div class="tooltip-actions">
+          <button
+            type="button"
+            class="tooltip-action-btn"
+            (click)="onToggleSelectAllRelations($event)"
+            [disabled]="relationTotalCount() === 0"
+          >
+            {{ relationsAllSelected() ? 'Deseleziona tutto' : 'Seleziona tutto' }}
+          </button>
+        </div>
+        <div class="tooltip-filter-wrap">
+          <input
+            type="search"
+            class="tooltip-filter"
+            [value]="relationsFilter()"
+            (input)="onRelationsFilterInput($event)"
+            placeholder="Filtra nazione…"
+            aria-label="Filtra nazioni relazioni"
+          />
+        </div>
+        <div class="tooltip-list">
+          <div
+            class="tooltip-row tooltip-row--switch"
+            *ngFor="let opt of filteredRelationOptions()"
+            role="option"
+          >
+            <span class="country-flag">{{ getFlagEmoji(opt.code) }}</span>
+            <span class="country-name">{{ opt.name }}</span>
+            <button
+              type="button"
+              class="ios-switch"
+              role="switch"
+              [attr.aria-checked]="isRelationEnabled(opt.code)"
+              [attr.aria-label]="'Attiva relazioni per ' + opt.name"
+              [class.is-on]="isRelationEnabled(opt.code)"
+              (click)="onToggleRelation(opt.code, $event)"
+            >
+              <span class="ios-switch__thumb" aria-hidden="true"></span>
+            </button>
+          </div>
+          <div class="tooltip-empty" *ngIf="filteredRelationOptions().length === 0">
+            {{
+              relationOptions().length === 0
+                ? 'Nessuna relazione nel giorno'
+                : 'Nessuna nazione corrisponde al filtro'
+            }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- 1. COSTI (PopOver Filtrato per Data Selezionata) -->
+    <div
+      class="article-count-container"
+      (mouseenter)="isCostiTooltipHovered.set(true)"
+      (mouseleave)="isCostiTooltipHovered.set(false)"
+    >
+      <button
+        type="button"
+        class="article-count costi-count-btn"
+        (click)="toggleCostiTooltip($event)"
+        [attr.aria-expanded]="isCostiTooltipVisible()"
+        aria-haspopup="true"
+      >
+        COSTI:
+        <strong>{{ totalCostUsd() === 0 ? '$0' : ('$' + (totalCostUsd() | number:'1.2-4')) }}</strong>
+      </button>
+
+      <div
+        #costiPopover
+        class="countries-tooltip status-popover"
+        *ngIf="isCostiTooltipVisible()"
+        role="dialog"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="tooltip-header">
+          <span class="tooltip-title">COSTI & METRICHE</span>
+          <button
+            type="button"
+            class="tooltip-close-btn"
+            (click)="closeCostiTooltip($event)"
+            aria-label="Chiudi"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div class="popover-content">
+          <!-- Sezione 1 — Costi generali -->
+          <div class="popover-section border-0 pt-0">
+            <span class="section-label" title="Metriche generali di costo ed ingestione per il giorno selezionato">📊 Costi generali</span>
+            <div class="metrics-grid">
+              <div class="metric-card" title="Costo complessivo stimato per chiamate LLM di classificazione completate per il giorno selezionato">
+                <span class="metric-val">{{ totalCostUsd() === 0 ? '$0' : ('$' + (totalCostUsd() | number:'1.4-4')) }}</span>
+                <span class="metric-key">Costo stimato giorno</span>
+              </div>
+              <div class="metric-card" title="Numero totale di articoli pubblicati ed estratti dai feed RSS nel giorno selezionato">
+                <span class="metric-val">{{ metricsSummary()?.total_articles ?? 0 }}</span>
+                <span class="metric-key">Articoli ingestiti</span>
+              </div>
+              <div class="metric-card" title="Numero totale di chiamate API inviate ai provider LLM (classificazione, retry, compare) nel giorno">
+                <span class="metric-val">{{ metricsSummary()?.llm?.total_requests ?? 0 }}</span>
+                <span class="metric-key">Richieste LLM</span>
+              </div>
+              <div class="metric-card" title="Tempo medio stimato per l'intera pipeline di elaborazione nel giorno selezionato">
+                <span class="metric-val">{{ metricsSummary()?.avg_pipeline_latency_ms ? (metricsSummary()!.avg_pipeline_latency_ms! | number:'1.0-0') + ' ms' : 'N/D' }}</span>
+                <span class="metric-key">Latenza media pipeline</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sezione 2 — Costi LLM per modello (Posizionato subito sotto a Costi generali) -->
+          <div class="popover-section" *ngIf="metricsSummary()?.llm?.models_breakdown?.length">
+            <span class="section-label" title="Spacchettamento dei costi, articoli gestiti e richieste API per i singoli modelli nel giorno selezionato">💰 Costi LLM per modello</span>
+            <div class="model-cost-card" *ngFor="let m of metricsSummary()!.llm!.models_breakdown">
+              <div class="model-cost-header">
+                <span class="model-name">{{ m.model }}</span>
+                <span class="model-cost-val" title="Costo stimato per {{ m.model }} nel giorno selezionato">
+                  {{ (m.estimated_cost_usd ?? 0) === 0 ? '$0' : ('$' + (m.estimated_cost_usd! | number:'1.4-4')) }}
+                </span>
+              </div>
+              <div class="model-cost-grid">
+                <div class="mini-metric" title="Costo stimato per le chiamate di questo modello">
+                  <span class="mini-val">{{ (m.estimated_cost_usd ?? 0) === 0 ? '$0' : ('$' + (m.estimated_cost_usd! | number:'1.4-4')) }}</span>
+                  <span class="mini-key">Costo stimato</span>
+                </div>
+                <div class="mini-metric" title="Numero di articoli classificati da {{ m.model }} nel giorno selezionato">
+                  <span class="mini-val">{{ m.articles_count ?? 0 }}</span>
+                  <span class="mini-key">Articoli gestiti</span>
+                </div>
+                <div class="mini-metric" title="Numero di richieste API inviate a {{ m.model }} nel giorno selezionato">
+                  <span class="mini-val">{{ m.requests_count }}</span>
+                  <span class="mini-key">Richieste LLM</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sezione 3 — Consumo Token & Cache -->
+          <div class="popover-section" *ngIf="metricsSummary()?.llm">
+            <span class="section-label" title="Dettaglio token di input (Prompt), output (Completion) e serviti da Cache nel giorno selezionato">⚡ Consumo Token & Cache</span>
+            <div class="token-row">
+              <span title="Token di input (testo articoli + prompt sistema) inviati ai modelli LLM">Prompt: <strong>{{ metricsSummary()!.llm.total_prompt_tokens | number }}</strong></span>
+              <span title="Token di output (risposte e analisi JSON) generati dai modelli LLM">Completion: <strong>{{ metricsSummary()!.llm.total_completion_tokens | number }}</strong></span>
+              <span title="Token di prompt serviti da cache del provider LLM con abbattimento dei tempi e dei costi">Cached: <strong>{{ metricsSummary()!.llm.total_cached_prompt_tokens | number }}</strong> ({{ metricsSummary()!.llm.cache_hit_rate_pct }}%)</span>
+            </div>
+          </div>
+
+          <!-- Sezione 4 — Richieste LLM per Modello (Titolo modello e token totali, hover con in/out) -->
+          <div class="popover-section" *ngIf="metricsSummary()?.llm?.models_breakdown?.length">
+            <span class="section-label" title="Distribuzione delle chiamate e consumo token per ciascun modello LLM nel giorno selezionato">🤖 Richieste LLM per Modello</span>
+            <div
+              class="model-item"
+              *ngFor="let m of metricsSummary()!.llm!.models_breakdown"
+              title="Dettaglio {{ m.model }}: In {{ (m.prompt_tokens ?? 0) | number }} tok • Out {{ (m.completion_tokens ?? 0) | number }} tok • Cached {{ (m.cached_tokens ?? 0) | number }} tok"
+            >
+              <div class="model-info">
+                <span class="model-name">
+                  {{ m.model }}
+                </span>
+                <span class="rpd-count">
+                  {{ m.total_tokens | number }} tok
+                </span>
+              </div>
+              <div class="rpd-bar-wrapper">
+                <div
+                  class="rpd-bar-fill"
+                  [style.width.%]="metricsSummary()?.llm?.total_requests ? (m.requests_count / metricsSummary()!.llm!.total_requests) * 100 : 0"
+                ></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sezione 5 — Eventi Deduplicazione (Senza Totale) -->
+          <div class="popover-section" *ngIf="metricsSummary()?.dedup">
+            <span class="section-label" title="Dettaglio eventi di deduplicazione eseguiti per evitare elaborazioni e chiamate LLM ridondanti">🔍 Eventi Deduplicazione</span>
+            <div class="dedup-stats">
+              <span title="Deduplicazione esatta basata su URL identico già registrato nel DB (Pre-LLM SQL check)">URL: <strong>{{ metricsSummary()!.dedup.url_exact_count }}</strong></span>
+              <span title="Deduplicazione semantica vettoriale basata su distanza coseno degli embeddings pgvector">Vettoriale: <strong>{{ metricsSummary()!.dedup.semantic_vector_count }}</strong></span>
+              <span title="Deduplicazione basata su impronta SHA256 identica del contenuto testo pulito (Pre-Embedding)">Hash: <strong>{{ metricsSummary()!.dedup.content_hash_count }}</strong></span>
+            </div>
+          </div>
+
+          <!-- Sezione 6 — Costi complessivi (All-Time dell'applicativo) -->
+          <div class="popover-section overall-section" *ngIf="metricsSummary()?.overall">
+            <span class="section-label" title="Metriche cumulate di tutti i costi ed ingestione dell'intero applicativo dall'installazione ad oggi">🌐 Costi Complessivi Applicativo</span>
+            <div class="metrics-grid">
+              <div class="metric-card overall-card" title="Costo complessivo stimato dell'intero applicativo dall'installazione ad oggi">
+                <span class="metric-val highlight-val">
+                  {{ metricsSummary()!.overall!.total_estimated_cost_usd === 0 ? '$0' : ('$' + (metricsSummary()!.overall!.total_estimated_cost_usd | number:'1.4-4')) }}
+                </span>
+                <span class="metric-key">Costo totale storico</span>
+              </div>
+              <div class="metric-card overall-card" title="Totale complessivo di articoli pubblicati ed ingestiti nel database dall'installazione">
+                <span class="metric-val">{{ metricsSummary()!.overall!.total_articles | number }}</span>
+                <span class="metric-key">Articoli totali</span>
+              </div>
+              <div class="metric-card overall-card" title="Totale complessivo di chiamate API inviate ai provider LLM dall'installazione">
+                <span class="metric-val">{{ metricsSummary()!.overall!.total_requests | number }}</span>
+                <span class="metric-key">Richieste LLM totali</span>
+              </div>
+              <div class="metric-card overall-card" title="Totale complessivo di token elaborati dall'applicativo dall'installazione">
+                <span class="metric-val">{{ metricsSummary()!.overall!.total_tokens | number }}</span>
+                <span class="metric-key">Token totali</span>
+              </div>
+            </div>
+          </div>
+        </div>
     </div>
   </div>
 

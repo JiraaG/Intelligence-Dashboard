@@ -77,6 +77,7 @@ services:
       OBSIDIAN_VAULT_PATH: "/app/vault"
     volumes:
       - ./vault:/app/vault
+      - ./config:/app/config:ro
     depends_on:
       # Honoured by `compose up`, NOT by `compose restart` (parallel). See docker.md Regola 4.
       radar-db:
@@ -123,6 +124,7 @@ services:
       OBSIDIAN_VAULT_PATH: "/app/vault"
     volumes:
       - ./vault:/app/vault
+      - ./config:/app/config:ro
     depends_on:
       # Same caveat as backend: restart-all can race Postgres "starting up".
       radar-db:

@@ -10,6 +10,7 @@ import {
 } from '../models/article.model';
 import { MapSummaryRow } from '../models/map-summary.model';
 import { MapRelationRow } from '../models/map-relation.model';
+import { MetricsSummary, MetricsStatus } from '../models/metrics.model';
 
 /** Data ISO di generazione fixture — usata come ``published_at``, non come filtro query. */
 const TODAY = new Date().toISOString().split('T')[0];
@@ -349,5 +350,107 @@ export class ArticleMockService {
       });
     });
     return of(result);
+  }
+
+  getMetricsSummary(fromDate?: string, toDate?: string): Observable<MetricsSummary> {
+    void fromDate;
+    void toDate;
+    return of({
+      from: TODAY,
+      to: TODAY,
+      total_articles: 7,
+      total_clean_chars: 14200,
+      total_clean_words: 2100,
+      avg_pipeline_latency_ms: 1150.5,
+      avg_embedding_time_ms: 45.2,
+      llm: {
+        total_requests: 7,
+        total_prompt_tokens: 8400,
+        total_completion_tokens: 2450,
+        total_cached_prompt_tokens: 5600,
+        cache_hit_rate_pct: 66.67,
+        avg_execution_time_ms: 890.0,
+        total_estimated_cost_usd: 0.00105,
+        models_breakdown: [
+          {
+            model: 'gemini-2.5-flash-lite',
+            provider: 'gemini',
+            requests_count: 5,
+            prompt_tokens: 6000,
+            completion_tokens: 1800,
+            cached_tokens: 4000,
+            total_tokens: 7800,
+            estimated_cost_usd: 0.00075,
+            articles_count: 5,
+          },
+          {
+            model: 'deepseek-v3',
+            provider: 'deepseek',
+            requests_count: 2,
+            prompt_tokens: 2400,
+            completion_tokens: 650,
+            cached_tokens: 1600,
+            total_tokens: 3050,
+            estimated_cost_usd: 0.0003,
+            articles_count: 2,
+          },
+        ],
+      },
+      dedup: {
+        total_events: 2,
+        url_exact_count: 1,
+        semantic_vector_count: 1,
+        content_hash_count: 0,
+      },
+      overall: {
+        total_estimated_cost_usd: 0.191,
+        total_articles: 591,
+        total_requests: 852,
+        total_tokens: 12863000,
+        total_dedup_events: 162,
+      },
+    });
+  }
+
+  getMetricsStatus(): Observable<MetricsStatus> {
+    return of({
+      as_of: new Date().toISOString(),
+      timezone: 'UTC',
+      level: 'nominal',
+      estimated_cost_usd_today: 0.00105,
+      l1_likely_active: false,
+      l1_reason: 'none',
+      models: [
+        {
+          role: 'primary',
+          lane: 'simple',
+          provider: 'gemini',
+          model: 'gemini-3.5-flash-lite',
+          rpd_used: 14,
+          rpd_limit: 500,
+          cooling_down: false,
+          cooldown_until: null,
+        },
+        {
+          role: 'complex',
+          lane: 'complex',
+          provider: 'deepseek',
+          model: 'deepseek-v4-flash',
+          rpd_used: 2,
+          rpd_limit: 0,
+          cooling_down: false,
+          cooldown_until: null,
+        },
+      ],
+      llm: {
+        total_requests: 7,
+        total_prompt_tokens: 8400,
+        total_completion_tokens: 2450,
+        total_cached_prompt_tokens: 5600,
+        cache_hit_rate_pct: 66.67,
+        avg_execution_time_ms: 890.0,
+        total_estimated_cost_usd: 0.00105,
+      },
+    });
   }
 }

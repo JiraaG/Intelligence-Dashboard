@@ -28,7 +28,8 @@ Carica questa skill **prima** di toccare layout laterale, carousel PrimeNG, card
 
 1. Consentito aggiungere/aggiornare il toggle **Salva / Rimuovi dai salvati** sulle card (template single + carousel) e lo stile minimo allineato a `.read-btn`.
 2. Consentito aggiungere la sezione **"Paesi correlati"** (dopo Aziende e prima di Tag) che mostra le chip (`.related-chip`) display-only dei codici ISO Alpha-2 tradotti in italiano.
-3. Vietato qualsiasi altro restyle, refactor carousel, o spostamento della logica di stato dentro la sidebar.
+3. Consentito aggiungere il blocco **"ANALISI FINOPS & FONTE RSS"** (dopo Tag) nelle card single e carousel (display-only: modello, lane, token, latenza, costo, link feed XML).
+4. Vietato qualsiasi altro restyle, refactor carousel, o spostamento della logica di stato dentro la sidebar.
 
 ## Anti-pattern
 
