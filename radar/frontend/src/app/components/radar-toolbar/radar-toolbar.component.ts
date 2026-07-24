@@ -130,6 +130,32 @@ export class RadarToolbarComponent {
     return '🔴 RISORSE LIMITATE / DEGRADATO: Worker stale, tutti i modelli in cooldown o limiti RPD giornalieri esauriti.';
   });
 
+  readonly l1ReasonLabel = computed(() => {
+    const reason = this.metricsStatus()?.l1_reason;
+    if (reason === 'primary_cooldown') return 'Fallback L1 (Pausa Primario)';
+    if (reason === 'primary_rpd_exhausted') return 'Fallback L1 (Quota Esaurita)';
+    if (reason === 'recent_articles') return 'Fallback L1 (Articoli Recenti)';
+    return 'Fallback L1 Attivo';
+  });
+
+  readonly l1ReasonDescription = computed(() => {
+    const reason = this.metricsStatus()?.l1_reason;
+    if (reason === 'primary_cooldown') {
+      return 'Il modello primario SIMPLE è in pausa temporanea (cooldown). Le chiamate sono dirottate in automatico sul modello di Fallback L1.';
+    }
+    if (reason === 'primary_rpd_exhausted') {
+      return 'La quota giornaliera (RPD) del modello primario SIMPLE è esaurita. Il sistema sta utilizzando il modello di Fallback L1 per garantire la continuità.';
+    }
+    if (reason === 'recent_articles') {
+      return 'Dirottamento automatico al modello Fallback L1 per la deduplicazione e la gestione degli articoli recenti.';
+    }
+    return 'Le richieste della corsia SIMPLE vengono attualmente dirottate sul modello di Fallback L1 per garantire l\'elaborazione dei dati.';
+  });
+
+  readonly l1BadgeTooltip = computed(() => {
+    return `Fallback L1 Attivo: ${this.l1ReasonDescription()}`;
+  });
+
   readonly relationOptions = computed(() => this.state.relationCountryOptions());
   readonly relationEnabled = computed(() => this.state.relationCountriesEnabled());
   readonly relationEnabledCount = computed(() => this.relationEnabled().size);

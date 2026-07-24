@@ -40,10 +40,27 @@
           <!-- Sezione 1 — Banner Stato Sistema -->
           <div class="status-level-banner" [class]="'level-' + statusLevel()" [title]="statusDotTooltip()">
             <span class="level-dot">{{ statusDotEmoji() }}</span>
-            <span class="level-label">Stato sistema: <strong>{{ statusLevelLabel() }}</strong></span>
-            <span class="l1-badge" *ngIf="metricsStatus()?.l1_likely_active" title="Fallback L1 attivo: le richieste della corsia Simple vengono attualmente dirottate sul modello di fallback a causa di cooldown o limite RPD">
-              L1 Fallback ({{ metricsStatus()?.l1_reason }})
+            <div class="level-text">
+              <span class="level-caption">Stato sistema</span>
+              <strong class="level-title">{{ statusLevelLabel() }}</strong>
+            </div>
+            <span
+              class="l1-badge"
+              *ngIf="metricsStatus()?.l1_likely_active"
+              [title]="l1BadgeTooltip()"
+            >
+              <span class="l1-pulse-dot"></span>
+              {{ l1ReasonLabel() }}
             </span>
+          </div>
+
+          <!-- Alert Box esplicito per Fallback L1 -->
+          <div class="l1-alert-box" *ngIf="metricsStatus()?.l1_likely_active">
+            <div class="alert-header">
+              <span class="alert-icon">🔄</span>
+              <span class="alert-title">Dettaglio Fallback L1</span>
+            </div>
+            <p class="alert-desc">{{ l1ReasonDescription() }}</p>
           </div>
 
           <!-- Sezione 2 — Modelli & Quote RPD attuali -->
