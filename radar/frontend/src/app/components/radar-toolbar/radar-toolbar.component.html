@@ -14,7 +14,7 @@
         aria-haspopup="true"
       >
         STATUS
-        <span class="status-dot-icon" [title]="'Stato: ' + statusLevel()">{{ statusDotEmoji() }}</span>
+        <span class="status-dot-icon" [title]="statusDotTooltip()">{{ statusDotEmoji() }}</span>
       </button>
 
       <div
@@ -38,23 +38,29 @@
 
         <div class="popover-content">
           <!-- Sezione 1 — Banner Stato Sistema -->
-          <div class="status-level-banner" [class]="'level-' + statusLevel()">
+          <div class="status-level-banner" [class]="'level-' + statusLevel()" [title]="statusDotTooltip()">
             <span class="level-dot">{{ statusDotEmoji() }}</span>
             <span class="level-label">Stato sistema: <strong>{{ statusLevelLabel() }}</strong></span>
-            <span class="l1-badge" *ngIf="metricsStatus()?.l1_likely_active">L1 Fallback ({{ metricsStatus()?.l1_reason }})</span>
+            <span class="l1-badge" *ngIf="metricsStatus()?.l1_likely_active" title="Fallback L1 attivo: le richieste della corsia Simple vengono attualmente dirottate sul modello di fallback a causa di cooldown o limite RPD">
+              L1 Fallback ({{ metricsStatus()?.l1_reason }})
+            </span>
           </div>
 
           <!-- Sezione 2 — Modelli & Quote RPD attuali -->
           <div class="popover-section" *ngIf="metricsStatus()?.models?.length">
-            <span class="section-label">🤖 Modelli & Quote RPD attuali</span>
-            <div class="model-item" *ngFor="let m of metricsStatus()!.models">
+            <span class="section-label" title="Utilizzo giornaliero delle quote RPD (Richieste Per Giorno) per ciascun modello di intelligenza artificiale">🤖 Modelli & Quote RPD attuali</span>
+            <div
+              class="model-item"
+              *ngFor="let m of metricsStatus()!.models"
+              title="Ruolo {{ m.role === 'primary' ? 'SIMPLE' : (m.role | uppercase) }}: {{ m.rpd_used }} di {{ m.rpd_limit > 0 ? m.rpd_limit : 'illimitate' }} RPD consumate oggi"
+            >
               <div class="model-info">
                 <span class="model-name">
-                  <span class="role-tag" [class]="'role-' + m.role">{{ m.role | uppercase }}</span>
+                  <span class="role-tag" [class]="'role-' + m.role" title="Corsia / Ruolo del modello">{{ m.role === 'primary' ? 'SIMPLE' : (m.role | uppercase) }}</span>
                   {{ m.model }}
                 </span>
-                <span class="rpd-count" *ngIf="m.rpd_limit > 0">{{ m.rpd_used }} / {{ m.rpd_limit }} RPD</span>
-                <span class="rpd-count" *ngIf="m.rpd_limit === 0">{{ m.rpd_used }} RPD (unmanaged)</span>
+                <span class="rpd-count" *ngIf="m.rpd_limit > 0" title="Quota giornaliera consumata rispetto al limite RPD">{{ m.rpd_used }} / {{ m.rpd_limit }} RPD</span>
+                <span class="rpd-count" *ngIf="m.rpd_limit === 0" title="Modello senza limite RPD rigido impostato">{{ m.rpd_used }} RPD (unmanaged)</span>
               </div>
               <div class="rpd-bar-wrapper" *ngIf="m.rpd_limit > 0">
                 <div
@@ -64,7 +70,7 @@
                   [class.danger]="m.cooling_down || m.rpd_used >= m.rpd_limit"
                 ></div>
               </div>
-              <span class="cooldown-warning" *ngIf="m.cooling_down">
+              <span class="cooldown-warning" *ngIf="m.cooling_down" title="Il modello è in pausa temporanea a causa di rate-limit (429) o errore quota provider">
                 ⚠️ Cooling down (scade: {{ m.cooldown_until | date:'HH:mm:ss' }})
               </span>
             </div>

@@ -119,6 +119,16 @@ export class RadarToolbarComponent {
     if (lvl === 'fallback_or_escalation') return 'FALLBACK / ESCALATION ATTIVA';
     return 'RISORSE LIMITATE / DEGRADATO';
   });
+  readonly statusDotTooltip = computed(() => {
+    const lvl = this.statusLevel();
+    if (lvl === 'nominal') {
+      return '🟢 OPERATIVO: Corsia SIMPLE nominale ed attiva senza errori o fallback.';
+    }
+    if (lvl === 'fallback_or_escalation') {
+      return '🟡 FALLBACK / ESCALATION ATTIVA: Modello primario in cooldown o limite RPD raggiunto. Il sistema sta usando la corsia di fallback L1 o escalation COMPLEX.';
+    }
+    return '🔴 RISORSE LIMITATE / DEGRADATO: Worker stale, tutti i modelli in cooldown o limiti RPD giornalieri esauriti.';
+  });
 
   readonly relationOptions = computed(() => this.state.relationCountryOptions());
   readonly relationEnabled = computed(() => this.state.relationCountriesEnabled());

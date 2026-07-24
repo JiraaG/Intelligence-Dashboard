@@ -96,21 +96,21 @@
       </div>
 
       <div class="badge-section finops-section" *ngIf="hasFinOps(displayArticle())">
-        <span class="badge-label">📊 ANALISI FINOPS & FONTE RSS</span>
+        <span class="badge-label" title="Dettagli di analisi economica FinOps e provenienza sorgente del feed">📊 ANALISI FINOPS & FONTE RSS</span>
         <div class="finops-grid">
-          <div class="finops-item" *ngIf="displayArticle()?.classified_by_model">
+          <div class="finops-item" *ngIf="displayArticle()?.classified_by_model" title="Modello di intelligenza artificiale utilizzato per analizzare ed estrarre i metadati di questa notizia">
             <span class="finops-key">Modello LLM:</span>
             <span class="finops-val">{{ displayArticle()!.classified_by_model }} ({{ displayArticle()!.classification_lane ?? 'simple' }})</span>
           </div>
-          <div class="finops-item" *ngIf="displayArticle()?.was_escalated != null">
+          <div class="finops-item" *ngIf="displayArticle()?.was_escalated != null" title="Indica se l'articolo ha richiesto un'escalation dalla corsia SIMPLE alla corsia COMPLEX per una ri-analisi ad alta precisione">
             <span class="finops-key">Escalation:</span>
             <span class="finops-val">{{ displayArticle()!.was_escalated ? 'Sì (COMPLEX)' : 'No' }}</span>
           </div>
-          <div class="finops-item" *ngIf="displayArticle()?.prompt_tokens != null">
+          <div class="finops-item" *ngIf="displayArticle()?.prompt_tokens != null" title="Dettaglio dei token di input (prompt), output (completion) e serviti da cache per questo articolo">
             <span class="finops-key">Token:</span>
             <span class="finops-val">{{ displayArticle()!.prompt_tokens }} in / {{ displayArticle()!.completion_tokens ?? 0 }} out ({{ displayArticle()!.cached_prompt_tokens ?? 0 }} cached)</span>
           </div>
-          <div class="finops-item" *ngIf="displayArticle()?.pipeline_latency_ms != null || displayArticle()?.llm_execution_time_ms != null">
+          <div class="finops-item" *ngIf="displayArticle()?.pipeline_latency_ms != null || displayArticle()?.llm_execution_time_ms != null" title="Tempo di esecuzione della chiamata API LLM e tempo di elaborazione totale della pipeline in millisecondi">
             <span class="finops-key">Latenza:</span>
             <span class="finops-val">
               <ng-container *ngIf="displayArticle()?.llm_execution_time_ms != null">LLM {{ displayArticle()!.llm_execution_time_ms! | number:'1.0-0' }} ms</ng-container>
@@ -118,11 +118,11 @@
               <ng-container *ngIf="displayArticle()?.pipeline_latency_ms != null">Pipeline {{ displayArticle()!.pipeline_latency_ms! | number:'1.0-0' }} ms</ng-container>
             </span>
           </div>
-          <div class="finops-item" *ngIf="displayArticle()?.estimated_cost_usd != null">
+          <div class="finops-item" *ngIf="displayArticle()?.estimated_cost_usd != null" title="Costo finanziario reale ed effettivo calcolato in USD per l'elaborazione di questo specifico articolo">
             <span class="finops-key">Costo stimato:</span>
             <span class="finops-val">{{ displayArticle()!.estimated_cost_usd === 0 ? '$0 / gratis' : ('$' + (displayArticle()!.estimated_cost_usd! | number:'1.4-6')) }}</span>
           </div>
-          <div class="finops-item" *ngIf="displayArticle()?.feed_url">
+          <div class="finops-item" *ngIf="displayArticle()?.feed_url" title="Link diretto all'URL della sorgente XML del feed RSS di origine">
             <span class="finops-key">Feed RSS:</span>
             <a [href]="displayArticle()!.feed_url" target="_blank" rel="noopener" class="feed-xml-link">
               Link XML feed 🔗
@@ -247,21 +247,21 @@
           </div>
 
           <div class="badge-section finops-section" *ngIf="hasFinOps(a)">
-            <span class="badge-label">📊 ANALISI FINOPS & FONTE RSS</span>
+            <span class="badge-label" title="Dettagli di analisi economica FinOps e provenienza sorgente del feed">📊 ANALISI FINOPS & FONTE RSS</span>
             <div class="finops-grid">
-              <div class="finops-item" *ngIf="a.classified_by_model">
+              <div class="finops-item" *ngIf="a.classified_by_model" title="Modello di intelligenza artificiale utilizzato per analizzare ed estrarre i metadati di questa notizia">
                 <span class="finops-key">Modello LLM:</span>
                 <span class="finops-val">{{ a.classified_by_model }} ({{ a.classification_lane ?? 'simple' }})</span>
               </div>
-              <div class="finops-item" *ngIf="a.was_escalated != null">
+              <div class="finops-item" *ngIf="a.was_escalated != null" title="Indica se l'articolo ha richiesto un'escalation dalla corsia SIMPLE alla corsia COMPLEX per una ri-analisi ad alta precisione">
                 <span class="finops-key">Escalation:</span>
                 <span class="finops-val">{{ a.was_escalated ? 'Sì (COMPLEX)' : 'No' }}</span>
               </div>
-              <div class="finops-item" *ngIf="a.prompt_tokens != null">
+              <div class="finops-item" *ngIf="a.prompt_tokens != null" title="Dettaglio dei token di input (prompt), output (completion) e serviti da cache per questo articolo">
                 <span class="finops-key">Token:</span>
                 <span class="finops-val">{{ a.prompt_tokens }} in / {{ a.completion_tokens ?? 0 }} out ({{ a.cached_prompt_tokens ?? 0 }} cached)</span>
               </div>
-              <div class="finops-item" *ngIf="a.pipeline_latency_ms != null || a.llm_execution_time_ms != null">
+              <div class="finops-item" *ngIf="a.pipeline_latency_ms != null || a.llm_execution_time_ms != null" title="Tempo di esecuzione della chiamata API LLM e tempo di elaborazione totale della pipeline in millisecondi">
                 <span class="finops-key">Latenza:</span>
                 <span class="finops-val">
                   <ng-container *ngIf="a.llm_execution_time_ms != null">LLM {{ a.llm_execution_time_ms! | number:'1.0-0' }} ms</ng-container>
@@ -269,11 +269,11 @@
                   <ng-container *ngIf="a.pipeline_latency_ms != null">Pipeline {{ a.pipeline_latency_ms! | number:'1.0-0' }} ms</ng-container>
                 </span>
               </div>
-              <div class="finops-item" *ngIf="a.estimated_cost_usd != null">
+              <div class="finops-item" *ngIf="a.estimated_cost_usd != null" title="Costo finanziario reale ed effettivo calcolato in USD per l'elaborazione di questo specifico articolo">
                 <span class="finops-key">Costo stimato:</span>
                 <span class="finops-val">{{ a.estimated_cost_usd === 0 ? '$0 / gratis' : ('$' + (a.estimated_cost_usd! | number:'1.4-6')) }}</span>
               </div>
-              <div class="finops-item" *ngIf="a.feed_url">
+              <div class="finops-item" *ngIf="a.feed_url" title="Link diretto all'URL della sorgente XML del feed RSS di origine">
                 <span class="finops-key">Feed RSS:</span>
                 <a [href]="a.feed_url" target="_blank" rel="noopener" class="feed-xml-link">
                   Link XML feed 🔗
