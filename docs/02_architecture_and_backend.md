@@ -87,6 +87,7 @@ Schema applicato da `core/migrations.py` + SQL ordinati in `radar/backend/migrat
 | `012_pgvector_article_embeddings.sql` | Estensione pgvector + embeddings 384d per dedup semantica |
 | `013_metrics_and_feed_tracking.sql` | Metriche denormalizzate articles, FinOps llm_request_ledger, tracciamento feed e dedup_events |
 | `014_articles_content_sha256.sql` | `articles.content_sha256` + indice lookback (FinOps Wave A / M6 content-hash dedup) |
+| `015_llm_ledger_reasoning_effort.sql` | `llm_request_ledger.reasoning_effort` + indice per-effort (FinOps breakdown per tupla modello+effort) |
 
 Commit: transazione DB + riga outbox → reconcile vault → mark-read Miniflux **solo** se outbox `completed`.
 
@@ -128,8 +129,8 @@ CORS: middleware solo se `CORS_ALLOW_ORIGINS` non vuoto; metodi `GET`, `PATCH`, 
 | GET | `/api/map-relations` | `date`, `sentiment?`, `relevance_level?` | Righe undirected `source_country ↔ target_country` per categoria (+ volume). Semantica **star** v1: un arco per ogni coppia `(country_code, related)` via `LEAST/GREATEST` — **non** clique tra soli `related_countries` (es. US+IT+FR → US–IT e US–FR, non IT–FR). `XX` escluso. |
 | GET | `/api/saved-summary` | `sentiment?`, `relevance_level?` | Stessa shape di map-summary; solo `is_saved=true`; **senza date** |
 | GET | `/api/countries` | `date`, filtri opzionali | Rollup paese (`categories`, `article_count`) |
-| GET | `/api/metrics/summary` | `from?`, `to?` | Metrics FinOps: latenze, token LLM (`total_estimated_cost_usd`, `cache_hit_rate_pct`, cached/prompt/completion), dedup (`url_exact_count`, `semantic_vector_count`, `content_hash_count`) |
-| GET | `/api/metrics/status` | — | Snapshot FinOps & Health in tempo reale: `level` (`nominal` \| `fallback_or_escalation` \| `degraded`), `estimated_cost_usd_today`, `l1_likely_active`, `l1_reason`, quote RPD per modello (`role`, `lane`, `rpd_used`, `rpd_limit`, `cooling_down`), e `llm` summary odierno |
+| GET | `/api/metrics/summary` | `from?`, `to?` | FinOps giorno: latenze; `llm` (`total_estimated_cost_usd`, `cache_hit_rate_pct`, token aggregates, `models_breakdown[]` per tupla `(model, reasoning_effort)` con `requests_count`, `prompt_tokens`, `completion_tokens`, `cached_tokens`, `total_tokens`, `estimated_cost_usd`, `articles_count` — **senza `provider`**); `dedup`; **`overall`** all-time (`total_estimated_cost_usd`, `total_articles`, `total_requests`, `total_tokens`, `total_dedup_events`) |
+| GET | `/api/metrics/status` | — | Snapshot live: `level`, `estimated_cost_usd_today`, `l1_likely_active`, `l1_reason`, `models[]` (`role`, `lane`, `provider`, `model`, `rpd_used`, `rpd_limit`, `cooling_down`, `cooldown_until`, `reasoning_effort`), **`borderline`** (`model`, `provider`, `reasoning_effort`, `articles_today`, `rpd_used`, `rpd_limit`), `llm` summary odierno |
 | GET | `/api/metrics/by-feed` | `from?`, `to?` | Aggregazione per feed Miniflux (`feed_id`, `feed_domain`, `feed_title`, `clean_chars`, latenze) |
 | GET | `/api/metrics/dedup` | `from?`, `to?` | Aggregazione per tipo evento dedup (`dedup_kind`, `action_taken`, count, avg_cosine, avg_confidence) |
 | PATCH | `/api/articles/{id}/read_status` | `{ "is_read": bool }` | `{ "status", "is_read", "is_saved"? }` — unread ⇒ `is_saved=false` |
@@ -137,7 +138,7 @@ CORS: middleware solo se `CORS_ALLOW_ORIGINS` non vuoto; metodi `GET`, `PATCH`, 
 
 Companies/tags sugli articoli: join **LATERAL** (no Cartesian `array_agg` classico). UI giorno: preferire **map-summary**; lista piena in nation-open day **o** vault salvati (`saved=true`, FE pagina fino a `next_cursor` null).
 
-Nota metriche FinOps: `summary.total_articles` calcola gli articoli ingestiti nel DB basandosi su `created_at` nella finestra del giorno, mentre `map-summary` calcola gli articoli presenti in mappa filtrando su `published_at`. `total_estimated_cost_usd` somma le sole chiamate di classificazione completate (`purpose LIKE 'classify:%' OR purpose='classify_article'`), escludendo il costo di comparazione qualità (`quality:compare`).
+Nota metriche FinOps: `summary.total_articles` usa `created_at` nella finestra giorno, mentre `map-summary` filtra su `published_at`. `total_estimated_cost_usd` (e costi/`articles_count` nel breakdown) sommano sole chiamate di classificazione completate (`purpose LIKE 'classify:%' OR purpose='classify_article'`), escludendo `quality:compare`. Su RPD esaurita il cooldown modello punta a **`day_end`** della finestra giornaliera (non +24h); altri cooldown (es. 5xx) restano a ore (`LLM_MODEL_COOLDOWN_HOURS`). **Caveat STATUS `borderline`:** `articles_today` / `rpd_used` contano le row ledger `lane='complex' AND status='completed'` senza filtro purpose/effort (può includere COMPLEX puro e `quality:compare`); il `rpd_used` del modello COMPLEX viene ridotto di quel conteggio. Commit articolo: backfill `llm_request_ledger.article_id` da `miniflux_entry_id` quando ancora NULL.
 
 ---
 

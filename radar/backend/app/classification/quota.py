@@ -319,6 +319,7 @@ class QuotaLedger:
         provider: str | None = None,
         lane: str | None = None,
         miniflux_entry_id: int | None = None,
+        reasoning_effort: str | None = None,
     ) -> int:
         """Riserva capacità sulla lane **prima** di una chiamata provider.
 
@@ -333,6 +334,7 @@ class QuotaLedger:
             provider: Solo se ``lane`` assente (mapping legacy).
             lane: Lane dei contatori RPM/TPM/RPD/budget.
             miniflux_entry_id: ID entry Miniflux correlata pre-commit.
+            reasoning_effort: Livello di reasoning effort (es. high/none/medium/low).
         Returns:
             ``reservation_id`` da ``complete`` / ``fail`` / ``release``.
         Raises:
@@ -360,6 +362,7 @@ class QuotaLedger:
             else max(0, int(estimated_tokens))
         )
         purpose_value = purpose if purpose is not None else purpose_for_lane(quota_lane)
+        effort_value = (reasoning_effort or "none").strip().lower()
 
         while True:
             local_wait = await self._in_process_spacing_wait(quota_lane)
@@ -374,6 +377,7 @@ class QuotaLedger:
                 provider=provider,
                 lane=quota_lane,
                 miniflux_entry_id=miniflux_entry_id,
+                reasoning_effort=effort_value,
             )
             if outcome.reservation_id is not None:
                 async with self._spacing_lock:
@@ -554,6 +558,7 @@ class QuotaLedger:
         provider: str | None = None,
         lane: str,
         miniflux_entry_id: int | None = None,
+        reasoning_effort: str = "none",
     ) -> _ReserveOutcome:
         """Un tentativo sotto ``pg_advisory_xact_lock``: budget → RPM → TPM → RPD → INSERT.
 
@@ -717,9 +722,10 @@ class QuotaLedger:
                         lane,
                         provider,
                         estimated_cost_usd,
-                        miniflux_entry_id
+                        miniflux_entry_id,
+                        reasoning_effort
                     )
-                    VALUES ($1, 'reserved', $2, $3, $4, $5, $6, $7)
+                    VALUES ($1, 'reserved', $2, $3, $4, $5, $6, $7, $8)
                     RETURNING id
                     """,
                     estimated_tokens,
@@ -729,6 +735,7 @@ class QuotaLedger:
                     provider,
                     cost_est,
                     miniflux_entry_id,
+                    reasoning_effort,
                 )
                 if reservation_id is None:
                     raise RuntimeError("INSERT llm_request_ledger non ha restituito id")

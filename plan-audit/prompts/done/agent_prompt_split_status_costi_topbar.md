@@ -1,12 +1,14 @@
 # Agent prompt — Topbar Split: STATUS & COSTI in 2 Pulsanti Separati
 
-> **Stato: READY** — pronto per chat Agent di implementazione.  
+> **Stato: DONE / SUPERSEDED** — implementato su `feature/upgrades` (`5b84a34`+).  
+> **Layout reale SoT:** STATUS all’estrema **sinistra** (`.toolbar-left`); COSTI all’estrema **destra** (`.toolbar-right` dopo RELAZIONI) — non entrambi in left dopo i filtri come nello spec sotto.  
+> **SoT UI attuale:** [`docs/03_frontend_and_ui.md`](../../../docs/03_frontend_and_ui.md).  
 > **Branch:** `feature/upgrades`  
 > **No Commit:** Nessun `git commit` o `git push` senza conferma esplicita dell'utente.
 
 ---
 
-## Come usare
+## Come usare (storico)
 
 1. Apri una **nuova chat Agent** su branch `feature/upgrades`.
 2. Incolla **tutto** il blocco PROMPT sottostante.
@@ -14,7 +16,7 @@
 
 ---
 
-## PROMPT (incolla in Agent mode)
+## PROMPT (incolla in Agent mode) — SPEC STORICA
 
 ```text
 # Task — Topbar UI Refactor: Separazione in 2 Pulsanti & Popover "COSTI" e "STATUS"

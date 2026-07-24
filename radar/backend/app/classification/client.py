@@ -926,6 +926,7 @@ class ClassificationClient:
                     lane=ref.quota_lane,
                     provider=ref.provider,
                     miniflux_entry_id=miniflux_entry_id,
+                    reasoning_effort=ref.reasoning_effort,
                 )
             except QuotaBudgetExceeded as budget_err:
                 logger.warning(

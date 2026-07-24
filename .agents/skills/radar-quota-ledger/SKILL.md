@@ -8,7 +8,7 @@ description: >
   effort da LLM_BORDERLINE_REASONING_EFFORT (default high, ops tipico none).
 when_to_use:
   - classification/quota.py, cooldown.py, llm_request_ledger, client cascade/retry
-version: 2.3.1
+version: 2.4.0
 ---
 
 ## Limiti (obbligatorio)
@@ -37,7 +37,11 @@ Residual cross-lane fattura `ref.quota_lane` (SIMPLE↔COMPLEX se identity diver
 
 ```python
 reservation_id = await self.quota.reserve(
-    estimated_tokens=..., model=ref.model, lane=ref.quota_lane, provider=ref.provider
+    estimated_tokens=...,
+    model=ref.model,
+    lane=ref.quota_lane,
+    provider=ref.provider,
+    reasoning_effort=ref.reasoning_effort,
 )
 ```
 
@@ -46,8 +50,15 @@ reservation_id = await self.quota.reserve(
 3. `PROVIDER` ∈ {gemini, deepseek, openai, glm, grok, claude}.
    OpenAI-compat dialect: deepseek → `thinking`; openai|glm|grok → stock (no DeepSeek-only fields).
 4. Budget exceeded → skip, no cooldown 24h.
+5. **`reasoning_effort`** persistito su `llm_request_ledger` (migrazione `015_llm_ledger_reasoning_effort.sql`; default `'none'`). Usato dal breakdown COSTI per tupla `(model, reasoning_effort)`.
+
+## Cooldown RPD vs ore
+
+- **RPD esaurita** (`QuotaDailyExceeded`): `until_ts=day_end` della finestra giornaliera (`compute_day_window` / `RADAR_TIME_ZONE`) → `ModelCooldownStore.set_cooldown(..., until=day_end)`. Non usare +24h statiche per RPD.
+- **Altri cooldown** (es. 5xx / retry esauriti): `set_cooldown(..., hours=LLM_MODEL_COOLDOWN_HOURS)` (default tipico 24h).
+- UI STATUS: countdown live su `cooldown_until` (`formatCooldownUntil`).
 
 ## SoT
 
-`radar/backend/app/core/llm_lanes.py` + `classification/quota.py` + `.env.example` +
+`radar/backend/app/core/llm_lanes.py` + `classification/quota.py` + `classification/cooldown.py` + `.env.example` +
 `plan-audit/complete/sot_llm_multi_model_fallback.md`.

@@ -1,8 +1,8 @@
 # Piano impl — FinOps UI (Metrics card + STATUS topbar)
 
-> **Stato: ACTIVE** — pronto per implementazione (documento 2026-07-24)  
+> **Stato: COMPLETE / SUPERSEDED (chrome UI)** — GATE VERDE 2026-07-24; hub singolo **STATUS & COSTI** poi sostituito da split STATUS left / COSTI right. SoT attuale: [`../../docs/03_frontend_and_ui.md`](../../docs/03_frontend_and_ui.md).  
 > **Branch:** `feature/upgrades`  
-> **Prompt Agent:** [`../prompts/active/agent_prompt_finops_ui_metrics.md`](../prompts/active/agent_prompt_finops_ui_metrics.md)  
+> **Prompt Agent:** [`../prompts/done/agent_prompt_finops_ui_metrics.md`](../prompts/done/agent_prompt_finops_ui_metrics.md)  
 > **Origine analisi:** `.cursor/plans/finops_handoff_review_3859bfae.plan.md`  
 > **Prerequisito:** Metrics 013 **GATE VERDE** — [`../complete/plan_impl_fase_metrics_013.md`](../complete/plan_impl_fase_metrics_013.md)  
 > **Ops LLM:** SIMPLE primary `gemini-3.5-flash-lite`, L1 `gemini-3.1-flash-lite`, COMPLEX `deepseek-v4-flash` (Profilo A)

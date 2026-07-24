@@ -1,5 +1,7 @@
 # Audit — STATUS & COSTI numbers
 
+> **Nota:** audit del popover aggregato pre-split; i numeri SQL restano utili. Chrome UI attuale = due pulsanti STATUS / COSTI — [`docs/03_frontend_and_ui.md`](../../docs/03_frontend_and_ui.md).
+
 Report di misurazione, riconciliazione SQL, tariffe API ufficiali e audit UX per i numeri e le etichette della finestra **STATUS & COSTI FINOPS** (UI vs Database PostgreSQL vs Fattura Console DeepSeek).
 
 ---

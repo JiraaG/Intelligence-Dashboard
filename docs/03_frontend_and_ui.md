@@ -179,31 +179,35 @@ Per collegare le notizie multilaterali, la mappa disegna archi curvi bidireziona
 
 ---
 
-## FinOps UI: Pulsanti & Popover COSTI e STATUS (Topbar)
+## FinOps UI: Pulsanti & Popover STATUS e COSTI (Topbar)
 
-1. **Separazione Topbar (`.toolbar-left`)**:
-   - Gruppo di sinistra (`.toolbar-left`): Calendario date picker, filtro **Sentiment**, filtro **Tipologia**, pulsante **`COSTI`** e pulsante **`STATUS`**.
-   - Gruppo di destra (`.toolbar-right`): NOTIZIE LETTE/TROVATE, NOTIZIE SALVATE, RELAZIONI ATTIVE.
-   - I due pulsanti costituiscono popover distinti con ripristino ed esclusione reciproca all'apertura.
+1. **Layout topbar (ordine reale)**:
+   - **`.toolbar-left`:** pulsante **`STATUS`** (primo) → calendario → **Sentiment** → **Tipologia**.
+   - **`.toolbar-right`:** NOTIZIE LETTE/TROVATE → NOTIZIE SALVATE → RELAZIONI ATTIVE → pulsante **`COSTI`** (ultimo).
+   - Due popover indipendenti (apertura mutuamente esclusiva). Fonte live: `metricsStatus()`; fonte giorno calendario: `metricsSummary()`.
 
-2. **Popover `COSTI` (Filtrato per Data Selezionata)**:
-   - Pulsante `COSTI: $X.XXXX` con costo stimato per le chiamate LLM di classificazione nel giorno attivo.
-   - Popover glassmorphic contenente 4 sezioni analitiche:
-     - **Grid Summary:** Costo stimato giorno, Articoli ingestiti, Richieste LLM, Latenza media pipeline.
-     - **Consumo Token & Cache:** Prompt, Completion, Cached % (filtrati per data).
-     - **Richieste LLM per Singolo Modello:** Breakdown per modello (`model`, `provider`, `requests_count`, `total_tokens`) per il giorno selezionato (`metricsSummary()?.llm?.models_breakdown`).
-     - **Eventi Deduplicazione:** Totale, URL, Vettoriale, Hash.
+2. **Popover `STATUS` (operativo / oggi ops)** — `GET /api/metrics/status`:
+   - Pulsante `STATUS` + pallino 🟢 / 🟡 / 🔴 da `level` (`nominal` | `fallback_or_escalation` | `degraded`).
+   - **Banner stato** + badge L1 con **etichette italiane** (non snake_case raw) quando `l1_likely_active`.
+   - Alert box L1 / degradato (condizionati).
+   - **Modelli & Quote RPD:** ordine **SIMPLE → FALLBACK → BORDERLINE → COMPLEX** (barre RPD, cooldown con countdown live). L’effort **non** compare nel titolo modello.
+   - **Gestione & Effort:** matrice 2×2 — SIMPLE/FALLBACK hardcode `NONE`; BORDERLINE ← `borderline.reasoning_effort`; COMPLEX ← `models[complex].reasoning_effort`.
+   - Cooldown RPD: scadenza a **`day_end`** (finestra giornaliera), non +24h statiche. Altri cooldown (es. 5xx) restano a ore configurate.
 
-3. **Popover `STATUS` (Operativo & Real-Time / Oggi ops)**:
-   - Pulsante `STATUS 🟢` (🟡 `fallback_or_escalation`, 🔴 `degraded`) indicante lo stato di salute live del sistema.
-   - Popover glassmorphic contenente 2 sezioni operative:
-     - **Banner Stato Sistema:** Indicatore visuale, livello operativo (`OPERATIVO (Catena Simple OK)`, etc.) e badge L1 Fallback attivo con causa (`primary_cooldown`, `primary_rpd_exhausted`, `recent_articles`).
-     - **Modelli & Quote RPD (Oggi ops):** Barre di avanzamento RPD live per modello (`primary`, `fallback`, `complex`), quote limite, indicatore di cooldown e rate-limiting in tempo reale (`metricsStatus()`).
+3. **Popover `COSTI` (filtrato per data)** — `GET /api/metrics/summary?from=&to=`:
+   - Pulsante `COSTI: $X.XXXX` da `llm.total_estimated_cost_usd` (solo classificazione `classify:%` / `classify_article`).
+   - Sei sezioni, in ordine:
+     1. **Costi generali** — costo giorno, articoli ingestiti, richieste LLM, latenza media pipeline.
+     2. **Costi LLM per modello** — `models_breakdown` per tupla `(model, reasoning_effort)` con badge effort, costo, articoli, richieste (**niente `provider`** in API).
+     3. **Consumo Token & Cache** — prompt / completion / cached %.
+     4. **Richieste LLM per modello** — token totali + hover in/out/cached + badge effort.
+     5. **Eventi Deduplicazione** — URL, Vettoriale, Hash (**senza** riga Totale in UI).
+     6. **Costi Complessivi Applicativo** — blocco `overall` all-time (costo, articoli, richieste, token).
 
 4. **Analisi FinOps & Fonte RSS (Sidebar Card - Freeze Carve-Out)**:
-   - Sezione informativa *ANALISI FINOPS & FONTE RSS* collocata sotto i chip dei Tag sia in modalità carta singola che nel carosello nazione/cluster.
-   - Espone: Modello LLM e lane, flag Escalation (`Sì (COMPLEX)` / `No`), dettaglio Token (prompt, completion, cached), Latenza distinta (LLM / Pipeline), Costo stimato ($ / gratis), e link diretto XML del feed RSS risolto dal seed Miniflux.
-   - Preserva l'identità del DOM del carosello PrimeNG tramite mutazione in-place su riferimenti `Article` esistenti in `mergeDetailArticlesFromServer`.
+   - Sezione *ANALISI FINOPS & FONTE RSS* sotto i chip Tag (carta singola e carosello).
+   - Espone: modello/lane, escalation, token, latenze, costo stimato, link XML feed.
+   - Mutazione in-place su riferimenti `Article` in `mergeDetailArticlesFromServer` (sidebar freeze).
 
-Dettaglio ops FE: [`radar/frontend/README.md`](../radar/frontend/README.md).
+Dettaglio ops FE: [`radar/frontend/README.md`](../radar/frontend/README.md). Contratto JSON: skill `radar-api-contract`.
 

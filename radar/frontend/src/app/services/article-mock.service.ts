@@ -20,12 +20,13 @@ const TODAY = new Date().toISOString().split('T')[0];
  * Attivo solo se ``MOCK_MODE=true`` (mai fallback silenzioso da ArticleService).
  *
  * @see skill spatial-data-mocking.
- */export const MOCK_ARTICLES: Article[] = [
+ */ export const MOCK_ARTICLES: Article[] = [
   // --- CLUSTER TEST: Due articoli in Germania (città diverse) ---
   {
     id: 1,
     title: 'TSMC inaugura la prima fab europea a Dresda',
-    summary: 'TSMC ha inaugurato in Sassonia il primo impianto produttivo europeo per chip a 28nm. La Germania consolida il suo ruolo di hub semiconduttore del continente.',
+    summary:
+      'TSMC ha inaugurato in Sassonia il primo impianto produttivo europeo per chip a 28nm. La Germania consolida il suo ruolo di hub semiconduttore del continente.',
     published_at: TODAY,
     source_url: 'https://example.com/tsmc-dresden',
     country_code: 'DE',
@@ -45,12 +46,13 @@ const TODAY = new Date().toISOString().split('T')[0];
   {
     id: 2,
     title: 'Siemens Energy amplia la rete di trasmissione ad alta tensione in Baviera',
-    summary: 'Siemens Energy ha completato il potenziamento di 800km di linee di trasmissione nel sud della Germania.',
+    summary:
+      'Siemens Energy ha completato il potenziamento di 800km di linee di trasmissione nel sud della Germania.',
     published_at: TODAY,
     source_url: 'https://example.com/siemens-baviera',
     country_code: 'DE',
     latitude: 48.1351,
-    longitude: 11.5820,
+    longitude: 11.582,
     companies_involved: ['Siemens Energy', 'Tennet'],
     tags: ['Energia', 'Grid', 'Germania', 'Rinnovabili'],
     primary_category: 'Energia',
@@ -66,7 +68,8 @@ const TODAY = new Date().toISOString().split('T')[0];
   {
     id: 3,
     title: 'Centrale di Zaporizhzhia: rapporto IAEA sui sistemi di raffreddamento',
-    summary: "L'IAEA certifica il funzionamento dei sistemi di backup della centrale. La missione permanente rimane sul posto.",
+    summary:
+      "L'IAEA certifica il funzionamento dei sistemi di backup della centrale. La missione permanente rimane sul posto.",
     published_at: TODAY,
     source_url: 'https://example.com/zaporizhzhia-iaea',
     country_code: 'UA',
@@ -77,7 +80,10 @@ const TODAY = new Date().toISOString().split('T')[0];
     primary_category: 'Nucleare',
     sentiment: 'Negativo',
     relevance_level: 5,
-    infrastructural_entities: ['Centrale Nucleare di Zaporizhzhia', 'Sito di stoccaggio combustibile'],
+    infrastructural_entities: [
+      'Centrale Nucleare di Zaporizhzhia',
+      'Sito di stoccaggio combustibile',
+    ],
     feed_title: 'IAEA Bulletin',
     related_countries: [],
     is_read: false,
@@ -85,13 +91,14 @@ const TODAY = new Date().toISOString().split('T')[0];
   },
   {
     id: 4,
-    title: 'Diga di Kakhovka: progetto di ricostruzione approvato dall\'UE',
-    summary: "L'Unione Europea ha approvato 2.3 miliardi di euro per la ricostruzione dell'infrastruttura idrica nel sud dell'Ucraina.",
+    title: "Diga di Kakhovka: progetto di ricostruzione approvato dall'UE",
+    summary:
+      "L'Unione Europea ha approvato 2.3 miliardi di euro per la ricostruzione dell'infrastruttura idrica nel sud dell'Ucraina.",
     published_at: TODAY,
     source_url: 'https://example.com/kakhovka-ue',
     country_code: 'UA',
     latitude: 47.3606,
-    longitude: 33.4750,
+    longitude: 33.475,
     companies_involved: ['European Commission', 'EBRD'],
     tags: ['Acqua', 'Diga', 'Ucraina', 'Ricostruzione'],
     primary_category: 'Ambiente',
@@ -112,7 +119,7 @@ const TODAY = new Date().toISOString().split('T')[0];
     source_url: 'https://example.com/iran-uranium',
     country_code: 'IR',
     latitude: 32.4279,
-    longitude: 53.6880,
+    longitude: 53.688,
     companies_involved: ['IAEA'],
     tags: ['Nucleare', 'Iran', 'IAEA', 'ONU', 'Geopolitica'],
     primary_category: 'Nucleare',
@@ -127,12 +134,13 @@ const TODAY = new Date().toISOString().split('T')[0];
   {
     id: 6,
     title: 'Samsung avvia produzione chip 2nm a Seoul: sfida diretta a TSMC',
-    summary: 'Samsung Electronics ha avviato la produzione di massa di chip a 2nm nel suo impianto di Hwaseong.',
+    summary:
+      'Samsung Electronics ha avviato la produzione di massa di chip a 2nm nel suo impianto di Hwaseong.',
     published_at: TODAY,
     source_url: 'https://example.com/samsung-2nm',
     country_code: 'KR',
     latitude: 37.5665,
-    longitude: 126.9780,
+    longitude: 126.978,
     companies_involved: ['Samsung Electronics', 'TSMC', 'Apple'],
     tags: ['Chip', 'Samsung', 'Corea del Sud', '2nm', 'Semiconduttori'],
     primary_category: 'Tecnologia',
@@ -146,8 +154,9 @@ const TODAY = new Date().toISOString().split('T')[0];
   },
   {
     id: 7,
-    title: 'Pipeline TAP: record storico di esportazione gas dall\'Azerbaigian all\'Europa',
-    summary: 'Il gasdotto Trans-Adriatico ha trasportato 12 miliardi di m³ nel primo semestre 2026.',
+    title: "Pipeline TAP: record storico di esportazione gas dall'Azerbaigian all'Europa",
+    summary:
+      'Il gasdotto Trans-Adriatico ha trasportato 12 miliardi di m³ nel primo semestre 2026.',
     published_at: TODAY,
     source_url: 'https://example.com/tap-record',
     country_code: 'AZ',
@@ -158,7 +167,11 @@ const TODAY = new Date().toISOString().split('T')[0];
     primary_category: 'Energia',
     sentiment: 'Positivo',
     relevance_level: 4,
-    infrastructural_entities: ['Trans-Adriatic Pipeline (TAP)', 'Terminale di Melendugno', 'Campo di Shah Deniz II'],
+    infrastructural_entities: [
+      'Trans-Adriatic Pipeline (TAP)',
+      'Terminale di Melendugno',
+      'Campo di Shah Deniz II',
+    ],
     feed_title: 'Trans-Adriatic Pipeline Press',
     related_countries: ['IT'],
     is_read: false,
@@ -179,7 +192,10 @@ export class ArticleMockService {
    * Aggrega country×category con lat/lon media progressiva e filtri sentiment.
    * ``date`` ignorato (vedi nota classe / C-07).
    */
-  getMapSummary(date: string, sentiment?: Sentiment | Sentiment[] | null): Observable<MapSummaryRow[]> {
+  getMapSummary(
+    date: string,
+    sentiment?: Sentiment | Sentiment[] | null,
+  ): Observable<MapSummaryRow[]> {
     void date;
     let arts = MOCK_ARTICLES;
     if (Array.isArray(sentiment) && sentiment.length > 0) {
@@ -199,7 +215,8 @@ export class ArticleMockService {
         existing.latitude =
           (existing.latitude * (existing.article_count - 1) + a.latitude) / existing.article_count;
         existing.longitude =
-          (existing.longitude * (existing.article_count - 1) + a.longitude) / existing.article_count;
+          (existing.longitude * (existing.article_count - 1) + a.longitude) /
+          existing.article_count;
       } else {
         grouped.set(key, {
           country_code: a.country_code,
@@ -211,10 +228,12 @@ export class ArticleMockService {
         });
       }
     }
-    return of([...grouped.values()].sort((a, b) => {
-      const c = a.country_code.localeCompare(b.country_code);
-      return c !== 0 ? c : a.primary_category.localeCompare(b.primary_category);
-    }));
+    return of(
+      [...grouped.values()].sort((a, b) => {
+        const c = a.country_code.localeCompare(b.country_code);
+        return c !== 0 ? c : a.primary_category.localeCompare(b.primary_category);
+      }),
+    );
   }
 
   /**
@@ -229,7 +248,8 @@ export class ArticleMockService {
       if (filters.country && a.country_code !== filters.country.toUpperCase()) return false;
       if (filters.category && a.primary_category !== filters.category) return false;
       if (filters.sentiment && a.sentiment !== filters.sentiment) return false;
-      if (filters.relevance_level != null && a.relevance_level !== filters.relevance_level) return false;
+      if (filters.relevance_level != null && a.relevance_level !== filters.relevance_level)
+        return false;
       return true;
     });
     const sorted = [...allMatching].sort((a, b) => b.id - a.id);
@@ -266,7 +286,8 @@ export class ArticleMockService {
         existing.latitude =
           (existing.latitude * (existing.article_count - 1) + a.latitude) / existing.article_count;
         existing.longitude =
-          (existing.longitude * (existing.article_count - 1) + a.longitude) / existing.article_count;
+          (existing.longitude * (existing.article_count - 1) + a.longitude) /
+          existing.article_count;
       } else {
         grouped.set(key, {
           country_code: a.country_code,
@@ -278,17 +299,22 @@ export class ArticleMockService {
         });
       }
     }
-    return of([...grouped.values()].sort((a, b) => {
-      const c = a.country_code.localeCompare(b.country_code);
-      return c !== 0 ? c : a.primary_category.localeCompare(b.primary_category);
-    }));
+    return of(
+      [...grouped.values()].sort((a, b) => {
+        const c = a.country_code.localeCompare(b.country_code);
+        return c !== 0 ? c : a.primary_category.localeCompare(b.primary_category);
+      }),
+    );
   }
 
   /**
    * Deriva le relazioni undirected geopolitiche basate sui paesi secondari degli articoli mock.
    * ``date`` ignorato.
    */
-  getMapRelations(date: string, sentiment?: Sentiment | Sentiment[] | null): Observable<MapRelationRow[]> {
+  getMapRelations(
+    date: string,
+    sentiment?: Sentiment | Sentiment[] | null,
+  ): Observable<MapRelationRow[]> {
     void date;
     let arts = MOCK_ARTICLES;
     if (Array.isArray(sentiment) && sentiment.length > 0) {
@@ -377,26 +403,40 @@ export class ArticleMockService {
         total_estimated_cost_usd: 0.00105,
         models_breakdown: [
           {
-            model: 'gemini-2.5-flash-lite',
-            provider: 'gemini',
-            requests_count: 5,
-            prompt_tokens: 6000,
-            completion_tokens: 1800,
-            cached_tokens: 4000,
-            total_tokens: 7800,
-            estimated_cost_usd: 0.00075,
-            articles_count: 5,
+            model: 'deepseek-v4-flash',
+            reasoning_effort: 'high',
+            provider: 'deepseek',
+            requests_count: 276,
+            prompt_tokens: 240000,
+            completion_tokens: 65000,
+            cached_tokens: 160000,
+            total_tokens: 305000,
+            estimated_cost_usd: 0.12,
+            articles_count: 276,
           },
           {
-            model: 'deepseek-v3',
+            model: 'deepseek-v4-flash',
+            reasoning_effort: 'none',
             provider: 'deepseek',
-            requests_count: 2,
-            prompt_tokens: 2400,
-            completion_tokens: 650,
-            cached_tokens: 1600,
-            total_tokens: 3050,
-            estimated_cost_usd: 0.0003,
-            articles_count: 2,
+            requests_count: 549,
+            prompt_tokens: 30000,
+            completion_tokens: 5000,
+            cached_tokens: 20000,
+            total_tokens: 35000,
+            estimated_cost_usd: 0.0129,
+            articles_count: 10,
+          },
+          {
+            model: 'gemini-3.5-flash-lite',
+            reasoning_effort: 'none',
+            provider: 'gemini',
+            requests_count: 500,
+            prompt_tokens: 600000,
+            completion_tokens: 180000,
+            cached_tokens: 400000,
+            total_tokens: 1507752,
+            estimated_cost_usd: 0,
+            articles_count: 468,
           },
         ],
       },
@@ -421,7 +461,7 @@ export class ArticleMockService {
       as_of: new Date().toISOString(),
       timezone: 'UTC',
       level: 'nominal',
-      estimated_cost_usd_today: 0.00105,
+      estimated_cost_usd_today: 0.1329,
       l1_likely_active: false,
       l1_reason: 'none',
       models: [
@@ -430,30 +470,51 @@ export class ArticleMockService {
           lane: 'simple',
           provider: 'gemini',
           model: 'gemini-3.5-flash-lite',
-          rpd_used: 14,
+          rpd_used: 468,
           rpd_limit: 500,
           cooling_down: false,
           cooldown_until: null,
+          reasoning_effort: 'none',
+        },
+        {
+          role: 'fallback',
+          lane: 'simple',
+          provider: 'gemini',
+          model: 'gemini-3.1-flash-lite',
+          rpd_used: 12,
+          rpd_limit: 500,
+          cooling_down: false,
+          cooldown_until: null,
+          reasoning_effort: 'none',
         },
         {
           role: 'complex',
           lane: 'complex',
           provider: 'deepseek',
           model: 'deepseek-v4-flash',
-          rpd_used: 2,
+          rpd_used: 10,
           rpd_limit: 0,
           cooling_down: false,
           cooldown_until: null,
+          reasoning_effort: 'high',
         },
       ],
+      borderline: {
+        model: 'deepseek-v4-flash',
+        provider: 'deepseek',
+        reasoning_effort: 'none',
+        articles_today: 276,
+        rpd_used: 276,
+        rpd_limit: 0,
+      },
       llm: {
-        total_requests: 7,
-        total_prompt_tokens: 8400,
-        total_completion_tokens: 2450,
-        total_cached_prompt_tokens: 5600,
+        total_requests: 1325,
+        total_prompt_tokens: 870000,
+        total_completion_tokens: 250000,
+        total_cached_prompt_tokens: 580000,
         cache_hit_rate_pct: 66.67,
         avg_execution_time_ms: 890.0,
-        total_estimated_cost_usd: 0.00105,
+        total_estimated_cost_usd: 0.1329,
       },
     });
   }

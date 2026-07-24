@@ -1,5 +1,6 @@
 export interface ModelBreakdownItem {
   model: string;
+  reasoning_effort?: string;
   provider?: string;
   requests_count: number;
   prompt_tokens?: number;

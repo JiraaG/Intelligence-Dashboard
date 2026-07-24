@@ -269,9 +269,9 @@ docker compose exec -T radar-worker python -m app.scripts.verify_semantic_dedup 
 docker compose exec -T radar-worker python -m app.scripts.verify_semantic_dedup
 ```
 
-### Verifica Metriche FinOps & Diagnostica (Fase 013)
+### Verifica Metriche FinOps & Diagnostica (Fase 013 + effort 015)
 
-Wave A (M1–M6) espone su `GET /api/metrics/summary` i campi `llm.cache_hit_rate_pct`, `llm.models_breakdown` (`[{model, provider, requests_count, total_tokens}]`) e `dedup.content_hash_count` (migrazioni `013`+`014`). Twin completo: `plan-audit/complete/plan_impl_llm_finops_token_caching_verification.md` (soak OK).
+Wave A (M1–M6) + follow-up effort: `GET /api/metrics/summary` espone `llm.cache_hit_rate_pct`, `llm.models_breakdown` per tupla `(model, reasoning_effort)` (`requests_count`, token split, `estimated_cost_usd`, `articles_count` — **senza `provider`**), `dedup.content_hash_count`, e blocco **`overall`** all-time (migrazioni `013`+`014`+`015`). `GET /api/metrics/status` espone RPD live, `borderline`, cooldown (RPD → `day_end`). Twin Wave A: `plan-audit/complete/plan_impl_llm_finops_token_caching_verification.md` (soak OK). UI topbar: STATUS sinistra / COSTI destra — [`docs/03_frontend_and_ui.md`](../../docs/03_frontend_and_ui.md).
 
 
 ```bash
@@ -279,7 +279,8 @@ Wave A (M1–M6) espone su `GET /api/metrics/summary` i campi `llm.cache_hit_rat
 docker compose exec -T radar-worker python -m app.scripts.verify_metrics_013
 
 # Test live degli endpoint REST di diagnostica
-curl -s http://localhost/api/metrics/summary
+curl -s 'http://localhost/api/metrics/summary?from=2026-07-24&to=2026-07-24'
+curl -s http://localhost/api/metrics/status
 curl -s http://localhost/api/metrics/by-feed
 curl -s http://localhost/api/metrics/dedup
 ```

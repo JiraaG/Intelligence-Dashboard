@@ -38,7 +38,11 @@
 
         <div class="popover-content">
           <!-- Sezione 1 — Banner Stato Sistema -->
-          <div class="status-level-banner" [class]="'level-' + statusLevel()" [title]="statusDotTooltip()">
+          <div
+            class="status-level-banner"
+            [class]="'level-' + statusLevel()"
+            [title]="statusDotTooltip()"
+          >
             <span class="level-dot">{{ statusDotEmoji() }}</span>
             <div class="level-text">
               <span class="level-caption">Stato sistema</span>
@@ -74,31 +78,45 @@
 
           <!-- Sezione 2 — Modelli & Quote RPD attuali -->
           <div class="popover-section" *ngIf="metricsStatus()?.models?.length">
-            <span class="section-label" title="Utilizzo giornaliero delle quote RPD (Richieste Per Giorno) per ciascun modello">🤖 Modelli & Quote RPD</span>
+            <span
+              class="section-label"
+              title="Utilizzo giornaliero delle quote RPD (Richieste Per Giorno) per ciascun modello"
+              >🤖 Modelli & Quote RPD</span
+            >
 
             <!-- 1. SIMPLE (Primario) -->
             <ng-container *ngIf="primaryModel() as m">
               <div
                 class="model-item"
-                title="Ruolo SIMPLE: {{ m.rpd_used }} di {{ m.rpd_limit > 0 ? m.rpd_limit : 'illimitate' }} RPD consumate oggi"
+                title="Ruolo SIMPLE: {{ m.rpd_used }} di {{
+                  m.rpd_limit > 0 ? m.rpd_limit : 'illimitate'
+                }} RPD consumate oggi"
               >
                 <div class="model-info">
                   <span class="model-name">
                     <span class="role-tag role-primary" title="Corsia SIMPLE">SIMPLE</span>
                     {{ m.model }}
                   </span>
-                  <span class="rpd-count" *ngIf="m.rpd_limit > 0">{{ m.rpd_used }} / {{ m.rpd_limit }} RPD</span>
+                  <span class="rpd-count" *ngIf="m.rpd_limit > 0"
+                    >{{ m.rpd_used }} / {{ m.rpd_limit }} RPD</span
+                  >
                   <span class="rpd-count" *ngIf="m.rpd_limit === 0">{{ m.rpd_used }} RPD</span>
                 </div>
                 <div class="rpd-bar-wrapper" *ngIf="m.rpd_limit > 0">
                   <div
                     class="rpd-bar-fill"
                     [style.width.%]="(m.rpd_used / m.rpd_limit) * 100"
-                    [class.warning]="(m.rpd_used / m.rpd_limit) >= 0.8"
+                    [class.warning]="m.rpd_used / m.rpd_limit >= 0.8"
                     [class.danger]="m.cooling_down || m.rpd_used >= m.rpd_limit"
                   ></div>
                 </div>
-                <span class="cooldown-warning" *ngIf="m.cooling_down" [title]="'Pausa cooldown fino a: ' + (m.cooldown_until | date:'yyyy-MM-dd HH:mm:ss')">
+                <span
+                  class="cooldown-warning"
+                  *ngIf="m.cooling_down"
+                  [title]="
+                    'Pausa cooldown fino a: ' + (m.cooldown_until | date: 'yyyy-MM-dd HH:mm:ss')
+                  "
+                >
                   Cooling down: {{ formatCooldownUntil(m.cooldown_until, nowTick()) }}
                 </span>
               </div>
@@ -108,25 +126,35 @@
             <ng-container *ngFor="let m of fallbackModels()">
               <div
                 class="model-item"
-                title="Ruolo FALLBACK: {{ m.rpd_used }} di {{ m.rpd_limit > 0 ? m.rpd_limit : 'illimitate' }} RPD consumate oggi"
+                title="Ruolo FALLBACK: {{ m.rpd_used }} di {{
+                  m.rpd_limit > 0 ? m.rpd_limit : 'illimitate'
+                }} RPD consumate oggi"
               >
                 <div class="model-info">
                   <span class="model-name">
                     <span class="role-tag role-fallback" title="Corsia FALLBACK">FALLBACK</span>
                     {{ m.model }}
                   </span>
-                  <span class="rpd-count" *ngIf="m.rpd_limit > 0">{{ m.rpd_used }} / {{ m.rpd_limit }} RPD</span>
+                  <span class="rpd-count" *ngIf="m.rpd_limit > 0"
+                    >{{ m.rpd_used }} / {{ m.rpd_limit }} RPD</span
+                  >
                   <span class="rpd-count" *ngIf="m.rpd_limit === 0">{{ m.rpd_used }} RPD</span>
                 </div>
                 <div class="rpd-bar-wrapper" *ngIf="m.rpd_limit > 0">
                   <div
                     class="rpd-bar-fill"
                     [style.width.%]="(m.rpd_used / m.rpd_limit) * 100"
-                    [class.warning]="(m.rpd_used / m.rpd_limit) >= 0.8"
+                    [class.warning]="m.rpd_used / m.rpd_limit >= 0.8"
                     [class.danger]="m.cooling_down || m.rpd_used >= m.rpd_limit"
                   ></div>
                 </div>
-                <span class="cooldown-warning" *ngIf="m.cooling_down" [title]="'Pausa cooldown fino a: ' + (m.cooldown_until | date:'yyyy-MM-dd HH:mm:ss')">
+                <span
+                  class="cooldown-warning"
+                  *ngIf="m.cooling_down"
+                  [title]="
+                    'Pausa cooldown fino a: ' + (m.cooldown_until | date: 'yyyy-MM-dd HH:mm:ss')
+                  "
+                >
                   Cooling down: {{ formatCooldownUntil(m.cooldown_until, nowTick()) }}
                 </span>
               </div>
@@ -136,15 +164,23 @@
             <ng-container *ngIf="metricsStatus()?.borderline as bl">
               <div
                 class="model-item"
-                title="Ruolo BORDERLINE: {{ bl.rpd_used ?? bl.articles_today }} di {{ (bl.rpd_limit ?? 0) > 0 ? bl.rpd_limit : 'illimitate' }} RPD consumate oggi"
+                title="Ruolo BORDERLINE: {{ bl.rpd_used ?? bl.articles_today }} di {{
+                  (bl.rpd_limit ?? 0) > 0 ? bl.rpd_limit : 'illimitate'
+                }} RPD consumate oggi"
               >
                 <div class="model-info">
                   <span class="model-name">
-                    <span class="role-tag role-borderline" title="Corsia BORDERLINE">BORDERLINE</span>
+                    <span class="role-tag role-borderline" title="Corsia BORDERLINE"
+                      >BORDERLINE</span
+                    >
                     {{ bl.model }}
                   </span>
-                  <span class="rpd-count" *ngIf="(bl.rpd_limit ?? 0) > 0">{{ bl.rpd_used ?? bl.articles_today }} / {{ bl.rpd_limit }} RPD</span>
-                  <span class="rpd-count" *ngIf="(bl.rpd_limit ?? 0) === 0">{{ bl.rpd_used ?? bl.articles_today }} RPD</span>
+                  <span class="rpd-count" *ngIf="(bl.rpd_limit ?? 0) > 0"
+                    >{{ bl.rpd_used ?? bl.articles_today }} / {{ bl.rpd_limit }} RPD</span
+                  >
+                  <span class="rpd-count" *ngIf="(bl.rpd_limit ?? 0) === 0"
+                    >{{ bl.rpd_used ?? bl.articles_today }} RPD</span
+                  >
                 </div>
                 <div class="rpd-bar-wrapper" *ngIf="(bl.rpd_limit ?? 0) > 0">
                   <div
@@ -159,25 +195,35 @@
             <ng-container *ngIf="complexModel() as m">
               <div
                 class="model-item"
-                title="Ruolo COMPLEX: {{ m.rpd_used }} di {{ m.rpd_limit > 0 ? m.rpd_limit : 'illimitate' }} RPD consumate oggi"
+                title="Ruolo COMPLEX: {{ m.rpd_used }} di {{
+                  m.rpd_limit > 0 ? m.rpd_limit : 'illimitate'
+                }} RPD consumate oggi"
               >
                 <div class="model-info">
                   <span class="model-name">
                     <span class="role-tag role-complex" title="Corsia COMPLEX">COMPLEX</span>
                     {{ m.model }}
                   </span>
-                  <span class="rpd-count" *ngIf="m.rpd_limit > 0">{{ m.rpd_used }} / {{ m.rpd_limit }} RPD</span>
+                  <span class="rpd-count" *ngIf="m.rpd_limit > 0"
+                    >{{ m.rpd_used }} / {{ m.rpd_limit }} RPD</span
+                  >
                   <span class="rpd-count" *ngIf="m.rpd_limit === 0">{{ m.rpd_used }} RPD</span>
                 </div>
                 <div class="rpd-bar-wrapper" *ngIf="m.rpd_limit > 0">
                   <div
                     class="rpd-bar-fill"
                     [style.width.%]="(m.rpd_used / m.rpd_limit) * 100"
-                    [class.warning]="(m.rpd_used / m.rpd_limit) >= 0.8"
+                    [class.warning]="m.rpd_used / m.rpd_limit >= 0.8"
                     [class.danger]="m.cooling_down || m.rpd_used >= m.rpd_limit"
                   ></div>
                 </div>
-                <span class="cooldown-warning" *ngIf="m.cooling_down" [title]="'Pausa cooldown fino a: ' + (m.cooldown_until | date:'yyyy-MM-dd HH:mm:ss')">
+                <span
+                  class="cooldown-warning"
+                  *ngIf="m.cooling_down"
+                  [title]="
+                    'Pausa cooldown fino a: ' + (m.cooldown_until | date: 'yyyy-MM-dd HH:mm:ss')
+                  "
+                >
                   Cooling down: {{ formatCooldownUntil(m.cooldown_until, nowTick()) }}
                 </span>
               </div>
@@ -186,24 +232,47 @@
 
           <!-- Sezione 3 — Gestione & Effort -->
           <div class="popover-section">
-            <span class="section-label" title="Dettaglio livelli di Reasoning Effort configurati per ciascun ruolo/corsia del sistema">⚖️ Gestione & Effort</span>
+            <span
+              class="section-label"
+              title="Dettaglio livelli di Reasoning Effort configurati per ciascun ruolo/corsia del sistema"
+              >⚖️ Gestione & Effort</span
+            >
             <div class="effort-summary-card">
               <div class="effort-matrix">
-                <div class="effort-matrix-item">
+                <div
+                  class="effort-matrix-item"
+                  title="Corsia SIMPLE (primaria): classificazione rapida ad alto volume. Effort NONE = risposta diretta senza catena di ragionamento, ottimizzata per latenza e consumo token."
+                >
                   <span class="effort-role role-primary-text">SIMPLE</span>
                   <span class="effort-badge effort-none">NONE</span>
                 </div>
-                <div class="effort-matrix-item">
+                <div
+                  class="effort-matrix-item"
+                  title="Corsia FALLBACK (L1): subentra quando SIMPLE è in cooldown o RPD esaurita. Effort NONE = stesso profilo leggero del primario, per continuità operativa."
+                >
                   <span class="effort-role role-fallback-text">FALLBACK</span>
                   <span class="effort-badge effort-none">NONE</span>
                 </div>
-                <div class="effort-matrix-item">
+                <div
+                  class="effort-matrix-item"
+                  title="Corsia BORDERLINE: ponte tra SIMPLE e COMPLEX per articoli ambigui. Effort {{
+                    metricsStatus()?.borderline?.reasoning_effort || 'none'
+                  }} = livello di reasoning configurato (LLM_BORDERLINE_REASONING_EFFORT)."
+                >
                   <span class="effort-role role-borderline-text">BORDERLINE</span>
-                  <span class="effort-badge" [class]="'effort-' + (metricsStatus()?.borderline?.reasoning_effort || 'none')">
-                    {{ (metricsStatus()?.borderline?.reasoning_effort || 'none') | uppercase }}
+                  <span
+                    class="effort-badge"
+                    [class]="'effort-' + (metricsStatus()?.borderline?.reasoning_effort || 'none')"
+                  >
+                    {{ metricsStatus()?.borderline?.reasoning_effort || 'none' | uppercase }}
                   </span>
                 </div>
-                <div class="effort-matrix-item">
+                <div
+                  class="effort-matrix-item"
+                  title="Corsia COMPLEX: articoli ad alta complessità geopolitica e quality:compare. Effort {{
+                    complexReasoningEffort()
+                  }} = livello di reasoning dedicato alle analisi profonde."
+                >
                   <span class="effort-role role-complex-text">COMPLEX</span>
                   <span class="effort-badge" [class]="'effort-' + complexReasoningEffort()">
                     {{ complexReasoningEffort() | uppercase }}
@@ -621,7 +690,9 @@
         aria-haspopup="true"
       >
         COSTI:
-        <strong>{{ totalCostUsd() === 0 ? '$0' : ('$' + (totalCostUsd() | number:'1.2-4')) }}</strong>
+        <strong>{{
+          totalCostUsd() === 0 ? '$0' : '$' + (totalCostUsd() | number: '1.2-4')
+        }}</strong>
       </button>
 
       <div
@@ -646,22 +717,44 @@
         <div class="popover-content">
           <!-- Sezione 1 — Costi generali -->
           <div class="popover-section border-0 pt-0">
-            <span class="section-label" title="Metriche generali di costo ed ingestione per il giorno selezionato">📊 Costi generali</span>
+            <span
+              class="section-label"
+              title="Metriche generali di costo ed ingestione per il giorno selezionato"
+              >📊 Costi generali</span
+            >
             <div class="metrics-grid">
-              <div class="metric-card" title="Costo complessivo stimato per chiamate LLM di classificazione completate per il giorno selezionato">
-                <span class="metric-val">{{ totalCostUsd() === 0 ? '$0' : ('$' + (totalCostUsd() | number:'1.4-4')) }}</span>
+              <div
+                class="metric-card"
+                title="Costo complessivo stimato per chiamate LLM di classificazione completate per il giorno selezionato"
+              >
+                <span class="metric-val">{{
+                  totalCostUsd() === 0 ? '$0' : '$' + (totalCostUsd() | number: '1.4-4')
+                }}</span>
                 <span class="metric-key">Costo stimato giorno</span>
               </div>
-              <div class="metric-card" title="Numero totale di articoli pubblicati ed estratti dai feed RSS nel giorno selezionato">
+              <div
+                class="metric-card"
+                title="Numero totale di articoli pubblicati ed estratti dai feed RSS nel giorno selezionato"
+              >
                 <span class="metric-val">{{ metricsSummary()?.total_articles ?? 0 }}</span>
                 <span class="metric-key">Articoli ingestiti</span>
               </div>
-              <div class="metric-card" title="Numero totale di chiamate API inviate ai provider LLM (classificazione, retry, compare) nel giorno">
+              <div
+                class="metric-card"
+                title="Numero totale di chiamate API inviate ai provider LLM (classificazione, retry, compare) nel giorno"
+              >
                 <span class="metric-val">{{ metricsSummary()?.llm?.total_requests ?? 0 }}</span>
                 <span class="metric-key">Richieste LLM</span>
               </div>
-              <div class="metric-card" title="Tempo medio stimato per l'intera pipeline di elaborazione nel giorno selezionato">
-                <span class="metric-val">{{ metricsSummary()?.avg_pipeline_latency_ms ? (metricsSummary()!.avg_pipeline_latency_ms! | number:'1.0-0') + ' ms' : 'N/D' }}</span>
+              <div
+                class="metric-card"
+                title="Tempo medio stimato per l'intera pipeline di elaborazione nel giorno selezionato"
+              >
+                <span class="metric-val">{{
+                  metricsSummary()?.avg_pipeline_latency_ms
+                    ? (metricsSummary()!.avg_pipeline_latency_ms! | number: '1.0-0') + ' ms'
+                    : 'N/D'
+                }}</span>
                 <span class="metric-key">Latenza media pipeline</span>
               </div>
             </div>
@@ -669,24 +762,59 @@
 
           <!-- Sezione 2 — Costi LLM per modello (Posizionato subito sotto a Costi generali) -->
           <div class="popover-section" *ngIf="metricsSummary()?.llm?.models_breakdown?.length">
-            <span class="section-label" title="Spacchettamento dei costi, articoli gestiti e richieste API per i singoli modelli nel giorno selezionato">💰 Costi LLM per modello</span>
+            <span
+              class="section-label"
+              title="Spacchettamento dei costi, articoli gestiti e richieste API per i singoli modelli nel giorno selezionato"
+              >💰 Costi LLM per modello</span
+            >
             <div class="model-cost-card" *ngFor="let m of metricsSummary()!.llm!.models_breakdown">
               <div class="model-cost-header">
-                <span class="model-name">{{ m.model }}</span>
-                <span class="model-cost-val" title="Costo stimato per {{ m.model }} nel giorno selezionato">
-                  {{ (m.estimated_cost_usd ?? 0) === 0 ? '$0' : ('$' + (m.estimated_cost_usd! | number:'1.4-4')) }}
+                <span class="model-name">
+                  {{ m.model }}
+                  <span
+                    *ngIf="m.reasoning_effort"
+                    class="effort-text"
+                    [class]="'effort-text-' + m.reasoning_effort"
+                    [title]="
+                      'Reasoning effort ' +
+                      m.reasoning_effort +
+                      ': livello di ragionamento usato da questo modello nelle chiamate del giorno selezionato'
+                    "
+                  >
+                    {{ m.reasoning_effort }}
+                  </span>
+                </span>
+                <span
+                  class="model-cost-val"
+                  title="Costo stimato per {{ m.model }} nel giorno selezionato"
+                >
+                  {{
+                    (m.estimated_cost_usd ?? 0) === 0
+                      ? '$0'
+                      : '$' + (m.estimated_cost_usd! | number: '1.4-4')
+                  }}
                 </span>
               </div>
               <div class="model-cost-grid">
                 <div class="mini-metric" title="Costo stimato per le chiamate di questo modello">
-                  <span class="mini-val">{{ (m.estimated_cost_usd ?? 0) === 0 ? '$0' : ('$' + (m.estimated_cost_usd! | number:'1.4-4')) }}</span>
+                  <span class="mini-val">{{
+                    (m.estimated_cost_usd ?? 0) === 0
+                      ? '$0'
+                      : '$' + (m.estimated_cost_usd! | number: '1.4-4')
+                  }}</span>
                   <span class="mini-key">Costo stimato</span>
                 </div>
-                <div class="mini-metric" title="Numero di articoli classificati da {{ m.model }} nel giorno selezionato">
+                <div
+                  class="mini-metric"
+                  title="Numero di articoli classificati da {{ m.model }} nel giorno selezionato"
+                >
                   <span class="mini-val">{{ m.articles_count ?? 0 }}</span>
                   <span class="mini-key">Articoli gestiti</span>
                 </div>
-                <div class="mini-metric" title="Numero di richieste API inviate a {{ m.model }} nel giorno selezionato">
+                <div
+                  class="mini-metric"
+                  title="Numero di richieste API inviate a {{ m.model }} nel giorno selezionato"
+                >
                   <span class="mini-val">{{ m.requests_count }}</span>
                   <span class="mini-key">Richieste LLM</span>
                 </div>
@@ -696,34 +824,70 @@
 
           <!-- Sezione 3 — Consumo Token & Cache -->
           <div class="popover-section" *ngIf="metricsSummary()?.llm">
-            <span class="section-label" title="Dettaglio token di input (Prompt), output (Completion) e serviti da Cache nel giorno selezionato">⚡ Consumo Token & Cache</span>
+            <span
+              class="section-label"
+              title="Dettaglio token di input (Prompt), output (Completion) e serviti da Cache nel giorno selezionato"
+              >⚡ Consumo Token & Cache</span
+            >
             <div class="token-row">
-              <span title="Token di input (testo articoli + prompt sistema) inviati ai modelli LLM">Prompt: <strong>{{ metricsSummary()!.llm.total_prompt_tokens | number }}</strong></span>
-              <span title="Token di output (risposte e analisi JSON) generati dai modelli LLM">Completion: <strong>{{ metricsSummary()!.llm.total_completion_tokens | number }}</strong></span>
-              <span title="Token di prompt serviti da cache del provider LLM con abbattimento dei tempi e dei costi">Cached: <strong>{{ metricsSummary()!.llm.total_cached_prompt_tokens | number }}</strong> ({{ metricsSummary()!.llm.cache_hit_rate_pct }}%)</span>
+              <span title="Token di input (testo articoli + prompt sistema) inviati ai modelli LLM"
+                >Prompt:
+                <strong>{{ metricsSummary()!.llm.total_prompt_tokens | number }}</strong></span
+              >
+              <span title="Token di output (risposte e analisi JSON) generati dai modelli LLM"
+                >Completion:
+                <strong>{{ metricsSummary()!.llm.total_completion_tokens | number }}</strong></span
+              >
+              <span
+                title="Token di prompt serviti da cache del provider LLM con abbattimento dei tempi e dei costi"
+                >Cached:
+                <strong>{{ metricsSummary()!.llm.total_cached_prompt_tokens | number }}</strong> ({{
+                  metricsSummary()!.llm.cache_hit_rate_pct
+                }}%)</span
+              >
             </div>
           </div>
 
           <!-- Sezione 4 — Richieste LLM per Modello (Titolo modello e token totali, hover con in/out) -->
           <div class="popover-section" *ngIf="metricsSummary()?.llm?.models_breakdown?.length">
-            <span class="section-label" title="Distribuzione delle chiamate e consumo token per ciascun modello LLM nel giorno selezionato">🤖 Richieste LLM per Modello</span>
+            <span
+              class="section-label"
+              title="Distribuzione delle chiamate e consumo token per ciascun modello LLM nel giorno selezionato"
+              >🤖 Richieste LLM per Modello</span
+            >
             <div
               class="model-item"
               *ngFor="let m of metricsSummary()!.llm!.models_breakdown"
-              title="Dettaglio {{ m.model }}: In {{ (m.prompt_tokens ?? 0) | number }} tok • Out {{ (m.completion_tokens ?? 0) | number }} tok • Cached {{ (m.cached_tokens ?? 0) | number }} tok"
+              title="Dettaglio {{ m.model }}: In {{ m.prompt_tokens ?? 0 | number }} tok • Out {{
+                m.completion_tokens ?? 0 | number
+              }} tok • Cached {{ m.cached_tokens ?? 0 | number }} tok"
             >
               <div class="model-info">
                 <span class="model-name">
                   {{ m.model }}
+                  <span
+                    *ngIf="m.reasoning_effort"
+                    class="effort-text"
+                    [class]="'effort-text-' + m.reasoning_effort"
+                    [title]="
+                      'Reasoning effort ' +
+                      m.reasoning_effort +
+                      ': livello di ragionamento usato da questo modello nelle chiamate del giorno selezionato'
+                    "
+                  >
+                    {{ m.reasoning_effort }}
+                  </span>
                 </span>
-                <span class="rpd-count">
-                  {{ m.total_tokens | number }} tok
-                </span>
+                <span class="rpd-count"> {{ m.total_tokens | number }} tok </span>
               </div>
               <div class="rpd-bar-wrapper">
                 <div
                   class="rpd-bar-fill"
-                  [style.width.%]="metricsSummary()?.llm?.total_requests ? (m.requests_count / metricsSummary()!.llm!.total_requests) * 100 : 0"
+                  [style.width.%]="
+                    metricsSummary()?.llm?.total_requests
+                      ? (m.requests_count / metricsSummary()!.llm!.total_requests) * 100
+                      : 0
+                  "
                 ></div>
               </div>
             </div>
@@ -731,47 +895,89 @@
 
           <!-- Sezione 5 — Eventi Deduplicazione (Senza Totale) -->
           <div class="popover-section" *ngIf="metricsSummary()?.dedup">
-            <span class="section-label" title="Dettaglio eventi di deduplicazione eseguiti per evitare elaborazioni e chiamate LLM ridondanti">🔍 Eventi Deduplicazione</span>
+            <span
+              class="section-label"
+              title="Dettaglio eventi di deduplicazione eseguiti per evitare elaborazioni e chiamate LLM ridondanti"
+              >🔍 Eventi Deduplicazione</span
+            >
             <div class="dedup-stats">
-              <span title="Deduplicazione esatta basata su URL identico già registrato nel DB (Pre-LLM SQL check)">URL: <strong>{{ metricsSummary()!.dedup.url_exact_count }}</strong></span>
-              <span title="Deduplicazione semantica vettoriale basata su distanza coseno degli embeddings pgvector">Vettoriale: <strong>{{ metricsSummary()!.dedup.semantic_vector_count }}</strong></span>
-              <span title="Deduplicazione basata su impronta SHA256 identica del contenuto testo pulito (Pre-Embedding)">Hash: <strong>{{ metricsSummary()!.dedup.content_hash_count }}</strong></span>
+              <span
+                title="Deduplicazione esatta basata su URL identico già registrato nel DB (Pre-LLM SQL check)"
+                >URL: <strong>{{ metricsSummary()!.dedup.url_exact_count }}</strong></span
+              >
+              <span
+                title="Deduplicazione semantica vettoriale basata su distanza coseno degli embeddings pgvector"
+                >Vettoriale:
+                <strong>{{ metricsSummary()!.dedup.semantic_vector_count }}</strong></span
+              >
+              <span
+                title="Deduplicazione basata su impronta SHA256 identica del contenuto testo pulito (Pre-Embedding)"
+                >Hash: <strong>{{ metricsSummary()!.dedup.content_hash_count }}</strong></span
+              >
             </div>
           </div>
 
           <!-- Sezione 6 — Costi complessivi (All-Time dell'applicativo) -->
           <div class="popover-section overall-section" *ngIf="metricsSummary()?.overall">
-            <span class="section-label" title="Metriche cumulate di tutti i costi ed ingestione dell'intero applicativo dall'installazione ad oggi">🌐 Costi Complessivi Applicativo</span>
+            <span
+              class="section-label"
+              title="Metriche cumulate di tutti i costi ed ingestione dell'intero applicativo dall'installazione ad oggi"
+              >🌐 Costi Complessivi Applicativo</span
+            >
             <div class="metrics-grid">
-              <div class="metric-card overall-card" title="Costo complessivo stimato dell'intero applicativo dall'installazione ad oggi">
+              <div
+                class="metric-card overall-card"
+                title="Costo complessivo stimato dell'intero applicativo dall'installazione ad oggi"
+              >
                 <span class="metric-val highlight-val">
-                  {{ metricsSummary()!.overall!.total_estimated_cost_usd === 0 ? '$0' : ('$' + (metricsSummary()!.overall!.total_estimated_cost_usd | number:'1.4-4')) }}
+                  {{
+                    metricsSummary()!.overall!.total_estimated_cost_usd === 0
+                      ? '$0'
+                      : '$' +
+                        (metricsSummary()!.overall!.total_estimated_cost_usd | number: '1.4-4')
+                  }}
                 </span>
                 <span class="metric-key">Costo totale storico</span>
               </div>
-              <div class="metric-card overall-card" title="Totale complessivo di articoli pubblicati ed ingestiti nel database dall'installazione">
-                <span class="metric-val">{{ metricsSummary()!.overall!.total_articles | number }}</span>
+              <div
+                class="metric-card overall-card"
+                title="Totale complessivo di articoli pubblicati ed ingestiti nel database dall'installazione"
+              >
+                <span class="metric-val">{{
+                  metricsSummary()!.overall!.total_articles | number
+                }}</span>
                 <span class="metric-key">Articoli totali</span>
               </div>
-              <div class="metric-card overall-card" title="Totale complessivo di chiamate API inviate ai provider LLM dall'installazione">
-                <span class="metric-val">{{ metricsSummary()!.overall!.total_requests | number }}</span>
+              <div
+                class="metric-card overall-card"
+                title="Totale complessivo di chiamate API inviate ai provider LLM dall'installazione"
+              >
+                <span class="metric-val">{{
+                  metricsSummary()!.overall!.total_requests | number
+                }}</span>
                 <span class="metric-key">Richieste LLM totali</span>
               </div>
-              <div class="metric-card overall-card" title="Totale complessivo di token elaborati dall'applicativo dall'installazione">
-                <span class="metric-val">{{ metricsSummary()!.overall!.total_tokens | number }}</span>
+              <div
+                class="metric-card overall-card"
+                title="Totale complessivo di token elaborati dall'applicativo dall'installazione"
+              >
+                <span class="metric-val">{{
+                  metricsSummary()!.overall!.total_tokens | number
+                }}</span>
                 <span class="metric-key">Token totali</span>
               </div>
             </div>
           </div>
         </div>
+      </div>
     </div>
-  </div>
 
-  @if (apiError()) {
-    <div class="api-error-banner" role="alert">Errore API — dati non disponibili</div>
-  }
+    @if (apiError()) {
+      <div class="api-error-banner" role="alert">Errore API — dati non disponibili</div>
+    }
 
-  <div class="loader-wrapper" *ngIf="isLoading()">
-    <p-progressBar mode="indeterminate" styleClass="radar-progress-bar"></p-progressBar>
+    <div class="loader-wrapper" *ngIf="isLoading()">
+      <p-progressBar mode="indeterminate" styleClass="radar-progress-bar"></p-progressBar>
+    </div>
   </div>
 </div>

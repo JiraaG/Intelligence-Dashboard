@@ -222,6 +222,17 @@ async def commit_article_to_db(
                 embedding_time_ms,
             )
 
+        if miniflux_entry_id is not None:
+            await conn.execute(
+                """
+                UPDATE llm_request_ledger
+                SET article_id = $1
+                WHERE miniflux_entry_id = $2 AND article_id IS NULL
+                """,
+                article_id,
+                miniflux_entry_id,
+            )
+
         await enqueue_outbox_row(
             conn,
             article_id=article_id,

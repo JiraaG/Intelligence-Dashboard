@@ -371,12 +371,13 @@ con i dati mockati prima di connettere il backend reale.
 - [ ] Zoom &lt; 4: hatching **multi-colore** — MapLibre: N fasce soft = N tipologie da `map-summary` (mainland US/RU; isole significative ≥0.5% area largest; clip terra∩strip — niente bande in mare; ordine legenda); Leaflet: SVG combo pattern — non fill solido di una sola categoria; non barcode `fill-pattern` su MapLibre
 - [ ] Path MapLibre: great-circle / LineString macro multicolore solida (tutti gli zoom) + hover thicken/tooltip; path Leaflet legacy: `relationsPane` + geometric dash ≥4
 
-### ✅ Test 8: FinOps UI & STATUS Topbar Hub
+### ✅ Test 8: FinOps UI — STATUS + COSTI (topbar split)
 
-- [ ] Topbar mostra il pulsante **STATUS & COSTI** con il costo totale del giorno (es. `$0.00` o `$0.0123`) e pallino tricolore status (🟢 nominal, 🟡 fallback/escalation, 🔴 degraded).
-- [ ] Cliccando su STATUS & COSTI si apre il popover aggregate con riepilogo token, latenze, dedup ed (in W5) la lista dei modelli con barre RPD usate/limite e cooldown.
-- [ ] La card sidebar mostra il blocco **"ANALISI FINOPS & FONTE RSS"** dopo i Tag con: modello LLM, lane, token in/out/cached, latenza, costo stimato e link al feed XML.
-- [ ] In MOCK_MODE: fixture restituite per summary, status e campi articolo FinOps.
+- [ ] Topbar **sinistra** inizia con **STATUS** (pallino 🟢/🟡/🔴); **destra** termina con **COSTI: $X.XXXX** (giorno calendario).
+- [ ] Popover **STATUS**: banner + eventuali alert L1/degradato; RPD SIMPLE→FALLBACK→BORDERLINE→COMPLEX; sezione **Gestione & Effort** (NONE/NONE/BL/COMPLEX).
+- [ ] Popover **COSTI**: 6 sezioni (generali → costi/modello con effort → token → richieste/modello → dedup senza Totale → overall all-time).
+- [ ] MOCK_MODE: `getMetricsSummary` ha `models_breakdown` con `reasoning_effort` + `overall`; `getMetricsStatus` ha `borderline`, `reasoning_effort` sui models, e almeno un FALLBACK se configurato nel fixture.
+- [ ] Card sidebar **"ANALISI FINOPS & FONTE RSS"** dopo i Tag (modello, lane, token, latenza, costo, feed XML).
 
 ---
 

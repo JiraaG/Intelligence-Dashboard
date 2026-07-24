@@ -204,6 +204,7 @@ async def compare_articles_quality(
             provider=provider,
             lane="complex",
             miniflux_entry_id=miniflux_entry_id,
+            reasoning_effort="none",
         )
     except (QuotaBudgetExceeded, QuotaDailyExceeded) as exc:
         logger.warning(

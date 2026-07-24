@@ -705,36 +705,19 @@ async def get_metrics_summary(
         models_brk_rows = await conn.fetch(
             """
             SELECT
-                m.model,
-                m.requests_count,
-                m.prompt_tokens,
-                m.completion_tokens,
-                m.cached_tokens,
-                m.total_tokens,
-                m.estimated_cost_usd,
-                COALESCE(a.articles_count, 0)::INT AS articles_count
-            FROM (
-                SELECT
-                    COALESCE(model, 'unknown') AS model,
-                    COUNT(*)::INT AS requests_count,
-                    COALESCE(SUM(prompt_tokens), 0)::BIGINT AS prompt_tokens,
-                    COALESCE(SUM(completion_tokens), 0)::BIGINT AS completion_tokens,
-                    COALESCE(SUM(cached_prompt_tokens), 0)::BIGINT AS cached_tokens,
-                    COALESCE(SUM(COALESCE(actual_tokens, COALESCE(prompt_tokens, 0) + COALESCE(completion_tokens, 0))), 0)::BIGINT AS total_tokens,
-                    COALESCE(SUM(estimated_cost_usd) FILTER (WHERE status = 'completed' AND (purpose LIKE 'classify:%' OR purpose = 'classify_article')), 0)::NUMERIC AS estimated_cost_usd
-                FROM llm_request_ledger
-                WHERE created_at >= $1 AND created_at < $2
-                GROUP BY COALESCE(model, 'unknown')
-            ) m
-            LEFT JOIN (
-                SELECT
-                    COALESCE(classified_by_model, 'unknown') AS model,
-                    COUNT(*)::INT AS articles_count
-                FROM articles
-                WHERE created_at >= $1 AND created_at < $2 AND classified_by_model IS NOT NULL
-                GROUP BY COALESCE(classified_by_model, 'unknown')
-            ) a ON m.model = a.model
-            ORDER BY m.requests_count DESC
+                COALESCE(model, 'unknown') AS model,
+                COALESCE(reasoning_effort, 'none') AS reasoning_effort,
+                COUNT(*)::INT AS requests_count,
+                COALESCE(SUM(prompt_tokens), 0)::BIGINT AS prompt_tokens,
+                COALESCE(SUM(completion_tokens), 0)::BIGINT AS completion_tokens,
+                COALESCE(SUM(cached_prompt_tokens), 0)::BIGINT AS cached_tokens,
+                COALESCE(SUM(COALESCE(actual_tokens, COALESCE(prompt_tokens, 0) + COALESCE(completion_tokens, 0))), 0)::BIGINT AS total_tokens,
+                COALESCE(SUM(estimated_cost_usd) FILTER (WHERE status = 'completed' AND (purpose LIKE 'classify:%' OR purpose = 'classify_article')), 0)::NUMERIC AS estimated_cost_usd,
+                COUNT(DISTINCT COALESCE(article_id, miniflux_entry_id)) FILTER (WHERE status = 'completed' AND (purpose LIKE 'classify:%' OR purpose = 'classify_article'))::INT AS articles_count
+            FROM llm_request_ledger
+            WHERE created_at >= $1 AND created_at < $2
+            GROUP BY COALESCE(model, 'unknown'), COALESCE(reasoning_effort, 'none')
+            ORDER BY requests_count DESC
             """,
             start_dt,
             end_dt,
@@ -769,6 +752,7 @@ async def get_metrics_summary(
     models_breakdown = [
         {
             "model": r["model"],
+            "reasoning_effort": r["reasoning_effort"],
             "requests_count": r["requests_count"],
             "prompt_tokens": int(r["prompt_tokens"]),
             "completion_tokens": int(r["completion_tokens"]),

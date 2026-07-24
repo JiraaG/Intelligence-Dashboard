@@ -1,5 +1,7 @@
 # Walkthrough — FinOps UI Metrics
 
+> **Nota:** walkthrough del hub aggregato pre-split. Chrome UI attuale = STATUS sinistra / COSTI destra — [`docs/03_frontend_and_ui.md`](../../docs/03_frontend_and_ui.md).
+
 Walkthrough e closeout per l'implementazione della FinOps UI (Metrics card + STATUS topbar) ed i fix residuali post-review (F1–F6).
 
 ---
