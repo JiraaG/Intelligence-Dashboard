@@ -946,6 +946,7 @@ class ClassificationClient:
                     ref.provider,
                     ref.model,
                     reason=str(rpd_err),
+                    until=rpd_err.until_ts,
                 )
                 return None, "hard_cooldown"
             response_text: str | None = None

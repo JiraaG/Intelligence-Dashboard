@@ -637,8 +637,9 @@
     border: 1px solid rgba(0, 212, 255, 0.2);
 
     &.level-nominal {
-      background: rgba(0, 255, 136, 0.08);
-      border-color: rgba(0, 255, 136, 0.25);
+      background: linear-gradient(135deg, rgba(0, 255, 136, 0.1), rgba(0, 212, 255, 0.05));
+      border-color: rgba(0, 255, 136, 0.35);
+      box-shadow: inset 0 0 12px rgba(0, 255, 136, 0.05);
     }
     &.level-fallback_or_escalation {
       background: linear-gradient(135deg, rgba(255, 187, 0, 0.12), rgba(255, 140, 0, 0.06));
@@ -646,8 +647,9 @@
       box-shadow: inset 0 0 12px rgba(255, 187, 0, 0.05);
     }
     &.level-degraded {
-      background: rgba(255, 51, 102, 0.08);
-      border-color: rgba(255, 51, 102, 0.25);
+      background: linear-gradient(135deg, rgba(255, 51, 102, 0.14), rgba(200, 20, 60, 0.07));
+      border-color: rgba(255, 51, 102, 0.4);
+      box-shadow: inset 0 0 12px rgba(255, 51, 102, 0.08);
     }
 
     .level-dot {
@@ -742,6 +744,41 @@
     }
   }
 
+  .degraded-alert-box {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: rgba(255, 51, 102, 0.08);
+    border: 1px solid rgba(255, 51, 102, 0.3);
+    border-left: 3px solid #ff3366;
+
+    .alert-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+
+      .alert-icon {
+        font-size: 0.8rem;
+      }
+
+      .alert-title {
+        font-size: 0.73rem;
+        font-weight: 600;
+        color: #ff5580;
+        letter-spacing: 0.2px;
+      }
+    }
+
+    .alert-desc {
+      margin: 0;
+      font-size: 0.71rem;
+      line-height: 1.35;
+      color: rgba(255, 255, 255, 0.85);
+    }
+  }
+
   .metrics-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -823,6 +860,11 @@
       padding: 6px 8px;
       border-radius: 4px;
       font-size: 0.72rem;
+      margin-bottom: 6px;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
 
       .model-info {
         display: flex;
@@ -858,7 +900,13 @@
           flex-shrink: 0;
           &.role-primary { background: rgba(0, 212, 255, 0.2); color: #00d4ff; }
           &.role-fallback { background: rgba(255, 187, 0, 0.2); color: #ffbb00; }
-          &.role-complex { background: rgba(180, 100, 255, 0.2); color: #b464ff; }
+          &.role-borderline { background: rgba(180, 100, 255, 0.2); color: #b464ff; }
+          &.role-complex { background: rgba(255, 51, 102, 0.2); color: #ff5580; }
+        }
+
+        .highlight-purple {
+          color: #b464ff;
+          font-weight: 600;
         }
 
         .rpd-count {
@@ -867,6 +915,16 @@
           font-size: 0.7rem;
           white-space: nowrap;
           flex-shrink: 0;
+        }
+      }
+
+      &.model-item-borderline {
+        background: rgba(180, 100, 255, 0.04);
+        border: 1px dashed rgba(180, 100, 255, 0.3);
+
+        &:hover {
+          background: rgba(180, 100, 255, 0.08);
+          border-color: rgba(180, 100, 255, 0.5);
         }
       }
 
@@ -889,6 +947,84 @@
       .cooldown-warning {
         color: #ff3366;
         font-size: 0.68rem;
+      }
+    }
+
+    .effort-summary-card {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 6px;
+      padding: 10px 12px;
+
+      .effort-matrix {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+
+        .effort-matrix-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background: rgba(255, 255, 255, 0.03);
+          padding: 6px 8px;
+          border-radius: 4px;
+          border: 1px solid rgba(255, 255, 255, 0.04);
+
+          .effort-role {
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+
+            &.role-primary-text { color: #00d4ff; }
+            &.role-fallback-text { color: #ffbb00; }
+            &.role-borderline-text { color: #b464ff; }
+            &.role-complex-text { color: #ff5580; }
+          }
+        }
+      }
+
+      .borderline-details {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+
+        .detail-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 0.72rem;
+
+          .detail-label {
+            color: var(--color-text-muted, #888);
+          }
+
+          .detail-val {
+            color: var(--color-text-primary, #fff);
+            font-family: 'JetBrains Mono', monospace;
+
+            &.highlight-purple {
+              color: #b464ff;
+              font-weight: 700;
+              text-shadow: 0 0 6px rgba(180, 100, 255, 0.3);
+            }
+          }
+        }
+      }
+
+      .effort-badge {
+        font-size: 0.62rem;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: 700;
+        font-family: 'JetBrains Mono', monospace;
+        letter-spacing: 0.5px;
+        &.effort-none { background: rgba(0, 255, 136, 0.15); color: #00ff88; border: 1px solid rgba(0, 255, 136, 0.35); }
+        &.effort-high { background: rgba(255, 51, 102, 0.15); color: #ff5580; border: 1px solid rgba(255, 51, 102, 0.35); }
+        &.effort-medium { background: rgba(255, 187, 0, 0.15); color: #ffc800; border: 1px solid rgba(255, 187, 0, 0.35); }
+        &.effort-low { background: rgba(0, 212, 255, 0.15); color: #00d4ff; border: 1px solid rgba(0, 212, 255, 0.35); }
       }
     }
 

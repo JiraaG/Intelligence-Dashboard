@@ -62,6 +62,16 @@ export interface ModelStatusItem {
   rpd_limit: number;
   cooling_down: boolean;
   cooldown_until: string | null;
+  reasoning_effort?: string;
+}
+
+export interface BorderlineStatusInfo {
+  model: string;
+  provider?: string;
+  reasoning_effort: string;
+  articles_today: number;
+  rpd_used?: number;
+  rpd_limit?: number;
 }
 
 export interface MetricsStatus {
@@ -72,5 +82,6 @@ export interface MetricsStatus {
   l1_likely_active: boolean;
   l1_reason: L1Reason;
   models: ModelStatusItem[];
+  borderline?: BorderlineStatusInfo;
   llm?: MetricsSummaryLlm;
 }

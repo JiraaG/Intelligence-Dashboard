@@ -63,33 +63,153 @@
             <p class="alert-desc">{{ l1ReasonDescription() }}</p>
           </div>
 
+          <!-- Alert Box esplicito per Stato Degradato -->
+          <div class="degraded-alert-box" *ngIf="statusLevel() === 'degraded'">
+            <div class="alert-header">
+              <span class="alert-icon">🔴</span>
+              <span class="alert-title">Stato Sistema Degradato</span>
+            </div>
+            <p class="alert-desc">{{ degradedReasonDescription() }}</p>
+          </div>
+
           <!-- Sezione 2 — Modelli & Quote RPD attuali -->
           <div class="popover-section" *ngIf="metricsStatus()?.models?.length">
-            <span class="section-label" title="Utilizzo giornaliero delle quote RPD (Richieste Per Giorno) per ciascun modello di intelligenza artificiale">🤖 Modelli & Quote RPD attuali</span>
-            <div
-              class="model-item"
-              *ngFor="let m of metricsStatus()!.models"
-              title="Ruolo {{ m.role === 'primary' ? 'SIMPLE' : (m.role | uppercase) }}: {{ m.rpd_used }} di {{ m.rpd_limit > 0 ? m.rpd_limit : 'illimitate' }} RPD consumate oggi"
-            >
-              <div class="model-info">
-                <span class="model-name">
-                  <span class="role-tag" [class]="'role-' + m.role" title="Corsia / Ruolo del modello">{{ m.role === 'primary' ? 'SIMPLE' : (m.role | uppercase) }}</span>
-                  {{ m.model }}
+            <span class="section-label" title="Utilizzo giornaliero delle quote RPD (Richieste Per Giorno) per ciascun modello">🤖 Modelli & Quote RPD</span>
+
+            <!-- 1. SIMPLE (Primario) -->
+            <ng-container *ngIf="primaryModel() as m">
+              <div
+                class="model-item"
+                title="Ruolo SIMPLE: {{ m.rpd_used }} di {{ m.rpd_limit > 0 ? m.rpd_limit : 'illimitate' }} RPD consumate oggi"
+              >
+                <div class="model-info">
+                  <span class="model-name">
+                    <span class="role-tag role-primary" title="Corsia SIMPLE">SIMPLE</span>
+                    {{ m.model }}
+                  </span>
+                  <span class="rpd-count" *ngIf="m.rpd_limit > 0">{{ m.rpd_used }} / {{ m.rpd_limit }} RPD</span>
+                  <span class="rpd-count" *ngIf="m.rpd_limit === 0">{{ m.rpd_used }} RPD</span>
+                </div>
+                <div class="rpd-bar-wrapper" *ngIf="m.rpd_limit > 0">
+                  <div
+                    class="rpd-bar-fill"
+                    [style.width.%]="(m.rpd_used / m.rpd_limit) * 100"
+                    [class.warning]="(m.rpd_used / m.rpd_limit) >= 0.8"
+                    [class.danger]="m.cooling_down || m.rpd_used >= m.rpd_limit"
+                  ></div>
+                </div>
+                <span class="cooldown-warning" *ngIf="m.cooling_down" [title]="'Pausa cooldown fino a: ' + (m.cooldown_until | date:'yyyy-MM-dd HH:mm:ss')">
+                  Cooling down: {{ formatCooldownUntil(m.cooldown_until, nowTick()) }}
                 </span>
-                <span class="rpd-count" *ngIf="m.rpd_limit > 0" title="Quota giornaliera consumata rispetto al limite RPD">{{ m.rpd_used }} / {{ m.rpd_limit }} RPD</span>
-                <span class="rpd-count" *ngIf="m.rpd_limit === 0" title="Modello senza limite RPD rigido impostato">{{ m.rpd_used }} RPD (unmanaged)</span>
               </div>
-              <div class="rpd-bar-wrapper" *ngIf="m.rpd_limit > 0">
-                <div
-                  class="rpd-bar-fill"
-                  [style.width.%]="(m.rpd_used / m.rpd_limit) * 100"
-                  [class.warning]="(m.rpd_used / m.rpd_limit) >= 0.8"
-                  [class.danger]="m.cooling_down || m.rpd_used >= m.rpd_limit"
-                ></div>
+            </ng-container>
+
+            <!-- 2. FALLBACK (L1) -->
+            <ng-container *ngFor="let m of fallbackModels()">
+              <div
+                class="model-item"
+                title="Ruolo FALLBACK: {{ m.rpd_used }} di {{ m.rpd_limit > 0 ? m.rpd_limit : 'illimitate' }} RPD consumate oggi"
+              >
+                <div class="model-info">
+                  <span class="model-name">
+                    <span class="role-tag role-fallback" title="Corsia FALLBACK">FALLBACK</span>
+                    {{ m.model }}
+                  </span>
+                  <span class="rpd-count" *ngIf="m.rpd_limit > 0">{{ m.rpd_used }} / {{ m.rpd_limit }} RPD</span>
+                  <span class="rpd-count" *ngIf="m.rpd_limit === 0">{{ m.rpd_used }} RPD</span>
+                </div>
+                <div class="rpd-bar-wrapper" *ngIf="m.rpd_limit > 0">
+                  <div
+                    class="rpd-bar-fill"
+                    [style.width.%]="(m.rpd_used / m.rpd_limit) * 100"
+                    [class.warning]="(m.rpd_used / m.rpd_limit) >= 0.8"
+                    [class.danger]="m.cooling_down || m.rpd_used >= m.rpd_limit"
+                  ></div>
+                </div>
+                <span class="cooldown-warning" *ngIf="m.cooling_down" [title]="'Pausa cooldown fino a: ' + (m.cooldown_until | date:'yyyy-MM-dd HH:mm:ss')">
+                  Cooling down: {{ formatCooldownUntil(m.cooldown_until, nowTick()) }}
+                </span>
               </div>
-              <span class="cooldown-warning" *ngIf="m.cooling_down" [title]="'Pausa cooldown fino a: ' + (m.cooldown_until | date:'yyyy-MM-dd HH:mm:ss')">
-                ⚠️ Cooling down: {{ formatCooldownUntil(m.cooldown_until, nowTick()) }}
-              </span>
+            </ng-container>
+
+            <!-- 3. BORDERLINE (Divisore / Ponte tra SIMPLE e COMPLEX) -->
+            <ng-container *ngIf="metricsStatus()?.borderline as bl">
+              <div
+                class="model-item"
+                title="Ruolo BORDERLINE: {{ bl.rpd_used ?? bl.articles_today }} di {{ (bl.rpd_limit ?? 0) > 0 ? bl.rpd_limit : 'illimitate' }} RPD consumate oggi"
+              >
+                <div class="model-info">
+                  <span class="model-name">
+                    <span class="role-tag role-borderline" title="Corsia BORDERLINE">BORDERLINE</span>
+                    {{ bl.model }}
+                  </span>
+                  <span class="rpd-count" *ngIf="(bl.rpd_limit ?? 0) > 0">{{ bl.rpd_used ?? bl.articles_today }} / {{ bl.rpd_limit }} RPD</span>
+                  <span class="rpd-count" *ngIf="(bl.rpd_limit ?? 0) === 0">{{ bl.rpd_used ?? bl.articles_today }} RPD</span>
+                </div>
+                <div class="rpd-bar-wrapper" *ngIf="(bl.rpd_limit ?? 0) > 0">
+                  <div
+                    class="rpd-bar-fill"
+                    [style.width.%]="((bl.rpd_used ?? bl.articles_today) / bl.rpd_limit!) * 100"
+                  ></div>
+                </div>
+              </div>
+            </ng-container>
+
+            <!-- 4. COMPLEX -->
+            <ng-container *ngIf="complexModel() as m">
+              <div
+                class="model-item"
+                title="Ruolo COMPLEX: {{ m.rpd_used }} di {{ m.rpd_limit > 0 ? m.rpd_limit : 'illimitate' }} RPD consumate oggi"
+              >
+                <div class="model-info">
+                  <span class="model-name">
+                    <span class="role-tag role-complex" title="Corsia COMPLEX">COMPLEX</span>
+                    {{ m.model }}
+                  </span>
+                  <span class="rpd-count" *ngIf="m.rpd_limit > 0">{{ m.rpd_used }} / {{ m.rpd_limit }} RPD</span>
+                  <span class="rpd-count" *ngIf="m.rpd_limit === 0">{{ m.rpd_used }} RPD</span>
+                </div>
+                <div class="rpd-bar-wrapper" *ngIf="m.rpd_limit > 0">
+                  <div
+                    class="rpd-bar-fill"
+                    [style.width.%]="(m.rpd_used / m.rpd_limit) * 100"
+                    [class.warning]="(m.rpd_used / m.rpd_limit) >= 0.8"
+                    [class.danger]="m.cooling_down || m.rpd_used >= m.rpd_limit"
+                  ></div>
+                </div>
+                <span class="cooldown-warning" *ngIf="m.cooling_down" [title]="'Pausa cooldown fino a: ' + (m.cooldown_until | date:'yyyy-MM-dd HH:mm:ss')">
+                  Cooling down: {{ formatCooldownUntil(m.cooldown_until, nowTick()) }}
+                </span>
+              </div>
+            </ng-container>
+          </div>
+
+          <!-- Sezione 3 — Gestione & Effort -->
+          <div class="popover-section">
+            <span class="section-label" title="Dettaglio livelli di Reasoning Effort configurati per ciascun ruolo/corsia del sistema">⚖️ Gestione & Effort</span>
+            <div class="effort-summary-card">
+              <div class="effort-matrix">
+                <div class="effort-matrix-item">
+                  <span class="effort-role role-primary-text">SIMPLE</span>
+                  <span class="effort-badge effort-none">NONE</span>
+                </div>
+                <div class="effort-matrix-item">
+                  <span class="effort-role role-fallback-text">FALLBACK</span>
+                  <span class="effort-badge effort-none">NONE</span>
+                </div>
+                <div class="effort-matrix-item">
+                  <span class="effort-role role-borderline-text">BORDERLINE</span>
+                  <span class="effort-badge" [class]="'effort-' + (metricsStatus()?.borderline?.reasoning_effort || 'none')">
+                    {{ (metricsStatus()?.borderline?.reasoning_effort || 'none') | uppercase }}
+                  </span>
+                </div>
+                <div class="effort-matrix-item">
+                  <span class="effort-role role-complex-text">COMPLEX</span>
+                  <span class="effort-badge" [class]="'effort-' + complexReasoningEffort()">
+                    {{ complexReasoningEffort() | uppercase }}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

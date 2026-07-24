@@ -116,6 +116,12 @@ export class RadarToolbarComponent {
   readonly metricsSummary = computed(() => this.state.metricsSummary());
   readonly metricsStatus = computed(() => this.state.metricsStatus());
   readonly statusLevel = computed(() => this.metricsStatus()?.level ?? 'nominal');
+
+  readonly primaryModel = computed(() => this.metricsStatus()?.models?.find((m) => m.role === 'primary'));
+  readonly fallbackModels = computed(() => this.metricsStatus()?.models?.filter((m) => m.role === 'fallback') ?? []);
+  readonly complexModel = computed(() => this.metricsStatus()?.models?.find((m) => m.role === 'complex'));
+  readonly complexReasoningEffort = computed(() => this.complexModel()?.reasoning_effort || 'high');
+
   readonly totalCostUsd = computed(() => {
     return this.metricsSummary()?.llm?.total_estimated_cost_usd ?? 0;
   });
@@ -166,6 +172,10 @@ export class RadarToolbarComponent {
 
   readonly l1BadgeTooltip = computed(() => {
     return `Fallback L1 Attivo: ${this.l1ReasonDescription()}`;
+  });
+
+  readonly degradedReasonDescription = computed(() => {
+    return 'Tutti i modelli di Intelligenza Artificiale configurati sono attualmente in pausa per cooldown o quota RPD esaurita. L\'elaborazione di nuovi articoli riprenderà automaticamente al loro sblocco.';
   });
 
   formatCooldownUntil(isoString: string | null | undefined, nowMs: number): string {

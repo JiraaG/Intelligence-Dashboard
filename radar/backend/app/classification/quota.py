@@ -59,6 +59,10 @@ class QuotaBudgetExceeded(Exception):
 class QuotaDailyExceeded(Exception):
     """RPD (richieste/giorno) della lane esaurito — failover residual sull'altra lane."""
 
+    def __init__(self, message: str, until_ts: datetime | None = None) -> None:
+        super().__init__(message)
+        self.until_ts = until_ts
+
 
 def compute_day_window(
     now_utc: datetime,
@@ -699,7 +703,8 @@ class QuotaLedger:
                         # per residual sull'altra lane. RPM/TPM invece attendono.
                         raise QuotaDailyExceeded(
                             f"lane={lane} model={model or 'default'} RPD={limits.rpd} exhausted "
-                            f"(until day_end={day_end.isoformat()})"
+                            f"(until day_end={day_end.isoformat()})",
+                            until_ts=day_end,
                         )
 
                 reservation_id = await conn.fetchval(

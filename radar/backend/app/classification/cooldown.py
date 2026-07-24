@@ -87,23 +87,32 @@ class ModelCooldownStore:
         *,
         reason: str | None = None,
         hours: int | None = None,
+        until: datetime | None = None,
     ) -> datetime:
         """
-        UPSERT cooldown: ``until = now + hours`` (default 24h SoT).
+        UPSERT cooldown: ``until`` esplicito oppure ``now + hours`` (default 24h SoT).
         Ritorna ``until_ts`` effettivo. Log WARNING (SQL o memory).
         """
-        hrs = hours if hours is not None else self._default_hours
-        until = self._now() + timedelta(hours=hrs)
+        if until is not None:
+            target_until = until
+            if target_until.tzinfo is None:
+                target_until = target_until.replace(tzinfo=timezone.utc)
+            else:
+                target_until = target_until.astimezone(timezone.utc)
+        else:
+            hrs = hours if hours is not None else self._default_hours
+            target_until = self._now() + timedelta(hours=hrs)
+
         if self.pool is None:
-            self._memory[(provider, model)] = (until, reason)
+            self._memory[(provider, model)] = (target_until, reason)
             logger.warning(
                 "Cooldown in-memory %s/%s until %s (%s)",
                 provider,
                 model,
-                until.isoformat(),
+                target_until.isoformat(),
                 reason,
             )
-            return until
+            return target_until
 
         await self.pool.execute(
             """
@@ -116,17 +125,17 @@ class ModelCooldownStore:
             """,
             provider,
             model,
-            until,
+            target_until,
             reason,
         )
         logger.warning(
             "Cooldown SQL %s/%s until %s (%s)",
             provider,
             model,
-            until.isoformat(),
+            target_until.isoformat(),
             reason,
         )
-        return until
+        return target_until
 
     async def clear_expired(self) -> int:
         """

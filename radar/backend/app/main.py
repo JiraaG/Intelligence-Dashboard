@@ -914,7 +914,14 @@ async def get_metrics_status() -> dict[str, Any]:
 
     from app.classification.cooldown import ModelCooldownStore
     from app.classification.quota import compute_day_window, get_model_rpd_used
-    from app.core.config import LLM_COMPLEX, LLM_SIMPLE, RADAR_TIME_ZONE, RADAR_TIME_ZONE_NAME, WORKER_HEARTBEAT_STALE_SECONDS
+    from app.core.config import (
+        LLM_BORDERLINE_REASONING_EFFORT,
+        LLM_COMPLEX,
+        LLM_SIMPLE,
+        RADAR_TIME_ZONE,
+        RADAR_TIME_ZONE_NAME,
+        WORKER_HEARTBEAT_STALE_SECONDS,
+    )
     from app.core.heartbeat import fetch_worker_heartbeat, heartbeat_age_seconds
 
     now_utc = datetime.now(timezone.utc)
@@ -955,6 +962,7 @@ async def get_metrics_status() -> dict[str, Any]:
             "provider": prim_prov,
             "model": prim_model,
             "rpd_limit": prim_rpd_lim,
+            "reasoning_effort": "none",
         })
         for fb in LLM_SIMPLE.fallbacks:
             fb_lim = LLM_SIMPLE.model_limits.get(fb, (0, 0, LLM_SIMPLE.rpd))[2]
@@ -964,16 +972,19 @@ async def get_metrics_status() -> dict[str, Any]:
                 "provider": prim_prov,
                 "model": fb,
                 "rpd_limit": fb_lim,
+                "reasoning_effort": "none",
             })
         cplx_model = LLM_COMPLEX.model
         cplx_prov = LLM_COMPLEX.provider
         cplx_rpd_lim = LLM_COMPLEX.model_limits.get(cplx_model, (0, 0, LLM_COMPLEX.rpd))[2]
+        cplx_effort = getattr(LLM_COMPLEX, "reasoning_effort", "high") or "high"
         models_config.append({
             "role": "complex",
             "lane": "complex",
             "provider": cplx_prov,
             "model": cplx_model,
             "rpd_limit": cplx_rpd_lim,
+            "reasoning_effort": str(cplx_effort).lower(),
         })
 
         model_items: list[dict[str, Any]] = []
@@ -991,6 +1002,7 @@ async def get_metrics_status() -> dict[str, Any]:
                 "rpd_limit": m["rpd_limit"],
                 "cooling_down": is_cooling,
                 "cooldown_until": cd_until,
+                "reasoning_effort": m["reasoning_effort"],
             })
 
         prim_item = model_items[0]
@@ -1028,6 +1040,24 @@ async def get_metrics_status() -> dict[str, Any]:
             l1_likely_active = True
             l1_reason = "recent_articles"
 
+        borderline_count_val = await conn.fetchval(
+            """
+            SELECT COUNT(*)::INT
+            FROM llm_request_ledger
+            WHERE created_at >= $1 AND created_at < $2
+              AND status = 'completed'
+              AND lane = 'complex'
+            """,
+            day_start,
+            day_end,
+        )
+        borderline_count = int(borderline_count_val or 0)
+        total_cplx_rpd = model_items[-1]["rpd_used"] if model_items else 0
+        borderline_rpd = min(borderline_count, total_cplx_rpd)
+        pure_cplx_rpd = max(0, total_cplx_rpd - borderline_rpd)
+        if model_items and model_items[-1]["role"] == "complex":
+            model_items[-1]["rpd_used"] = pure_cplx_rpd
+
         all_cooling = all(m["cooling_down"] for m in model_items)
         yellow_band = max(50, int(0.20 * prim_lim)) if prim_lim > 0 else 0
         residual = prim_lim - prim_used if prim_lim > 0 else 999999
@@ -1052,5 +1082,13 @@ async def get_metrics_status() -> dict[str, Any]:
         "l1_likely_active": l1_likely_active,
         "l1_reason": l1_reason,
         "models": model_items,
+        "borderline": {
+            "model": LLM_COMPLEX.model,
+            "provider": LLM_COMPLEX.provider,
+            "reasoning_effort": str(LLM_BORDERLINE_REASONING_EFFORT).lower(),
+            "articles_today": borderline_count,
+            "rpd_used": borderline_rpd,
+            "rpd_limit": model_items[-1]["rpd_limit"] if model_items else 0,
+        },
         "llm": summary_today.get("llm", {}),
     }
