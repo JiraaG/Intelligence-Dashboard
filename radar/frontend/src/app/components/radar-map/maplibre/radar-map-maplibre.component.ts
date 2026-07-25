@@ -10,6 +10,7 @@ import {
   computed,
   effect,
   inject,
+  HostListener,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
@@ -132,6 +133,24 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
     { label: 'Difesa', icon: '⚔️', cssVar: '--color-difesa' },
     { label: 'Materie Prime', icon: '⛏️', cssVar: '--color-materie-prime' },
   ];
+
+  readonly isLegendOpen = signal<boolean>(false);
+
+  toggleLegend(event: MouseEvent): void {
+    event.stopPropagation();
+    this.isLegendOpen.update((v) => !v);
+  }
+
+  closeLegend(): void {
+    this.isLegendOpen.set(false);
+  }
+
+  @HostListener('document:click')
+  onDocumentClick(): void {
+    if (this.isLegendOpen()) {
+      this.isLegendOpen.set(false);
+    }
+  }
 
   private readonly COUNTRY_PIN_SIZE = { w: 64, h: 76 } as const;
   private readonly COUNTRIES_SOURCE = 'radar-countries';

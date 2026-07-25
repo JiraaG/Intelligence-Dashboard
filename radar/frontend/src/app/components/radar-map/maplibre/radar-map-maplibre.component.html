@@ -13,18 +13,41 @@
       <p>MapLibre non è stato inizializzato. Ricarica la pagina o verifica WebGL.</p>
     </div>
   } @else {
-    <div class="map-legend" *ngIf="!isParsingGeoJson()">
-      <div class="legend-item" *ngFor="let item of legendItems">
-        <span
-          class="legend-color-dot"
-          [ngStyle]="{
-            'background-color': 'var(' + item.cssVar + ')',
-            'box-shadow': '0 0 8px var(' + item.cssVar + ')',
-          }"
-        ></span>
-        <span class="legend-icon">{{ item.icon }}</span>
-        <span class="legend-label">{{ item.label }}</span>
+    <div class="map-legend-wrap" *ngIf="!isParsingGeoJson()">
+      <!-- Popover Espandibile -->
+      <div class="legend-popover" *ngIf="isLegendOpen()" (click)="$event.stopPropagation()">
+        <div class="legend-popover-header">
+          <span class="legend-popover-title">CLASSIFICAZIONE GEOPOLITICA</span>
+          <button type="button" class="legend-popover-close" (click)="closeLegend()" aria-label="Chiudi legenda">✕</button>
+        </div>
+        <div class="legend-grid">
+          <div class="legend-item" *ngFor="let item of legendItems">
+            <span
+              class="legend-color-dot"
+              [ngStyle]="{
+                'background-color': 'var(' + item.cssVar + ')',
+                'box-shadow': '0 0 8px var(' + item.cssVar + ')',
+              }"
+            ></span>
+            <span class="legend-icon">{{ item.icon }}</span>
+            <span class="legend-label">{{ item.label }}</span>
+          </div>
+        </div>
       </div>
+
+      <!-- Pulsante Trigger -->
+      <button
+        type="button"
+        class="legend-trigger-btn"
+        [class.is-open]="isLegendOpen()"
+        (click)="toggleLegend($event)"
+        aria-label="Legenda Categorie"
+      >
+        <span class="legend-trigger-icon">🏷️</span>
+        <span class="legend-trigger-text">LEGENDA CATEGORIE</span>
+        <span class="legend-trigger-badge">15</span>
+        <span class="legend-trigger-chevron">{{ isLegendOpen() ? '▼' : '▲' }}</span>
+      </button>
     </div>
 
     <div class="bootstrapping-overlay" *ngIf="isParsingGeoJson()">
