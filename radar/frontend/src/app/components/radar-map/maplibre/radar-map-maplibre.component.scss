@@ -187,11 +187,14 @@
     font-size: 0.75rem;
     letter-spacing: 0.05em;
     text-transform: uppercase;
+    white-space: nowrap;
+    flex-shrink: 0;
 
     .legend-color-dot {
       width: 8px;
       height: 8px;
       border-radius: 50%;
+      flex-shrink: 0;
       transition: box-shadow var(--transition-fast);
     }
 
@@ -199,11 +202,13 @@
       font-size: 0.85rem;
       display: flex;
       align-items: center;
+      flex-shrink: 0;
     }
 
     .legend-label {
       color: var(--color-text-secondary);
       font-weight: 500;
+      white-space: nowrap;
     }
   }
 }

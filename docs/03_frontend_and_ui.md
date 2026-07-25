@@ -114,7 +114,7 @@ Offline: `{ provide: MOCK_MODE, useValue: true }`. Errori API restano visibili â
 
 **MapLibre (default):** nessun MarkerCluster â€” hub nazione + fan emoji custom per categoria attiva (stessa UX: keep su latch pin / collapse su latch hatching; soglia enter 4 + isteresi 0.4).
 
-**Leaflet legacy:** un `markerClusterGroup` **per ciascuna delle 10 categorie** (nation detail):
+**Leaflet legacy:** un `markerClusterGroup` **per ciascuna delle 15 categorie** (nation detail):
 
 - `maxClusterRadius: 40`
 - `spiderfyOnMaxZoom: false` (espansione custom / flyTo)

@@ -27,7 +27,7 @@ URL_HASH_HEX_CHARS = 16
 
 
 def initialize_vault_directories(vault_path: str | None = None) -> None:
-    """Crea la root vault e le 10 sottocartelle categoria se mancanti.
+    """Crea la root vault e le 15 sottocartelle categoria se mancanti.
 
     Default root: ``OBSIDIAN_VAULT_PATH`` (``/app/vault`` in container).
     Raises:

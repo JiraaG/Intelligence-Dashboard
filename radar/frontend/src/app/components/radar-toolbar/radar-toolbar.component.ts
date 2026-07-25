@@ -306,6 +306,11 @@ export class RadarToolbarComponent {
     { label: '🌿 Ambiente', value: 'Ambiente' },
     { label: '⚕️ Salute', value: 'Salute' },
     { label: '🛡️ Sicurezza', value: 'Sicurezza' },
+    { label: '🤖 Intelligenza Artificiale', value: 'Intelligenza Artificiale' },
+    { label: '🔒 Cybersecurity', value: 'Cybersecurity' },
+    { label: '💎 Finanza', value: 'Finanza' },
+    { label: '⚔️ Difesa', value: 'Difesa' },
+    { label: '⛏️ Materie Prime', value: 'Materie Prime' },
   ];
 
   readonly COUNTRY_NAMES: Record<string, string> = {

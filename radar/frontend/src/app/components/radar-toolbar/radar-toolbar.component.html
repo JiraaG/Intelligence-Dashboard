@@ -361,7 +361,10 @@
             *ngFor="let opt of filteredSentimentOptions()"
             role="option"
           >
-            <span class="country-name">{{ opt.label }}</span>
+            <div class="sentiment-option-label" [ngClass]="'sentiment-opt--' + opt.value.toLowerCase()">
+              <span class="sentiment-icon">{{ opt.value === 'Positivo' ? '▲' : opt.value === 'Negativo' ? '▼' : '●' }}</span>
+              <span class="sentiment-name">{{ opt.value }}</span>
+            </div>
             <button
               type="button"
               class="ios-switch"

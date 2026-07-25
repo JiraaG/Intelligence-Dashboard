@@ -356,6 +356,44 @@
             min-width: 0;
           }
 
+          .sentiment-option-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-grow: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+
+            .sentiment-icon {
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              width: 14px;
+              height: 14px;
+              font-size: 0.8rem;
+              line-height: 1;
+              flex-shrink: 0;
+            }
+
+            .sentiment-name {
+              font-size: 0.8125rem;
+              color: var(--color-text-primary);
+            }
+
+            &.sentiment-opt--positivo .sentiment-icon {
+              color: var(--color-sentiment-pos);
+            }
+
+            &.sentiment-opt--neutrale .sentiment-icon {
+              color: var(--color-sentiment-neu);
+            }
+
+            &.sentiment-opt--negativo .sentiment-icon {
+              color: var(--color-sentiment-neg);
+            }
+          }
+
           .country-badge {
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.75rem;

@@ -8,7 +8,12 @@ export type PrimaryCategory =
   | 'Spazio'
   | 'Ambiente'
   | 'Salute'
-  | 'Sicurezza';
+  | 'Sicurezza'
+  | 'Intelligenza Artificiale'
+  | 'Cybersecurity'
+  | 'Finanza'
+  | 'Difesa'
+  | 'Materie Prime';
 
 export type Sentiment = 'Positivo' | 'Neutrale' | 'Negativo';
 

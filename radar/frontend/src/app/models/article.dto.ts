@@ -18,6 +18,11 @@ const PRIMARY_CATEGORIES: ReadonlySet<string> = new Set<PrimaryCategory>([
   'Ambiente',
   'Salute',
   'Sicurezza',
+  'Intelligenza Artificiale',
+  'Cybersecurity',
+  'Finanza',
+  'Difesa',
+  'Materie Prime',
 ]);
 
 const SENTIMENTS: ReadonlySet<string> = new Set<Sentiment>([

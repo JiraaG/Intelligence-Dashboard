@@ -328,7 +328,7 @@ con i dati mockati prima di connettere il backend reale.
 
 ### ✅ Test 3: Cluster / spiderfy per Categoria e Carosello PrimeNG
 
-- [ ] Le 10 categorie valide (Nucleare…Sicurezza) — **no** Chip/Acqua/Elettronica come primary
+- [ ] Le 15 categorie valide (Nucleare…Materie Prime) — **no** Chip/Acqua/Elettronica come primary
 - [ ] Cliccando hub/categoria si apre la sidebar sinistra con **solo** gli articoli di quella categoria
 - [ ] Il componente `p-carousel` scorre correttamente tra le notizie della categoria selezionata (**osservare only** — non editare `radar-sidebar/**`)
 - [ ] Ogni slide del carousel mostra: titolo, summary, badge tags, link sorgente

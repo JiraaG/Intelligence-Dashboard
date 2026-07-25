@@ -51,7 +51,7 @@ Moduli sotto `radar/backend/app/`:
 - Campi multi-valore **`str` CSV** (`companies_involved`, `tags`, `infrastructural_entities`, `related_countries`) — non `List[str]`
 - Nessun campo `reasoning` / Chain-of-Thought
 - `build_gemini_response_schema()` sanitizza lo schema per l’API Google
-- 10 categorie: Nucleare, Energia, Infrastrutture, Geopolitica, Economia, Tecnologia, Spazio, Ambiente, Salute, Sicurezza
+- 15 categorie: Nucleare, Energia, Infrastrutture, Geopolitica, Economia, Tecnologia, Spazio, Ambiente, Salute, Sicurezza, Intelligenza Artificiale, Cybersecurity, Finanza, Difesa, Materie Prime
 - Prompt SoT: `classification/prompts.py` — fallback `Tecnologia`+`XX` **ristretto** (solo assenza di fatti geo/industriali/politici); albero decisionale anti-`XX`; multilaterali = 1 primary + `related_countries` CSV
 - Fallback geografico su fallimento irreversibile: paese `XX`, categoria `Infrastrutture` (vedi `validator.py`)
 - Provider: `gemini` \| `deepseek` \| `openai` \| `glm` \| `grok` \| `claude` (**stub**; Messages API non implementata)

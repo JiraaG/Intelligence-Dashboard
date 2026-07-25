@@ -150,9 +150,11 @@ class GeopoliticalArticleSchema(BaseModel):
     primary_category: Literal[
         "Nucleare", "Energia", "Infrastrutture",
         "Geopolitica", "Economia", "Tecnologia",
-        "Spazio", "Ambiente", "Salute", "Sicurezza"
+        "Spazio", "Ambiente", "Salute", "Sicurezza",
+        "Intelligenza Artificiale", "Cybersecurity", "Finanza",
+        "Difesa", "Materie Prime"
     ] = Field(
-        description="La macro-categoria principale scelta dall'elenco chiuso (10 categorie).",
+        description="La macro-categoria principale scelta dall'elenco chiuso (15 categorie).",
     )
     sentiment: Literal["Positivo", "Neutrale", "Negativo"] = Field(
         description="Sentiment strategico legato alla notizia.",

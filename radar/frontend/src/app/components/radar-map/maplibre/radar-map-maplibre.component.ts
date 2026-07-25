@@ -90,6 +90,11 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
     Ambiente: '🌿',
     Salute: '⚕️',
     Sicurezza: '🛡️',
+    'Intelligenza Artificiale': '🤖',
+    Cybersecurity: '🔒',
+    Finanza: '💎',
+    Difesa: '⚔️',
+    'Materie Prime': '⛏️',
   };
 
   private readonly CATEGORY_CSS_VARS: Record<string, string> = {
@@ -103,6 +108,11 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
     Ambiente: '--color-ambiente',
     Salute: '--color-salute',
     Sicurezza: '--color-sicurezza',
+    'Intelligenza Artificiale': '--color-intelligenza-artificiale',
+    Cybersecurity: '--color-cybersecurity',
+    Finanza: '--color-finanza',
+    Difesa: '--color-difesa',
+    'Materie Prime': '--color-materie-prime',
   };
 
   readonly legendItems = [
@@ -116,6 +126,11 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
     { label: 'Ambiente', icon: '🌿', cssVar: '--color-ambiente' },
     { label: 'Salute', icon: '⚕️', cssVar: '--color-salute' },
     { label: 'Sicurezza', icon: '🛡️', cssVar: '--color-sicurezza' },
+    { label: 'A.I.', icon: '🤖', cssVar: '--color-intelligenza-artificiale' },
+    { label: 'Cybersecurity', icon: '🔒', cssVar: '--color-cybersecurity' },
+    { label: 'Finanza', icon: '💎', cssVar: '--color-finanza' },
+    { label: 'Difesa', icon: '⚔️', cssVar: '--color-difesa' },
+    { label: 'Materie Prime', icon: '⛏️', cssVar: '--color-materie-prime' },
   ];
 
   private readonly COUNTRY_PIN_SIZE = { w: 64, h: 76 } as const;

@@ -286,7 +286,7 @@ Dashboard finance/
     ├── ops/                           # backup/restore + README ops
     ├── docs/runbook.md
     ├── backend/
-    │   ├── migrations/                # 001–010
+    │   ├── migrations/                # 001–016
     │   └── app/
     │       ├── main.py                # API-only
     │       ├── worker.py              # ingest

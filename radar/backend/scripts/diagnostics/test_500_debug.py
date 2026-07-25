@@ -24,7 +24,8 @@ class FullSchema(BaseModel):
     primary_category: Literal[
         'Nucleare', 'Energia', 'Infrastrutture',
         'Geopolitica', 'Economia', 'Tecnologia',
-        'Spazio', 'Ambiente', 'Salute', 'Sicurezza'
+        'Spazio', 'Ambiente', 'Salute', 'Sicurezza',
+        'Intelligenza Artificiale', 'Cybersecurity', 'Finanza', 'Difesa', 'Materie Prime'
     ]
     sentiment: Literal['Positivo', 'Neutrale', 'Negativo']
     infrastructural_entities: List[str]

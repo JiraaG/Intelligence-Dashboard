@@ -33,18 +33,9 @@ import asyncpg
 
 from app.core.config import DATABASE_URL
 
-CATEGORIES = (
-    "Nucleare",
-    "Energia",
-    "Infrastrutture",
-    "Geopolitica",
-    "Economia",
-    "Tecnologia",
-    "Spazio",
-    "Ambiente",
-    "Salute",
-    "Sicurezza",
-)
+from app.classification.validator import PRIMARY_CATEGORIES
+
+CATEGORIES = PRIMARY_CATEGORIES
 
 SENTIMENTS = ("Positivo", "Neutrale", "Negativo")
 

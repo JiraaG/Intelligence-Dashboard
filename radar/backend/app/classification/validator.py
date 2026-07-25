@@ -32,6 +32,11 @@ PRIMARY_CATEGORIES = (
     "Ambiente",
     "Salute",
     "Sicurezza",
+    "Intelligenza Artificiale",
+    "Cybersecurity",
+    "Finanza",
+    "Difesa",
+    "Materie Prime",
 )
 
 SENTIMENT_VALUES = ("Positivo", "Neutrale", "Negativo")
@@ -63,6 +68,25 @@ _CATEGORY_ALIASES: dict[str, str] = {
     "infrastructure": "Infrastrutture",
     "infrastructures": "Infrastrutture",
     "infrastrutture": "Infrastrutture",
+    "ai": "Intelligenza Artificiale",
+    "artificial intelligence": "Intelligenza Artificiale",
+    "intelligenza artificiale": "Intelligenza Artificiale",
+    "cybersecurity": "Cybersecurity",
+    "cyber security": "Cybersecurity",
+    "cyber": "Cybersecurity",
+    "sicurezza informatica": "Cybersecurity",
+    "finance": "Finanza",
+    "finanza": "Finanza",
+    "financial markets": "Finanza",
+    "mercati finanziari": "Finanza",
+    "defense": "Difesa",
+    "defence": "Difesa",
+    "difesa": "Difesa",
+    "armamenti": "Difesa",
+    "raw materials": "Materie Prime",
+    "commodities": "Materie Prime",
+    "materie prime": "Materie Prime",
+    "minerals": "Materie Prime",
 }
 
 _SENTIMENT_ALIASES: dict[str, str] = {
@@ -467,8 +491,13 @@ class GeopoliticalArticleSchema(BaseModel):
         "Ambiente",
         "Salute",
         "Sicurezza",
+        "Intelligenza Artificiale",
+        "Cybersecurity",
+        "Finanza",
+        "Difesa",
+        "Materie Prime",
     ] = Field(
-        description="Macro-categoria principale scelta rigorosamente tra le 10 categorie geopolitiche.",
+        description="Macro-categoria principale scelta rigorosamente tra le 15 categorie geopolitiche.",
     )
     sentiment: Literal["Positivo", "Neutrale", "Negativo"] = Field(
         description="Sentiment strategico legato alla notizia.",

@@ -22,19 +22,24 @@ SICUREZZA E DELIMITAZIONE DEI DATI:
 Segui tassativamente le seguenti regole operative per l'estrazione:
 
 1. CATEGORIZZAZIONE GEOPOLITICA:
-   Assegna l'articolo ad ESATTAMENTE UNA delle seguenti categorie primarie (il primo tag in 'tags' deve essere identico alla categoria scelta):
+   Assegna l'articolo ad ESATTAMENTE UNA delle seguenti 15 categorie primarie (il primo tag in 'tags' deve essere identico alla categoria scelta):
    - 'Nucleare': impianti atomici, reattori, uranio arricchito, sanzioni nucleari, monitoraggio IAEA.
    - 'Energia': oleodotti, gasdotti, reti di trasmissione elettrica, transizione energetica, idrogeno, materie prime energetiche (non solo policy green senza asset → usa 'Ambiente').
-   - 'Infrastrutture': porti marittimi commerciali, ferrovie di collegamento merci, aeroporti cargo, corridoi commerciali fisici (non infrastruttura digitale → 'Tecnologia').
-   - 'Geopolitica': elezioni, conflitti, tensioni diplomatiche, sanzioni politiche, alleanze, governance, politica interna, scandali politici.
-   - 'Economia': mercati finanziari, tassi di interesse, inflazione, accordi commerciali, debito (accordo solo militare/strategico → 'Geopolitica' o 'Sicurezza').
-   - 'Tecnologia': semiconduttori, intelligenza artificiale, telecomunicazioni, ricerca avanzata, biotecnologie industriali (non soft-news, sport o scandali politici).
-   - 'Spazio': esplorazione spaziale, satelliti, lanci orbitali, missioni (telecom terrestri → 'Tecnologia').
-   - 'Ambiente': cambiamenti climatici, disastri naturali, inquinamento, politiche green (asset energetici fisici come focus → 'Energia').
-   - 'Salute': pandemie, regolamentazioni sanitarie, OMS, farmaci strategici, salute pubblica / surrogacy normativa (biotech industriale chip/AI → 'Tecnologia').
-   - 'Sicurezza': cybersecurity, difesa militare, intelligence, attacchi hacker, spionaggio (tensioni diplomatiche pure → 'Geopolitica').
-   Tie-break: atto politico/potere/legge → 'Geopolitica'; asset fisico critico → 'Energia'/'Infrastrutture'/'Nucleare'; threat/ops → 'Sicurezza'; mercato/prezzo → 'Economia'.
-   Scegli sempre la categoria più pertinente tra le 10 elencate. Non usare categorie esterne allo schema.
+   - 'Infrastrutture': porti marittimi commerciali, ferrovie di collegamento merci, aeroporti cargo, corridoi commerciali fisici (infrastruttura digitale/AI → 'Tecnologia' o 'Intelligenza Artificiale').
+   - 'Geopolitica': elezioni, tensioni diplomatiche, sanzioni politiche, alleanze, governance, politica interna, trattati internazionali, scandali politici.
+   - 'Economia': macroeconomia, tassi di interesse, inflazione, PIL, debito sovrano, politiche commerciali, dazi, tariffe (trading/borse → 'Finanza'; miniera/litio → 'Materie Prime').
+   - 'Tecnologia': hardware/software generico, telecomunicazioni, cloud computing, ricerca avanzata, open source, dev, semiconduttori, biotecnologie industriali (modelli AI/LLM → 'Intelligenza Artificiale'; minacce cyber → 'Cybersecurity').
+   - 'Spazio': esplorazione spaziale, satelliti, lanci orbitali, stazioni spaziali, astronautica (telecom terrestri → 'Tecnologia').
+   - 'Ambiente': cambiamenti climatici, disastri naturali, inquinamento, sostenibilità, biodiversità (asset energetici fisici come focus → 'Energia').
+   - 'Salute': pandemie, regolamentazioni sanitarie, OMS, farmaci strategici, salute pubblica, biotecnologie mediche.
+   - 'Sicurezza': intelligence, ordine pubblico, sicurezza interna, forze di polizia, protezione civile (attacchi cyber → 'Cybersecurity'; operazioni militari/eserciti → 'Difesa').
+   - 'Intelligenza Artificiale': modelli LLM/frontier, AI agenti, chip per AI, sovranità di calcolo AI, regolamentazione dell'IA, automazione intelligente, deep learning.
+   - 'Cybersecurity': attacchi informatici, ransomware, data breach, malware, vulnerabilità zero-day, cyber-spionaggio, difesa di rete e infrastrutture critiche digitali.
+   - 'Finanza': mercati finanziari, borse valori, azioni, criptovalute, banche centrali, trading, capitale di rischio, fintech, investimenti speculativi.
+   - 'Difesa': forze armate, esercito, armamenti, sistemi missilistici, droni militari, procuramento militare, marina/aeronautica di difesa, operazioni di guerra.
+   - 'Materie Prime': litio, terre rare, rame, petrolio greggio, gas naturale, minerali critici, estrazione mineraria, catene di fornitura delle risorse naturali.
+   Tie-break: AI/LLM → 'Intelligenza Artificiale'; attacco cyber → 'Cybersecurity'; mercato/borsa/cripto → 'Finanza'; esercito/armi → 'Difesa'; litio/minerale → 'Materie Prime'; atto politico/legge → 'Geopolitica'; asset energetico → 'Energia'; threat/police → 'Sicurezza'; economia macro/PIL → 'Economia'.
+   Scegli sempre la categoria più pertinente tra le 15 elencate. Non usare categorie esterne allo schema.
    Categorie o sentiment non validi verranno rifiutati dal validatore: non inventare valori alternativi.
    ANTI-PATTERN (vietati): default comodo 'Tecnologia'; soft-news geolocalizzabile → 'Tecnologia'; scandalo politico → 'Tecnologia'; sport/cronaca giudiziaria (atleta, processo, guida, reato) → 'Tecnologia'; 'XX' solo perché l'articolo è soft-news.
    FALLBACK OFF-TOPIC (ristretto): usa 'Tecnologia', relevance_level 1 e country_code 'XX' SOLO se il testo non contiene fatti geopolitici, industriali, politici, sanitari, giudiziari o geografici attribuibili (filosofia astratta, saggio puro, entertainment senza teatro/attori nazionali). Soft-news con persona, istituzione o nazione → categoria reale + ISO reale (es. scandalo/politica/sport/processo → 'Geopolitica'; norma sanitaria → 'Salute'; incendio/disastro con luogo → 'Ambiente').
