@@ -236,18 +236,43 @@
         text-transform: uppercase;
       }
 
-      .legend-popover-close {
-        background: transparent;
-        border: none;
-        color: var(--color-text-secondary, #8b949e);
-        font-size: 0.85rem;
-        cursor: pointer;
-        padding: 2px 6px;
-        border-radius: 4px;
+      .legend-popover-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
 
-        &:hover {
-          color: #ffffff;
-          background: rgba(255, 255, 255, 0.1);
+        .legend-popover-reset {
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 0.65rem;
+          font-weight: 700;
+          letter-spacing: 0.05em;
+          background: rgba(0, 212, 255, 0.12);
+          color: var(--color-text-accent, #00d4ff);
+          border: 1px solid rgba(0, 212, 255, 0.25);
+          border-radius: 4px;
+          padding: 2px 7px;
+          cursor: pointer;
+          transition: all var(--transition-fast, 0.15s ease);
+
+          &:hover {
+            background: rgba(0, 212, 255, 0.25);
+            color: #ffffff;
+          }
+        }
+
+        .legend-popover-close {
+          background: transparent;
+          border: none;
+          color: var(--color-text-secondary, #8b949e);
+          font-size: 0.85rem;
+          cursor: pointer;
+          padding: 2px 6px;
+          border-radius: 4px;
+
+          &:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.1);
+          }
         }
       }
     }
@@ -255,11 +280,11 @@
     .legend-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 10px 18px;
+      gap: 6px 12px;
 
       @media (max-width: 540px) {
         grid-template-columns: repeat(2, 1fr);
-        gap: 8px 12px;
+        gap: 6px 10px;
       }
 
       .legend-item {
@@ -270,6 +295,28 @@
         font-size: 0.75rem;
         letter-spacing: 0.03em;
         white-space: nowrap;
+        padding: 5px 8px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all var(--transition-fast, 0.15s ease);
+        opacity: 0.55;
+        border: 1px solid transparent;
+
+        &:hover {
+          opacity: 0.9;
+          background: rgba(255, 255, 255, 0.06);
+        }
+
+        &.is-active {
+          opacity: 1;
+          background: rgba(0, 212, 255, 0.12);
+          border-color: rgba(0, 212, 255, 0.3);
+
+          .legend-label {
+            color: #ffffff;
+            font-weight: 600;
+          }
+        }
 
         .legend-color-dot {
           width: 8px;

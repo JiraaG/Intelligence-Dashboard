@@ -378,6 +378,7 @@ con i dati mockati prima di connettere il backend reale.
 - [ ] Popover **COSTI**: 6 sezioni (generali → costi/modello con effort → token → richieste/modello → dedup senza Totale → overall all-time).
 - [ ] MOCK_MODE: `getMetricsSummary` ha `models_breakdown` con `reasoning_effort` + `overall`; `getMetricsStatus` ha `borderline`, `reasoning_effort` sui models, e almeno un FALLBACK se configurato nel fixture.
 - [ ] Card sidebar **"ANALISI FINOPS & FONTE RSS"** dopo i Tag (modello, lane, token, latenza, costo, feed XML).
+- [ ] **Legenda Categorie Geopolitiche**: pulsante `🏷️ LEGENDA CATEGORIE [15]` in basso al centro (`bottom: 20px; left: 50%`) apre popover griglia a 3 colonne glassmorphic per tutte le 15 categorie; anteprima in hover (`mouseenter`/`mouseleave`) e blocco permanente al click (`isLegendClicked`).
 
 ---
 

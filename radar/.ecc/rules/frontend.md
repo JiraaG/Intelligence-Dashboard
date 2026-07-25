@@ -401,7 +401,7 @@ const L = (window as any).L as typeof import('leaflet');
 2. **Focus Bounding Box (US & RU):** Per evitare crash o anomalie nel calcolo dinamico dei bounds derivati dall'antimeridiano, utilizzare bounding box statici hardcoded (literal da `radar-map.component.ts`):
    * Stati Uniti (`US`): `L.latLngBounds(L.latLng(24.396308, -125.0), L.latLng(49.384358, -66.93457))`
    * Russia (`RU`): `L.latLngBounds(L.latLng(41.1856, 19.6389), L.latLng(81.8587, 169.0))`
-3. **Legenda Monoriga:** La legenda in basso alla mappa deve disporsi su una singola riga orizzontale (`flex-wrap: nowrap` con `overflow-x: auto` e `max-width: 90vw` in CSS) per un look glassmorphic premium e per evitare il wrap verticale.
+3. **Legenda Categorie (Popover Grid 3 Colonne):** La legenda in basso alla mappa usa un pulsante trigger compatto `🏷️ LEGENDA CATEGORIE [15]` (`bottom: 20px; left: 50%`) che apre un popover glassmorphic in griglia a 3 colonne per tutte le 15 categorie geopolitiche. Supporta l'anteprima al passaggio del mouse (`mouseenter`/`mouseleave`) ed il blocco permanente al click (`isLegendClicked`) per la navigazione interattiva della mappa e della sidebar con la legenda a vista.
 4. **Allineamento Tooltip Nazioni:** La riga del tooltip delle nazioni (`.tooltip-row`) deve allineare perfettamente flag, nome e badge a livello di baseline/center impostando un `line-height` comune ed allineando i flex item.
 5. **Livello di Zoom Massimo Focus:** Lo zoom durante l'azione di focus su nazione deve essere moderato (`maxZoom: 4` o inferiore nel `fitBounds`) per prevenire uno zoom-in troppo profondo che farebbe perdere il contesto.
 

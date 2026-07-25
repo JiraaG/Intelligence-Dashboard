@@ -134,7 +134,7 @@ Build FE Docker: `npm ci --legacy-peer-deps` (peer matrix Angular/PrimeNG).
 |---|-----------|-----------|
 | 01 | [docs/01_getting_started.md](docs/01_getting_started.md) | Installazione, `.env`, Docker, health, Miniflux feed/backup |
 | 02 | [docs/02_architecture_and_backend.md](docs/02_architecture_and_backend.md) | Worker, migrazioni, API, quote, outbox |
-| 03 | [docs/03_frontend_and_ui.md](docs/03_frontend_and_ui.md) | Mappa MapLibre (hatching isole/anti-bleed, pin, spiderfy), map-summary, archi relazioni (hover/click bilaterale), `MOCK_MODE`, stato UI |
+| 03 | [docs/03_frontend_and_ui.md](docs/03_frontend_and_ui.md) | Mappa MapLibre (hatching isole/anti-bleed, pin, spiderfy), Legenda Categorie Popover Grid (hover + click lock), map-summary, archi relazioni (hover/click bilaterale), `MOCK_MODE`, stato UI |
 | 04 | [docs/04_ecc_framework.md](docs/04_ecc_framework.md) | Harness ECC: `.agents` + `.ecc` + wiring Cursor |
 
 **Percorso per ruolo (non è una sequenza unica 01→04):** day-1 ops → `docs/01` + [ops](radar/ops/README.md) + [runbook](radar/docs/runbook.md); backend/API → `docs/02`; FE prodotto → `docs/03` + [frontend README](radar/frontend/README.md); agenti Cursor → `docs/04` + AGENTS/CLAUDE.

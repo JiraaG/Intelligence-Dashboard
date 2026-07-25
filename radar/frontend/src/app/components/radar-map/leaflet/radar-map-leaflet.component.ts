@@ -8,7 +8,6 @@ import {
   computed,
   effect,
   inject,
-  HostListener,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
@@ -16,6 +15,7 @@ import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import type * as Leaflet from 'leaflet';
 import { Article, CountrySummary, PrimaryCategory } from '../../../models/article.model';
+import { StateService } from '../../../services/state.service';
 import { MapSummaryRow } from '../../../models/map-summary.model';
 import { MapRelationRow } from '../../../models/map-relation.model';
 import { CountryOpenRequest, RelationOpenRequest } from '../radar-map.types';
@@ -189,22 +189,18 @@ export class RadarMapLeafletComponent implements AfterViewInit {
     { label: 'Materie Prime', icon: '⛏️', cssVar: '--color-materie-prime' },
   ];
 
-  readonly isLegendOpen = signal<boolean>(false);
+  readonly isLegendHovered = signal<boolean>(false);
+  readonly isLegendClicked = signal<boolean>(false);
+  readonly isLegendVisible = computed(() => this.isLegendHovered() || this.isLegendClicked());
 
-  toggleLegend(event: MouseEvent): void {
+  toggleLegendClick(event: MouseEvent): void {
     event.stopPropagation();
-    this.isLegendOpen.update((v) => !v);
+    this.isLegendClicked.update((v) => !v);
   }
 
   closeLegend(): void {
-    this.isLegendOpen.set(false);
-  }
-
-  @HostListener('document:click')
-  onDocumentClick(): void {
-    if (this.isLegendOpen()) {
-      this.isLegendOpen.set(false);
-    }
+    this.isLegendClicked.set(false);
+    this.isLegendHovered.set(false);
   }
 
   /** Box pixel pin day-view (punta in basso). Hub nazione usa disco compatto separato. */

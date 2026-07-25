@@ -13,12 +13,28 @@
       <p>MapLibre non è stato inizializzato. Ricarica la pagina o verifica WebGL.</p>
     </div>
   } @else {
-    <div class="map-legend-wrap" *ngIf="!isParsingGeoJson()">
+    <div
+      class="map-legend-wrap"
+      *ngIf="!isParsingGeoJson()"
+      (mouseenter)="isLegendHovered.set(true)"
+      (mouseleave)="isLegendHovered.set(false)"
+    >
       <!-- Popover Espandibile -->
-      <div class="legend-popover" *ngIf="isLegendOpen()" (click)="$event.stopPropagation()">
+      <div
+        class="legend-popover"
+        *ngIf="isLegendVisible()"
+        (click)="$event.stopPropagation()"
+      >
         <div class="legend-popover-header">
           <span class="legend-popover-title">CLASSIFICAZIONE GEOPOLITICA</span>
-          <button type="button" class="legend-popover-close" (click)="closeLegend()" aria-label="Chiudi legenda">✕</button>
+          <button
+            type="button"
+            class="legend-popover-close"
+            (click)="closeLegend()"
+            aria-label="Chiudi legenda"
+          >
+            ✕
+          </button>
         </div>
         <div class="legend-grid">
           <div class="legend-item" *ngFor="let item of legendItems">
@@ -39,14 +55,15 @@
       <button
         type="button"
         class="legend-trigger-btn"
-        [class.is-open]="isLegendOpen()"
-        (click)="toggleLegend($event)"
+        [class.is-active]="isLegendClicked()"
+        [class.is-open]="isLegendVisible()"
+        (click)="toggleLegendClick($event)"
         aria-label="Legenda Categorie"
       >
         <span class="legend-trigger-icon">🏷️</span>
         <span class="legend-trigger-text">LEGENDA CATEGORIE</span>
         <span class="legend-trigger-badge">15</span>
-        <span class="legend-trigger-chevron">{{ isLegendOpen() ? '▼' : '▲' }}</span>
+        <span class="legend-trigger-chevron">{{ isLegendVisible() ? '▼' : '▲' }}</span>
       </button>
     </div>
 

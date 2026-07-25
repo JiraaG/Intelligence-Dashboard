@@ -128,6 +128,21 @@ PATCH saved status: update ottimistico + rollback; risposta `{status, is_saved, 
 
 ---
 
+## Legenda Categorie Geopolitiche (Mappa)
+
+La legenda collocata in basso al centro della mappa (`bottom: 20px; left: 50%`) è strutturata con un'architettura **Popover Grid a 3 colonne** per garantire la massima pulizia visiva e facilità d'uso con tutte le **15 categorie geopolitiche**:
+
+1. **Pulsante Trigger Compatto**:
+   - Bottone glassmorphic `🏷️ LEGENDA CATEGORIE [15]` con badge ciano e indicatore d'apertura (`▼` / `▲`).
+2. **Popover Grid (3 Colonne × 5 Righe)**:
+   - Griglia espandibile glassmorphic contenente tutte le 15 categorie con pallini luminosi (`box-shadow` del colore di categoria), emoji tematiche e nome della categoria in carattere `JetBrains Mono`.
+3. **Pattern di Interazione (Parità con la Toolbar)**:
+   - **Hover preview (`mouseenter`/`mouseleave`)**: Passando col mouse sopra il pulsante, il popover si apre in anteprima temporanea.
+   - **Click Lock (`isLegendClicked`)**: Cliccando il pulsante trigger, la legenda si blocca in stato aperto permanente. In questo stato l'utente può interagire liberamente con la mappa (ruotare il globo, cliccare sui marker, esplorare le nazioni) ed aprire la sidebar mantenendo sempre la legenda visibile.
+   - **Chiusura**: Pulsante `✕` nell'header del popover o secondo click sul pulsante trigger.
+
+---
+
 ## Interazione split-screen
 
 ```mermaid
