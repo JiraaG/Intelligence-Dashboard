@@ -99,9 +99,10 @@ export class AppModule { }
 Non usare `BehaviorSubject`, `Subject` o `EventEmitter` per lo stato UI globale.
 Usare esclusivamente `signal()`, `computed()` e `effect()` di Angular 21.
 
-**Policy Phase 4 (Signals vs RxJS):**
+**Policy Phase 4 & Real-Time (Signals vs RxJS & SSE):**
 - **Signals** possiedono lo stato UI (`StateService`, input/output componenti, filtri).
 - **RxJS** è ammesso solo come adapter di trasporto HttpClient (`Observable`, `rxResource`, operatori HTTP).
+- **Resilienza SSE Real-Time:** L'aggiornamento dello stato in tempo reale è pilotato dallo stream SSE in `StateService` (`initRealTimeConnection`). I timer di resilienza per il `metricsStatusResource` (Fix A open reload, Fix B retries 15s/45s su `degraded`, Fix C safety net 5m) vivono fuori dalla Zone Angular (`runOutsideAngular`) per non generare cicli Change Detection spuri. **Non modificare né rimuovere questi meccanismi di resilienza.**
 - Non introdurre `BehaviorSubject` per stato locale. Un eventuale passaggio a `httpResource` resta **deferred post–Phase 5 (D11)**; il trasporto attuale è `rxResource` + HttpClient.
 
 **OBBLIGATORIO:**

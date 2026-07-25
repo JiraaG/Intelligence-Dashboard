@@ -206,6 +206,8 @@ Restore SHA sotto (Phase 0–6). Il branch di lavoro corrente può differire —
 | Relazioni Wave 1 (filtro nazioni) | `ec771b1` (`feature/upgrades`) | Toolbar **RELAZIONI ATTIVE** → `visibleMapRelations` (OR stella, default OFF); paint invariato — piano [`plan_impl_map_relations_nation_filter.md`](plan-audit/complete/plan_impl_map_relations_nation_filter.md) — **restore point** |
 | Hatching isole + anti-bleed MapLibre | `32203c9` (`feature/upgrades`) | `extractPaintPolygons` + `polygon-clipping` terra∩strip; isole ≥0.5% largest; US/RU mainland — piano [`plan_impl_map_category_fills_islands.md`](plan-audit/complete/plan_impl_map_category_fills_islands.md) — **restore point** |
 | Fase C — dedup semantica (`pgvector`) | `f1e1de0` (`feature/upgrades`) | Migrazione `012`, embedder CPU MiniLM, soglia sim **0.80**, `quality:compare` COMPLEX, replace in-place — piano [`plan_impl_fase_C_semantic_dedup.md`](plan-audit/complete/plan_impl_fase_C_semantic_dedup.md) — **restore point** |
+| FinOps UI Metrics | `5b84a34` (`feature/upgrades`) | Metriche FinOps in topbar STATUS/COSTI, migrazione `015`, breakdown tupla `(model, reasoning_effort)` — **restore point** |
+| Fix STATUS Real-Time SSE | `state.service.ts` (`feature/upgrades`) | Resilienza connessione SSE: Fix A (open reload), Fix B (retries 15s/45s), Fix C (safety net 5m) — **GATE VERDE** |
 
 Esempio restore tip archi UI Leaflet-era: `git checkout 5c74e57` (branch `feature/upgrades`).  
 Esempio restore pre-filtro-nazioni (archi sempre tutti visibili): `git checkout 0d942ed`.  
@@ -254,6 +256,12 @@ Esempio Phase 6: `git checkout 56c2eff`. Dettaglio gate Phase 0–6: [plan_impl_
 | GET | `/api/map-relations` | Righe undirected `source_country ↔ target_country` per categoria + volume + `article_ids`. FE: archi MapLibre (great-circle macro multicolore solida; hover evidenzia tutte le linee collegate alla medesima notizia multi-paese; legacy Leaflet `relationsPane` dash+fan su latch pin); **filtro nazioni toolbar RELAZIONI ATTIVE** → solo `visibleMapRelations` (default 0 archi); click → carosello bilaterale |
 | GET | `/api/saved-summary` | Stessa shape; solo `is_saved`; **senza date** |
 | GET | `/api/countries` | Rollup paese (compat) |
+| GET | `/api/metrics/status` | Stato del sistema (level, quote, cooldowns, breakdown modelli/reasoning) |
+| GET | `/api/metrics/summary` | Summary FinOps (costi, token, latenze, cache hit rate) |
+| GET | `/api/metrics/by-feed` | Metriche per feed RSS |
+| GET | `/api/metrics/dedup` | Statistiche di deduplicazione semantica |
+| GET | `/api/articles/events` | Stream SSE in tempo reale per `article_processed` |
+| POST | `/api/webhooks/miniflux` | Ingest Webhook HMAC da Miniflux |
 | PATCH | `/api/articles/{id}/read_status` | Body `{is_read}`; unread ⇒ `is_saved=false` |
 | PATCH | `/api/articles/{id}/saved_status` | Body `{is_saved}`; save ⇒ `is_read=true` |
 

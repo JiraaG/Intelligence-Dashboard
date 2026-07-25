@@ -244,8 +244,10 @@ Phase 2: stessa immagine, due processi.
 - Saved vault: `GET /api/saved-summary` → stessa shape, `is_saved=true`, **senza date**
 - Nation: `GET /api/articles` → envelope `{ items, next_cursor, total }` (keyset, page ≤ 100; include `related_countries` string array)
 - Saved open: `GET /api/articles?saved=true&country=` → stesso envelope, ignora `date`
+- Metriche & FinOps: `GET /api/metrics/status`, `GET /api/metrics/summary`, `GET /api/metrics/by-feed`, `GET /api/metrics/dedup`
+- Real-time & Ingest: `GET /api/articles/events` (SSE streaming), `POST /api/webhooks/miniflux` (Ingest Webhook HMAC)
 - `PATCH .../read_status` (unread ⇒ `is_saved=false`); `PATCH .../saved_status` (save ⇒ `is_read=true`)
-- Implementazione SQL: `backend/app/api/articles_query.py` + migrazioni `007` + `010_articles_is_saved` + `011_articles_related_countries`
+- Implementazione SQL: `backend/app/api/articles_query.py` + migrazioni `007` + `010` + `011` + `013` + `015`
 
 **OBBLIGATORIO (Dockerfile / Compose):**
 ```bash

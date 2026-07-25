@@ -114,6 +114,18 @@ export class StateService {
     this.zone.runOutsideAngular(() => {
       const es = new EventSource('/api/articles/events');
       this.eventSource = es;
+
+      // FIX A — Reload immediato appena la connessione SSE si stabilisce.
+      // Copre la finestra di startup: il primo fetch rxResource può avvenire
+      // prima che il worker abbia scritto il primo heartbeat (worker_stale=true → degraded).
+      // Fires una sola volta per sessione browser.
+      es.addEventListener('open', () => {
+        this.zone.run(() => {
+          this.metricsStatusResource.reload();
+          this.scheduleStatusStartupRetries();
+        });
+      });
+
       es.addEventListener('article_processed', (evt: Event) => {
         const msg = evt as MessageEvent<string>;
         let data: ArticleProcessedEvent;
@@ -132,9 +144,22 @@ export class StateService {
           this.metricsStatusResource.reload();
         });
       });
+
       es.onerror = () => {
         console.warn('[StateService] SSE connection error (browser will retry).');
       };
+
+      // FIX C — Safety net: ogni 5 minuti ricarica lo status solo se ancora degraded.
+      // Copre sistemi completamente idle (nessun articolo da ore, quota LLM esaurita,
+      // worker in pausa lunga) dove nessun SSE article_processed arriverà mai.
+      // A regime nominale (level != 'degraded') non esegue la chiamata HTTP.
+      const safetyNetTimer = setInterval(() => {
+        const currentLevel = this.metricsStatus()?.level ?? 'degraded';
+        if (currentLevel === 'degraded') {
+          this.zone.run(() => this.metricsStatusResource.reload());
+        }
+      }, 300_000);
+      this.destroyRef.onDestroy(() => clearInterval(safetyNetTimer));
     });
   }
 
@@ -142,6 +167,25 @@ export class StateService {
     if (this.eventSource) {
       this.eventSource.close();
       this.eventSource = null;
+    }
+  }
+
+  /**
+   * FIX B — Retry condizionali con backoff a 15s e 45s dall'evento SSE 'open'.
+   * Copre la finestra di startup lunga: worker lento, container slow-start,
+   * drain iniziale ancora in corso. Esegue la chiamata HTTP solo se il livello
+   * è ancora 'degraded'; si auto-disattiva una volta risolto il problema.
+   * Chiamato dentro zone.runOutsideAngular() tramite il listener 'open'.
+   */
+  private scheduleStatusStartupRetries(): void {
+    for (const delayMs of [15_000, 45_000]) {
+      const t = setTimeout(() => {
+        const currentLevel = this.metricsStatus()?.level ?? 'degraded';
+        if (currentLevel === 'degraded') {
+          this.zone.run(() => this.metricsStatusResource.reload());
+        }
+      }, delayMs);
+      this.destroyRef.onDestroy(() => clearTimeout(t));
     }
   }
 
