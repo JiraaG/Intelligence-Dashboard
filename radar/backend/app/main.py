@@ -971,9 +971,15 @@ async def get_metrics_status() -> dict[str, Any]:
             "reasoning_effort": str(cplx_effort).lower(),
         })
 
+        bl_effort = str(LLM_BORDERLINE_REASONING_EFFORT).lower()
         model_items: list[dict[str, Any]] = []
         for m in models_config:
-            rpd_used = await get_model_rpd_used(conn, m["model"], m["lane"], day_start, day_end)
+            if m["role"] == "complex" and m["reasoning_effort"] != bl_effort:
+                rpd_used = await get_model_rpd_used(
+                    conn, m["model"], m["lane"], day_start, day_end, reasoning_effort=m["reasoning_effort"]
+                )
+            else:
+                rpd_used = await get_model_rpd_used(conn, m["model"], m["lane"], day_start, day_end)
             cd_entry = cooldown_map.get((m["provider"], m["model"]))
             is_cooling = cd_entry is not None
             cd_until = cd_entry["until_ts"].isoformat() if cd_entry else None
@@ -1024,23 +1030,30 @@ async def get_metrics_status() -> dict[str, Any]:
             l1_likely_active = True
             l1_reason = "recent_articles"
 
-        borderline_count_val = await conn.fetchval(
-            """
-            SELECT COUNT(*)::INT
-            FROM llm_request_ledger
-            WHERE created_at >= $1 AND created_at < $2
-              AND status = 'completed'
-              AND lane = 'complex'
-            """,
-            day_start,
-            day_end,
-        )
-        borderline_count = int(borderline_count_val or 0)
-        total_cplx_rpd = model_items[-1]["rpd_used"] if model_items else 0
-        borderline_rpd = min(borderline_count, total_cplx_rpd)
-        pure_cplx_rpd = max(0, total_cplx_rpd - borderline_rpd)
-        if model_items and model_items[-1]["role"] == "complex":
-            model_items[-1]["rpd_used"] = pure_cplx_rpd
+        if cplx_effort != bl_effort:
+            borderline_rpd = await get_model_rpd_used(
+                conn, LLM_COMPLEX.model, "complex", day_start, day_end, reasoning_effort=bl_effort
+            )
+        else:
+            borderline_count_val = await conn.fetchval(
+                """
+                SELECT COUNT(*)::INT
+                FROM llm_request_ledger
+                WHERE created_at >= $1 AND created_at < $2
+                  AND status = 'completed'
+                  AND lane = 'complex'
+                """,
+                day_start,
+                day_end,
+            )
+            borderline_count = int(borderline_count_val or 0)
+            total_cplx_rpd = model_items[-1]["rpd_used"] if model_items else 0
+            borderline_rpd = min(borderline_count, total_cplx_rpd)
+            pure_cplx_rpd = max(0, total_cplx_rpd - borderline_rpd)
+            if model_items and model_items[-1]["role"] == "complex":
+                model_items[-1]["rpd_used"] = pure_cplx_rpd
+
+        borderline_count = borderline_rpd
 
         all_cooling = all(m["cooling_down"] for m in model_items)
         yellow_band = max(50, int(0.20 * prim_lim)) if prim_lim > 0 else 0

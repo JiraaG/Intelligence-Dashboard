@@ -125,6 +125,24 @@ export class RadarToolbarComponent {
   readonly totalCostUsd = computed(() => {
     return this.metricsSummary()?.llm?.total_estimated_cost_usd ?? 0;
   });
+
+  readonly modelsByCost = computed(() => {
+    const list = this.metricsSummary()?.llm?.models_breakdown;
+    if (!list) return [];
+    return [...list].sort((a, b) => (b.estimated_cost_usd ?? 0) - (a.estimated_cost_usd ?? 0));
+  });
+
+  readonly modelsByTokens = computed(() => {
+    const list = this.metricsSummary()?.llm?.models_breakdown;
+    if (!list) return [];
+    return [...list].sort((a, b) => (b.total_tokens ?? 0) - (a.total_tokens ?? 0));
+  });
+
+  readonly totalTokensSum = computed(() => {
+    const llm = this.metricsSummary()?.llm;
+    if (!llm) return 0;
+    return (llm.total_prompt_tokens ?? 0) + (llm.total_completion_tokens ?? 0);
+  });
   readonly statusDotEmoji = computed(() => {
     const lvl = this.statusLevel();
     if (lvl === 'nominal') return '🟢';

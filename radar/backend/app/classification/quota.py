@@ -779,24 +779,46 @@ async def get_model_rpd_used(
     lane: str,
     day_start: datetime,
     day_end: datetime,
+    reasoning_effort: str | None = None,
 ) -> int:
-    """Helper pubblico per contare RPD usate da un modello nella finestra giorno."""
+    """Helper pubblico per contare RPD usate da un modello nella finestra giorno (opzionalmente filtrato per reasoning_effort)."""
     purpose_exact = purpose_for_lane(lane)
-    count = await conn.fetchval(
-        """
-        SELECT COUNT(*)::INT
-        FROM llm_request_ledger
-        WHERE created_at >= $1
-          AND created_at < $2
-          AND status = ANY($3::text[])
-          AND (lane = $4 OR (lane IS NULL AND purpose = $5))
-          AND model = $6
-        """,
-        day_start,
-        day_end,
-        list(_ACTIVE_STATUSES),
-        lane,
-        purpose_exact,
-        model,
-    )
+    if reasoning_effort is not None:
+        count = await conn.fetchval(
+            """
+            SELECT COUNT(*)::INT
+            FROM llm_request_ledger
+            WHERE created_at >= $1
+              AND created_at < $2
+              AND status = ANY($3::text[])
+              AND (lane = $4 OR (lane IS NULL AND purpose = $5))
+              AND model = $6
+              AND LOWER(COALESCE(reasoning_effort, 'none')) = LOWER($7)
+            """,
+            day_start,
+            day_end,
+            list(_ACTIVE_STATUSES),
+            lane,
+            purpose_exact,
+            model,
+            reasoning_effort.strip(),
+        )
+    else:
+        count = await conn.fetchval(
+            """
+            SELECT COUNT(*)::INT
+            FROM llm_request_ledger
+            WHERE created_at >= $1
+              AND created_at < $2
+              AND status = ANY($3::text[])
+              AND (lane = $4 OR (lane IS NULL AND purpose = $5))
+              AND model = $6
+            """,
+            day_start,
+            day_end,
+            list(_ACTIVE_STATUSES),
+            lane,
+            purpose_exact,
+            model,
+        )
     return int(count or 0)

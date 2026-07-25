@@ -190,7 +190,7 @@ Per collegare le notizie multilaterali, la mappa disegna archi curvi bidireziona
    - Pulsante `STATUS` + pallino 🟢 / 🟡 / 🔴 da `level` (`nominal` | `fallback_or_escalation` | `degraded`).
    - **Banner stato** + badge L1 con **etichette italiane** (non snake_case raw) quando `l1_likely_active`.
    - Alert box L1 / degradato (condizionati).
-   - **Modelli & Quote RPD:** ordine **SIMPLE → FALLBACK → BORDERLINE → COMPLEX** (barre RPD, cooldown con countdown live). L’effort **non** compare nel titolo modello.
+   - **Modelli & Quote RPD:** ordine **SIMPLE → FALLBACK → BORDERLINE → COMPLEX** (barre RPD, cooldown con countdown live). Conteggio RPD distinto per BORDERLINE (effort `none`) e COMPLEX (effort `high`) calcolato fedelmente sulle chiamate del Ledger per ciascun `reasoning_effort`. L’effort **non** compare nel titolo modello.
    - **Gestione & Effort:** matrice 2×2 — SIMPLE/FALLBACK hardcode `NONE`; BORDERLINE ← `borderline.reasoning_effort`; COMPLEX ← `models[complex].reasoning_effort`.
    - Cooldown RPD: scadenza a **`day_end`** (finestra giornaliera), non +24h statiche. Altri cooldown (es. 5xx) restano a ore configurate.
 
@@ -198,9 +198,9 @@ Per collegare le notizie multilaterali, la mappa disegna archi curvi bidireziona
    - Pulsante `COSTI: $X.XXXX` da `llm.total_estimated_cost_usd` (solo classificazione `classify:%` / `classify_article`).
    - Sei sezioni, in ordine:
      1. **Costi generali** — costo giorno, articoli ingestiti, richieste LLM, latenza media pipeline.
-     2. **Costi LLM per modello** — `models_breakdown` per tupla `(model, reasoning_effort)` con badge effort, costo, articoli, richieste (**niente `provider`** in API).
+     2. **Costi LLM per modello** — `models_breakdown` per tupla `(model, reasoning_effort)` ordinate dinamicamente per consumo costi (`estimated_cost_usd` decrescente), con badge effort, costo, articoli, richieste (**niente `provider`** in API).
      3. **Consumo Token & Cache** — prompt / completion / cached %.
-     4. **Richieste LLM per modello** — token totali + hover in/out/cached + badge effort.
+     4. **Richieste LLM per modello** — ordinate dinamicamente per consumo token (`total_tokens` decrescente) con barra azzurra di avanzamento commisurata al totale dei token (`totalTokensSum()`) + hover in/out/cached + badge effort.
      5. **Eventi Deduplicazione** — URL, Vettoriale, Hash (**senza** riga Totale in UI).
      6. **Costi Complessivi Applicativo** — blocco `overall` all-time (costo, articoli, richieste, token).
 

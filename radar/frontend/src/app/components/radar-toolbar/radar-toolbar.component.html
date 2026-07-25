@@ -761,13 +761,13 @@
           </div>
 
           <!-- Sezione 2 — Costi LLM per modello (Posizionato subito sotto a Costi generali) -->
-          <div class="popover-section" *ngIf="metricsSummary()?.llm?.models_breakdown?.length">
+          <div class="popover-section" *ngIf="modelsByCost().length">
             <span
               class="section-label"
               title="Spacchettamento dei costi, articoli gestiti e richieste API per i singoli modelli nel giorno selezionato"
               >💰 Costi LLM per modello</span
             >
-            <div class="model-cost-card" *ngFor="let m of metricsSummary()!.llm!.models_breakdown">
+            <div class="model-cost-card" *ngFor="let m of modelsByCost()">
               <div class="model-cost-header">
                 <span class="model-name">
                   {{ m.model }}
@@ -849,7 +849,7 @@
           </div>
 
           <!-- Sezione 4 — Richieste LLM per Modello (Titolo modello e token totali, hover con in/out) -->
-          <div class="popover-section" *ngIf="metricsSummary()?.llm?.models_breakdown?.length">
+          <div class="popover-section" *ngIf="modelsByTokens().length">
             <span
               class="section-label"
               title="Distribuzione delle chiamate e consumo token per ciascun modello LLM nel giorno selezionato"
@@ -857,7 +857,7 @@
             >
             <div
               class="model-item"
-              *ngFor="let m of metricsSummary()!.llm!.models_breakdown"
+              *ngFor="let m of modelsByTokens()"
               title="Dettaglio {{ m.model }}: In {{ m.prompt_tokens ?? 0 | number }} tok • Out {{
                 m.completion_tokens ?? 0 | number
               }} tok • Cached {{ m.cached_tokens ?? 0 | number }} tok"
@@ -884,8 +884,8 @@
                 <div
                   class="rpd-bar-fill"
                   [style.width.%]="
-                    metricsSummary()?.llm?.total_requests
-                      ? (m.requests_count / metricsSummary()!.llm!.total_requests) * 100
+                    totalTokensSum() > 0
+                      ? ((m.total_tokens ?? 0) / totalTokensSum()) * 100
                       : 0
                   "
                 ></div>
