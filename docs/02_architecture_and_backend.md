@@ -88,6 +88,8 @@ Schema applicato da `core/migrations.py` + SQL ordinati in `radar/backend/migrat
 | `013_metrics_and_feed_tracking.sql` | Metriche denormalizzate articles, FinOps llm_request_ledger, tracciamento feed e dedup_events |
 | `014_articles_content_sha256.sql` | `articles.content_sha256` + indice lookback (FinOps Wave A / M6 content-hash dedup) |
 | `015_llm_ledger_reasoning_effort.sql` | `llm_request_ledger.reasoning_effort` + indice per-effort (FinOps breakdown per tupla modello+effort) |
+| `016_add_new_categories.sql` | Espansione delle tipologie primarie (da 10 a 15 categorie) |
+| `017_borderline_classification_lane.sql` | Distinzione retroattiva della corsia `borderline` in `articles.classification_lane` |
 
 Commit: transazione DB + riga outbox → reconcile vault → mark-read Miniflux **solo** se outbox `completed`.
 

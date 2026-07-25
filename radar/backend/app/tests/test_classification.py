@@ -750,3 +750,24 @@ def test_extract_usage_tokens_deepseek_and_openai() -> None:
     # Response vuoto
     assert extract_usage_tokens(None, "deepseek") == (None, None, None)
 
+
+def test_borderline_classification_lane_set_in_result() -> None:
+    """Test that ClassificationResult sets classification_lane = 'borderline' when lane is BORDERLINE and not escalated."""
+    from app.classification.client import ClassificationResult, _ModelRef
+    from app.classification.complexity import Lane
+
+    ref = _ModelRef("deepseek", "deepseek-v4-flash", "complex", "none")
+    lane = Lane.BORDERLINE
+    was_escalated = False
+
+    eff_lane = lane.value.lower() if (lane == Lane.BORDERLINE and not was_escalated) else ref.quota_lane
+    res = ClassificationResult(
+        article=MagicMock(),
+        classification_lane=eff_lane,
+        classified_by_model=ref.model,
+        classified_by_provider=ref.provider,
+        was_escalated=was_escalated,
+    )
+    assert res.classification_lane == "borderline"
+
+

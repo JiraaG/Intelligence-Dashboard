@@ -1023,9 +1023,14 @@ class ClassificationClient:
                         attempt + 1,
                         title[:50],
                     )
+                eff_lane = (
+                    lane.value.lower()
+                    if (lane == Lane.BORDERLINE and not was_escalated)
+                    else ref.quota_lane
+                )
                 res = ClassificationResult(
                     article=extracted,
-                    classification_lane=ref.quota_lane,
+                    classification_lane=eff_lane,
                     classified_by_model=ref.model,
                     classified_by_provider=ref.provider,
                     was_escalated=was_escalated,
