@@ -266,7 +266,7 @@ export class StateService {
   readonly metricsSummary = computed((): MetricsSummary | null => this.metricsSummaryResource.value() ?? null);
   readonly metricsStatus = computed((): MetricsStatus | null => this.metricsStatusResource.value() ?? null);
 
-  /** Righe summary con filtro categoria client-side (toolbar). */
+  /** Righe summary con filtro categoria client-side (toolbar/legenda). */
   readonly filteredSummary = computed((): MapSummaryRow[] => {
     const raw = this.mapSummaryResource.value() ?? [];
     const cats = this.filters().categories;
@@ -274,7 +274,21 @@ export class StateService {
     return raw.filter((row) => cats.includes(row.primary_category));
   });
 
-  /** Righe relations con filtro categoria client-side (toolbar). */
+  /** Conteggio notizie grezze per ciascuna categoria geopolitica (day-summary o saved-summary). */
+  readonly categoryCounts = computed((): Record<string, number> => {
+    const isSaved = this.sidebarMode() === 'saved';
+    const summaryRows: Array<{ primary_category: string; article_count: number }> = isSaved
+      ? (this.savedSummaryResource.value() ?? [])
+      : (this.mapSummaryResource.value() ?? []);
+
+    const counts: Record<string, number> = {};
+    for (const row of summaryRows) {
+      counts[row.primary_category] = (counts[row.primary_category] ?? 0) + row.article_count;
+    }
+    return counts;
+  });
+
+  /** Righe relations con filtro categoria client-side (toolbar/legenda). */
   readonly filteredMapRelations = computed((): MapRelationRow[] => {
     const raw = this.mapRelationsResource.value() ?? [];
     const cats = this.filters().categories;

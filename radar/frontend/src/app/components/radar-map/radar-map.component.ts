@@ -32,6 +32,7 @@ export class RadarMapComponent {
   mapSummary = input<MapSummaryRow[]>([]);
   mapRelations = input<MapRelationRow[]>([]);
   focusCountryCode = input<string | null>(null);
+  isSidebarOpen = input<boolean>(false);
 
   markerClicked = output<Article>();
   clusterClicked = output<Article[]>();

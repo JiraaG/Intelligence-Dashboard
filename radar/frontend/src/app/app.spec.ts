@@ -136,6 +136,7 @@ class MapStubComponent {
   mapSummary = input<import('./models/map-summary.model').MapSummaryRow[]>([]);
   mapRelations = input<import('./models/map-relation.model').MapRelationRow[]>([]);
   focusCountryCode = input<string | null>(null);
+  isSidebarOpen = input<boolean>(false);
   markerClicked = output<Article>();
   clusterClicked = output<Article[]>();
   countryClicked =
@@ -311,6 +312,7 @@ describe('App / map behavior', () => {
           provideHttpClient(),
           provideHttpClientTesting(),
           { provide: MAP_RENDERER, useValue: 'leaflet' as const },
+          { provide: MOCK_MODE, useValue: true },
         ],
       }).compileComponents();
 

@@ -63,6 +63,7 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
   mapSummary = input<MapSummaryRow[]>([]);
   mapRelations = input<MapRelationRow[]>([]);
   focusCountryCode = input<string | null>(null);
+  isSidebarOpen = input<boolean>(false);
 
   markerClicked = output<Article>();
   clusterClicked = output<Article[]>();
@@ -116,27 +117,139 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
     'Materie Prime': '--color-materie-prime',
   };
 
-  readonly legendItems = [
-    { label: 'Nucleare', icon: '☢️', cssVar: '--color-nucleare' },
-    { label: 'Energia', icon: '⚡', cssVar: '--color-energia' },
-    { label: 'Infrastrutture', icon: '🏗️', cssVar: '--color-infrastrutture' },
-    { label: 'Geopolitica', icon: '🌍', cssVar: '--color-geopolitica' },
-    { label: 'Economia', icon: '📈', cssVar: '--color-economia' },
-    { label: 'Tecnologia', icon: '💻', cssVar: '--color-tecnologia' },
-    { label: 'Spazio', icon: '🚀', cssVar: '--color-spazio' },
+  readonly state = inject(StateService, { optional: true });
+
+  readonly legendItems: Array<{ label: PrimaryCategory; icon: string; cssVar: string }> = [
     { label: 'Ambiente', icon: '🌿', cssVar: '--color-ambiente' },
+    { label: 'Cybersecurity', icon: '🔒', cssVar: '--color-cybersecurity' },
+    { label: 'Difesa', icon: '⚔️', cssVar: '--color-difesa' },
+    { label: 'Economia', icon: '📈', cssVar: '--color-economia' },
+    { label: 'Energia', icon: '⚡', cssVar: '--color-energia' },
+    { label: 'Finanza', icon: '💎', cssVar: '--color-finanza' },
+    { label: 'Geopolitica', icon: '🌍', cssVar: '--color-geopolitica' },
+    { label: 'Infrastrutture', icon: '🏗️', cssVar: '--color-infrastrutture' },
+    { label: 'Intelligenza Artificiale', icon: '🤖', cssVar: '--color-intelligenza-artificiale' },
+    { label: 'Materie Prime', icon: '⛏️', cssVar: '--color-materie-prime' },
+    { label: 'Nucleare', icon: '☢️', cssVar: '--color-nucleare' },
     { label: 'Salute', icon: '⚕️', cssVar: '--color-salute' },
     { label: 'Sicurezza', icon: '🛡️', cssVar: '--color-sicurezza' },
-    { label: 'A.I.', icon: '🤖', cssVar: '--color-intelligenza-artificiale' },
-    { label: 'Cybersecurity', icon: '🔒', cssVar: '--color-cybersecurity' },
-    { label: 'Finanza', icon: '💎', cssVar: '--color-finanza' },
-    { label: 'Difesa', icon: '⚔️', cssVar: '--color-difesa' },
-    { label: 'Materie Prime', icon: '⛏️', cssVar: '--color-materie-prime' },
+    { label: 'Spazio', icon: '🚀', cssVar: '--color-spazio' },
+    { label: 'Tecnologia', icon: '💻', cssVar: '--color-tecnologia' },
   ];
 
   readonly isLegendHovered = signal<boolean>(false);
   readonly isLegendClicked = signal<boolean>(false);
+  readonly hoveredLegendCategory = signal<PrimaryCategory | null>(null);
+
   readonly isLegendVisible = computed(() => this.isLegendHovered() || this.isLegendClicked());
+
+  readonly hoveredCategoryItem = computed(() => {
+    const label = this.hoveredLegendCategory();
+    if (!label) return null;
+    return this.legendItems.find((item) => item.label === label) ?? null;
+  });
+
+  private readonly CATEGORY_DESCRIPTIONS: Record<string, string> = {
+    Ambiente: 'Monitoraggio di clima, ecosistemi, eventi naturali e transizione ecologica.',
+    Cybersecurity: 'Analisi di minacce cibernetiche, attacchi informatici e sicurezza dei dati.',
+    Difesa: 'Operazioni militari, alleanze strategiche, armamenti e sicurezza nazionale.',
+    Economia: 'Mercati finanziari, politiche monetarie, commercio e indicatori macroeconomici.',
+    Energia: 'Forniture energetiche, petrolio, gas, fonti rinnovabili e reti critiche.',
+    Finanza: 'Investimenti globali, mercati azionari, banche centrali e stabilità finanziaria.',
+    Geopolitica: 'Relazioni internazionali, diplomazia, trattati e tensioni tra nazioni.',
+    Infrastrutture: 'Logistica, trasporti, reti di comunicazione e grandi opere pubbliche.',
+    'Intelligenza Artificiale': 'Sviluppo di algoritmi, modelli di IA, automazione e regolamentazione tech.',
+    'Materie Prime': 'Risorse naturali, estrazione di minerali, metalli rari e filiere industriali.',
+    Nucleare: 'Energia nucleare, arricchimento, trattati di non proliferazione e sicurezza atomica.',
+    Salute: 'Sanità globale, epidemie, ricerca farmaceutica e politiche di salute pubblica.',
+    Sicurezza: 'Sicurezza interna, ordine pubblico, antiterrorismo e gestione delle emergenze.',
+    Spazio: 'Esplorazione spaziale, satelliti, difesa orbitale e tecnologie aerospaziali.',
+    Tecnologia: 'Innovazione digitale, semiconduttori, hardware, software e telecomunicazioni.',
+  };
+
+  getCategoryDescription(label: PrimaryCategory): string {
+    return this.CATEGORY_DESCRIPTIONS[label] ?? '';
+  }
+
+  readonly highlightedCategories = signal<Set<PrimaryCategory>>(new Set());
+
+  readonly highlightedCount = computed(() => this.highlightedCategories().size);
+
+  readonly legendBadgeText = computed(() => {
+    const count = this.highlightedCount();
+    return count === 0 ? '15' : `${count}/15`;
+  });
+
+  isCategoryCardActive(label: PrimaryCategory): boolean {
+    return this.highlightedCategories().has(label);
+  }
+
+  getCategoryCount(label: PrimaryCategory): number {
+    return this.state?.categoryCounts?.()?.[label] ?? 0;
+  }
+
+  onCategoryCardClick(label: PrimaryCategory, event: MouseEvent): void {
+    event.stopPropagation();
+    const next = new Set(this.highlightedCategories());
+    if (next.has(label)) {
+      next.delete(label);
+    } else {
+      next.add(label);
+    }
+    this.highlightedCategories.set(next);
+    this.applyCategoryFillOpacity();
+  }
+
+  toggleSelectAllCategories(event: MouseEvent): void {
+    event.stopPropagation();
+    if (this.highlightedCount() > 0) {
+      this.highlightedCategories.set(new Set());
+    } else {
+      this.highlightedCategories.set(new Set(this.legendItems.map((i) => i.label)));
+    }
+    this.applyCategoryFillOpacity();
+  }
+
+  onCategoryCardHover(label: PrimaryCategory): void {
+    this.hoveredLegendCategory.set(label);
+    this.applyCategoryFillOpacity();
+  }
+
+  onCategoryCardHoverEnd(): void {
+    this.hoveredLegendCategory.set(null);
+    this.applyCategoryFillOpacity();
+  }
+
+  private applyCategoryFillOpacity(): void {
+    if (!this.map || !this.map.getLayer(this.COUNTRY_CAT_FILL)) return;
+    const zoomedOut = this.isZoomedOut();
+    if (!zoomedOut) {
+      this.map.setPaintProperty(this.COUNTRY_CAT_FILL, 'fill-opacity', 0);
+      return;
+    }
+
+    const hovered = this.hoveredLegendCategory();
+    const activeSet = new Set(this.highlightedCategories());
+    if (hovered) {
+      activeSet.add(hovered);
+    }
+    const activeLabels = Array.from(activeSet);
+
+    if (activeLabels.length > 0) {
+      this.map.setPaintProperty(this.COUNTRY_CAT_FILL, 'fill-opacity', [
+        'case',
+        ['in', ['get', 'category'], ['literal', activeLabels]],
+        0.85,
+        this.CATEGORY_FILL_OPACITY,
+      ]);
+    } else {
+      this.map.setPaintProperty(
+        this.COUNTRY_CAT_FILL,
+        'fill-opacity',
+        this.CATEGORY_FILL_OPACITY,
+      );
+    }
+  }
 
   toggleLegendClick(event: MouseEvent): void {
     event.stopPropagation();
@@ -644,6 +757,7 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
       return;
     }
     this.pinModeActive.set(next);
+    if (next) this.closeLegend();
     this.refreshHatchingStyles();
     this.syncSummaryMarkerVisibility();
   }
@@ -1099,13 +1213,7 @@ export class RadarMapMaplibreComponent implements AfterViewInit {
       }
     }
 
-    if (this.map.getLayer(this.COUNTRY_CAT_FILL)) {
-      this.map.setPaintProperty(
-        this.COUNTRY_CAT_FILL,
-        'fill-opacity',
-        zoomedOut ? this.CATEGORY_FILL_OPACITY : 0,
-      );
-    }
+    this.applyCategoryFillOpacity();
 
     if (this.map.getLayer(this.COUNTRIES_LINE)) {
       this.map.setPaintProperty(

@@ -11,6 +11,8 @@ import {
   type StubClusterGroup,
   type StubMap,
 } from '../../../testing/leaflet.stub';
+import { MOCK_MODE } from '../../../services/mock-mode.token';
+import { StateService } from '../../../services/state.service';
 
 const FIXTURE_DATE = '2026-07-14';
 
@@ -118,7 +120,11 @@ describe('RadarMapLeafletComponent (Phase 4)', () => {
 
     await TestBed.configureTestingModule({
       imports: [MapHostComponent],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: StateService, useValue: null },
+      ],
     }).compileComponents();
 
     httpMock = TestBed.inject(HttpTestingController);

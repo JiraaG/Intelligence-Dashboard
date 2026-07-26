@@ -14,38 +14,77 @@
 
     <div
       class="map-legend-wrap"
+      [class.sidebar-open]="isSidebarOpen()"
       *ngIf="!isParsingGeoJson()"
       (mouseenter)="isLegendHovered.set(true)"
       (mouseleave)="isLegendHovered.set(false)"
     >
-      <!-- Popover Espandibile -->
+      <!-- Popover Espandibile Legenda Tipologie -->
       <div
         class="legend-popover"
         *ngIf="isLegendVisible()"
         (click)="$event.stopPropagation()"
       >
-        <div class="legend-popover-header">
-          <span class="legend-popover-title">CLASSIFICAZIONE GEOPOLITICA</span>
-          <button
-            type="button"
-            class="legend-popover-close"
-            (click)="closeLegend()"
-            aria-label="Chiudi legenda"
-          >
-            ✕
-          </button>
+        <!-- Tooltip Popover per la card in Hover (sopra il popover) -->
+        <div
+          class="legend-card-tooltip"
+          *ngIf="hoveredCategoryItem() as hoveredItem"
+        >
+          <div class="tooltip-header">
+            <span
+              class="tooltip-color-dot"
+              [ngStyle]="{ 'background-color': 'var(' + hoveredItem.cssVar + ')' }"
+            ></span>
+            <span class="tooltip-icon">{{ hoveredItem.icon }}</span>
+            <span class="tooltip-title">{{ hoveredItem.label }}</span>
+            <span class="tooltip-badge">({{ getCategoryCount(hoveredItem.label) }} notizie)</span>
+          </div>
+          <p class="tooltip-desc">{{ getCategoryDescription(hoveredItem.label) }}</p>
         </div>
-        <div class="legend-grid">
-          <div class="legend-item" *ngFor="let item of legendItems">
+        <div class="legend-popover-header">
+          <div class="legend-popover-title-wrap">
+            <span class="legend-popover-title">LEGENDA TIPOLOGIE</span>
+            <span class="legend-popover-badge">{{ legendBadgeText() }}</span>
+          </div>
+          <div class="legend-popover-actions">
+            <button
+              type="button"
+              class="legend-action-btn"
+              (click)="toggleSelectAllCategories($event)"
+            >
+              {{ highlightedCount() > 0 ? 'Deseleziona tutto' : 'Seleziona tutto' }}
+            </button>
+            <button
+              type="button"
+              class="legend-popover-close"
+              (click)="closeLegend()"
+              aria-label="Chiudi legenda"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+        <div class="legend-grid" role="listbox">
+          <div
+            class="legend-card"
+            *ngFor="let item of legendItems"
+            role="option"
+            [attr.aria-selected]="isCategoryCardActive(item.label)"
+            [class.is-active]="isCategoryCardActive(item.label)"
+            (click)="onCategoryCardClick(item.label, $event)"
+            (mouseenter)="onCategoryCardHover(item.label)"
+            (mouseleave)="onCategoryCardHoverEnd()"
+          >
             <span
               class="legend-color-dot"
               [ngStyle]="{
                 'background-color': 'var(' + item.cssVar + ')',
-                'box-shadow': '0 0 8px var(' + item.cssVar + ')',
+                'box-shadow': isCategoryCardActive(item.label) ? '0 0 10px var(' + item.cssVar + ')' : 'none'
               }"
             ></span>
             <span class="legend-icon">{{ item.icon }}</span>
             <span class="legend-label">{{ item.label }}</span>
+            <span class="legend-count">({{ getCategoryCount(item.label) }})</span>
           </div>
         </div>
       </div>
@@ -57,11 +96,11 @@
         [class.is-active]="isLegendClicked()"
         [class.is-open]="isLegendVisible()"
         (click)="toggleLegendClick($event)"
-        aria-label="Legenda Categorie"
+        aria-label="Legenda Tipologie"
       >
         <span class="legend-trigger-icon">🏷️</span>
-        <span class="legend-trigger-text">LEGENDA CATEGORIE</span>
-        <span class="legend-trigger-badge">15</span>
+        <span class="legend-trigger-text">LEGENDA TIPOLOGIE</span>
+        <span class="legend-trigger-badge">{{ legendBadgeText() }}</span>
         <span class="legend-trigger-chevron">{{ isLegendVisible() ? '▼' : '▲' }}</span>
       </button>
     </div>

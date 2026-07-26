@@ -128,18 +128,26 @@ PATCH saved status: update ottimistico + rollback; risposta `{status, is_saved, 
 
 ---
 
-## Legenda Categorie Geopolitiche (Mappa)
+## Legenda Tipologie Geopolitiche (Evidenziazione Mappa & Popover Grid)
 
-La legenda collocata in basso al centro della mappa (`bottom: 20px; left: 50%`) è strutturata con un'architettura **Popover Grid a 3 colonne** per garantire la massima pulizia visiva e facilità d'uso con tutte le **15 categorie geopolitiche**:
+La legenda collocata in basso alla mappa (`bottom: 20px`) è strutturata con un'architettura **Popover Grid a 3 colonne** dedicata all'illuminazione geospaziale sulla mappa (il filtraggio effettivo dei dati articoli è affidato al menu **Tipologia** in toolbar):
 
 1. **Pulsante Trigger Compatto**:
-   - Bottone glassmorphic `🏷️ LEGENDA CATEGORIE [15]` con badge ciano e indicatore d'apertura (`▼` / `▲`).
-2. **Popover Grid (3 Colonne × 5 Righe)**:
-   - Griglia espandibile glassmorphic contenente tutte le 15 categorie con pallini luminosi (`box-shadow` del colore di categoria), emoji tematiche e nome della categoria in carattere `JetBrains Mono`.
-3. **Pattern di Interazione (Parità con la Toolbar)**:
-   - **Hover preview (`mouseenter`/`mouseleave`)**: Passando col mouse sopra il pulsante, il popover si apre in anteprima temporanea.
-   - **Click Lock (`isLegendClicked`)**: Cliccando il pulsante trigger, la legenda si blocca in stato aperto permanente. In questo stato l'utente può interagire liberamente con la mappa (ruotare il globo, cliccare sui marker, esplorare le nazioni) ed aprire la sidebar mantenendo sempre la legenda visibile.
-   - **Chiusura**: Pulsante `✕` nell'header del popover o secondo click sul pulsante trigger.
+   - Bottone glassmorphic `🏷️ LEGENDA TIPOLOGIE 15` (o `1/15`, `2/15` quando è attiva un'evidenziazione bloccata) ed indicatore d'apertura (`▼` / `▲`).
+2. **Posizionamento Reattivo (Anti-Sovrapposizione Sidebar)**:
+   - Centrata a `left: 50%` quando la sidebar è chiusa.
+   - Quando la sidebar è aperta (`isSidebarOpen()`), si trasla dinamicamente a destra (`left: calc(50% + min(35vw, 480px) / 2)`), centrandosi nello spazio di mappa rimanente senza mai sovrapporsi al carosello articoli.
+3. **Tooltip con Descrizione Geopolitica in Hover**:
+   - In hover su ciascuna card appare un popup glassmorphic fluttuante (`legend-card-tooltip`) sopra la legenda con l'icona, il nome completo della tipologia (anti-troncamento per etichette lunghe come *"Intelligenza Artificiale"*), il badge notizie `(X notizie)` ed una breve descrizione descrittiva del campo geopolitico.
+4. **Popover Grid (3 Colonne × 5 Righe A-Z)**:
+   - Griglia espandibile glassmorphic contenente tutte le 15 tipologie ordinate alfabeticamente A-Z (Ambiente 🌿 a Tecnologia 💻).
+   - Layout fluido con troncamento anti-overflow delle etichette e badge del numero di notizie `(14)` sempre visibile.
+5. **Pulsanti "Seleziona Tutto" / "Deseleziona Tutto"**:
+   - "Deseleziona tutto" sblocca il lock e ripristina l'opacità standard (`0.34`) per tutte e 15 le tipologie. "Seleziona tutto" illumina tutte le campiture.
+6. **Pattern di Evidenziazione Mappa (Glow Senza Offuscamento & Combinato)**:
+   - **Hover preview sulle Card**: Il passaggio del mouse illumina la tipologia hoverata sulla mappa (`fill-opacity` = `0.85`), lasciando le altre tipologie al colore ed opacità standard (`0.34`), senza oscurarle. Se sono presenti card già attive/bloccate, l'hover su un'altra tipologia le illumina **tutte contemporaneamente**.
+   - **Click su Card (Lock Evidenziazione)**: Cliccando su una o più card, la mappa mantiene illuminate (`fill-opacity` = `0.85`) solo le tipologie selezionate, mentre tutte le altre mantengono la loro tinta normale (`0.34`). Il badge del titolo si aggiorna in `N/15`.
+   - **Auto-Close su Zoom Marker**: Quando lo zoom si avvicina ai marker (zoom >= 4 / `pinModeActive`), la legenda si chiude automaticamente per liberare la visuale.
 
 ---
 
