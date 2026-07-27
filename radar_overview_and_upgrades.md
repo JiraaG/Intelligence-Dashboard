@@ -94,7 +94,7 @@ Il database PostgreSQL utilizza driver `asyncpg` asincroni puri senza ORM per ma
 
 La configurazione del motore LLM supporta canali (Lanes) indipendenti per la classificazione:
 * **SIMPLE Lane (`LLM_SIMPLE_*`):** Destinata a pezzi semplici, tipicamente appoggiata a modelli di base ed economici (es. Profilo A: `gemini-3.5-flash-lite` con L1 `gemini-3.1-flash-lite`; altri: `deepseek-v4-flash` con `effort=none`).
-* **COMPLEX Lane (`LLM_COMPLEX_*`):** Destinata ad articoli complessi o escalation, tipicamente associata ad alta capacità di reasoning (es. `deepseek-v4-flash` con `effort=high`, `gemini-3.5-flash`).
+* **COMPLEX Lane (`LLM_COMPLEX_*`):** Destinata ad articoli complessi o escalation, tipicamente associata ad alta capacità di reasoning (es. `deepseek-v4-flash` con `effort=max`, `gemini-3.5-flash`).
 
 L'algoritmo **Heuristic Complexity v2.2** determina la lane corretta analizzando il testo sanitizzato (titolo + body):
 
@@ -108,7 +108,7 @@ L'algoritmo **Heuristic Complexity v2.2** determina la lane corretta analizzando
    * Se famiglia $N$ attiva e nessuna altra: `lane = SIMPLE`.
    * Se l'unica famiglia attiva è $L$: `lane = SIMPLE` (la sola lunghezza non rappresenta un rischio di rottura dello schema).
    * Se sono attive $\ge 2$ famiglie qualsiasi tra $\{G, E, L, X\}$: `lane = COMPLEX`.
-   * Se è attiva esattamente 1 famiglia forte tra $\{G, E, X\}$: `lane = BORDERLINE` (che esegue la catena `LLM_COMPLEX` con effort da `LLM_BORDERLINE_REASONING_EFFORT`, default `high`, target ops `none`).
+   * Se è attiva esattamente 1 famiglia forte tra $\{G, E, X\}$: `lane = BORDERLINE` (che esegue la catena `LLM_COMPLEX` con effort da `LLM_BORDERLINE_REASONING_EFFORT`, default/ops tipico `high`).
    * Altrimenti: `lane = SIMPLE`.
 
 ```mermaid
@@ -260,7 +260,7 @@ LLM_COMPLEX_RPM=0
 LLM_COMPLEX_TPM=0
 LLM_COMPLEX_RPD=0
 LLM_COMPLEX_TIMEOUT=180
-LLM_COMPLEX_REASONING_EFFORT=high
+LLM_COMPLEX_REASONING_EFFORT=max
 ```
 
 ##### Scenario 2: Local SIMPLE + Cloud COMPLEX (Local-Hybrid — DEFAULT / Profilo F)
@@ -284,7 +284,7 @@ LLM_COMPLEX_PROVIDER=deepseek
 LLM_COMPLEX_MODEL=deepseek-v4-flash
 LLM_COMPLEX_API_KEY=TUA_DEEPSEEK_API_KEY
 LLM_COMPLEX_BASE_URL=https://api.deepseek.com
-LLM_COMPLEX_REASONING_EFFORT=high
+LLM_COMPLEX_REASONING_EFFORT=max
 ```
 
 ##### Scenario 3: Cloud SIMPLE + Local COMPLEX
@@ -308,7 +308,7 @@ LLM_COMPLEX_API_KEY=ollama
 LLM_COMPLEX_BASE_URL=http://host.docker.internal:11434/v1
 LLM_COMPLEX_RPM=0
 LLM_COMPLEX_TIMEOUT=180
-LLM_COMPLEX_REASONING_EFFORT=high
+LLM_COMPLEX_REASONING_EFFORT=max
 ```
 
 ##### Scenario 4: Dual local (due modelli) — non default su 12 GB
@@ -437,7 +437,7 @@ Invece di limitarsi a una deduplica basata sull'URL esatto (inadeguata se feed d
 
 #### 1. Modifiche al Database: Script di Migrazione (`012_pgvector_article_embeddings.sql`)
 
-> **Design shipped (SoT completo):** near-dup → **quality:compare** su lane **COMPLEX** (`reasoning_effort=none`) → keep oppure **replace in-place** (stesso `article_id`). Vedi [`plan-audit/complete/plan_impl_fase_C_semantic_dedup.md`](plan-audit/complete/plan_impl_fase_C_semantic_dedup.md).
+> **Design shipped (SoT completo):** near-dup → **quality:compare** su lane **COMPLEX** (`reasoning_effort=high`) → keep oppure **replace in-place** (stesso `article_id`). Vedi [`plan-audit/complete/plan_impl_fase_C_semantic_dedup.md`](plan-audit/complete/plan_impl_fase_C_semantic_dedup.md).
 
 ```sql
 -- Abilita l'estensione pgvector nel database PostgreSQL

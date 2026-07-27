@@ -31,6 +31,22 @@ OLLAMA_THINK_NUM_PREDICT = 8192
 # sotto carico parallelo e lasciava thinking senza spazio per il JSON.
 OLLAMA_THINK_NUM_CTX = 8192
 
+# Cap output cloud (non Ollama): soffitto, si paga solo i token emessi.
+# Think Max può generare reasoning lungo prima del JSON articolo.
+MAX_TOKENS_NONE = 2048
+MAX_TOKENS_HIGH = 8192
+MAX_TOKENS_MAX = 32768
+
+
+def max_tokens_for_effort(effort: str) -> int:
+    """Soffitto ``max_tokens`` per effort cloud (DeepSeek / OpenAI-compat stock)."""
+    value = (effort or "none").strip().lower()
+    if value in {"none", "off", "disabled"}:
+        return MAX_TOKENS_NONE
+    if value == "max":
+        return MAX_TOKENS_MAX
+    return MAX_TOKENS_HIGH
+
 
 def normalize_api_dialect(raw: str | None) -> str:
     """Normalizza dialect a ``deepseek``|``openai``; default ``deepseek`` se ignoto."""
@@ -62,7 +78,7 @@ def build_chat_completions_payload(
 ) -> dict[str, Any]:
     """Costruisce il JSON POST ``/chat/completions`` per il dialect richiesto.
 
-    - ``effort=none`` → ``max_tokens`` 2048; altrimenti 8192.
+    - ``effort=none`` → ``max_tokens`` 2048; ``high`` → 8192; ``max`` → 32768.
     - Dialect ``deepseek``: campi ``thinking`` + ``reasoning_effort``.
     - Dialect ``openai`` stock: nessun campo DeepSeek-only.
     - Modelli ``uses_ollama_think_protocol``: ``think=true`` sempre + budget
@@ -76,10 +92,8 @@ def build_chat_completions_payload(
     ollama_think = uses_ollama_think_protocol(model)
     if ollama_think:
         max_tokens = OLLAMA_THINK_NUM_PREDICT
-    elif effort != "none":
-        max_tokens = 8192
     else:
-        max_tokens = 2048
+        max_tokens = max_tokens_for_effort(effort)
     payload: dict[str, Any] = {
         "model": model,
         "messages": [

@@ -410,7 +410,7 @@ export class ArticleMockService {
         models_breakdown: [
           {
             model: 'deepseek-v4-flash',
-            reasoning_effort: 'high',
+            reasoning_effort: 'max',
             provider: 'deepseek',
             requests_count: 276,
             prompt_tokens: 240000,
@@ -422,7 +422,7 @@ export class ArticleMockService {
           },
           {
             model: 'deepseek-v4-flash',
-            reasoning_effort: 'none',
+            reasoning_effort: 'high',
             provider: 'deepseek',
             requests_count: 549,
             prompt_tokens: 30000,
@@ -502,13 +502,13 @@ export class ArticleMockService {
           rpd_limit: 0,
           cooling_down: false,
           cooldown_until: null,
-          reasoning_effort: 'high',
+          reasoning_effort: 'max',
         },
       ],
       borderline: {
         model: 'deepseek-v4-flash',
         provider: 'deepseek',
-        reasoning_effort: 'none',
+        reasoning_effort: 'high',
         articles_today: 276,
         rpd_used: 276,
         rpd_limit: 0,

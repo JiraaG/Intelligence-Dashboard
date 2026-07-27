@@ -316,7 +316,7 @@ Routing opzionale (`LLM_ROUTING_MODE=off|complexity`). Lane = heuristic in
 |-----|--------|
 | `LLM_SIMPLE_PROVIDER` / `LLM_SIMPLE_MODEL` / `*_REASONING_EFFORT` | Solo lane **SIMPLE** (tipico `effort=none`) |
 | `LLM_COMPLEX_PROVIDER` / `LLM_COMPLEX_MODEL` / `*_REASONING_EFFORT` | **BORDERLINE + COMPLEX** + escalate |
-| `LLM_BORDERLINE_REASONING_EFFORT` | Effort reasoning per heuristic BORDERLINE sulla catena COMPLEX (default safe `high`, target ops `none` con escalate `high` su ValidationError) |
+| `LLM_BORDERLINE_REASONING_EFFORT` | Effort reasoning per heuristic BORDERLINE sulla catena COMPLEX (default/ops tipico `high` con escalate `high` su ValidationError) |
 | `LLM_COMPLEX_RPM/TPM/RPD` / `*_BUDGET_USD_DAY` | Limiti lane COMPLEX (`0` = unmanaged) |
 | `GEMINI_MODEL_FALLBACKS` | Cascata CSV extra **solo** se provider lane = gemini |
 | `DEEPSEEK_*` / `LLM_RPM` | Legacy key/model/effort/base + alias fill-gap quote |

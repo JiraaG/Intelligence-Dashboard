@@ -374,7 +374,7 @@ con i dati mockati prima di connettere il backend reale.
 ### ✅ Test 8: FinOps UI — STATUS + COSTI (topbar split)
 
 - [ ] Topbar **sinistra** inizia con **STATUS** (pallino 🟢/🟡/🔴); **destra** termina con **COSTI: $X.XXXX** (giorno calendario).
-- [ ] Popover **STATUS**: banner + eventuali alert L1/degradato; RPD SIMPLE→FALLBACK→BORDERLINE→COMPLEX; sezione **Gestione & Effort** (NONE/NONE/BL/COMPLEX).
+- [ ] Popover **STATUS**: banner + eventuali alert L1/degradato; RPD SIMPLE→FALLBACK→BORDERLINE→COMPLEX; sezione **Gestione & Effort** (NONE/NONE/HIGH/MAX tipico ops Flash).
 - [ ] Popover **COSTI**: 6 sezioni (generali → costi/modello con effort → token → richieste/modello → dedup senza Totale → overall all-time).
 - [ ] MOCK_MODE: `getMetricsSummary` ha `models_breakdown` con `reasoning_effort` + `overall`; `getMetricsStatus` ha `borderline`, `reasoning_effort` sui models, e almeno un FALLBACK se configurato nel fixture.
 - [ ] Card sidebar **"ANALISI FINOPS & FONTE RSS"** dopo i Tag (modello, lane, token, latenza, costo, feed XML).

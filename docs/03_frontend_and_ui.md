@@ -214,7 +214,7 @@ Per collegare le notizie multilaterali, la mappa disegna archi curvi bidireziona
    - **Banner stato** + badge L1 con **etichette italiane** (non snake_case raw) quando `l1_likely_active`.
    - Alert box L1 / degradato (condizionati).
    - **Modelli & Quote RPD:** ordine **SIMPLE → FALLBACK → BORDERLINE → COMPLEX** (barre RPD, cooldown con countdown live). Conteggio RPD distinto per BORDERLINE e COMPLEX quando gli effort differiscono; se COMPLEX e BORDERLINE condividono lo stesso `reasoning_effort`, il ledger aggrega le righe active complex-lane (incluso `quality:compare`) sotto quell’effort — vedi caveat in [`docs/02`](02_architecture_and_backend.md). L’effort **non** compare nel titolo modello.
-   - **Gestione & Effort:** matrice 2×2 — SIMPLE/FALLBACK hardcode `NONE`; BORDERLINE ← `borderline.reasoning_effort`; COMPLEX ← `models[complex].reasoning_effort`.
+   - **Gestione & Effort:** matrice 2×2 — SIMPLE/FALLBACK hardcode `NONE`; BORDERLINE ← `borderline.reasoning_effort` (ops tipico `HIGH`); COMPLEX ← `models[complex].reasoning_effort` (ops tipico `MAX` su Flash). Badge CSS: `effort-none|low|medium|high|max`.
    - **Sorgenti** (read-only): `Sorgenti N/M attive` da `feeds.active_count` / `total_count`; se `error_count > 0` nota compatta. Hint: apri FONTI → Catalogo. Niente lista/toggle qui.
    - Cooldown RPD: scadenza a **`day_end`** (finestra giornaliera), non +24h statiche. Altri cooldown (es. 5xx) restano a ore configurate.
 

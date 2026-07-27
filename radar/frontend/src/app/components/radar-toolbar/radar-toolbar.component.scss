@@ -1165,6 +1165,11 @@
           color: #ff5580;
           border: 1px solid rgba(255, 51, 102, 0.35);
         }
+        &.effort-max {
+          background: rgba(180, 80, 255, 0.18);
+          color: #c084fc;
+          border: 1px solid rgba(180, 80, 255, 0.4);
+        }
         &.effort-medium {
           background: rgba(255, 187, 0, 0.15);
           color: #ffc800;
@@ -1202,6 +1207,9 @@
       }
       &.effort-text-high {
         color: #ff5580;
+      }
+      &.effort-text-max {
+        color: #c084fc;
       }
       &.effort-text-medium {
         color: #ffc800;

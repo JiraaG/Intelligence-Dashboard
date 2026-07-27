@@ -5,7 +5,7 @@ description: >
   provider; limiti per-lane LLM_SIMPLE_* / LLM_COMPLEX_* (0=unmanaged); soft-trim =
   LLM_SIMPLE.rpd se >0; free=RPM/RPD vs paid=BUDGET; RPD half-open; rispettare 429 Retry-After.
   Complexity v2.2: BORDERLINE → purpose classify:complex;
-  effort da LLM_BORDERLINE_REASONING_EFFORT (default high, ops tipico none).
+  effort da LLM_BORDERLINE_REASONING_EFFORT (default/ops tipico high; COMPLEX tipico max).
 when_to_use:
   - classification/quota.py, cooldown.py, llm_request_ledger, client cascade/retry
 version: 2.4.0
@@ -30,7 +30,7 @@ Residual cross-lane fattura `ref.quota_lane` (SIMPLE↔COMPLEX se identity diver
 
 ## Complexity routing (v2.2)
 
-- BORDERLINE / COMPLEX → reserve `lane=complex` (`purpose=classify:complex`). Nota effort BORDERLINE: BORDERLINE usa effort da `LLM_BORDERLINE_REASONING_EFFORT` (default safe `high`, target ops `none` con escalate `high` su `ValidationError`), mantenendo `purpose=classify:complex`.
+- BORDERLINE / COMPLEX → reserve `lane=complex` (`purpose=classify:complex`). Nota effort BORDERLINE: BORDERLINE usa effort da `LLM_BORDERLINE_REASONING_EFFORT` (default/ops tipico `high` con escalate `high` su `ValidationError`), mantenendo `purpose=classify:complex`.
 - quality:compare (Fase C near-dup) → reserve `lane=complex`, `purpose=quality:compare`
 
 ## Protocollo

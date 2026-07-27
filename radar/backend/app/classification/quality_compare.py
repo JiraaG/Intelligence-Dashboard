@@ -4,7 +4,7 @@ Determina se l'articolo in arrivo e il candidato esisitente trattano la medesima
 (same_story) e quale dei due e il vincitore (winner: 'existing' | 'incoming').
 
 Invarianti:
-- 1 call su lane COMPLEX con reasoning_effort=none
+- 1 call su lane COMPLEX con reasoning_effort=high
 - purpose="quality:compare", lane="complex"
 - Prefilter: keep existing solo se len_incoming < len_existing * 0.7
 - Profilo balanced per il testo (<=2500 intero, oltre scaglioni 40/45/50 max 4500, split 50/50 o 40/20/40 se >5k)
@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Literal
+from typing import Any, Literal
 
 import asyncpg
 import httpx
@@ -204,7 +204,7 @@ async def compare_articles_quality(
             provider=provider,
             lane="complex",
             miniflux_entry_id=miniflux_entry_id,
-            reasoning_effort="none",
+            reasoning_effort="high",
         )
     except (QuotaBudgetExceeded, QuotaDailyExceeded) as exc:
         logger.warning(
@@ -254,12 +254,12 @@ async def compare_articles_quality(
 
         elif provider in OPENAI_COMPAT_PROVIDERS:
             # OpenAI-compat via httpx (DeepSeek / OpenAI / GLM / Grok)
-            # Override effort=none per scontro di qualità
+            # Override effort=high per scontro di qualità (allineato a BORDERLINE)
             ds_client = DeepSeekClient(
                 api_key=LLM_COMPLEX.api_key,
                 base_url=LLM_COMPLEX.base_url,
                 model=model,
-                effort="none",
+                effort="high",
                 timeout=LLM_COMPLEX.timeout or GEMINI_REQUEST_TIMEOUT,
                 api_dialect=LLM_COMPLEX.api_dialect,
             )

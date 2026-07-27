@@ -91,6 +91,7 @@ async def test_compare_articles_quality_prefilter_skips_when_incoming_longer() -
     mock_ledger.reserve.assert_awaited_once()
     assert mock_ledger.reserve.await_args.kwargs["purpose"] == "quality:compare"
     assert mock_ledger.reserve.await_args.kwargs["lane"] == "complex"
+    assert mock_ledger.reserve.await_args.kwargs["reasoning_effort"] == "high"
 
 
 @pytest.mark.asyncio

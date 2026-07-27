@@ -173,7 +173,7 @@ export class RadarToolbarComponent {
   readonly complexModel = computed(() =>
     this.metricsStatus()?.models?.find((m) => m.role === 'complex'),
   );
-  readonly complexReasoningEffort = computed(() => this.complexModel()?.reasoning_effort || 'high');
+  readonly complexReasoningEffort = computed(() => this.complexModel()?.reasoning_effort || 'max');
 
   readonly totalCostUsd = computed(() => {
     return this.metricsSummary()?.llm?.total_estimated_cost_usd ?? 0;

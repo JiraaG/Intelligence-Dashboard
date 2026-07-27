@@ -69,9 +69,11 @@ Sintomi: log worker con wait/`429`/`Retry-After`; pochi articoli nuovi; ready pu
 - Routing: `LLM_ROUTING_MODE=complexity` + lane env:
   - `LLM_SIMPLE_PROVIDER` / `LLM_SIMPLE_MODEL` (lane SIMPLE only — effort tipico `none`)
   - `LLM_COMPLEX_PROVIDER` / `LLM_COMPLEX_MODEL` (BORDERLINE + COMPLEX + escalate — effort `LLM_BORDERLINE_REASONING_EFFORT` su BL, `LLM_COMPLEX_REASONING_EFFORT` su COMPLEX)
-  - `LLM_BORDERLINE_REASONING_EFFORT` (effort dedicato per heuristic BORDERLINE sulla catena COMPLEX; default safe `high`; target ops post dual-run `none`. Valori: `none` | `high` | `max`; alias `off`/`disabled` → `none`; `low`/`medium` → `high` + warning log)
-  - Escalate: `ValidationError` esaurita su BORDERLINE `none` → tentata con primary COMPLEX a effort `high` (`escalate_ref`). Caveat: escalate su ValidationError **non** corregge `country_code` errato ma schema-valido (es. `XX`). Dual-run su campione ≥30 obbligatorio prima di confermare `none`.
-  - Rollback immediato: se KPI dual-run degradano (XX rate > +5pp o escalate rate ≥25%), impostare `LLM_BORDERLINE_REASONING_EFFORT=high` e restartare `radar-worker`.
+  - `LLM_BORDERLINE_REASONING_EFFORT` (effort dedicato per heuristic BORDERLINE sulla catena COMPLEX; default/ops tipico `high`. Valori: `none` | `high` | `max`; alias `off`/`disabled` → `none`; `low`/`medium` → `high` + warning log)
+  - `LLM_COMPLEX_REASONING_EFFORT` (ops tipico `max` su `deepseek-v4-flash`; cloud `max_tokens` = 32768; timeout COMPLEX tipico 120s)
+  - Escalate: `ValidationError` esaurita su BORDERLINE → tentata con primary COMPLEX a `LLM_COMPLEX_REASONING_EFFORT` (`escalate_ref`, identity include effort). Caveat: escalate su ValidationError **non** corregge `country_code` errato ma schema-valido (es. `XX`).
+  - Rollback immediato COMPLEX: se Think Max degrada (timeout / ValidationError spike), `LLM_COMPLEX_REASONING_EFFORT=high` e restart `radar-worker`. Rollback BL: `LLM_BORDERLINE_REASONING_EFFORT=high` (già ops tipico).
+  - `quality:compare` (near-dup): effort fisso `high` su lane COMPLEX (non `max`)
   - Residual SIMPLE↔COMPLEX se identity diversa (**eccezione:** SIMPLE Ollama-think → **niente** residual/escalate verso cloud)
   - Complessità = rischio estrazione schema (G/E/X); **L sola → SIMPLE** (non eleva)
   - Swap provider: cambiare `PROVIDER`+`MODEL`+`API_KEY`+`BASE_URL`+limiti/budget; restart `radar-worker`; **un solo** blocco profilo attivo
@@ -119,7 +121,8 @@ docker compose restart radar-worker
 
 Il worker fetch unread filtra già `published_after` ≈ 48h (`MINIFLUX` client). Entry unread più vecchie restano in coda Miniflux ma non entrano nel ciclo finché non rientrano nella finestra.
 
-Poi nei log: `route lane=SIMPLE … effort=none`, `BORDERLINE … effort=<LLM_BORDERLINE_REASONING_EFFORT>` (ops tipico `none`), e `COMPLEX … effort=high`; gate: `Ciclo … 0 errori`.
+Poi nei log: `route lane=SIMPLE … effort=none`, `BORDERLINE … effort=<LLM_BORDERLINE_REASONING_EFFORT>` (ops tipico `high`), e `COMPLEX … effort=max`; gate: `Ciclo … 0 errori`.
+Rollback effort: se Think Max degrada (timeout/ValidationError), impostare `LLM_COMPLEX_REASONING_EFFORT=high` e restartare `radar-worker`.
 
 ---
 

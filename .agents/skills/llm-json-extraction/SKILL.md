@@ -58,8 +58,9 @@ DeepSeek `prompt_cache_hit_tokens` → `cached_prompt_tokens` via `extract_usage
 | Condizione | Lane | Catena |
 |------------|------|--------|
 | 0 famiglie forti, o solo L | SIMPLE | `LLM_SIMPLE` (tipico effort=`none`) |
-| 1 di {G, E, X} | BORDERLINE | `LLM_COMPLEX` (effort da `LLM_BORDERLINE_REASONING_EFFORT`; default `high`, target ops `none`) |
-| ≥2 famiglie (L solo in combo) | COMPLEX | `LLM_COMPLEX` (tipico effort=`high`) |
+| 1 di {G, E, X} | BORDERLINE | `LLM_COMPLEX` (effort da `LLM_BORDERLINE_REASONING_EFFORT`; default/ops tipico `high`) |
+| ≥2 famiglie (L solo in combo) | COMPLEX | `LLM_COMPLEX` (tipico effort=`max`) |
+| near-dup residuo | `quality:compare` | lane COMPLEX, effort fisso `high` (non `max`) |
 
 `geo_marker` da solo: solo se `body_len ≥ 1500`. ≥2 country → G sempre.
 
@@ -75,7 +76,7 @@ LLM_SIMPLE_RPM=0
 LLM_SIMPLE_RPD=0
 LLM_COMPLEX_PROVIDER=deepseek
 LLM_COMPLEX_MODEL=deepseek-v4-flash
-LLM_COMPLEX_REASONING_EFFORT=high
+LLM_COMPLEX_REASONING_EFFORT=max
 LLM_COMPLEX_RPM=0
 LLM_COMPLEX_RPD=0
 # Soft-trim worker = LLM_SIMPLE.rpd se > 0; free=RPM/RPD>0; paid=0+BUDGET

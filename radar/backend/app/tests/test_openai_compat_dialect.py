@@ -85,6 +85,17 @@ def test_deepseek_dialect_payload_includes_thinking() -> None:
     assert high_payload["reasoning_effort"] == "high"
     assert high_payload["max_tokens"] == 8192
 
+    max_payload = build_chat_completions_payload(
+        model="deepseek-v4-flash",
+        system="sys",
+        user="user",
+        effort="max",
+        api_dialect="deepseek",
+    )
+    assert max_payload["thinking"] == {"type": "enabled"}
+    assert max_payload["reasoning_effort"] == "max"
+    assert max_payload["max_tokens"] == 32768
+
 
 def test_openai_dialect_payload_omits_thinking() -> None:
     for effort in ("none", "high"):
