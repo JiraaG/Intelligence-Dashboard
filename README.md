@@ -29,7 +29,7 @@ Alternativa senza bootstrap: `docker compose up --build -d` poi `./ops/import-mi
 
 Knobs LLM / Profili A–F: [`radar/.env.example`](radar/.env.example) + SoT [`sot_llm_multi_model_fallback.md`](plan-audit/complete/sot_llm_multi_model_fallback.md).  
 **Profilo F (Local-Hybrid):** Ollama host + overlay [`radar/docker-compose.ollama-host.yml`](radar/docker-compose.ollama-host.yml) — runbook [`radar/docs/runbook.md`](radar/docs/runbook.md) § Local-Hybrid (VRAM: unload a idle via `OLLAMA_*` / `ops/verify-ollama-vram.sh`).  
-**Limiti lane:** RPM/TPM pieni → attesa stessa lane; RPD/cooldown → residual cross-lane (es. Flash Lite → DeepSeek). Topbar FinOps: **STATUS** (sinistra, live `/api/metrics/status`) e **COSTI** (destra, giorno `/api/metrics/summary`) — costi per tupla `(modello, reasoning_effort)`. Dettaglio: SoT §0 + skill `radar-quota-ledger` / `radar-api-contract` + [`docs/03_frontend_and_ui.md`](docs/03_frontend_and_ui.md).
+**Limiti lane:** RPM/TPM pieni → attesa stessa lane; RPD/cooldown → residual cross-lane (es. Flash Lite → DeepSeek). Topbar FinOps: **STATUS** (sinistra, live `/api/metrics/status`) → **FONTI** (Giorno `published_at` + Catalogo toggle Miniflux) → calendario; **COSTI** (destra, giorno `/api/metrics/summary`) — costi per tupla `(modello, reasoning_effort)`. Add feed nuovi = seed + CLI (non UI). Dettaglio: skill `radar-quota-ledger` / `radar-api-contract` + [`docs/03_frontend_and_ui.md`](docs/03_frontend_and_ui.md).
 
 **Routing LLM:** `.env.example` ops tipico = **Profilo B** + `LLM_ROUTING_MODE=complexity`. Effort BORDERLINE configurabile via `LLM_BORDERLINE_REASONING_EFFORT` (default safe `high`, target ops `none` con escalate `high` su `ValidationError`). Default codice boot-safe (senza env) = `LLM_ROUTING_MODE=off` + `LLM_ROUTING_SHADOW=true` — non confondere i due. Local-Hybrid = **Profilo F** (SIMPLE Ollama / COMPLEX cloud).
 
@@ -207,6 +207,7 @@ Restore SHA sotto (Phase 0–6). Il branch di lavoro corrente può differire —
 | Hatching isole + anti-bleed MapLibre | `32203c9` (`feature/upgrades`) | `extractPaintPolygons` + `polygon-clipping` terra∩strip; isole ≥0.5% largest; US/RU mainland — piano [`plan_impl_map_category_fills_islands.md`](plan-audit/complete/plan_impl_map_category_fills_islands.md) — **restore point** |
 | Fase C — dedup semantica (`pgvector`) | `f1e1de0` (`feature/upgrades`) | Migrazione `012`, embedder CPU MiniLM, soglia sim **0.80**, `quality:compare` COMPLEX, replace in-place — piano [`plan_impl_fase_C_semantic_dedup.md`](plan-audit/complete/plan_impl_fase_C_semantic_dedup.md) — **restore point** |
 | FinOps UI Metrics | `5b84a34` (`feature/upgrades`) | Metriche FinOps in topbar STATUS/COSTI, migrazione `015`, breakdown tupla `(model, reasoning_effort)` — **restore point** |
+| FONTI feed management | `feature/upgrades` (2026-07-27) | Topbar FONTI Giorno+Catalogo, `/api/feeds` + by-feed `date_field`, STATUS Sorgenti N/M — **GATE VERDE** |
 | Fix STATUS Real-Time SSE | `state.service.ts` (`feature/upgrades`) | Resilienza connessione SSE: Fix A (open reload), Fix B (retries 15s/45s), Fix C (safety net 5m) — **GATE VERDE** |
 
 Esempio restore tip archi UI Leaflet-era: `git checkout 5c74e57` (branch `feature/upgrades`).  
@@ -258,7 +259,9 @@ Esempio Phase 6: `git checkout 56c2eff`. Dettaglio gate Phase 0–6: [plan_impl_
 | GET | `/api/countries` | Rollup paese (compat) |
 | GET | `/api/metrics/status` | Stato del sistema (level, quote, cooldowns, breakdown modelli/reasoning) |
 | GET | `/api/metrics/summary` | Summary FinOps (costi, token, latenze, cache hit rate) |
-| GET | `/api/metrics/by-feed` | Metriche per feed RSS |
+| GET | `/api/metrics/by-feed` | Metriche per feed RSS (`date_field=published_at\|created_at`, default `created_at`; FE FONTI Giorno passa `published_at`) |
+| GET | `/api/feeds` | Catalogo merge seed RO + Miniflux live (`active_count`/`total_count`/`error_count` + groups) |
+| PATCH | `/api/feeds/{id}/toggle` | Abilita/disabilita feed su Miniflux (`disabled`); opz. `X-Feed-Admin-Token` se `FEED_ADMIN_TOKEN` set |
 | GET | `/api/metrics/dedup` | Statistiche di deduplicazione semantica |
 | GET | `/api/articles/events` | Stream SSE in tempo reale per `article_processed` |
 | POST | `/api/webhooks/miniflux` | Ingest Webhook HMAC da Miniflux |

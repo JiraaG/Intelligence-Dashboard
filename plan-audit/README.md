@@ -17,7 +17,7 @@ Cartella di audit, prompt orchestratore e SoT del modulo Radar.
 
 ## `complete/` — chiusi
 
-Vedi [`complete/README.md`](complete/README.md) (**FinOps UI** + split STATUS/COSTI, **Eager drain**, **FinOps LLM Wave A**, **BORDERLINE effort split**, **Quote per-modello**, **Metrics 013 FinOps**, Phase 0–6, SoT LLM, Fase A Ollama, audit lane env, Fase B/H, archi UI, **W1 filtro nazioni Relazioni**, **Fase C semantic dedup**, Final Release, commenti, Notizie Salvate, playbook, ticket status, monorepo check).
+Vedi [`complete/README.md`](complete/README.md) (**FONTI** feed management, **FinOps UI** + split STATUS/COSTI, **Eager drain**, **FinOps LLM Wave A**, **BORDERLINE effort split**, **Quote per-modello**, **Metrics 013 FinOps**, Phase 0–6, SoT LLM, Fase A Ollama, audit lane env, Fase B/H, archi UI, **W1 filtro nazioni Relazioni**, **Fase C semantic dedup**, Final Release, commenti, Notizie Salvate, playbook, ticket status, monorepo check).
 
 ## Layout
 
@@ -40,6 +40,7 @@ plan-audit/
 
 ## Prompt done (recente)
 
+* [agent_prompt_fonti_feed_management.md](prompts/done/agent_prompt_fonti_feed_management.md) — **FONTI** Giorno+Catalogo / API feeds — **GATE VERDE** 2026-07-27
 * [agent_prompt_split_status_costi_topbar.md](prompts/done/agent_prompt_split_status_costi_topbar.md) — Split STATUS left / COSTI right — **DONE / SUPERSEDED** (layout reale in `docs/03`)
 * [agent_prompt_audit_finops_status_costs.md](prompts/done/agent_prompt_audit_finops_status_costs.md) — Audit numeri STATUS & COSTI
 * [agent_prompt_finops_ui_closeout.md](prompts/done/agent_prompt_finops_ui_closeout.md) — FinOps UI closeout

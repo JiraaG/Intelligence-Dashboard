@@ -10,7 +10,13 @@ import {
 } from '../models/article.model';
 import { MapSummaryRow } from '../models/map-summary.model';
 import { MapRelationRow } from '../models/map-relation.model';
-import { MetricsSummary, MetricsStatus } from '../models/metrics.model';
+import {
+  MetricsSummary,
+  MetricsStatus,
+  MetricsByFeed,
+  FeedsResponse,
+  FeedToggleResponse,
+} from '../models/metrics.model';
 
 /** Data ISO di generazione fixture — usata come ``published_at``, non come filtro query. */
 const TODAY = new Date().toISOString().split('T')[0];
@@ -517,5 +523,144 @@ export class ArticleMockService {
         total_estimated_cost_usd: 0.1329,
       },
     });
+  }
+
+  getMetricsByFeed(
+    fromDate?: string,
+    toDate?: string,
+    dateField?: 'published_at' | 'created_at',
+  ): Observable<MetricsByFeed> {
+    void dateField;
+    const from = fromDate || TODAY;
+    const to = toDate || TODAY;
+    return of({
+      from,
+      to,
+      items: [
+        {
+          feed_id: 1,
+          feed_domain: 'bbc.com',
+          feed_title: 'BBC News — World',
+          article_count: 4,
+          total_clean_chars: 8200,
+          avg_clean_chars: 2050,
+          avg_pipeline_latency_ms: 1100,
+          avg_embedding_time_ms: 40,
+        },
+        {
+          feed_id: 2,
+          feed_domain: 'theguardian.com',
+          feed_title: 'The Guardian — World',
+          article_count: 2,
+          total_clean_chars: 4100,
+          avg_clean_chars: 2050,
+          avg_pipeline_latency_ms: 980,
+          avg_embedding_time_ms: 38,
+        },
+        {
+          feed_id: 3,
+          feed_domain: 'npr.org',
+          feed_title: 'NPR News',
+          article_count: 1,
+          total_clean_chars: 1900,
+          avg_clean_chars: 1900,
+          avg_pipeline_latency_ms: 870,
+          avg_embedding_time_ms: 35,
+        },
+      ],
+    });
+  }
+
+  getFeeds(): Observable<FeedsResponse> {
+    return of({
+      active_count: 3,
+      total_count: 4,
+      error_count: 1,
+      groups: [
+        {
+          category: 'BBC News',
+          feeds: [
+            {
+              id: 1,
+              title: 'BBC News — World',
+              feed_url: 'https://feeds.bbci.co.uk/news/world/rss.xml',
+              site_url: 'https://www.bbc.com/news',
+              category: 'BBC News',
+              scraper_rules: '#main-content',
+              crawler: true,
+              disabled: false,
+              enabled_in_seed: true,
+              in_seed: true,
+              parsing_error_count: 0,
+              parsing_error_msg: '',
+              checked_at: new Date().toISOString(),
+              next_check_at: null,
+            },
+            {
+              id: 4,
+              title: 'BBC News — Technology',
+              feed_url: 'https://feeds.bbci.co.uk/news/technology/rss.xml',
+              site_url: 'https://www.bbc.com/news/technology',
+              category: 'BBC News',
+              scraper_rules: '#main-content',
+              crawler: true,
+              disabled: true,
+              enabled_in_seed: true,
+              in_seed: true,
+              parsing_error_count: 0,
+              parsing_error_msg: '',
+              checked_at: null,
+              next_check_at: null,
+            },
+          ],
+        },
+        {
+          category: 'The Guardian',
+          feeds: [
+            {
+              id: 2,
+              title: 'The Guardian — World',
+              feed_url: 'https://www.theguardian.com/world/rss',
+              site_url: 'https://www.theguardian.com/world',
+              category: 'The Guardian',
+              scraper_rules: 'article',
+              crawler: true,
+              disabled: false,
+              enabled_in_seed: true,
+              in_seed: true,
+              parsing_error_count: 2,
+              parsing_error_msg: 'timeout fetching feed',
+              checked_at: new Date().toISOString(),
+              next_check_at: null,
+            },
+          ],
+        },
+        {
+          category: 'NPR',
+          feeds: [
+            {
+              id: 3,
+              title: 'NPR News',
+              feed_url: 'https://feeds.npr.org/1001/rss.xml',
+              site_url: 'https://www.npr.org',
+              category: 'NPR',
+              scraper_rules: '.storytext',
+              crawler: true,
+              disabled: false,
+              enabled_in_seed: true,
+              in_seed: true,
+              parsing_error_count: 0,
+              parsing_error_msg: '',
+              checked_at: new Date().toISOString(),
+              next_check_at: null,
+            },
+          ],
+        },
+      ],
+    });
+  }
+
+  toggleFeed(feedId: number, disabled: boolean): Observable<FeedToggleResponse> {
+    return of({ id: feedId, disabled, status: 'ok' });
   }
 }

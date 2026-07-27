@@ -281,11 +281,210 @@
               </div>
             </div>
           </div>
+
+          <!-- Sezione Sorgenti (read-only) -->
+          <div class="popover-section fonti-status-snippet">
+            <span
+              class="section-label"
+              title="Conteggio feed attivi su Miniflux rispetto al totale (seed + live)"
+              >📡 Sorgenti</span
+            >
+            <div class="sorgenti-row" *ngIf="feeds() as f">
+              <span class="sorgenti-count"
+                >Sorgenti: <strong>{{ f.active_count }}/{{ f.total_count }}</strong> attive</span
+              >
+              <span class="sorgenti-errors" *ngIf="f.error_count > 0"
+                >· {{ f.error_count }} con errori</span
+              >
+            </div>
+            <div class="sorgenti-row sorgenti-loading" *ngIf="!feeds()">Caricamento sorgenti…</div>
+            <p class="sorgenti-hint">Apri FONTI → Catalogo per abilitare/disabilitare i feed.</p>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Separatore dopo STATUS -->
+    <!-- FONTI (dopo STATUS, prima del divider) -->
+    <div
+      class="article-count-container"
+      (mouseenter)="isFontiTooltipHovered.set(true)"
+      (mouseleave)="isFontiTooltipHovered.set(false)"
+    >
+      <button
+        type="button"
+        class="article-count status-count-btn"
+        (click)="toggleFontiTooltip($event)"
+        [attr.aria-expanded]="isFontiTooltipVisible()"
+        aria-haspopup="true"
+      >
+        FONTI
+        <strong>{{ fontiBadgeLabel() }}</strong>
+      </button>
+
+      <div
+        #fontiPopover
+        class="countries-tooltip status-popover status-popover-left fonti-popover"
+        *ngIf="isFontiTooltipVisible()"
+        role="dialog"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="tooltip-header">
+          <span class="tooltip-title">FONTI</span>
+          <button
+            type="button"
+            class="tooltip-close-btn"
+            (click)="closeFontiTooltip($event)"
+            aria-label="Chiudi"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div class="fonti-tabs" role="tablist">
+          <button
+            type="button"
+            class="fonti-tab"
+            role="tab"
+            [class.is-active]="fontiView() === 'giorno'"
+            [attr.aria-selected]="fontiView() === 'giorno'"
+            (click)="setFontiView('giorno', $event)"
+          >
+            Giorno
+          </button>
+          <button
+            type="button"
+            class="fonti-tab"
+            role="tab"
+            [class.is-active]="fontiView() === 'catalogo'"
+            [attr.aria-selected]="fontiView() === 'catalogo'"
+            (click)="setFontiView('catalogo', $event)"
+          >
+            Catalogo
+          </button>
+        </div>
+
+        <div class="popover-content">
+          <!-- Vista Giorno -->
+          <ng-container *ngIf="fontiView() === 'giorno'">
+            <div class="fonti-day-header">
+              <span>{{ selectedDate() | date: 'yyyy-MM-dd' }}</span>
+              <span>{{ fontiDayFeedCount() }} fonti · {{ fontiDayArticleCount() }} articoli</span>
+            </div>
+            <div class="fonti-empty" *ngIf="fontiDayFeedCount() === 0">
+              Nessuna fonte per questa data
+            </div>
+            <div class="fonti-accordion" *ngIf="fontiDayFeedCount() > 0">
+              <div class="fonti-group" *ngFor="let g of fontiDayGroups()">
+                <button
+                  type="button"
+                  class="fonti-group-header"
+                  (click)="toggleFontiCategory(g.category, $event)"
+                  [attr.aria-expanded]="isFontiCategoryExpanded(g.category)"
+                >
+                  <span class="fonti-chevron">{{
+                    isFontiCategoryExpanded(g.category) ? '▾' : '▸'
+                  }}</span>
+                  <span class="fonti-group-title">{{ g.category }}</span>
+                  <span class="fonti-group-count" title="Articoli nel giorno">{{
+                    fontiGroupArticleSum(g.feeds)
+                  }}</span>
+                </button>
+                <div class="fonti-group-body" *ngIf="isFontiCategoryExpanded(g.category)">
+                  <div class="fonti-feed-row" *ngFor="let f of g.feeds">
+                    <span class="fonti-feed-title">{{ fontiFeedSubtitle(f.feed_title) }}</span>
+                    <span class="fonti-feed-count" title="Articoli">{{ f.article_count }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ng-container>
+
+          <!-- Vista Catalogo -->
+          <ng-container *ngIf="fontiView() === 'catalogo'">
+            <div class="fonti-catalog-header" *ngIf="feeds() as f">
+              <span>{{ f.active_count }}/{{ f.total_count }} attive</span>
+              <span class="fonti-catalog-hint" *ngIf="f.error_count === 0"
+                >toggle = fetch Miniflux</span
+              >
+              <span *ngIf="f.error_count > 0" class="fonti-catalog-errors"
+                >{{ f.error_count }} errori</span
+              >
+            </div>
+            <div class="fonti-empty" *ngIf="!feeds()">Caricamento catalogo…</div>
+            <div class="fonti-accordion" *ngIf="feeds() as catalog">
+              <div class="fonti-group" *ngFor="let g of catalog.groups">
+                <button
+                  type="button"
+                  class="fonti-group-header"
+                  (click)="toggleFontiCategory(g.category, $event)"
+                  [attr.aria-expanded]="isFontiCategoryExpanded(g.category)"
+                >
+                  <span class="fonti-chevron">{{
+                    isFontiCategoryExpanded(g.category) ? '▾' : '▸'
+                  }}</span>
+                  <span class="fonti-group-title">{{ g.category }}</span>
+                  <span class="fonti-group-count" title="Feed attivi / totali in questo publisher"
+                    >{{ fontiGroupActiveCount(g.feeds) }}/{{ g.feeds.length }}</span
+                  >
+                </button>
+                <div class="fonti-group-body" *ngIf="isFontiCategoryExpanded(g.category)">
+                  <div
+                    class="fonti-feed-row fonti-feed-row--catalog"
+                    *ngFor="let feed of g.feeds"
+                    [class.is-disabled]="feed.disabled"
+                    [class.has-error]="feed.parsing_error_count > 0"
+                    [attr.title]="feed.feed_url || null"
+                  >
+                    <div class="fonti-feed-meta">
+                      <span class="fonti-feed-title">{{ fontiFeedSubtitle(feed.title) }}</span>
+                      <span class="fonti-feed-host" *ngIf="feed.feed_url">{{
+                        fontiFeedHost(feed.feed_url)
+                      }}</span>
+                    </div>
+                    <span
+                      class="fonti-feed-badge"
+                      [class.badge-on]="
+                        feed.id != null && !feed.disabled && feed.parsing_error_count === 0
+                      "
+                      [class.badge-off]="feed.id == null || feed.disabled"
+                      [class.badge-err]="
+                        feed.id != null && !feed.disabled && feed.parsing_error_count > 0
+                      "
+                      [attr.title]="feed.parsing_error_msg || null"
+                    >
+                      <ng-container *ngIf="feed.id == null">N/A</ng-container>
+                      <ng-container *ngIf="feed.id != null && feed.disabled">OFF</ng-container>
+                      <ng-container
+                        *ngIf="feed.id != null && !feed.disabled && feed.parsing_error_count > 0"
+                        >ERR</ng-container
+                      >
+                      <ng-container
+                        *ngIf="feed.id != null && !feed.disabled && feed.parsing_error_count === 0"
+                        >ATTIVO</ng-container
+                      >
+                    </span>
+                    <button
+                      type="button"
+                      class="ios-switch"
+                      role="switch"
+                      [attr.aria-checked]="!feed.disabled"
+                      [attr.aria-label]="(feed.disabled ? 'Abilita ' : 'Disabilita ') + feed.title"
+                      [class.is-on]="!feed.disabled"
+                      [disabled]="feed.id == null"
+                      (click)="onToggleFeed(feed.id, feed.disabled, $event)"
+                    >
+                      <span class="ios-switch__thumb" aria-hidden="true"></span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ng-container>
+        </div>
+      </div>
+    </div>
+
+    <!-- Separatore dopo STATUS/FONTI -->
     <div class="divider"></div>
 
     <!-- Calendario PrimeNG -->
@@ -361,8 +560,13 @@
             *ngFor="let opt of filteredSentimentOptions()"
             role="option"
           >
-            <div class="sentiment-option-label" [ngClass]="'sentiment-opt--' + opt.value.toLowerCase()">
-              <span class="sentiment-icon">{{ opt.value === 'Positivo' ? '▲' : opt.value === 'Negativo' ? '▼' : '●' }}</span>
+            <div
+              class="sentiment-option-label"
+              [ngClass]="'sentiment-opt--' + opt.value.toLowerCase()"
+            >
+              <span class="sentiment-icon">{{
+                opt.value === 'Positivo' ? '▲' : opt.value === 'Negativo' ? '▼' : '●'
+              }}</span>
               <span class="sentiment-name">{{ opt.value }}</span>
             </div>
             <button
@@ -887,9 +1091,7 @@
                 <div
                   class="rpd-bar-fill"
                   [style.width.%]="
-                    totalTokensSum() > 0
-                      ? ((m.total_tokens ?? 0) / totalTokensSum()) * 100
-                      : 0
+                    totalTokensSum() > 0 ? ((m.total_tokens ?? 0) / totalTokensSum()) * 100 : 0
                   "
                 ></div>
               </div>

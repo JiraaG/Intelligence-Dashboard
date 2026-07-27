@@ -24,6 +24,12 @@ def test_metrics_by_feed_invalid_date(client):
     assert "Invalid 'to' date format" in response.json()["detail"]
 
 
+def test_metrics_by_feed_invalid_date_field(client):
+    response = client.get("/api/metrics/by-feed?date_field=foo")
+    assert response.status_code == 400
+    assert "date_field" in response.json()["detail"]
+
+
 def test_metrics_dedup_from_after_to(client):
     """from > to deve restituire 400."""
     response = client.get("/api/metrics/dedup?from=2026-07-20&to=2026-07-10")

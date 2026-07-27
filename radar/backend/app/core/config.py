@@ -319,6 +319,8 @@ MINIFLUX_FEEDS_SEED_PATH = (
     _env_str("MINIFLUX_FEEDS_SEED_PATH", "/app/config/miniflux-feeds.seed.json")
     or "/app/config/miniflux-feeds.seed.json"
 )
+# Opzionale: se non vuoto, PATCH /api/feeds/{id}/toggle richiede X-Feed-Admin-Token.
+FEED_ADMIN_TOKEN = _env_str("FEED_ADMIN_TOKEN", "") or ""
 MINIFLUX_LIMIT = _env_int("MINIFLUX_LIMIT", 50, min_value=1, max_value=500)
 
 # Ceiling byte sullo stream HTTP e sul singolo entry prima del parse (docs/01).

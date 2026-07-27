@@ -9,6 +9,7 @@ import {
   Sentiment,
   PrimaryCategory,
 } from '../../models/article.model';
+import { MetricsByFeedItem } from '../../models/metrics.model';
 import { StateService } from '../../services/state.service';
 
 export interface FilterOption<T extends string = string> {
@@ -113,13 +114,65 @@ export class RadarToolbarComponent {
     () => this.isStatusTooltipHovered() || this.isStatusTooltipClicked(),
   );
 
+  isFontiTooltipHovered = signal(false);
+  isFontiTooltipClicked = signal(false);
+  isFontiTooltipVisible = computed(
+    () => this.isFontiTooltipHovered() || this.isFontiTooltipClicked(),
+  );
+  /** Vista interna FONTI: Giorno (default) | Catalogo. */
+  fontiView = signal<'giorno' | 'catalogo'>('giorno');
+  /** Accordion publisher aperti in Catalogo / Giorno. */
+  fontiExpandedCategories = signal<Set<string>>(new Set());
+
   readonly metricsSummary = computed(() => this.state.metricsSummary());
   readonly metricsStatus = computed(() => this.state.metricsStatus());
+  readonly metricsByFeed = computed(() => this.state.metricsByFeed());
+  readonly feeds = computed(() => this.state.feeds());
   readonly statusLevel = computed(() => this.metricsStatus()?.level ?? 'nominal');
 
-  readonly primaryModel = computed(() => this.metricsStatus()?.models?.find((m) => m.role === 'primary'));
-  readonly fallbackModels = computed(() => this.metricsStatus()?.models?.filter((m) => m.role === 'fallback') ?? []);
-  readonly complexModel = computed(() => this.metricsStatus()?.models?.find((m) => m.role === 'complex'));
+  /** FONTI Giorno: solo feed con article_count > 0. */
+  readonly fontiDayItems = computed(() => {
+    const items = this.metricsByFeed()?.items ?? [];
+    return items.filter((i) => (i.article_count ?? 0) > 0);
+  });
+  readonly fontiDayFeedCount = computed(() => this.fontiDayItems().length);
+  readonly fontiDayArticleCount = computed(() =>
+    this.fontiDayItems().reduce((sum, i) => sum + (i.article_count ?? 0), 0),
+  );
+  /** Raggruppa by-feed per publisher (prefisso titolo prima di " — "). */
+  readonly fontiDayGroups = computed(() => {
+    const groups = new Map<string, { category: string; feeds: MetricsByFeedItem[] }>();
+    for (const item of this.fontiDayItems()) {
+      const title = (item.feed_title || item.feed_domain || 'Sconosciuto').replace(
+        /^Feed:\s*/i,
+        '',
+      );
+      const sep = title.indexOf(' — ');
+      const category = sep >= 0 ? title.slice(0, sep) : item.feed_domain || 'Altro';
+      const list = groups.get(category) ?? { category, feeds: [] as MetricsByFeedItem[] };
+      list.feeds.push(item);
+      groups.set(category, list);
+    }
+    return [...groups.values()].sort((a, b) => a.category.localeCompare(b.category, 'it'));
+  });
+  readonly fontiBadgeLabel = computed(() => {
+    if (this.fontiView() === 'catalogo') {
+      const f = this.feeds();
+      if (!f) return '…';
+      return `${f.active_count}/${f.total_count}`;
+    }
+    return String(this.fontiDayFeedCount());
+  });
+
+  readonly primaryModel = computed(() =>
+    this.metricsStatus()?.models?.find((m) => m.role === 'primary'),
+  );
+  readonly fallbackModels = computed(
+    () => this.metricsStatus()?.models?.filter((m) => m.role === 'fallback') ?? [],
+  );
+  readonly complexModel = computed(() =>
+    this.metricsStatus()?.models?.find((m) => m.role === 'complex'),
+  );
   readonly complexReasoningEffort = computed(() => this.complexModel()?.reasoning_effort || 'high');
 
   readonly totalCostUsd = computed(() => {
@@ -185,7 +238,7 @@ export class RadarToolbarComponent {
     if (reason === 'recent_articles') {
       return 'Dirottamento automatico al modello Fallback L1 per la deduplicazione e la gestione degli articoli recenti.';
     }
-    return 'Le richieste della corsia SIMPLE vengono attualmente dirottate sul modello di Fallback L1 per garantire l\'elaborazione dei dati.';
+    return "Le richieste della corsia SIMPLE vengono attualmente dirottate sul modello di Fallback L1 per garantire l'elaborazione dei dati.";
   });
 
   readonly l1BadgeTooltip = computed(() => {
@@ -193,7 +246,7 @@ export class RadarToolbarComponent {
   });
 
   readonly degradedReasonDescription = computed(() => {
-    return 'Tutti i modelli di Intelligenza Artificiale configurati sono attualmente in pausa per cooldown o quota RPD esaurita. L\'elaborazione di nuovi articoli riprenderà automaticamente al loro sblocco.';
+    return "Tutti i modelli di Intelligenza Artificiale configurati sono attualmente in pausa per cooldown o quota RPD esaurita. L'elaborazione di nuovi articoli riprenderà automaticamente al loro sblocco.";
   });
 
   formatCooldownUntil(isoString: string | null | undefined, nowMs: number): string {
@@ -342,7 +395,16 @@ export class RadarToolbarComponent {
   };
 
   private closeAllPanelsExcept(
-    keep: 'nations' | 'saved' | 'relations' | 'sentiment' | 'category' | 'status' | 'costi' | null,
+    keep:
+      | 'nations'
+      | 'saved'
+      | 'relations'
+      | 'sentiment'
+      | 'category'
+      | 'status'
+      | 'fonti'
+      | 'costi'
+      | null,
   ): void {
     if (keep !== 'nations') this.isTooltipClicked.set(false);
     if (keep !== 'saved') this.isSavedTooltipClicked.set(false);
@@ -350,6 +412,7 @@ export class RadarToolbarComponent {
     if (keep !== 'sentiment') this.isSentimentTooltipClicked.set(false);
     if (keep !== 'category') this.isCategoryTooltipClicked.set(false);
     if (keep !== 'status') this.isStatusTooltipClicked.set(false);
+    if (keep !== 'fonti') this.isFontiTooltipClicked.set(false);
     if (keep !== 'costi') this.isCostiTooltipClicked.set(false);
   }
 
@@ -376,6 +439,7 @@ export class RadarToolbarComponent {
     this.isStatusTooltipClicked.set(next);
     if (next) {
       this.state.metricsStatusResource.reload();
+      this.state.feedsResource.reload();
     }
   }
 
@@ -383,6 +447,75 @@ export class RadarToolbarComponent {
     event.stopPropagation();
     this.isStatusTooltipClicked.set(false);
     this.isStatusTooltipHovered.set(false);
+  }
+
+  toggleFontiTooltip(event: Event): void {
+    event.stopPropagation();
+    const next = !this.isFontiTooltipClicked();
+    this.closeAllPanelsExcept(next ? 'fonti' : null);
+    this.isFontiTooltipClicked.set(next);
+    if (next) {
+      this.state.metricsByFeedResource.reload();
+      this.state.feedsResource.reload();
+    }
+  }
+
+  closeFontiTooltip(event: Event): void {
+    event.stopPropagation();
+    this.isFontiTooltipClicked.set(false);
+    this.isFontiTooltipHovered.set(false);
+  }
+
+  setFontiView(view: 'giorno' | 'catalogo', event?: Event): void {
+    event?.stopPropagation();
+    this.fontiView.set(view);
+    if (view === 'giorno') {
+      this.state.metricsByFeedResource.reload();
+    } else {
+      this.state.feedsResource.reload();
+    }
+  }
+
+  toggleFontiCategory(category: string, event: Event): void {
+    event.stopPropagation();
+    const next = new Set(this.fontiExpandedCategories());
+    if (next.has(category)) next.delete(category);
+    else next.add(category);
+    this.fontiExpandedCategories.set(next);
+  }
+
+  isFontiCategoryExpanded(category: string): boolean {
+    return this.fontiExpandedCategories().has(category);
+  }
+
+  onToggleFeed(feedId: number | null, currentlyDisabled: boolean, event: Event): void {
+    event.stopPropagation();
+    if (feedId == null) return;
+    this.state.toggleFeedDisabled(feedId, !currentlyDisabled);
+  }
+
+  fontiFeedSubtitle(title: string | null | undefined): string {
+    const clean = (title || '').replace(/^Feed:\s*/i, '');
+    const sep = clean.indexOf(' — ');
+    return sep >= 0 ? clean.slice(sep + 3) : clean;
+  }
+
+  /** Host URL corto per Catalogo (URL completo resta in title/tooltip). */
+  fontiFeedHost(url: string | null | undefined): string {
+    if (!url) return '';
+    try {
+      return new URL(url).host.replace(/^www\./, '');
+    } catch {
+      return url.replace(/^https?:\/\//, '').split('/')[0] || url;
+    }
+  }
+
+  fontiGroupArticleSum(feeds: { article_count?: number }[]): number {
+    return feeds.reduce((sum, f) => sum + (f.article_count ?? 0), 0);
+  }
+
+  fontiGroupActiveCount(feeds: { disabled?: boolean }[]): number {
+    return feeds.filter((f) => !f.disabled).length;
   }
 
   toggleTooltip(event: Event): void {

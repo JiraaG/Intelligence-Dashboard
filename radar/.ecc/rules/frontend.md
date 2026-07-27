@@ -103,6 +103,7 @@ Usare esclusivamente `signal()`, `computed()` e `effect()` di Angular 21.
 - **Signals** possiedono lo stato UI (`StateService`, input/output componenti, filtri).
 - **RxJS** è ammesso solo come adapter di trasporto HttpClient (`Observable`, `rxResource`, operatori HTTP).
 - **Resilienza SSE Real-Time:** L'aggiornamento dello stato in tempo reale è pilotato dallo stream SSE in `StateService` (`initRealTimeConnection`). I timer di resilienza per il `metricsStatusResource` (Fix A open reload, Fix B retries 15s/45s su `degraded`, Fix C safety net 5m) vivono fuori dalla Zone Angular (`runOutsideAngular`) per non generare cicli Change Detection spuri. **Non modificare né rimuovere questi meccanismi di resilienza.**
+- **Topbar FinOps/FONTI:** `.toolbar-left` = **STATUS** → **FONTI** → calendario; `.toolbar-right` termina con **COSTI**. Popover glass (`role="dialog"`), **no `p-dialog`**. FONTI Giorno = by-feed `published_at` (read-only); Catalogo = `GET/PATCH /api/feeds` (Miniflux `disabled` only). Errori feeds/by-feed **non** nel banner mappa. Dettaglio: `docs/03_frontend_and_ui.md` + skill `radar-api-contract` / `spatial-data-mocking` Test 8–9.
 - Non introdurre `BehaviorSubject` per stato locale. Un eventuale passaggio a `httpResource` resta **deferred post–Phase 5 (D11)**; il trasporto attuale è `rxResource` + HttpClient.
 
 **OBBLIGATORIO:**

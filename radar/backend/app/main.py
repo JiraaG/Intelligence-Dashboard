@@ -26,6 +26,11 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.api.feed_url_resolve import resolve_feed_url
+from app.api.feeds import (
+    load_seed_feeds,
+    merge_feeds_catalog,
+    require_feed_admin_token,
+)
 from app.api.articles_query import (
     DEFAULT_ARTICLES_LIMIT,
     build_articles_count_query,
@@ -41,10 +46,15 @@ from app.api.articles_query import (
 from app.core.config import (
     CORS_ALLOW_ORIGINS,
     DATABASE_URL,
+    FEED_ADMIN_TOKEN,
+    MINIFLUX_API_KEY,
+    MINIFLUX_API_URL,
     MINIFLUX_WEBHOOK_SECRET,
     RADAR_TIME_ZONE,
     WORKER_HEARTBEAT_STALE_SECONDS,
 )
+from app.extraction.client import MinifluxClient
+import httpx
 from app.core.database import bootstrap_database, init_pool
 from app.core.heartbeat import evaluate_readiness
 from app.core.logging import setup_logging
@@ -802,16 +812,26 @@ async def get_metrics_summary(
 async def get_metrics_by_feed(
     from_date: str | None = Query(default=None, alias="from"),
     to_date: str | None = Query(default=None, alias="to"),
+    date_field: str = Query(default="created_at"),
 ) -> dict[str, Any]:
-    """Metriche raggruppate per feed Miniflux."""
+    """Metriche raggruppate per feed Miniflux.
+
+    ``date_field``: ``created_at`` (default API / ops) o ``published_at`` (FE FONTI Giorno).
+    """
     start_dt, end_dt, from_str, to_str = _parse_metrics_date_range(from_date, to_date)
+    field = (date_field or "created_at").strip().lower()
+    if field not in ("created_at", "published_at"):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid date_field. Expected 'created_at' or 'published_at'.",
+        )
 
     if state.db_pool is None:
         raise HTTPException(status_code=503, detail="database_unavailable")
 
-    async with state.db_pool.acquire() as conn:
-        rows = await conn.fetch(
-            """
+    # Identificatore colonna whitelist-only (no interpolazione user input grezzo).
+    date_col = "published_at" if field == "published_at" else "created_at"
+    sql = f"""
             SELECT
                 feed_id,
                 feed_domain,
@@ -822,13 +842,13 @@ async def get_metrics_by_feed(
                 AVG(pipeline_latency_ms)::FLOAT AS avg_pipeline_latency_ms,
                 AVG(embedding_time_ms)::FLOAT AS avg_embedding_time_ms
             FROM articles
-            WHERE created_at >= $1 AND created_at < $2
+            WHERE {date_col} >= $1 AND {date_col} < $2
             GROUP BY feed_id, feed_domain, feed_title
             ORDER BY article_count DESC
-            """,
-            start_dt,
-            end_dt,
-        )
+            """
+
+    async with state.db_pool.acquire() as conn:
+        rows = await conn.fetch(sql, start_dt, end_dt)
 
     items = [
         {
@@ -845,6 +865,70 @@ async def get_metrics_by_feed(
     ]
 
     return {"from": from_str, "to": to_str, "items": items}
+
+
+
+class FeedToggleBody(BaseModel):
+    disabled: bool
+
+
+@app.get("/api/feeds")
+async def get_feeds() -> dict[str, Any]:
+    """Catalogo feed: merge seed RO + stato live Miniflux."""
+    if not MINIFLUX_API_KEY:
+        raise HTTPException(status_code=503, detail="miniflux_unavailable")
+    seed_feeds = load_seed_feeds()
+    try:
+        async with httpx.AsyncClient() as http:
+            client = MinifluxClient(
+                api_url=MINIFLUX_API_URL,
+                api_key=MINIFLUX_API_KEY,
+                http_client=http,
+            )
+            live_feeds = await client.list_feeds()
+    except Exception as exc:
+        logger.error("GET /api/feeds: errore Miniflux list_feeds: %s", exc)
+        raise HTTPException(status_code=502, detail="miniflux_list_failed") from exc
+    return merge_feeds_catalog(seed_feeds, live_feeds)
+
+
+@app.patch("/api/feeds/{feed_id}/toggle")
+async def toggle_feed(
+    feed_id: int,
+    body: FeedToggleBody,
+    x_feed_admin_token: str | None = Header(default=None, alias="X-Feed-Admin-Token"),
+) -> dict[str, Any]:
+    """Abilita/disabilita un feed su Miniflux (non scrive il seed)."""
+    try:
+        require_feed_admin_token(FEED_ADMIN_TOKEN, x_feed_admin_token)
+    except PermissionError as exc:
+        raise HTTPException(status_code=401, detail="unauthorized") from exc
+    if not MINIFLUX_API_KEY:
+        raise HTTPException(status_code=503, detail="miniflux_unavailable")
+    try:
+        async with httpx.AsyncClient() as http:
+            client = MinifluxClient(
+                api_url=MINIFLUX_API_URL,
+                api_key=MINIFLUX_API_KEY,
+                http_client=http,
+            )
+            await client.update_feed(feed_id, disabled=body.disabled)
+            live_feeds = await client.list_feeds()
+    except httpx.HTTPStatusError as exc:
+        if exc.response is not None and exc.response.status_code == 404:
+            raise HTTPException(status_code=404, detail="feed_not_found") from exc
+        logger.error("PATCH toggle feed %s HTTP error: %s", feed_id, exc)
+        raise HTTPException(status_code=502, detail="miniflux_update_failed") from exc
+    except Exception as exc:
+        logger.error("PATCH toggle feed %s failed: %s", feed_id, exc)
+        raise HTTPException(status_code=502, detail="miniflux_update_failed") from exc
+
+    matched = next((f for f in live_feeds if int(f.get("id") or -1) == int(feed_id)), None)
+    return {
+        "id": feed_id,
+        "disabled": bool(matched.get("disabled")) if matched else bool(body.disabled),
+        "status": "ok",
+    }
 
 
 @app.get("/api/metrics/dedup")

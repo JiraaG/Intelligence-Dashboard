@@ -202,20 +202,26 @@ Per collegare le notizie multilaterali, la mappa disegna archi curvi bidireziona
 
 ---
 
-## FinOps UI: Pulsanti & Popover STATUS e COSTI (Topbar)
+## FinOps UI: Pulsanti & Popover STATUS, FONTI e COSTI (Topbar)
 
 1. **Layout topbar (ordine reale)**:
-   - **`.toolbar-left`:** pulsante **`STATUS`** (primo) → calendario → **Sentiment** → **Tipologia**.
+   - **`.toolbar-left`:** pulsante **`STATUS`** (primo) → **`FONTI`** → divider → calendario → **Sentiment** → **Tipologia**.
    - **`.toolbar-right`:** NOTIZIE LETTE/TROVATE → NOTIZIE SALVATE → RELAZIONI ATTIVE → pulsante **`COSTI`** (ultimo).
-   - Due popover indipendenti (apertura mutuamente esclusiva). Fonte live: `metricsStatus()`; fonte giorno calendario: `metricsSummary()`.
+   - Popover glass mutuamente esclusivi (`closeAllPanelsExcept`; **no `p-dialog`**). Fonte live STATUS: `metricsStatus()` + snippet feeds; FONTI: by-feed + feeds; COSTI giorno: `metricsSummary()`.
 
-2. **Popover `STATUS` (operativo / oggi ops)** — `GET /api/metrics/status`:
+2. **Popover `STATUS` (operativo / oggi ops)** — `GET /api/metrics/status` (+ snippet `GET /api/feeds`):
    - Pulsante `STATUS` + pallino 🟢 / 🟡 / 🔴 da `level` (`nominal` | `fallback_or_escalation` | `degraded`).
    - **Banner stato** + badge L1 con **etichette italiane** (non snake_case raw) quando `l1_likely_active`.
    - Alert box L1 / degradato (condizionati).
    - **Modelli & Quote RPD:** ordine **SIMPLE → FALLBACK → BORDERLINE → COMPLEX** (barre RPD, cooldown con countdown live). Conteggio RPD distinto per BORDERLINE (effort `none`) e COMPLEX (effort `high`) calcolato fedelmente sulle chiamate del Ledger per ciascun `reasoning_effort`. L’effort **non** compare nel titolo modello.
    - **Gestione & Effort:** matrice 2×2 — SIMPLE/FALLBACK hardcode `NONE`; BORDERLINE ← `borderline.reasoning_effort`; COMPLEX ← `models[complex].reasoning_effort`.
+   - **Sorgenti** (read-only): `Sorgenti N/M attive` da `feeds.active_count` / `total_count`; se `error_count > 0` nota compatta. Hint: apri FONTI → Catalogo. Niente lista/toggle qui.
    - Cooldown RPD: scadenza a **`day_end`** (finestra giornaliera), non +24h statiche. Altri cooldown (es. 5xx) restano a ore configurate.
+
+2b. **Popover `FONTI`** — due viste interne (**Giorno** default | **Catalogo**):
+   - **Giorno:** `GET /api/metrics/by-feed?from=&to=&date_field=published_at` con data = `StateService.filters.date` (allineata mappa). Solo `article_count > 0`. Header `N fonti · M articoli`. **Nessun toggle.** Empty: “Nessuna fonte per questa data”.
+   - **Catalogo:** `GET /api/feeds` (publisher → sotto-feed) + toggle iOS → `PATCH /api/feeds/{id}/toggle` (solo Miniflux `disabled`; seed resta RO). Badge pulsante: count fonti giorno oppure `N/M` in Catalogo.
+   - **Add URL nuovi:** **non** da UI — seed JSON + `./ops/import-miniflux-feeds.sh` (vedi docs/01 §6).
 
 3. **Popover `COSTI` (filtrato per data)** — `GET /api/metrics/summary?from=&to=`:
    - Pulsante `COSTI: $X.XXXX` da `llm.total_estimated_cost_usd` (solo classificazione `classify:%` / `classify_article`).

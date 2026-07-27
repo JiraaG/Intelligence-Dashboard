@@ -16,7 +16,7 @@ import asyncio
 import json
 import logging
 import time
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -324,3 +324,37 @@ class MinifluxClient:
             logger.warning("Errore durante il refresh forzato dei feed: %s", e)
         except Exception as e:
             logger.error("Errore imprevisto durante il refresh dei feed: %s", e)
+
+    async def list_feeds(self) -> list[dict[str, Any]]:
+        """Elenca tutti i feed Miniflux (`GET /v1/feeds`).
+
+        Returns:
+            Lista di dict grezzi Miniflux; lista vuota se la risposta non è una list.
+        Raises:
+            httpx.HTTPError / RuntimeError: dopo esaurimento retry (non fail-soft).
+        """
+        data = await self._request("GET", "/v1/feeds")
+        if not isinstance(data, list):
+            logger.error("Risposta Miniflux /v1/feeds non è una lista: %s", type(data).__name__)
+            return []
+        return [item for item in data if isinstance(item, dict)]
+
+    async def update_feed(self, feed_id: int, *, disabled: bool) -> dict[str, Any]:
+        """Aggiorna un feed Miniflux (`PUT /v1/feeds/{id}`) — solo ``disabled``.
+
+        Args:
+            feed_id: ID feed Miniflux.
+            disabled: True = feed spento (non fetchato).
+        Returns:
+            Dict risposta Miniflux (o ``{}`` se body vuoto).
+        """
+        payload = {"disabled": bool(disabled)}
+        logger.info("Aggiornamento feed Miniflux id=%s disabled=%s", feed_id, disabled)
+        data = await self._request(
+            "PUT",
+            f"/v1/feeds/{int(feed_id)}",
+            json_body=payload,
+        )
+        if isinstance(data, dict):
+            return data
+        return {}

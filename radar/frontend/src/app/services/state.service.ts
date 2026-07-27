@@ -5,7 +5,12 @@ import { ArticleService } from './article.service';
 import { Article, ArticleFilters, CountrySummary, PrimaryCategory } from '../models/article.model';
 import { MapSummaryRow } from '../models/map-summary.model';
 import { MapRelationRow } from '../models/map-relation.model';
-import { MetricsSummary, MetricsStatus } from '../models/metrics.model';
+import {
+  MetricsSummary,
+  MetricsStatus,
+  MetricsByFeed,
+  FeedsResponse,
+} from '../models/metrics.model';
 import { MOCK_MODE } from './mock-mode.token';
 
 /** Opzione nazione nel pannello filtri Relazioni (Wave 1). */
@@ -263,8 +268,32 @@ export class StateService {
     stream: () => this.articleService.getMetricsStatus(),
   });
 
-  readonly metricsSummary = computed((): MetricsSummary | null => this.metricsSummaryResource.value() ?? null);
-  readonly metricsStatus = computed((): MetricsStatus | null => this.metricsStatusResource.value() ?? null);
+  /** By-feed per FONTI Giorno: allineato a `filters.date` + `published_at`. */
+  readonly metricsByFeedResource = rxResource({
+    params: () => ({ date: this.filters().date }),
+    stream: (p) =>
+      this.articleService.getMetricsByFeed({
+        from: p.params.date,
+        to: p.params.date,
+        date_field: 'published_at',
+      }),
+  });
+
+  /** Catalogo feed (seed + Miniflux): caricato on-demand da FONTI/STATUS. */
+  readonly feedsResource = rxResource({
+    stream: () => this.articleService.getFeeds(),
+  });
+
+  readonly metricsSummary = computed(
+    (): MetricsSummary | null => this.metricsSummaryResource.value() ?? null,
+  );
+  readonly metricsStatus = computed(
+    (): MetricsStatus | null => this.metricsStatusResource.value() ?? null,
+  );
+  readonly metricsByFeed = computed(
+    (): MetricsByFeed | null => this.metricsByFeedResource.value() ?? null,
+  );
+  readonly feeds = computed((): FeedsResponse | null => this.feedsResource.value() ?? null);
 
   /** Righe summary con filtro categoria client-side (toolbar/legenda). */
   readonly filteredSummary = computed((): MapSummaryRow[] => {
@@ -842,6 +871,22 @@ export class StateService {
           );
           this.patchSummaryReadCount(art.country_code, art.primary_category, beforeRead, prevRead);
         }
+      },
+    });
+  }
+
+  /**
+   * Toggle enable/disable feed su Miniflux; ricarica catalogo on success.
+   * Errori restano nel resource (non nel banner mappa).
+   */
+  toggleFeedDisabled(feedId: number, disabled: boolean): void {
+    this.articleService.toggleFeed(feedId, disabled).subscribe({
+      next: () => {
+        this.feedsResource.reload();
+      },
+      error: (err) => {
+        console.error('[StateService] Impossibile aggiornare lo stato del feed:', err);
+        this.feedsResource.reload();
       },
     });
   }

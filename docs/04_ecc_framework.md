@@ -48,6 +48,7 @@ Harness per vincolare l’agente alle regole di produzione. Overlay Radar a **tr
 
 Piani Phase 0–6 (**DONE / GATE VERDE**, riferimento — non backlog): [`plan_impl_phase_0_6.md`](../plan-audit/complete/plan_impl_phase_0_6.md) + [`plan_impl_phase_0_6_execution.md`](../plan-audit/complete/plan_impl_phase_0_6_execution.md) (voce **ECC expansion wiring — DONE**).  
 Final Release (**F0–F4 COMPLETE** 2026-07-18; PR #1 merged; Fase 5 deferred accettato, non richiesto): [`STATUS.md`](../plan-audit/STATUS.md) · [`plan_release_final_gate.md`](../plan-audit/complete/plan_release_final_gate.md) · handoff [`audit_remediation_final_release_handoff.md`](../plan-audit/remediation/audit_remediation_final_release_handoff.md).  
+FONTI feed management (**COMPLETE / GATE VERDE** 2026-07-27): [`plan_impl_fonti_feed_management.md`](../plan-audit/complete/plan_impl_fonti_feed_management.md) · walkthrough [`walkthrough_fonti_feed_management.md`](../plan-audit/complete/walkthrough_fonti_feed_management.md).  
 Checklist docs: [`plan_docs_monorepo_source.md`](../plan-audit/complete/plan_docs_monorepo_source.md).  
 Handoff expansion (eseguito): [`handoff_ecc_expansion.md`](../plan-audit/archive/ecc/handoff_ecc_expansion.md).  
 Non usare come piano vivo: `Fase2_Implementation_Plan.md`, `plan*.md` in archive, `ecc_deep_dive_analysis.md` (V1 assente).
@@ -75,12 +76,12 @@ Regola d’oro (upstream cross-harness): comportamento durevole in skill/rules/h
 
 1. **angular-developer** — Signals, standalone, pattern Angular 21  
 2. **llm-json-extraction** — Gemini SDK (`google-genai`) + OpenAI-compat httpx (`deepseek`/`openai`/`glm`/`grok`; dialect); schema Pydantic **strict**, CSV `str`, no CoT; path: `classification/` + `worker.py`  
-3. **spatial-data-mocking** — offline FE via `MOCK_MODE` esplicito; sidebar freeze  
+3. **spatial-data-mocking** — offline FE via `MOCK_MODE` esplicito; sidebar freeze; checklist FinOps STATUS/COSTI (Test 8) + **FONTI** Giorno/Catalogo (Test 9)
 
 **Dominio Radar** (SoT `.agents/skills/radar-*/SKILL.md`)
 
 4. **radar-sidebar-freeze** — freeze `radar-sidebar/**` + eccezione mirata (toggle Salva e chip `related_countries`); `p-carousel` only  
-5. **radar-api-contract** — map-summary + saved-summary + envelope `{items,next_cursor,total}` (+ `saved=true`); PATCH read/save coupling; `MOCK_MODE`  
+5. **radar-api-contract** — map-summary + saved-summary + envelope `{items,next_cursor,total}` (+ `saved=true`); PATCH read/save; metrics FinOps; **FONTI** `GET/PATCH /api/feeds` + by-feed `date_field`; `MOCK_MODE`  
 6. **radar-docker-ops** — edge/data, live/ready, verify-geojson, `./data/postgres`; ops backup → [`ops/README.md`](../radar/ops/README.md) §Windows  
 7. **radar-geojson-assets** — gitignore + `--fetch` in Docker build; `ASSET_LICENSE`  
 8. **radar-quota-ledger** — reserve/complete/fail; limiti per-lane `LLM_SIMPLE_*`/`LLM_COMPLEX_*`; BORDERLINE → `purpose=classify:complex` con effort da `LLM_BORDERLINE_REASONING_EFFORT`; soft-trim = `LLM_SIMPLE.rpd`; RPM/TPM attesa stessa lane; RPD esaurita → `QuotaDailyExceeded` + residual cross-lane; 429 Retry-After; free vs paid budget; provider `gemini`\|`deepseek`\|`openai`\|`glm`\|`grok`\|`claude` (**stub**)  

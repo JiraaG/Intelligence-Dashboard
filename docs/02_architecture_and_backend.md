@@ -122,7 +122,7 @@ Effetti collaterali e prerequisiti: [runbook](../radar/docs/runbook.md).
 
 ## API REST
 
-CORS: middleware solo se `CORS_ALLOW_ORIGINS` non vuoto; metodi `GET`, `PATCH`, `OPTIONS`. Dietro Nginx same-origin: **lasciare vuoto**. Nessuna auth applicativa.
+CORS: middleware solo se `CORS_ALLOW_ORIGINS` non vuoto; metodi `GET`, `PATCH`, `OPTIONS`. Dietro Nginx same-origin: **lasciare vuoto**. Nessuna auth applicativa globale; mutazioni feed opzionalmente gated da `FEED_ADMIN_TOKEN` → `X-Feed-Admin-Token`.
 
 | Metodo | Endpoint | Parametri | Risposta |
 |--------|----------|-----------|----------|
@@ -133,8 +133,10 @@ CORS: middleware solo se `CORS_ALLOW_ORIGINS` non vuoto; metodi `GET`, `PATCH`, 
 | GET | `/api/countries` | `date`, filtri opzionali | Rollup paese (`categories`, `article_count`) |
 | GET | `/api/metrics/summary` | `from?`, `to?` | FinOps giorno: latenze; `llm` (`total_estimated_cost_usd`, `cache_hit_rate_pct`, token aggregates, `models_breakdown[]` per tupla `(model, reasoning_effort)` con `requests_count`, `prompt_tokens`, `completion_tokens`, `cached_tokens`, `total_tokens`, `estimated_cost_usd`, `articles_count` — **senza `provider`**); `dedup`; **`overall`** all-time (`total_estimated_cost_usd`, `total_articles`, `total_requests`, `total_tokens`, `total_dedup_events`) |
 | GET | `/api/metrics/status` | — | Snapshot live: `level`, `estimated_cost_usd_today`, `l1_likely_active`, `l1_reason`, `models[]` (`role`, `lane`, `provider`, `model`, `rpd_used`, `rpd_limit`, `cooling_down`, `cooldown_until`, `reasoning_effort`), **`borderline`** (`model`, `provider`, `reasoning_effort`, `articles_today`, `rpd_used`, `rpd_limit`), `llm` summary odierno |
-| GET | `/api/metrics/by-feed` | `from?`, `to?` | Aggregazione per feed Miniflux (`feed_id`, `feed_domain`, `feed_title`, `clean_chars`, latenze) |
+| GET | `/api/metrics/by-feed` | `from?`, `to?`, `date_field?` (`published_at` \| `created_at`, default **`created_at`**) | Aggregazione per feed Miniflux (`feed_id`, `feed_domain`, `feed_title`, `clean_chars`, latenze). FE FONTI Giorno passa sempre `published_at`. |
 | GET | `/api/metrics/dedup` | `from?`, `to?` | Aggregazione per tipo evento dedup (`dedup_kind`, `action_taken`, count, avg_cosine, avg_confidence) |
+| GET | `/api/feeds` | — | Catalogo merge seed RO + Miniflux live (`active_count` / `total_count` / `error_count` + `groups[]` per publisher) |
+| PATCH | `/api/feeds/{id}/toggle` | `{ "disabled": bool }` (+ header `X-Feed-Admin-Token` se `FEED_ADMIN_TOKEN` set) | Abilita/disabilita feed su Miniflux; **non** scrive `config/` |
 | PATCH | `/api/articles/{id}/read_status` | `{ "is_read": bool }` | `{ "status", "is_read", "is_saved"? }` — unread ⇒ `is_saved=false` |
 | PATCH | `/api/articles/{id}/saved_status` | `{ "is_saved": bool }` | `{ "status", "is_saved", "is_read"? }` — save ⇒ `is_read=true` |
 

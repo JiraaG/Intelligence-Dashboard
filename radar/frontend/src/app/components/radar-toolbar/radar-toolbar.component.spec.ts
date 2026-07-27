@@ -24,8 +24,13 @@ describe('RadarToolbarComponent', () => {
     visibleMapRelations: signal([]),
     metricsSummaryResource: { reload: vi.fn(), value: signal(null) },
     metricsStatusResource: { reload: vi.fn(), value: signal(null) },
+    metricsByFeedResource: { reload: vi.fn(), value: signal(null) },
+    feedsResource: { reload: vi.fn(), value: signal(null) },
     metricsSummary: signal(null),
     metricsStatus: signal(null),
+    metricsByFeed: signal(null),
+    feeds: signal(null),
+    toggleFeedDisabled: vi.fn(),
     setFilters: vi.fn(),
   };
 

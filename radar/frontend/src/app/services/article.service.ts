@@ -11,8 +11,22 @@ import {
 } from '../models/article.model';
 import { MapSummaryRow } from '../models/map-summary.model';
 import { MapRelationRow } from '../models/map-relation.model';
-import { MetricsSummary, MetricsStatus } from '../models/metrics.model';
-import { parseArticlesPageDto, parseMapSummaryDto, parseMapRelationsDto, parseMetricsSummaryDto, parseMetricsStatusDto } from '../models/article.dto';
+import {
+  MetricsSummary,
+  MetricsStatus,
+  MetricsByFeed,
+  FeedsResponse,
+  FeedToggleResponse,
+} from '../models/metrics.model';
+import {
+  parseArticlesPageDto,
+  parseMapSummaryDto,
+  parseMapRelationsDto,
+  parseMetricsSummaryDto,
+  parseMetricsStatusDto,
+  parseMetricsByFeedDto,
+  parseFeedsDto,
+} from '../models/article.dto';
 import { ArticleMockService } from './article-mock.service';
 import { MOCK_MODE } from './mock-mode.token';
 
@@ -66,9 +80,9 @@ export class ArticleService {
     for (const s of sentiments) {
       params = params.append('sentiment', s);
     }
-    return this.http.get<unknown>('/api/map-summary', { params }).pipe(
-      map((payload) => parseMapSummaryDto(payload)),
-    );
+    return this.http
+      .get<unknown>('/api/map-summary', { params })
+      .pipe(map((payload) => parseMapSummaryDto(payload)));
   }
 
   /**
@@ -91,18 +105,20 @@ export class ArticleService {
     for (const s of sentiments) {
       params = params.append('sentiment', s);
     }
-    return this.http.get<unknown>('/api/map-relations', { params }).pipe(
-      map((payload) => parseMapRelationsDto(payload)),
-    );
+    return this.http
+      .get<unknown>('/api/map-relations', { params })
+      .pipe(map((payload) => parseMapRelationsDto(payload)));
   }
 
   /**
    * Vault salvati: ``GET /api/saved-summary`` (no date).
    * Sentiment multiplo: query ripetuta ``sentiment=`` (OR lato API).
    */
-  getSavedSummary(filters: {
-    sentiment?: Sentiment | Sentiment[] | null;
-  } = {}): Observable<MapSummaryRow[]> {
+  getSavedSummary(
+    filters: {
+      sentiment?: Sentiment | Sentiment[] | null;
+    } = {},
+  ): Observable<MapSummaryRow[]> {
     if (this.mockMode) {
       return this.mock.getSavedSummary(filters.sentiment ?? undefined);
     }
@@ -115,9 +131,9 @@ export class ArticleService {
     for (const s of sentiments) {
       params = params.append('sentiment', s);
     }
-    return this.http.get<unknown>('/api/saved-summary', { params }).pipe(
-      map((payload) => parseMapSummaryDto(payload)),
-    );
+    return this.http
+      .get<unknown>('/api/saved-summary', { params })
+      .pipe(map((payload) => parseMapSummaryDto(payload)));
   }
 
   /**
@@ -142,9 +158,9 @@ export class ArticleService {
       params = params.set('relevance_level', String(filters.relevance_level));
     }
     if (filters.cursor != null) params = params.set('cursor', String(filters.cursor));
-    return this.http.get<unknown>('/api/articles', { params }).pipe(
-      map((payload) => parseArticlesPageDto(payload)),
-    );
+    return this.http
+      .get<unknown>('/api/articles', { params })
+      .pipe(map((payload) => parseArticlesPageDto(payload)));
   }
 
   /**
@@ -209,10 +225,9 @@ export class ArticleService {
         ...(isRead ? {} : { is_saved: false }),
       });
     }
-    return this.http.patch<ReadStatusResponse>(
-      `/api/articles/${articleId}/read_status`,
-      { is_read: isRead },
-    );
+    return this.http.patch<ReadStatusResponse>(`/api/articles/${articleId}/read_status`, {
+      is_read: isRead,
+    });
   }
 
   /** PATCH saved-status; save ⇒ is_read=true. In mock risponde ``of(...)`` senza HTTP. */
@@ -224,10 +239,9 @@ export class ArticleService {
         ...(isSaved ? { is_read: true } : {}),
       });
     }
-    return this.http.patch<SavedStatusResponse>(
-      `/api/articles/${articleId}/saved_status`,
-      { is_saved: isSaved },
-    );
+    return this.http.patch<SavedStatusResponse>(`/api/articles/${articleId}/saved_status`, {
+      is_saved: isSaved,
+    });
   }
 
   getMetricsSummary(filters: { from?: string; to?: string } = {}): Observable<MetricsSummary> {
@@ -237,17 +251,50 @@ export class ArticleService {
     let params = new HttpParams();
     if (filters.from) params = params.set('from', filters.from);
     if (filters.to) params = params.set('to', filters.to);
-    return this.http.get<unknown>('/api/metrics/summary', { params }).pipe(
-      map((payload) => parseMetricsSummaryDto(payload)),
-    );
+    return this.http
+      .get<unknown>('/api/metrics/summary', { params })
+      .pipe(map((payload) => parseMetricsSummaryDto(payload)));
   }
 
   getMetricsStatus(): Observable<MetricsStatus> {
     if (this.mockMode) {
       return this.mock.getMetricsStatus();
     }
-    return this.http.get<unknown>('/api/metrics/status').pipe(
-      map((payload) => parseMetricsStatusDto(payload)),
-    );
+    return this.http
+      .get<unknown>('/api/metrics/status')
+      .pipe(map((payload) => parseMetricsStatusDto(payload)));
+  }
+
+  getMetricsByFeed(
+    filters: {
+      from?: string;
+      to?: string;
+      date_field?: 'published_at' | 'created_at';
+    } = {},
+  ): Observable<MetricsByFeed> {
+    if (this.mockMode) {
+      return this.mock.getMetricsByFeed(filters.from, filters.to, filters.date_field);
+    }
+    let params = new HttpParams();
+    if (filters.from) params = params.set('from', filters.from);
+    if (filters.to) params = params.set('to', filters.to);
+    if (filters.date_field) params = params.set('date_field', filters.date_field);
+    return this.http
+      .get<unknown>('/api/metrics/by-feed', { params })
+      .pipe(map((payload) => parseMetricsByFeedDto(payload)));
+  }
+
+  getFeeds(): Observable<FeedsResponse> {
+    if (this.mockMode) {
+      return this.mock.getFeeds();
+    }
+    return this.http.get<unknown>('/api/feeds').pipe(map((payload) => parseFeedsDto(payload)));
+  }
+
+  toggleFeed(feedId: number, disabled: boolean): Observable<FeedToggleResponse> {
+    if (this.mockMode) {
+      return this.mock.toggleFeed(feedId, disabled);
+    }
+    return this.http.patch<FeedToggleResponse>(`/api/feeds/${feedId}/toggle`, { disabled });
   }
 }

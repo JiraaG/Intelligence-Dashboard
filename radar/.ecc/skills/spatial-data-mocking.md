@@ -380,6 +380,14 @@ con i dati mockati prima di connettere il backend reale.
 - [ ] Card sidebar **"ANALISI FINOPS & FONTE RSS"** dopo i Tag (modello, lane, token, latenza, costo, feed XML).
 - [ ] **Legenda Categorie Geopolitiche**: pulsante `🏷️ LEGENDA CATEGORIE [15]` in basso al centro (`bottom: 20px; left: 50%`) apre popover griglia a 3 colonne glassmorphic per tutte le 15 categorie; anteprima in hover (`mouseenter`/`mouseleave`) e blocco permanente al click (`isLegendClicked`).
 
+### ✅ Test 9: FONTI (Giorno + Catalogo)
+
+- [ ] Topbar **sinistra**: dopo **STATUS** compare **FONTI** (prima del divider/calendario); popover glass (`role="dialog"`), **no `p-dialog`**.
+- [ ] Vista **Giorno** (default): data = calendario; header `N fonti · M articoli`; solo feed con `article_count > 0`; **nessun toggle**. Empty: “Nessuna fonte per questa data”.
+- [ ] Vista **Catalogo**: publisher → sotto-feed; badge ATTIVO/OFF/ERR + switch iOS; toggle chiama `PATCH /api/feeds/{id}/toggle`; conteggio header `N/M attive` aggiornato.
+- [ ] **STATUS** snippet: `Sorgenti N/M attive` (read-only) + hint Catalogo.
+- [ ] MOCK_MODE: `getMetricsByFeed` / `getFeeds` / `toggleFeed` presenti; errori feeds/by-feed **non** nel banner mappa.
+
 ---
 
 ## Dati Mock per Scenari di Test Aggiuntivi

@@ -380,6 +380,14 @@ con i dati mockati prima di connettere il backend reale.
 - [ ] Card sidebar **"ANALISI FINOPS & FONTE RSS"** dopo i Tag (modello, lane, token, latenza, costo, feed XML).
 - [ ] **Legenda Tipologie**: pulsante `🏷️ LEGENDA TIPOLOGIE 15` (o `N/15` con lock) in basso al centro (`bottom: 20px; left: 50%`) apre popover griglia a 3 colonne glassmorphic per tutte le 15 tipologie A-Z con card selezionabili, badge notizie `(14)` sempre visibile senza overflow, glow illuminazione campiture (`0.85`) senza oscuramento delle altre tipologie (`0.34`), e auto-close a zoom >= 4. Il filtraggio articoli è gestito dal selettore Tipologia in toolbar.
 
+### ✅ Test 9: FONTI (Giorno + Catalogo)
+
+- [ ] Topbar **sinistra**: dopo **STATUS** compare **FONTI** (prima del divider/calendario); popover glass (`role="dialog"`), **no `p-dialog`**.
+- [ ] Vista **Giorno** (default): data = calendario; header `N fonti · M articoli`; solo feed con `article_count > 0`; **nessun toggle**. Empty: “Nessuna fonte per questa data”.
+- [ ] Vista **Catalogo**: publisher → sotto-feed; badge ATTIVO/OFF/ERR + switch iOS; toggle chiama `PATCH /api/feeds/{id}/toggle`; conteggio header `N/M attive` aggiornato.
+- [ ] **STATUS** snippet: `Sorgenti N/M attive` (read-only) + hint Catalogo.
+- [ ] MOCK_MODE: `getMetricsByFeed` / `getFeeds` / `toggleFeed` presenti; errori feeds/by-feed **non** nel banner mappa.
+
 ---
 
 ## Dati Mock per Scenari di Test Aggiuntivi

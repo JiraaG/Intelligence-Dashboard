@@ -151,6 +151,7 @@ def _update_feed(
     scraper: str,
     crawler: bool,
     user_agent: str,
+    disabled: bool = False,
 ) -> None:
     payload = {
         "title": title,
@@ -158,6 +159,7 @@ def _update_feed(
         "scraper_rules": scraper,
         "crawler": crawler,
         "user_agent": user_agent,
+        "disabled": disabled,
     }
     status, body = _request(
         "PUT",
@@ -179,6 +181,14 @@ def _is_duplicate_create(status: int, body: bytes) -> bool:
     return "duplicate" in text or "23505" in text or "unique constraint" in text
 
 
+
+def seed_enabled(spec: dict[str, Any]) -> bool:
+    """Campo opzionale ``enabled``: assente = True."""
+    if "enabled" not in spec:
+        return True
+    return bool(spec.get("enabled"))
+
+
 def import_seed(base_url: str, token: str, seed: dict[str, Any]) -> None:
     default_ua = str(seed.get("user_agent") or "")
     default_crawler = bool(seed.get("crawler_default", True))
@@ -195,6 +205,7 @@ def import_seed(base_url: str, token: str, seed: dict[str, Any]) -> None:
         scraper = str(spec.get("scraper_rules") or "")
         crawler = bool(spec.get("crawler", default_crawler))
         user_agent = str(spec.get("user_agent") or default_ua)
+        disabled = not seed_enabled(spec)
         existing = find_feed(current, url)
         if existing is not None:
             _update_feed(
@@ -206,9 +217,10 @@ def import_seed(base_url: str, token: str, seed: dict[str, Any]) -> None:
                 scraper=scraper,
                 crawler=crawler,
                 user_agent=user_agent,
+                disabled=disabled,
             )
             updated += 1
-            print(f"  ~ update {title}", flush=True)
+            print(f"  ~ update {title} disabled={disabled}", flush=True)
             continue
 
         payload = {
@@ -217,6 +229,7 @@ def import_seed(base_url: str, token: str, seed: dict[str, Any]) -> None:
             "crawler": crawler,
             "user_agent": user_agent,
             "scraper_rules": scraper,
+            "disabled": disabled,
         }
         status, body = _request(
             "POST",
@@ -240,9 +253,10 @@ def import_seed(base_url: str, token: str, seed: dict[str, Any]) -> None:
                     scraper=scraper,
                     crawler=crawler,
                     user_agent=user_agent,
+                    disabled=disabled,
                 )
                 updated += 1
-                print(f"  ~ update after race {title}", flush=True)
+                print(f"  ~ update after race {title} disabled={disabled}", flush=True)
                 continue
             if status != 201:
                 snippet = body.decode("utf-8", errors="replace")[:500]
@@ -263,10 +277,11 @@ def import_seed(base_url: str, token: str, seed: dict[str, Any]) -> None:
             scraper=scraper,
             crawler=crawler,
             user_agent=user_agent,
+            disabled=disabled,
         )
         current = existing_feeds(base_url, token)
         created += 1
-        print(f"  + create {title}", flush=True)
+        print(f"  + create {title} disabled={disabled}", flush=True)
     print(
         f"Done: created={created} updated={updated} skipped={skipped} "
         f"seed={len(seed['feeds'])}",
@@ -317,6 +332,7 @@ def live_to_seed(base_url: str, token: str) -> dict[str, Any]:
             "feed_url": str(feed["feed_url"]),
             "scraper_rules": str(feed.get("scraper_rules") or ""),
             "crawler": bool(feed.get("crawler", False)),
+            "enabled": not bool(feed.get("disabled", False)),
         }
         ua = str(feed.get("user_agent") or "")
         if ua and ua != default_ua:
@@ -333,6 +349,7 @@ def live_to_seed(base_url: str, token: str) -> dict[str, Any]:
                     "feed_url": str(feed["feed_url"]),
                     "scraper_rules": str(feed.get("scraper_rules") or ""),
                     "crawler": bool(feed.get("crawler", False)),
+                    "enabled": not bool(feed.get("disabled", False)),
                 }
             )
 

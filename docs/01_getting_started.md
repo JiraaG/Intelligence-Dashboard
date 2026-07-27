@@ -153,17 +153,28 @@ docker compose -f docker-compose.yml -f docker-compose.lan.yml up -d
 
 | File | Contenuto |
 |------|-----------|
-| [`radar/config/miniflux-feeds.seed.json`](../radar/config/miniflux-feeds.seed.json) | Config completa: titolo, categoria, `feed_url`, `scraper_rules`, `crawler`, `user_agent` |
+| [`radar/config/miniflux-feeds.seed.json`](../radar/config/miniflux-feeds.seed.json) | Config completa: titolo, categoria, `feed_url`, `scraper_rules`, `crawler`, `user_agent`, `enabled?` (assente = **true**) |
 | [`radar/config/miniflux-feeds.opml`](../radar/config/miniflux-feeds.opml) | OPML portabile (categorie/URL; le regole scraper vivono nello seed) |
 | [`RSS.txt`](../RSS.txt) | Catalogo umano di riferimento (URL + selettori CSS) |
 
-**Volume mappa:** dipende dai feed sottoscritti in Miniflux, non dal solo worker. Con 1–2 feed (es. BBC World + NASA) tipicamente ~40–60 articoli/48h; per ~centinaia di notizie/giorno importa lo seed completo (Guardian, BBC sezioni, NPR, DW, CNBC, …).
+**UI FONTI vs CLI (add feed):**
+
+| Azione | Dove |
+|--------|------|
+| Vedere chi ha prodotto articoli nel giorno calendario | Topbar **FONTI → Giorno** (`published_at`) |
+| Spegnere / accendere un feed già importato | Topbar **FONTI → Catalogo** (toggle → Miniflux `disabled`; seed **non** riscritto) |
+| Conteggio sorgenti attive | **STATUS → Sorgenti N/M** (read-only) |
+| **Aggiungere un URL nuovo** | Edit seed (`enabled` opzionale, default true) + mirror `RSS.txt` → `./ops/import-miniflux-feeds.sh` → commit seed+OPML. **Non** da UI. |
+| Gate mutazioni PATCH feed (opzionale) | `FEED_ADMIN_TOKEN` in `.env`; se valorizzato, header `X-Feed-Admin-Token` obbligatorio |
+
+**Volume mappa:** dipende dai feed sottoscritti in Miniflux, non dal solo worker. Con 1–2 feed (es. BBC World + NASA) tipicamente ~40–60 articoli/48h; per ~centinaia di notizie/giorno importa lo seed completo (Guardian, BBC sezioni, NPR, DW, CNBC, …). Default catalogo: tutti abilitati (`enabled` assente = true); l’import applica `disabled = not enabled`.
 
 Per ogni feed nello seed Radar usa tipicamente:
 
 - **Fetch original content** (`crawler: true`) — tranne Hacker News
 - **Scraper rules** CSS (es. `article`, `#main-content`, `.storytext`) come in `RSS.txt`
 - **User-Agent** browser-like (campo nello seed / per-feed in Miniflux)
+- **`enabled`** opzionale (default true) — import synca lo stato `disabled` su Miniflux
 
 Opzionale ma utile: in Miniflux **Settings → Integrations → Webhook** punta a  
 `http://radar-backend:8000/api/webhooks/miniflux` con lo stesso secret di `MINIFLUX_WEBHOOK_SECRET`.

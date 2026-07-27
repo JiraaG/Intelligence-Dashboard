@@ -83,8 +83,18 @@ Guida utente (config minima + backup): [`docs/01_getting_started.md`](../../docs
 
 Commit-ready list (from repo-root [`RSS.txt`](../../RSS.txt)):
 
-- `config/miniflux-feeds.seed.json` — titles, categories, crawler, `user_agent`, `scraper_rules`
+- `config/miniflux-feeds.seed.json` — titles, categories, crawler, `user_agent`, `scraper_rules`, optional `enabled` (absent = **true**)
 - `config/miniflux-feeds.opml` — portable OPML (categories only; full settings live in the seed)
+
+| UI FONTI (topbar) | CLI / seed |
+|-------------------|------------|
+| Giorno: chi ha articoli nella data calendario (`published_at`) | — |
+| Catalogo: enable/disable feed già presenti (Miniflux `disabled` only) | — |
+| **Add nuovo URL** | Edit seed + `./ops/import-miniflux-feeds.sh` (o Admin Miniflux → `./ops/sync-miniflux-seed.sh`) |
+
+Import applica `disabled = not enabled` (default enabled). Sync live→seed esporta `enabled`. Toggle da UI **non** riscrive il seed (`config/` resta `:ro`).
+
+Opzionale: `FEED_ADMIN_TOKEN` in `.env` — se set, `PATCH /api/feeds/{id}/toggle` richiede `X-Feed-Admin-Token`.
 
 ```bash
 # Publish admin UI, then import/update all feeds on a fresh PC:

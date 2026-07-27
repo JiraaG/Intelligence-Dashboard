@@ -86,3 +86,57 @@ export interface MetricsStatus {
   borderline?: BorderlineStatusInfo;
   llm?: MetricsSummaryLlm;
 }
+
+/** Item di `GET /api/metrics/by-feed` (aggregati per feed). */
+export interface MetricsByFeedItem {
+  feed_id: number | null;
+  feed_domain: string | null;
+  feed_title: string | null;
+  article_count: number;
+  total_clean_chars: number;
+  avg_clean_chars: number | null;
+  avg_pipeline_latency_ms: number | null;
+  avg_embedding_time_ms: number | null;
+}
+
+export interface MetricsByFeed {
+  from: string;
+  to: string;
+  items: MetricsByFeedItem[];
+}
+
+/** Feed nel catalogo `GET /api/feeds`. */
+export interface FeedCatalogItem {
+  id: number | null;
+  title: string;
+  feed_url: string;
+  site_url: string;
+  category: string;
+  scraper_rules: string;
+  crawler: boolean;
+  disabled: boolean;
+  enabled_in_seed: boolean;
+  in_seed: boolean;
+  parsing_error_count: number;
+  parsing_error_msg: string;
+  checked_at: string | null;
+  next_check_at: string | null;
+}
+
+export interface FeedCatalogGroup {
+  category: string;
+  feeds: FeedCatalogItem[];
+}
+
+export interface FeedsResponse {
+  active_count: number;
+  total_count: number;
+  error_count: number;
+  groups: FeedCatalogGroup[];
+}
+
+export interface FeedToggleResponse {
+  id: number;
+  disabled: boolean;
+  status: string;
+}

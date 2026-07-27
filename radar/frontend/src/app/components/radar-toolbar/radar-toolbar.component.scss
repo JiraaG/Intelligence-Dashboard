@@ -1303,3 +1303,289 @@
     box-shadow: 0 0 0 0 rgba(255, 187, 0, 0);
   }
 }
+
+/* FONTI + Sorgenti STATUS — tipografia allineata a Tipologia (~0.875rem) */
+.fonti-popover {
+  min-width: 400px;
+  max-width: 460px;
+}
+
+.fonti-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 12px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fonti-tab {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted, #888);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+
+  &.is-active {
+    color: var(--color-text-accent, #00d4ff);
+    background: rgba(0, 212, 255, 0.08);
+    border-color: rgba(0, 212, 255, 0.25);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-border-accent, #00d4ff);
+    outline-offset: 1px;
+  }
+}
+
+.fonti-day-header,
+.fonti-catalog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--color-text-muted, #888);
+  margin-bottom: 8px;
+}
+
+.fonti-catalog-hint {
+  margin-left: auto;
+  opacity: 0.75;
+  font-size: 0.7rem;
+}
+
+.fonti-catalog-errors {
+  color: #ff6b6b;
+}
+
+.fonti-empty {
+  padding: 16px 4px;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--color-text-muted, #888);
+}
+
+.fonti-accordion {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fonti-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 4px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary, #ccc);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+
+  &:hover {
+    color: var(--color-text-accent, #00d4ff);
+  }
+}
+
+.fonti-chevron {
+  width: 1em;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.fonti-group-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fonti-group-count {
+  flex-shrink: 0;
+  min-width: 2.4em;
+  text-align: right;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted, #9aa);
+}
+
+.fonti-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 0 8px 14px;
+}
+
+.fonti-feed-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 6px 2px;
+  font-size: 0.875rem;
+  color: var(--color-text-primary, #e6e6e6);
+  border-radius: 4px;
+
+  &.is-disabled {
+    opacity: 0.7;
+  }
+
+  &.fonti-feed-row--catalog:hover {
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
+.fonti-feed-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.fonti-feed-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.fonti-feed-badge {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.6rem;
+  height: 1.35rem;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1;
+  color: var(--color-text-muted, #888);
+  background: rgba(255, 255, 255, 0.06);
+
+  &.badge-on {
+    color: #7dffa8;
+    background: rgba(0, 200, 100, 0.14);
+  }
+
+  &.badge-off {
+    color: #ff6b6b;
+    background: rgba(255, 70, 70, 0.16);
+  }
+
+  &.badge-err {
+    color: #ffb347;
+    background: rgba(255, 160, 40, 0.14);
+  }
+}
+
+.fonti-feed-host {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.7rem;
+  color: rgba(180, 190, 200, 0.78);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.fonti-feed-count {
+  flex-shrink: 0;
+  min-width: 1.6em;
+  text-align: right;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-accent, #00d4ff);
+  font-weight: 600;
+}
+
+.fonti-popover .ios-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 36px;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  appearance: none;
+  -webkit-appearance: none;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-border-accent, #00d4ff);
+    outline-offset: 2px;
+  }
+
+  &.is-on {
+    background: var(--color-text-accent, #00d4ff);
+
+    .ios-switch__thumb {
+      transform: translateX(16px);
+    }
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  .ios-switch__thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    transition: transform 0.2s ease;
+    pointer-events: none;
+  }
+}
+
+.fonti-status-snippet {
+  .sorgenti-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: baseline;
+    font-size: 0.8rem;
+    color: var(--color-text-secondary, #ccc);
+  }
+
+  .sorgenti-errors {
+    color: #ff6b6b;
+    font-size: 0.75rem;
+  }
+
+  .sorgenti-hint {
+    margin: 4px 0 0;
+    font-size: 0.68rem;
+    color: var(--color-text-muted, #888);
+  }
+
+  .sorgenti-loading {
+    font-size: 0.75rem;
+    color: var(--color-text-muted, #888);
+  }
+}
