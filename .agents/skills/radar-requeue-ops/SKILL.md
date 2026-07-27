@@ -6,12 +6,12 @@ description: >
 when_to_use:
   - Incident re-classify / re-classify after prompt or schema change
   - Runbook "requeue" / app.scripts.requeue_articles
-version: 1.1.0
+version: 1.2.0
 ---
 
 ## Quando attivare
 
-Devi far riprocessare gli ultimi N entry Miniflux già *read* (dopo fix prompt/schema/quota), senza inventare un altro path di ingest.
+Devi far riprocessare gli ultimi N entry Miniflux già *read* (dopo fix prompt/schema/quota/**factory wiki-link Fase G**), senza inventare un altro path di ingest.
 
 **Profilo F / Fase A:** stesso protocollo per il gate qualità 48h (Local-Hybrid Ollama host + COMPLEX cloud) — dry-run → requeue / `--purge-all` → restart worker; log attesi `route lane=SIMPLE … openai` + COMPLEX. Vedi runbook § Local-Hybrid.
 
@@ -37,6 +37,7 @@ Devi far riprocessare gli ultimi N entry Miniflux già *read* (dopo fix prompt/s
    docker compose restart radar-worker
    ```
 4. Verifica log worker: route lane SIMPLE/COMPLEX e assenza di errori vault/Miniflux.
+5. **Fase G:** dopo requeue, sample vault deve contenere `[[wiki-link]]` / `Raccordo Relazionale` e hub sotto `vault/_meta/` (countries/companies/…).
 
 - Requeue 48h / `--purge-all` dopo Profilo F: dry-run → write → `restart radar-worker` (skill `radar-requeue-ops`); host `OLLAMA_NUM_PARALLEL=1` consigliato. Post-ciclo: verificare `ollama_unload` / `ops/verify-ollama-vram.sh`.
 
@@ -45,7 +46,7 @@ Devi far riprocessare gli ultimi N entry Miniflux già *read* (dopo fix prompt/s
 SoT: `radar/backend/app/scripts/requeue_articles.py` + runbook `radar/docs/runbook.md`.
 
 - Marca unread le ultime N entry *read* su Miniflux
-- Cancella righe PostgreSQL `articles` / `article_outbox` e markdown vault correlati (URL SHA-256 hex[:16])
+- Cancella righe PostgreSQL `articles` / `article_outbox` e markdown vault correlati (URL SHA-256 hex[:16]); hub `_meta/` restano (idempotenti al prossimo write)
 - Pulisce `llm_model_cooldown`
 - **Deve** girare dentro `radar-worker` (mount vault + env Miniflux/DB)
 

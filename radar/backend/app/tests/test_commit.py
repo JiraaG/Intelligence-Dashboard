@@ -101,7 +101,15 @@ def test_generate_markdown_content() -> None:
     assert "# Riassunto" in md
     assert "Aumento delle forniture TAP." in md
     assert "# Entità Infrastrutturali" in md
-    assert "- Gasdotto TAP" in md
+    assert "- [[Gasdotto TAP]]" in md
+    assert "**Raccordo Relazionale:**" in md
+    assert "- Nazione: [[AZ]]" in md
+    assert "- Paesi correlati: [[CN]], [[US]]" in md
+    assert "- Categoria: [[Energia]]" in md
+    assert "[[TAP AG]]" in md and "[[SOCAR]]" in md
+    assert "[[Energia]]" in md and "[[Pipeline]]" in md
+    # Tag "Energia" collide with category in footer list — still present as wiki link
+    assert "- Tag:" in md
 
 
 # ─── Tests per Scrittura File Concorrente con Lock ───────────────────────────

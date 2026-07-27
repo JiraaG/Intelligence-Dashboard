@@ -47,6 +47,7 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 >
 > ### ⛔ Percorso di Fallback del Vault Obsidian
 > Il percorso predefinito di fallback per l'inizializzazione del Vault di Obsidian deve essere impostato esplicitamente su `/app/vault`.
+> **Fase G:** i Markdown articolo includono `[[wiki-link]]` (paesi, related, categoria, aziende, entità, tag) via `commit/wikilinks.py`; hub stub sotto `_meta/{countries,categories,companies,entities,tags}/` (`commit/hubs.py`). Radar → Vault only — vietato leggere `.md` Obsidian per aggiornare Postgres. Vault MD ≠ “Notizie Salvate” API (`is_saved`).
 
 ---
 

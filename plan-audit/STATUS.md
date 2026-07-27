@@ -56,6 +56,7 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 | Piani ECC / Limits / stub | [`archive/`](archive/) | SUPERSEDED / PRD |
 | Phase B Real-Time (webhook/SSE/soft-refresh) | [`complete/master_plan_impl_phase_B.md`](complete/master_plan_impl_phase_B.md) + [`implementation`](complete/implementation_plan_phase_B.md) + [`analisi`](complete/analisi_dettagliata_fase_B.md) | **DONE / GATE VERDE** 2026-07-18 — HMAC webhook, LISTEN dedicate, SSE, Angular soft-refresh |
 | Fase H — Grafo geospaziale | [`complete/master_plan_impl_phase_H_geospatial_graph.md`](complete/master_plan_impl_phase_H_geospatial_graph.md) | **DONE / GATE VERDE** (2026-07-18) — related_countries, GET /api/map-relations, archi mappa, chip carosello, allineamento docs + ECC. |
+| Fase G — Obsidian wiki-links | [`../radar_overview_and_upgrades.md`](../radar_overview_and_upgrades.md) §G | **DONE / GATE VERDE** (2026-07-27) — `[[wiki-link]]` + hub `_meta/`; Radar→Vault only; `wikilinks.py` + `hubs.py`. |
 | Archi multicolore + click bilaterale | [`complete/plan_archi_hatching_multicolor.md`](complete/plan_archi_hatching_multicolor.md) | **DONE / GATE VERDE** (2026-07-18) — Leaflet: macro &lt;5 + tratteggio geometrico ≥5. **MapLibre post-ship (2026-07-20):** macro multicolore solida a **tutti** gli zoom (`0d942ed`). |
 
 ---
@@ -71,12 +72,15 @@ Handoff Final Release: [`remediation/audit_remediation_final_release_handoff.md`
 | Fase C — Dedup semantica `pgvector` | **COMPLETE / GATE VERDE** | [`complete/plan_impl_fase_C_semantic_dedup.md`](complete/plan_impl_fase_C_semantic_dedup.md); migrazione `012`, embedder CPU, quality compare COMPLEX, replace in-place. |
 | Fase A — LLM locale AMD/Ollama | **COMPLETE** | Impl + VRAM **DONE**. Scorecard fixture = opz. Piano [`complete/plan_impl_fase_A_local_amd_ollama.md`](complete/plan_impl_fase_A_local_amd_ollama.md). |
 | Fase H — Grafo geospaziale | **DONE** | related_countries + GET /api/map-relations + archi mappa + chip carosello (2026-07-18). |
+| Fase G — Obsidian wiki-links | **DONE** | `[[wiki-link]]` + hub `_meta/` Radar→Vault (2026-07-27); no sync Obsidian→DB. |
 | Archi UI (multicolore + click) | **DONE** | Piano [`complete/plan_archi_hatching_multicolor.md`](complete/plan_archi_hatching_multicolor.md). **MapLibre:** residuo opzionale “multicolore anche ≥5” **chiuso** (`0d942ed`). Leaflet legacy: dash+fan su latch pin (`MAP_ZOOM_PIN_THRESHOLD=4` + isteresi). |
 | Relazioni filtro nazioni (Wave 1) | **DONE** | [`complete/plan_impl_map_relations_nation_filter.md`](complete/plan_impl_map_relations_nation_filter.md). Prossimo: spike Wave 2 elevate. |
 | Pin zoom soglia + isteresi globo | **DONE** | `MAP_ZOOM_PIN_THRESHOLD=4`, `MAP_ZOOM_PIN_HYSTERESIS=0.4`, `resolvePinMode` / `pinModeActive` — anti-flicker pan MapLibre globe. |
 | Hatching isole + anti-bleed MapLibre | **DONE** | [`complete/plan_impl_map_category_fills_islands.md`](complete/plan_impl_map_category_fills_islands.md) — GATE 2026-07-21. |
 
-**Nessun residuo operativo obbligatorio sulla Fase A / B / C / H / archi UI / W1 filtri / hatching isole / classification refine / map anchors / Profilo F core / audit env / Metrics 013 / FinOps Wave A (M1–M6).** Branch di riferimento feature: `feature/upgrades`. Candidata relazioni: **Wave 2 archi elevati**. **FinOps Wave A** = **COMPLETE / GATE VERDE (condizionato)** ([`complete/plan_impl_llm_finops_token_caching.md`](complete/plan_impl_llm_finops_token_caching.md)); M7 boilerplate = backlog. **Metrics 013** = **COMPLETE / GATE VERDE**. **§3.C pgvector** = **COMPLETE / GATE VERDE**.
+**Nessun residuo operativo obbligatorio sulla Fase A / B / C / G / H / archi UI / W1 filtri / hatching isole / classification refine / map anchors / Profilo F core / audit env / Metrics 013 / FinOps Wave A (M1–M6).** Branch di riferimento feature: `feature/upgrades`. Candidata relazioni: **Wave 2 archi elevati**. **FinOps Wave A** = **COMPLETE / GATE VERDE (condizionato)** ([`complete/plan_impl_llm_finops_token_caching.md`](complete/plan_impl_llm_finops_token_caching.md)); M7 boilerplate = backlog. **Metrics 013** = **COMPLETE / GATE VERDE**. **§3.C pgvector** = **COMPLETE / GATE VERDE**.
+
+**Futuro (non G):** note utente editabili UI↔Vault↔Obsidian (sync bidirezionale) — fuori scope wiki-link.
 
 **Restore points (catena `feature/upgrades`):** Fase C semantic dedup **`f1e1de0`**; hatching isole/anti-bleed **`32203c9`**; pin threshold+hysteresis **`7a2bfc9`**; toolbar unify Sentiment/Tipologia `33c348e`; W1 filtri nazioni **`ec771b1`**; archi MapLibre solidi `0d942ed`; docs LLM env `c9ef842`; Profilo F + VRAM `2996625`; Local-Hybrid `54c8038`; map anchors `a240b3c`; click hatching `911463a`; classification/geo `f7cf83d`; archi UI Leaflet `5c74e57`.
 

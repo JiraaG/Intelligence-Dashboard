@@ -221,6 +221,29 @@ Su `failed` persistenti: `last_error`, mount `./vault`, permessi, poi restart wo
 
 ---
 
+## Obsidian vault (Fase G wiki-links)
+
+Bind-mount host: `radar/vault` → container `/app/vault`. Aprire la cartella host in Obsidian per Graph/Backlinks.
+
+| Contenuto | Path |
+|-----------|------|
+| Articoli | `{Categoria}/{ISO}/*.md` — body con `[[wiki-link]]` + sezione **Raccordo Relazionale** |
+| Hub | `_meta/{countries,categories,companies,entities,tags}/*.md` |
+
+Dopo cambio factory/hubs: rebuild/restart `radar-worker`, poi nuovi articoli o requeue (sezione sopra) per rigenerare `.md` storici. Verifica:
+
+```bash
+# Sample: cerca wiki-link e hub
+find ./vault -name '*.md' | head
+grep -R "Raccordo Relazionale" ./vault --include='*.md' | head
+ls ./vault/_meta/countries/ 2>/dev/null | head
+docker compose logs --tail=100 radar-worker | grep -E 'outbox|Hub|vault|ERROR' || true
+```
+
+Hub upsert fallito → warning log; articolo resta `completed` (best-effort). Mark-read solo dopo vault articolo durable.
+
+---
+
 ## Backup / restore
 
 Procedure complete: **[ops/README.md](../ops/README.md)**. Guida utente Miniflux (feed minimi + seed): [`docs/01_getting_started.md`](../../docs/01_getting_started.md) §6.

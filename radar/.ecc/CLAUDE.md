@@ -113,12 +113,14 @@ radar/
 │       │   ├── quality_compare.py # Fase C near-dup: purpose quality:compare COMPLEX
 │       │   ├── prompts.py         # System prompt (no CoT) + build_user_prompt(<untrusted_article>)
 │       │   └── validator.py       # schema strict + normalize_llm_json_dict (Profilo F)
-│       ├── commit/                # Layer K: DB commit + outbox + Vault Obsidian
+│       ├── commit/                # Layer K: DB commit + outbox + Vault Obsidian (Fase G wiki-link)
 │       │   ├── db_commit.py       # commit atomico articles + outbox
-│       │   ├── outbox.py          # Reconcile vault; mark-read Miniflux solo se completed
-│       │   ├── factory.py         # generate_markdown_content() — yaml.safe_dump frontmatter
+│       │   ├── outbox.py          # Reconcile vault + hub upsert; mark-read solo se completed
+│       │   ├── factory.py         # generate_markdown_content() — yaml.safe_dump + [[wiki-link]]
+│       │   ├── wikilinks.py       # sanitize/format [[Target]] (SoT Fase G)
+│       │   ├── hubs.py            # stub _meta/{countries,categories,companies,entities,tags}/
 │       │   ├── lock.py            # scrittura atomica tmp→fsync→os.replace; lock sidecar permanente
-│       │   └── router.py          # pathlib + SHA-256 hex[:16] + containment vault
+│       │   └── router.py          # pathlib + SHA-256 hex[:16] + containment vault + init _meta
 │       └── tests/                 # Suite pytest smoke + integration + production
 ├── frontend/                      # Angular 21 SPA — già inizializzato
 │   ├── src/
@@ -252,11 +254,11 @@ Miniflux API (`WORKER_POLL_INTERVAL_SECONDS`, default 900)
         │
         ▼ commit atomico DB + article_outbox
         │
-        ▼ reconcile vault (atomic write) → status completed
+        ▼ reconcile vault (atomic write + hub _meta Fase G) → status completed
         │
         ▼ mark-read Miniflux (solo dopo vault durable)
         ▼
-  PostgreSQL 15 (radar-db) + Vault Obsidian
+  PostgreSQL 15 (radar-db) + Vault Obsidian ([[wiki-link]] + hub)
 ```
 
 ---

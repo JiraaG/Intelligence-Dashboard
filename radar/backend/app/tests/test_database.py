@@ -29,6 +29,16 @@ def test_initialize_vault_directories(tmp_path) -> None:
         assert os.path.exists(cat_path)
         assert os.path.isdir(cat_path)
 
+    # Fase G: _meta hub dirs + seed categorie
+    for sub in ("countries", "categories", "companies", "entities", "tags"):
+        assert (vault_dir / "_meta" / sub).is_dir()
+    for cat in categories:
+        hub = vault_dir / "_meta" / "categories" / f"{cat}.md"
+        assert hub.is_file()
+        text = hub.read_text(encoding="utf-8")
+        assert "type: category" in text
+        assert f"name: {cat}" in text
+
 
 # ─── Tests for Database Core Logic ──────────────────────────────────────────
 

@@ -169,12 +169,12 @@ Produces `backups/<UTC-stamp>/` (gitignored):
 - `radar_<db>.dump` — `pg_dump -Fc` (Radar + Miniflux tables)
 - `miniflux/miniflux-feeds.seed.json` + `.opml` — feed config snapshot
 - `BACKUP_INFO.txt` — restore hints
-- `vault.tar.gz` — only with `--with-vault`
+- `vault.tar.gz` — only with `--with-vault` (include article markdown **and** Fase G hub stubs under `_meta/`)
 - `SHA256SUMS`
 
 **Git SoT (clone → ready feeds):** `config/miniflux-feeds.seed.json` (+ `.opml`).  
 Commit the seed after `./ops/sync-miniflux-seed.sh` or after a backup that syncs live Miniflux.  
-Do **not** commit `backups/` or vault articles.
+Do **not** commit `backups/` or vault articles (including `_meta/` hubs).
 
 Fresh PC:
 

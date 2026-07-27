@@ -210,6 +210,7 @@ Restore SHA sotto (Phase 0–6). Il branch di lavoro corrente può differire —
 | FinOps UI Metrics | `5b84a34` (`feature/upgrades`) | Metriche FinOps in topbar STATUS/COSTI, migrazione `015`, breakdown tupla `(model, reasoning_effort)` — **restore point** |
 | FONTI feed management | `feature/upgrades` (2026-07-27) | Topbar FONTI Giorno+Catalogo, `/api/feeds` + by-feed `date_field`, STATUS Sorgenti N/M — **GATE VERDE** |
 | Fix STATUS Real-Time SSE | `state.service.ts` (`feature/upgrades`) | Resilienza connessione SSE: Fix A (open reload), Fix B (retries 15s/45s), Fix C (safety net 5m) — **GATE VERDE** |
+| Fase G — Obsidian wiki-links | `feature/upgrades` (2026-07-27) | `[[wiki-link]]` + hub `_meta/` Radar→Vault; `commit/wikilinks.py` + `hubs.py` — **GATE VERDE** |
 
 Esempio restore tip archi UI Leaflet-era: `git checkout 5c74e57` (branch `feature/upgrades`).  
 Esempio restore pre-filtro-nazioni (archi sempre tutti visibili): `git checkout 0d942ed`.  
@@ -231,6 +232,7 @@ Esempio Phase 6: `git checkout 56c2eff`. Dettaglio gate Phase 0–6: [plan_impl_
 | Requeue ops | `radar/backend/app/scripts/requeue_articles.py` |
 | API FastAPI (no ingest) | `radar/backend/app/main.py` |
 | Migrazioni / outbox | `radar/backend/migrations/` (001–017), `radar/backend/app/core/migrations.py`, `radar/backend/app/commit/outbox.py` |
+| Vault Obsidian wiki-link (Fase G) | `radar/backend/app/commit/{factory,wikilinks,hubs,router,outbox}.py` |
 | Query articles / map-summary / map-relations / saved | `radar/backend/app/api/articles_query.py` |
 | Compose + overlay | `radar/docker-compose.yml`, `radar/docker-compose.hardened.yml`, `radar/docker-compose.lan.yml` |
 | Ops backup/restore | `radar/ops/` |

@@ -242,6 +242,7 @@ Phase 2: stessa immagine, due processi.
 - Day: `GET /api/map-summary` → righe aggregate `country_code × primary_category`
 - Relations: `GET /api/map-relations` → righe aggregate relazioni undirected `source_country ↔ target_country` per categoria (**star** primary↔each related via `LEAST/GREATEST`; non clique tra related; `XX` escluso)
 - Saved vault: `GET /api/saved-summary` → stessa shape, `is_saved=true`, **senza date**
+- **Vault Obsidian (Fase G):** Markdown in `OBSIDIAN_VAULT_PATH` con wiki-link (`commit/wikilinks.py` + `factory.py`) e hub `_meta/` (`hubs.py`); Radar→Vault only; distinto da saved-summary API
 - Nation: `GET /api/articles` → envelope `{ items, next_cursor, total }` (keyset, page ≤ 100; include `related_countries` string array)
 - Saved open: `GET /api/articles?saved=true&country=` → stesso envelope, ignora `date`
 - Metriche & FinOps: `GET /api/metrics/status`, `GET /api/metrics/summary`, `GET /api/metrics/by-feed?date_field=`, `GET /api/metrics/dedup`

@@ -27,14 +27,17 @@ URL_HASH_HEX_CHARS = 16
 
 
 def initialize_vault_directories(vault_path: str | None = None) -> None:
-    """Crea la root vault e le 15 sottocartelle categoria se mancanti.
+    """Crea root vault, 15 cartelle categoria e ``_meta/*`` hub (Fase G).
 
     Default root: ``OBSIDIAN_VAULT_PATH`` (``/app/vault`` in container).
+    Pre-seed anche le 15 hub note categoria sotto ``_meta/categories/``.
     Raises:
         OSError: permessi / mount vault non scrivibile.
     SoT:
-        AGENTS.md §2 fallback vault ``/app/vault``.
+        AGENTS.md §2 fallback vault ``/app/vault``; commit/hubs.py.
     """
+    from app.commit.hubs import ensure_meta_directories, seed_category_hubs
+
     root = Path(vault_path or OBSIDIAN_VAULT_PATH)
 
     logger.info("Inizializzazione delle directory del Vault su: %s", root)
@@ -47,6 +50,14 @@ def initialize_vault_directories(vault_path: str | None = None) -> None:
             category_path = root / category
             category_path.mkdir(parents=True, exist_ok=True)
             logger.info("Creata/verificata sottocartella del Vault: %s", category_path)
+
+        ensure_meta_directories(str(root))
+        seeded = seed_category_hubs(str(root))
+        logger.info(
+            "Vault _meta hub inizializzato (categorie seed=%s) sotto %s",
+            seeded,
+            root / "_meta",
+        )
 
         logger.info("Inizializzazione directory Vault completata.")
     except OSError as exc:

@@ -17,8 +17,9 @@ from typing import TYPE_CHECKING, Optional
 
 import asyncpg
 
+from app.commit.hubs import upsert_hubs_for_payload
 from app.commit.lock import write_file_with_lock
-from app.core.config import OUTBOX_STALE_WRITING_SECONDS
+from app.core.config import OBSIDIAN_VAULT_PATH, OUTBOX_STALE_WRITING_SECONDS
 
 if TYPE_CHECKING:
     from app.extraction.client import MinifluxClient
@@ -82,7 +83,7 @@ async def enqueue_outbox_row(
 async def force_reopen_outbox_row(
     conn: asyncpg.Connection,
     *,
-    article_id: Any,
+    article_id: int,
     target_path: str,
     payload: str,
     miniflux_entry_id: int | None,
@@ -259,6 +260,22 @@ async def process_outbox_row(
         async with pool.acquire() as conn:
             await _mark_failed(conn, outbox_id, f"vault write failed: {write_err}")
         return False
+
+    # Fase G: hub notes best-effort — non fallisce l'outbox se lo stub hub fallisce.
+    try:
+        await asyncio.to_thread(
+            upsert_hubs_for_payload,
+            payload,
+            vault_path=OBSIDIAN_VAULT_PATH,
+        )
+    except Exception as hub_err:
+        logger.warning(
+            "Hub upsert fallito (articolo vault già durable) outbox id=%s article_id=%s: %s",
+            outbox_id,
+            claimed["article_id"],
+            hub_err,
+            exc_info=True,
+        )
 
     async with pool.acquire() as conn:
         await _mark_completed(conn, outbox_id)

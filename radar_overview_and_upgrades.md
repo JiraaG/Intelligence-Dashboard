@@ -152,7 +152,7 @@ Sezioni sotto = blueprint (architettura + ricette). Stato prodotto aggiornato **
 | **B** | Real-time webhook / SSE / soft-refresh | **DONE / GATE VERDE** (2026-07-18) |
 | **C** | Dedup semantica `pgvector` | **DONE / GATE VERDE** — SoT [`plan-audit/complete/plan_impl_fase_C_semantic_dedup.md`](plan-audit/complete/plan_impl_fase_C_semantic_dedup.md) |
 | **D** | Mappe offline air-gapped | **Futuro** — target FE = MapLibre `style` → `/tiles/` (non solo Leaflet PNG) |
-| **G** | Obsidian wiki-links bidirezionali | Futuro |
+| **G** | Obsidian wiki-links bidirezionali | **DONE / GATE VERDE** (2026-07-27) — `[[wiki-link]]` + hub `_meta/` (Radar→Vault; no sync Obsidian→DB) |
 | **H** | Grafo geospaziale / archi mappa | **DONE / GATE VERDE** (2026-07-18) |
 | **I** | Mappa 3D-primary MapLibre (parity; Leaflet dormiente) | **DONE** (2026-07-20) — SoT [`plan-audit/active/plan_impl_map_3d_globe.md`](plan-audit/active/plan_impl_map_3d_globe.md); follow-up hatching isole/anti-bleed **GATE VERDE** 2026-07-21 ([`plan_impl_map_category_fills_islands.md`](plan-audit/complete/plan_impl_map_category_fills_islands.md)) |
 | **J** | Upgrade proiezione globo vero (follow-up I) | **Futuro** — SoT [`plan-audit/active/plan_impl_map_globe_projection.md`](plan-audit/active/plan_impl_map_globe_projection.md) |
@@ -586,69 +586,47 @@ Puntare lo style MapLibre al tileserver locale (esempio):
 
 ### G. Obsidian Vault: Collegamenti Bidirezionali (Wiki-Links)
 
-> **Stato: Futuro** — non iniziata.
+> **Stato: DONE / GATE VERDE (2026-07-27).** Radar → Vault unidirezionale. “Bidirezionale” = backlink/grafo Obsidian (`[[A]]` ↔ backlinks su A), **non** sync editing Obsidian→Postgres.
 
-Per sfruttare appieno la visualizzazione a grafo e l'interconnessione concettuale all'interno di Obsidian, la generazione del Markdown deve incorporare la sintassi Wiki-Link (`[[Entità]]`) per le aziende coinvolte e i tag geografici o categoriali.
+Obiettivo: aprire `radar/vault` in Obsidian e navigare articoli ↔ paesi ↔ categorie ↔ aziende ↔ asset ↔ tag come grafo concettuale (complementare alla mappa geospaziale Fase H).
 
-#### 1. Blueprint per `factory.py` (`generate_markdown_content`)
+#### Contratto implementato
 
-Modificare la generazione del testo in modo da racchiudere le entità estratte in doppie parentesi quadre:
+| Pezzo | Path | Ruolo |
+|-------|------|--------|
+| Sanitize + `[[link]]` | `commit/wikilinks.py` | Unico SoT: reject `[]\|#/\\`, control chars; fallback plain |
+| Factory Markdown | `commit/factory.py` | Frontmatter invariato (+ `related_countries`); body con wiki-link + **Raccordo Relazionale** |
+| Hub stub | `commit/hubs.py` | `_meta/{countries,categories,companies,entities,tags}/`; upsert post-write outbox (best-effort) |
+| Init vault | `commit/router.py` | Crea `_meta/*` + seed 15 hub categoria |
+| Outbox | `commit/outbox.py` | Dopo write articolo: hub upsert; poi `completed` → mark-read (invariato) |
 
-```python
-def generate_markdown_content(article: GeopoliticalArticleSchema) -> str:
-    tags_list = parse_csv_list(article.tags)
-    companies_list = parse_csv_list(article.companies_involved)
-    entities_list = parse_csv_list(article.infrastructural_entities)
+**Frontmatter** (chiavi fisse): `title`, `location`, `country`, `related_countries`, `category`, `tags`, `companies`, `sentiment`, `relevance`, `published`, `source`.
 
-    summary = _truncate_text(article.summary, MAX_SUMMARY_CHARS, "summary")
+**Body (esempio):**
 
-    # Genera collegamenti bidirezionali sulle aziende
-    if companies_list:
-        companies_wiki = ", ".join(f"[[{c.strip()}]]" for c in companies_list if c.strip())
-    else:
-        companies_wiki = "Nessuna"
+```markdown
+# Riassunto
+...
 
-    # Genera collegamenti bidirezionali sugli asset fisici
-    if entities_list:
-        entities_markdown = "\n".join(f"- [[{entity.strip()}]]" for entity in entities_list if entity.strip())
-    else:
-        entities_markdown = "- Nessun asset fisico specifico menzionato."
+# Entità Infrastrutturali
+- [[Gasdotto TAP]]
 
-    entities_markdown = _truncate_text(entities_markdown, MAX_ENTITIES_FIELD_CHARS, "entità")
-
-    # Iniezione dei metadata di raccordo in fondo al file
-    wiki_footer = (
-        f"\n\n---\n"
-        f"**Raccordo Relazionale:**\n"
-        f"- Nazione: [[{article.country_code}]]\n"
-        f"- Categoria Geopolitica: [[{article.primary_category}]]\n"
-        f"- Aziende: {companies_wiki}\n"
-    )
-
-    body = (
-        f"# Riassunto\n\n{summary}\n\n"
-        f"# Entità Infrastrutturali\n\n{entities_markdown}"
-        f"{wiki_footer}"
-    )
-
-    if len(body) > MAX_MARKDOWN_BODY_CHARS:
-        body = _truncate_text(body, MAX_MARKDOWN_BODY_CHARS, "corpo Markdown")
-
-    frontmatter_yaml = _dump_frontmatter({
-        "title": article.title,
-        "location": [article.latitude, article.longitude],
-        "country": article.country_code,
-        "category": article.primary_category,
-        "tags": tags_list,
-        "companies": companies_list,
-        "sentiment": article.sentiment,
-        "relevance": article.relevance_level,
-        "published": article.published_at,
-        "source": article.source_url,
-    })
-
-    return f"---\n{frontmatter_yaml}\n---\n\n{body}"
+---
+**Raccordo Relazionale:**
+- Nazione: [[IT]]
+- Paesi correlati: [[CN]], [[US]]
+- Categoria: [[Energia]]
+- Aziende: [[Eni]], [[SOCAR]]
+- Tag: [[gasdotto]], [[lng]]
 ```
+
+**Hub note** (es. `_meta/countries/IT.md`): frontmatter `type`/`name`/`iso` + titolo. Tag che collidono con le 15 categorie SoT non creano hub tag duplicato (il link punta alla hub categoria).
+
+**Fuori scope G:** sync Obsidian→DB; note utente editabili in UI Angular; link articolo↔articolo; plugin Dataview obbligatori.
+
+**Futuro (outline — non G):** note utente UI↔Vault↔Obsidian richiederebbe tabella DB + API CRUD + UI (sidebar freeze) + scrittura vault da API + conflitti sync Obsidian→Radar. Pianificare come fase separata.
+
+**Ops:** aprire bind-mount `radar/vault` in Obsidian; Graph/Backlinks; regen via requeue worker (vedi runbook). Test: `test_wikilinks.py`, `test_hubs.py`.
 
 ---
 

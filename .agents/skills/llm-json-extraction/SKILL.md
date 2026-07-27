@@ -15,13 +15,14 @@ when_to_use:
   - Swap provider via LLM_SIMPLE_* / LLM_COMPLEX_* (Profili A–F)
   - Lifecycle VRAM Ollama (ollama_lifecycle, OLLAMA_*, unload fine-ciclo)
   - Aggiunta di nuovi campi al contratto di estrazione
-version: 1.9.2
+version: 1.9.3
 ---
 
 ## Quando Usare Questa Skill
 
 Carica questa skill ogni volta che:
 - Modifichi `backend/app/worker.py` o `classification/` (client, prompts, validator, quota, complexity, cooldown, deepseek, `openai_compat_*`, `ollama_lifecycle`, `quality_compare`)
+- Modifichi `commit/factory.py`, `commit/wikilinks.py`, `commit/hubs.py` o il flusso outbox→vault (Fase G wiki-link)
 - Ricevi errori del tipo `ValidationError` da Pydantic
 - Gemini/DeepSeek restituisce un JSON incompleto o con campi non presenti nello schema
 - Devi ottimizzare il System Prompt per ridurre le allucinazioni geografiche
@@ -45,7 +46,7 @@ Carica questa skill ogni volta che:
 4. Hard-fail → llm_model_cooldown 24h + next model; 429 breve → Retry-After same model
 5. Overwrite source_url + published_at da Miniflux
 6. Commit atomico DB + article_outbox (o replace in-place se quality winner=incoming)
-7. Reconcile vault → mark-read Miniflux solo se durable completed
+7. Reconcile vault (articolo `.md` + hub `_meta/` Fase G) → mark-read Miniflux solo se durable completed
 ```
 
 **Invarianti:** schema/prompt immutabili; `content[:4000]` su tutte le lane; package `openai` vietato;

@@ -89,7 +89,8 @@ CREATE TABLE IF NOT EXISTS article_outbox (
 );
 ```
 
-> Mark-read Miniflux solo dopo `status = completed` (vault durable). Quote LLM via `llm_request_ledger` (Phase 2).
+> Mark-read Miniflux solo dopo `status = completed` (vault articolo durable). Quote LLM via `llm_request_ledger` (Phase 2).
+> **Fase G:** ownership path hub `_meta/` + containment (`commit/hubs.py`, `router.py`); wiki-link sanitize in `wikilinks.py`. Vault MD Obsidian ≠ API Notizie Salvate.
 
 ### Tabella `companies` (Entità Aziendale)
 

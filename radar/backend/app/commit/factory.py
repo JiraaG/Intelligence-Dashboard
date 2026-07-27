@@ -1,14 +1,16 @@
 # factory.py — fabbrica Markdown Obsidian (frontmatter YAML + corpo).
 #
 # Usata da outbox/lock dopo il commit DB: produce il contenuto vault stabile
-# (safe_dump, liste flow per Leaflet/Obsidian). Truncamento sicuro se campi lunghi.
-# @see commit/router.py, commit/outbox.py; AGENTS vault.
+# (safe_dump, liste flow per Leaflet/Obsidian). Fase G: wiki-link nel corpo
+# (paesi, categoria, aziende, entità, tag) via commit/wikilinks.py.
+# @see commit/router.py, commit/outbox.py, commit/hubs.py; AGENTS vault.
 
 from __future__ import annotations
 
 import yaml
 
 from app.classification.validator import GeopoliticalArticleSchema, parse_csv_list
+from app.commit.wikilinks import format_wiki_link, format_wiki_link_list
 
 MAX_MARKDOWN_BODY_CHARS = 50_000
 MAX_SUMMARY_CHARS = 2000
@@ -67,12 +69,35 @@ def _dump_frontmatter(frontmatter: dict) -> str:
     ).rstrip("\n")
 
 
+def _build_relational_footer(
+    *,
+    country_code: str,
+    related_countries: list[str],
+    primary_category: str,
+    companies: list[str],
+    tags: list[str],
+) -> str:
+    """Sezione Raccordo Relazionale con wiki-link (Fase G)."""
+    related_wiki = format_wiki_link_list(related_countries, empty="Nessuno")
+    companies_wiki = format_wiki_link_list(companies, empty="Nessuna")
+    tags_wiki = format_wiki_link_list(tags, empty="Nessuno")
+    return (
+        "\n\n---\n"
+        "**Raccordo Relazionale:**\n"
+        f"- Nazione: {format_wiki_link(country_code)}\n"
+        f"- Paesi correlati: {related_wiki}\n"
+        f"- Categoria: {format_wiki_link(primary_category)}\n"
+        f"- Aziende: {companies_wiki}\n"
+        f"- Tag: {tags_wiki}\n"
+    )
+
+
 def generate_markdown_content(article: GeopoliticalArticleSchema) -> str:
     """
     Articolo geopolitico → Markdown con YAML frontmatter Obsidian.
 
     - ``location`` = [lat, lon]; tags/companies da ``parse_csv_list`` (schema Pydantic CSV str).
-    - Corpo: riassunto + elenco entità infrastrutturali (o placeholder se vuoto).
+    - Corpo: riassunto + entità come ``[[wiki-link]]`` + footer raccordo (Fase G).
     - Truncation a livelli summary / entities / body intero.
     """
     tags_list = parse_csv_list(article.tags)
@@ -83,13 +108,34 @@ def generate_markdown_content(article: GeopoliticalArticleSchema) -> str:
     summary = _truncate_text(article.summary, MAX_SUMMARY_CHARS, "summary")
 
     if entities_list:
-        entities_markdown = "\n".join(f"- {entity.strip()}" for entity in entities_list if entity.strip())
+        entity_lines = [
+            f"- {format_wiki_link(entity.strip())}"
+            for entity in entities_list
+            if entity.strip()
+        ]
+        entities_markdown = "\n".join(entity_lines) if entity_lines else (
+            "- Nessun asset fisico specifico menzionato."
+        )
     else:
         entities_markdown = "- Nessun asset fisico specifico menzionato."
 
-    entities_markdown = _truncate_text(entities_markdown, MAX_ENTITIES_FIELD_CHARS, "entità infrastrutturali")
+    entities_markdown = _truncate_text(
+        entities_markdown, MAX_ENTITIES_FIELD_CHARS, "entità infrastrutturali"
+    )
 
-    body = f"# Riassunto\n\n{summary}\n\n# Entità Infrastrutturali\n\n{entities_markdown}\n"
+    wiki_footer = _build_relational_footer(
+        country_code=article.country_code,
+        related_countries=related_countries_list,
+        primary_category=article.primary_category,
+        companies=companies_list,
+        tags=tags_list,
+    )
+
+    body = (
+        f"# Riassunto\n\n{summary}\n\n"
+        f"# Entità Infrastrutturali\n\n{entities_markdown}"
+        f"{wiki_footer}"
+    )
     if len(body) > MAX_MARKDOWN_BODY_CHARS:
         body = _truncate_text(body, MAX_MARKDOWN_BODY_CHARS, "corpo Markdown")
 

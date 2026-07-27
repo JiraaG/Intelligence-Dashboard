@@ -125,8 +125,10 @@ class GeopoliticalArticleSchema(BaseModel):
 Dopo la classificazione:
 1. **Overwrite autoritativo** di `source_url` e `published_at` con i valori Miniflux (non fidarsi del LLM).
 2. **Commit atomico** DB + riga `article_outbox` (`commit/` + `outbox.py`).
-3. **Reconcile vault** (scrittura atomica); solo a `status=completed` durable.
-4. **Mark-read Miniflux** solo dopo vault durable — mai prima.
+3. **Reconcile vault** (scrittura atomica articolo + hub `_meta/` Fase G best-effort); solo a `status=completed` durable.
+4. **Mark-read Miniflux** solo dopo vault articolo durable — mai prima.
+
+**Fase G:** `commit/wikilinks.py` + `factory.py` emettono `[[wiki-link]]`; `hubs.py` crea stub sotto `_meta/`. Radar→Vault only. Mark-read invariato.
 
 Ingestione in `worker.py` (Compose `radar-worker`): coda bounded + advisory lock + `QuotaLedger`. `main.py` è API-only.
 
