@@ -39,6 +39,13 @@ def test_initialize_vault_directories(tmp_path) -> None:
         assert "type: category" in text
         assert f"name: {cat}" in text
 
+    # Graph hub-centric seed
+    graph = vault_dir / ".obsidian" / "graph.json"
+    assert graph.is_file()
+    import json
+    gdata = json.loads(graph.read_text(encoding="utf-8"))
+    assert len(gdata["colorGroups"]) == 19
+
 
 # ─── Tests for Database Core Logic ──────────────────────────────────────────
 

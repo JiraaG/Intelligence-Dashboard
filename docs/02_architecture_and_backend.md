@@ -39,7 +39,7 @@ Moduli sotto `radar/backend/app/`:
 1. **`core/`** — config bounded, pool asyncpg, `migrations.py` (012 pgvector), logging, heartbeat, **`llm_lanes.py`** (provider/dialect/lane)
 2. **`extraction/`** — client Miniflux, parser HTML, dedup URL + semantica pre-LLM, **`embedder.py`** (`all-MiniLM-L6-v2`), **`semantic_dedup.py`** (`pgvector` `<=>`, sim ≥ **0.80**)
 3. **`classification/`** — client Gemini + OpenAI-compat httpx; **`quality_compare.py`** (1x scontro di qualità lane COMPLEX); `complexity.py` v2.2; `cooldown.py`; `quota.py` (tetti per-lane + contatori durable **per-model**); prompts; validator Pydantic strict
-4. **`commit/`** — commit atomico, **`replace_article_in_place`**, outbox (`force_reopen_outbox_row`), vault `yaml.safe_dump` + write atomica; **Fase G:** `wikilinks.py` (`[[wiki-link]]` sanitize), `hubs.py` (stub `_meta/{countries,categories,companies,entities,tags}/` post-write outbox)
+4. **`commit/`** — commit atomico, **`replace_article_in_place`**, outbox (`force_reopen_outbox_row`), vault `yaml.safe_dump` + write atomica; **Fase G:** `wikilinks.py` (`[[wiki-link]]` sanitize), `hubs.py` (stub `_meta/` post-write outbox), `obsidian_graph.py` (seed/sync Graph colorGroups)
 5. **`api/`** — query helpers Phase 5 (`articles_query.py`)
 6. **`scripts/`** — ops `requeue_articles.py`, **`verify_semantic_dedup.py`** — dettaglio [runbook](../radar/docs/runbook.md)
 
@@ -98,6 +98,7 @@ Commit: transazione DB + riga outbox → reconcile vault (articolo `.md` + hub `
 - Path container: `OBSIDIAN_VAULT_PATH` default `/app/vault` (bind `./vault`).
 - Articoli: `{category}/{ISO}/{date}_{slug}_{hash}.md` con `[[wiki-link]]` nel body + footer Raccordo (paese, related, categoria, aziende, tag; entità in lista).
 - Hub stub: `_meta/{countries,categories,companies,entities,tags}/` — upsert best-effort dopo write articolo; seed 15 categorie all’init worker.
+- Graph: init worker sync `.obsidian/graph.json` hub-centric (`commit/obsidian_graph.py`; mirror `radar/obsidian/graph.json`) — colori tipologia sulle hub categoria, nazioni neutre, articoli dim.
 - H = archi mappa (`related_countries` / API); G = grafo concettuale Obsidian. Nessun sync Obsidian→DB.
 - Dettaglio: [`radar_overview_and_upgrades.md`](../radar_overview_and_upgrades.md) §G.
 

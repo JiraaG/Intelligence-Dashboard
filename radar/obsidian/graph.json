@@ -1,0 +1,156 @@
+{
+  "collapse-filter": true,
+  "search": "",
+  "showTags": false,
+  "showAttachments": false,
+  "hideUnresolved": true,
+  "showOrphans": false,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    {
+      "query": "path:_meta/categories/Nucleare",
+      "color": {
+        "a": 1,
+        "rgb": 61695
+      }
+    },
+    {
+      "query": "path:_meta/categories/Energia",
+      "color": {
+        "a": 1,
+        "rgb": 16766720
+      }
+    },
+    {
+      "query": "path:_meta/categories/Infrastrutture",
+      "color": {
+        "a": 1,
+        "rgb": 7901340
+      }
+    },
+    {
+      "query": "path:_meta/categories/Geopolitica",
+      "color": {
+        "a": 1,
+        "rgb": 11032055
+      }
+    },
+    {
+      "query": "path:_meta/categories/Economia",
+      "color": {
+        "a": 1,
+        "rgb": 58998
+      }
+    },
+    {
+      "query": "path:_meta/categories/Tecnologia",
+      "color": {
+        "a": 1,
+        "rgb": 2718207
+      }
+    },
+    {
+      "query": "path:_meta/categories/Spazio",
+      "color": {
+        "a": 1,
+        "rgb": 6514417
+      }
+    },
+    {
+      "query": "path:_meta/categories/Ambiente",
+      "color": {
+        "a": 1,
+        "rgb": 3066993
+      }
+    },
+    {
+      "query": "path:_meta/categories/Salute",
+      "color": {
+        "a": 1,
+        "rgb": 16717636
+      }
+    },
+    {
+      "query": "path:_meta/categories/Sicurezza",
+      "color": {
+        "a": 1,
+        "rgb": 16739584
+      }
+    },
+    {
+      "query": "path:_meta/categories/Intelligenza Artificiale",
+      "color": {
+        "a": 1,
+        "rgb": 62932
+      }
+    },
+    {
+      "query": "path:_meta/categories/Cybersecurity",
+      "color": {
+        "a": 1,
+        "rgb": 16711807
+      }
+    },
+    {
+      "query": "path:_meta/categories/Finanza",
+      "color": {
+        "a": 1,
+        "rgb": 7798531
+      }
+    },
+    {
+      "query": "path:_meta/categories/Difesa",
+      "color": {
+        "a": 1,
+        "rgb": 14427686
+      }
+    },
+    {
+      "query": "path:_meta/categories/Materie Prime",
+      "color": {
+        "a": 1,
+        "rgb": 16096779
+      }
+    },
+    {
+      "query": "path:_meta/countries",
+      "color": {
+        "a": 1,
+        "rgb": 13686750
+      }
+    },
+    {
+      "query": "path:_meta/companies",
+      "color": {
+        "a": 1,
+        "rgb": 4738904
+      }
+    },
+    {
+      "query": "path:_meta/entities",
+      "color": {
+        "a": 1,
+        "rgb": 4738904
+      }
+    },
+    {
+      "query": "path:_meta/tags",
+      "color": {
+        "a": 1,
+        "rgb": 4738904
+      }
+    }
+  ],
+  "collapse-display": true,
+  "showArrow": false,
+  "textFadeMultiplier": -0.5,
+  "nodeSizeMultiplier": 1.15,
+  "lineSizeMultiplier": 1,
+  "collapse-forces": true,
+  "centerStrength": 0.52,
+  "repelStrength": 12,
+  "linkStrength": 1,
+  "linkDistance": 280,
+  "scale": 0.2,
+  "close": true
+}

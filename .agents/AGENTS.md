@@ -47,7 +47,7 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 >
 > ### ⛔ Percorso di Fallback del Vault Obsidian
 > Il percorso predefinito di fallback per l'inizializzazione del Vault di Obsidian deve essere impostato esplicitamente su `/app/vault`.
-> **Fase G:** i Markdown articolo includono `[[wiki-link]]` (paesi, related, categoria, aziende, entità, tag) via `commit/wikilinks.py`; hub stub sotto `_meta/{countries,categories,companies,entities,tags}/` (`commit/hubs.py`). Radar → Vault only — vietato leggere `.md` Obsidian per aggiornare Postgres. Vault MD ≠ “Notizie Salvate” API (`is_saved`).
+> **Fase G:** i Markdown articolo includono `[[wiki-link]]` (paesi, related, categoria, aziende, entità, tag) via `commit/wikilinks.py`; hub stub sotto `_meta/{countries,categories,companies,entities,tags}/` (`commit/hubs.py`); Graph hub-centric via `commit/obsidian_graph.py` (colori SoT sulle hub categoria, nazioni neutre). Radar → Vault only — vietato leggere `.md` Obsidian per aggiornare Postgres. Vault MD ≠ “Notizie Salvate” API (`is_saved`).
 
 ---
 
@@ -137,9 +137,9 @@ Questo file definisce le regole operative globali, i vincoli architetturali e i 
 
 > [!IMPORTANT]
 > ### ⛔ Regole di Esclusione Vault
-> La cartella radice `vault/` deve essere tracciata su Git unicamente tramite il file `.gitkeep`.
-> Qualsiasi file markdown (`.md`) o sottocartella generata per categoria o nazione DEVE essere ignorato inserendo `vault/*` e `!vault/.gitkeep` all'interno del file `.gitignore` globale. 
-> Non è necessario spingere la struttura ad albero su Git, in quanto il modulo di backend (`router.py`) si occupa di ricreare dinamicamente (`os.makedirs`) tutte le categorie e sottocartelle all'arrivo del primo articolo.
+> Il vault host vive in **`radar/vault/`** (bind Compose `./vault:/app/vault`). Su Git: solo `radar/vault/.gitkeep`; in `radar/.gitignore` usare `vault/*` e `!vault/.gitkeep`.
+> Qualsiasi file markdown (`.md`), `.obsidian/` runtime o sottocartella generata per categoria/nazione DEVE restare ignorato. Il template Graph versionato è fuori vault: `radar/obsidian/graph.json` (seed/sync via `commit/obsidian_graph.py` all’init worker).
+> Non è necessario spingere la struttura ad albero su Git: `router.py` ricrea dinamicamente categorie, `_meta/` e Graph all’avvio worker / primo articolo.
 
 > [!IMPORTANT]
 > ### Hook Cursor (auto) + fallback manuale

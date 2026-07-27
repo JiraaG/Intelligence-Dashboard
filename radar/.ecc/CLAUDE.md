@@ -119,8 +119,9 @@ radar/
 │       │   ├── factory.py         # generate_markdown_content() — yaml.safe_dump + [[wiki-link]]
 │       │   ├── wikilinks.py       # sanitize/format [[Target]] (SoT Fase G)
 │       │   ├── hubs.py            # stub _meta/{countries,categories,companies,entities,tags}/
+│       │   ├── obsidian_graph.py  # seed/sync .obsidian/graph.json hub-centric colorGroups
 │       │   ├── lock.py            # scrittura atomica tmp→fsync→os.replace; lock sidecar permanente
-│       │   └── router.py          # pathlib + SHA-256 hex[:16] + containment vault + init _meta
+│       │   └── router.py          # pathlib + SHA-256 hex[:16] + containment vault + init _meta/Graph
 │       └── tests/                 # Suite pytest smoke + integration + production
 ├── frontend/                      # Angular 21 SPA — già inizializzato
 │   ├── src/
@@ -254,7 +255,7 @@ Miniflux API (`WORKER_POLL_INTERVAL_SECONDS`, default 900)
         │
         ▼ commit atomico DB + article_outbox
         │
-        ▼ reconcile vault (atomic write + hub _meta Fase G) → status completed
+        ▼ reconcile vault (atomic write + hub _meta Fase G; Graph seed all’init) → status completed
         │
         ▼ mark-read Miniflux (solo dopo vault durable)
         ▼

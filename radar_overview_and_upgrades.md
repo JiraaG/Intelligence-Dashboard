@@ -597,7 +597,8 @@ Obiettivo: aprire `radar/vault` in Obsidian e navigare articoli ↔ paesi ↔ ca
 | Sanitize + `[[link]]` | `commit/wikilinks.py` | Unico SoT: reject `[]\|#/\\`, control chars; fallback plain |
 | Factory Markdown | `commit/factory.py` | Frontmatter invariato (+ `related_countries`); body con wiki-link + **Raccordo Relazionale** |
 | Hub stub | `commit/hubs.py` | `_meta/{countries,categories,companies,entities,tags}/`; upsert post-write outbox (best-effort) |
-| Init vault | `commit/router.py` | Crea `_meta/*` + seed 15 hub categoria |
+| Init vault | `commit/router.py` | Crea `_meta/*` + seed 15 hub categoria + sync Graph |
+| Graph visual | `commit/obsidian_graph.py` | Seed/sync `.obsidian/graph.json` hub-centric (colorGroups SoT) |
 | Outbox | `commit/outbox.py` | Dopo write articolo: hub upsert; poi `completed` → mark-read (invariato) |
 
 **Frontmatter** (chiavi fisse): `title`, `location`, `country`, `related_countries`, `category`, `tags`, `companies`, `sentiment`, `relevance`, `published`, `source`.
@@ -626,7 +627,20 @@ Obiettivo: aprire `radar/vault` in Obsidian e navigare articoli ↔ paesi ↔ ca
 
 **Futuro (outline — non G):** note utente UI↔Vault↔Obsidian richiederebbe tabella DB + API CRUD + UI (sidebar freeze) + scrittura vault da API + conflitti sync Obsidian→Radar. Pianificare come fase separata.
 
-**Ops:** aprire bind-mount `radar/vault` in Obsidian; Graph/Backlinks; regen via requeue worker (vedi runbook). Test: `test_wikilinks.py`, `test_hubs.py`.
+#### Graph visual (hub-centric)
+
+Con molte notizie, colorare ogni articolo per tipologia rende il grafo illeggibile. Schema:
+
+| Nodo | Query Obsidian | Colore |
+|------|----------------|--------|
+| Hub categoria (15) | `path:_meta/categories/<Nome>` | Hex SoT mappa (`styles.scss` `--color-*`) |
+| Hub nazione | `path:_meta/countries` | Argento `#d0d7de` (neutro; distinto da Infrastrutture) |
+| Company / entity / tag | `path:_meta/{companies,entities,tags}` | Muted `#484f58` |
+| Articoli | (nessun gruppo) | Default tema — massa neutra |
+
+Obsidian non espone size per-nodo: le hub paese crescono col grado (n° backlink). Seed: `initialize_vault_directories` → `ensure_obsidian_graph_config` scrive/aggiorna `colorGroups` (+ `showOrphans=false`, `hideUnresolved=true`, `showTags=false`) preservando scale/forces utente. Mirror docs/ops: [`radar/obsidian/graph.json`](radar/obsidian/graph.json).
+
+**Ops:** aprire bind-mount `radar/vault` in Obsidian; Graph/Backlinks; restart `radar-worker` per re-sync colori; regen MD via requeue (vedi runbook). Test: `test_wikilinks.py`, `test_hubs.py`, `test_obsidian_graph.py`.
 
 ---
 
@@ -634,7 +648,7 @@ Obiettivo: aprire `radar/vault` in Obsidian e navigare articoli ↔ paesi ↔ ca
 
 > **Stato: DONE / GATE VERDE (2026-07-18).** SoT: [`plan-audit/complete/master_plan_impl_phase_H_geospatial_graph.md`](plan-audit/complete/master_plan_impl_phase_H_geospatial_graph.md) + archi UI [`plan_archi_hatching_multicolor.md`](plan-audit/complete/plan_archi_hatching_multicolor.md). Blueprint storico sotto; non ripartire da zero.
 
-Questo modulo permette di tracciare visivamente le relazioni bilaterali e multilaterali (es. un trattato commerciale tra Italia e Cina, o un attacco informatico russo verso gli Stati Uniti) disegnando archi di connessione dinamici tra i centroidi dei rispettivi paesi direttamente sulla mappa Leaflet.
+Questo modulo permette di tracciare visivamente le relazioni bilaterali e multilaterali (es. un trattato commerciale tra Italia e Cina, o un attacco informatico russo verso gli Stati Uniti) disegnando archi di connessione dinamici tra i centroidi dei rispettivi paesi sulla mappa **MapLibre** (default; path Leaflet legacy dietro `MAP_RENDERER`).
 
 ```text
                      [Arco Curvo Dinamico]
@@ -682,7 +696,7 @@ ORDER BY volume DESC, source_country, target_country;
 
 #### 3. Endpoint API (`GET /api/map-relations`)
 
-L'endpoint `GET /api/map-relations?date=YYYY-MM-DD` restituisce un payload JSON strutturato:
+L'endpoint `GET /api/map-relations?date=YYYY-MM-DD` restituisce un payload JSON strutturato (include `article_ids` via `ARRAY_AGG`):
 
 ```json
 [
@@ -690,7 +704,8 @@ L'endpoint `GET /api/map-relations?date=YYYY-MM-DD` restituisce un payload JSON 
     "source_country": "AZ",
     "target_country": "IT",
     "primary_category": "Energia",
-    "volume": 2
+    "volume": 2,
+    "article_ids": [101, 204]
   }
 ]
 ```

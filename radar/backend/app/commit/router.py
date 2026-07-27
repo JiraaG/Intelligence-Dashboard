@@ -27,16 +27,19 @@ URL_HASH_HEX_CHARS = 16
 
 
 def initialize_vault_directories(vault_path: str | None = None) -> None:
-    """Crea root vault, 15 cartelle categoria e ``_meta/*`` hub (Fase G).
+    """Crea root vault, 15 cartelle categoria, ``_meta/*`` hub e Graph Obsidian.
 
     Default root: ``OBSIDIAN_VAULT_PATH`` (``/app/vault`` in container).
-    Pre-seed anche le 15 hub note categoria sotto ``_meta/categories/``.
+    Pre-seed le 15 hub note categoria sotto ``_meta/categories/`` e sync
+    ``.obsidian/graph.json`` (colorGroups hub-centric).
     Raises:
         OSError: permessi / mount vault non scrivibile.
     SoT:
-        AGENTS.md §2 fallback vault ``/app/vault``; commit/hubs.py.
+        AGENTS.md §2 fallback vault ``/app/vault``; commit/hubs.py;
+        commit/obsidian_graph.py.
     """
     from app.commit.hubs import ensure_meta_directories, seed_category_hubs
+    from app.commit.obsidian_graph import ensure_obsidian_graph_config
 
     root = Path(vault_path or OBSIDIAN_VAULT_PATH)
 
@@ -58,6 +61,9 @@ def initialize_vault_directories(vault_path: str | None = None) -> None:
             seeded,
             root / "_meta",
         )
+
+        graph_path = ensure_obsidian_graph_config(str(root))
+        logger.info("Obsidian Graph config sync: %s", graph_path)
 
         logger.info("Inizializzazione directory Vault completata.")
     except OSError as exc:

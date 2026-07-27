@@ -232,15 +232,19 @@ Bind-mount host: `radar/vault` → container `/app/vault`. Aprire la cartella ho
 |-----------|------|
 | Articoli | `{Categoria}/{ISO}/*.md` — body con `[[wiki-link]]` + sezione **Raccordo Relazionale** |
 | Hub | `_meta/{countries,categories,companies,entities,tags}/*.md` |
+| Graph colors | `.obsidian/graph.json` — seed/sync da worker (`commit/obsidian_graph.py`); mirror SoT [`obsidian/graph.json`](../obsidian/graph.json) |
 
-Dopo cambio factory/hubs: rebuild/restart `radar-worker`, poi nuovi articoli o requeue (sezione sopra) per rigenerare `.md` storici. Verifica:
+**Graph hub-centric:** hub categoria = 15 colori SoT mappa; hub nazioni = argento `#d0d7de`; company/entity/tag = muted; articoli = default (massa neutra). Size nodi = grado Obsidian (paesi con tanti backlink risultano più grandi). Re-sync colori: restart `radar-worker` (preserva scale/forces utente; aggiorna `colorGroups`).
+
+Dopo cambio factory/hubs/graph: rebuild/restart `radar-worker`, poi nuovi articoli o requeue (sezione sopra) per rigenerare `.md` storici. Verifica:
 
 ```bash
 # Sample: cerca wiki-link e hub
 find ./vault -name '*.md' | head
 grep -R "Raccordo Relazionale" ./vault --include='*.md' | head
 ls ./vault/_meta/countries/ 2>/dev/null | head
-docker compose logs --tail=100 radar-worker | grep -E 'outbox|Hub|vault|ERROR' || true
+test -f ./vault/.obsidian/graph.json && python3 -c "import json; g=json.load(open('./vault/.obsidian/graph.json')); print('colorGroups', len(g.get('colorGroups',[])))"
+docker compose logs --tail=100 radar-worker | grep -E 'outbox|Hub|vault|graph|ERROR' || true
 ```
 
 Hub upsert fallito → warning log; articolo resta `completed` (best-effort). Mark-read solo dopo vault articolo durable.
