@@ -430,6 +430,22 @@ WORKER_REFRESH_SETTLE_SECONDS = _env_int(
     min_value=0,
     max_value=120,
 )
+# Gate DNS esterno prima di refresh_all_feeds (evita mass ERR sticky a boot).
+WORKER_DNS_READY_HOST = (
+    _env_str("WORKER_DNS_READY_HOST", "example.com") or "example.com"
+).strip()
+WORKER_DNS_READY_RETRIES = _env_int(
+    "WORKER_DNS_READY_RETRIES",
+    5,
+    min_value=0,
+    max_value=30,
+)
+WORKER_DNS_READY_DELAY_SECONDS = _env_int(
+    "WORKER_DNS_READY_DELAY_SECONDS",
+    2,
+    min_value=0,
+    max_value=60,
+)
 
 # Chiave fissa session-level per pg_try_advisory_lock (singleton worker).
 WORKER_ADVISORY_LOCK_KEY = _env_int(

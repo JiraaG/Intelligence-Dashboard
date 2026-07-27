@@ -199,6 +199,15 @@ services:
     container_name: radar-miniflux
     restart: unless-stopped
     # No host ports by default — use docker-compose.lan.yml for admin UI on :8080
+    # Explicit public DNS: Docker embedded 127.0.0.11 still handles service names;
+    # external feed lookups forward here instead of flaky host/VPN DNS
+    # (avoids mass parsing_error_count = "no such host" on all feeds).
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    dns_opt:
+      - timeout:2
+      - attempts:3
     environment:
       - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@radar-db:5432/${POSTGRES_DB}?sslmode=disable
       - RUN_MIGRATIONS=1

@@ -322,6 +322,7 @@ Routing opzionale (`LLM_ROUTING_MODE=off|complexity`). Lane = heuristic in
 | `LLM_ROUTING_SHADOW=true` | Logga lane; chiama sempre catena SIMPLE |
 | `WORKER_POLL_INTERVAL_SECONDS` | Safety poll a coda vuota / wake timeout (default 900); non è l’unico trigger (webhook + drain) |
 | `WORKER_REFRESH_SETTLE_SECONDS` | Sosta post-`refresh_all_feeds` su boot/timeout (default 15; `0`=off) |
+| `WORKER_DNS_READY_HOST` / `RETRIES` / `DELAY_SECONDS` | Gate DNS esterno prima di `refresh_all_feeds` (skip se canary non risolve; evita mass ERR sticky) |
 
 **Lane v2.2:** L sola → SIMPLE; 1 di {G,E,X} → BORDERLINE; ≥2 famiglie (L solo in combo) → COMPLEX.
 `geo_marker` da solo richiede `body_len ≥ 1500`; ≥2 country names → G sempre.

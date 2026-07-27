@@ -108,6 +108,23 @@ docker compose -f docker-compose.yml -f docker-compose.lan.yml up -d
 
 Scripts load `MINIFLUX_API_KEY` via `ops/_load_dotenv.sh`. Override URL with `MINIFLUX_ADMIN_URL` if needed.
 
+### Miniflux egress / sticky ERR (DNS)
+
+If STATUS/FONTI shows **all feeds in error** with Miniflux message `lookup … on 127.0.0.11:53: no such host`:
+
+1. Ensure Compose has explicit `dns:` on `radar-miniflux` (see `docker-compose.yml`).
+2. Recreate: `docker compose up -d radar-miniflux radar-worker`
+3. Clear sticky counters with a successful refresh:
+
+```bash
+docker compose cp ops/verify_miniflux_egress.py radar-backend:/tmp/verify_miniflux_egress.py
+docker compose exec -T radar-backend python /tmp/verify_miniflux_egress.py
+# default VERIFY_MODE=per_feed (reliable clear of sticky ERR); optional VERIFY_MODE=all
+# optional: VERIFY_SETTLE_SECONDS=1 VERIFY_FINAL_SETTLE_SECONDS=10 VERIFY_MAX_ERRORS=0
+```
+
+Worker gate: `WORKER_DNS_READY_*` skips `refresh_all_feeds` when the canary host does not resolve (avoids writing mass ERR at boot).
+
 ---
 
 ## Hardened override (loopback FE)

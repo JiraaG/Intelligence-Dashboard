@@ -71,6 +71,9 @@ from app.core.config import (
     WORKER_PARSE_CONCURRENCY,
     WORKER_POLL_INTERVAL_SECONDS,
     WORKER_QUEUE_DEPTH,
+    WORKER_DNS_READY_DELAY_SECONDS,
+    WORKER_DNS_READY_HOST,
+    WORKER_DNS_READY_RETRIES,
     WORKER_REFRESH_SETTLE_SECONDS,
     WORKER_SHUTDOWN_TIMEOUT,
 )
@@ -1203,17 +1206,75 @@ async def _wait_interval(state: WorkerState, interval: float) -> bool:
         return False
 
 
+async def wait_for_external_dns(
+    *,
+    host: str | None = None,
+    retries: int | None = None,
+    delay_seconds: float | None = None,
+) -> bool:
+    """Attende resolve DNS esterno prima di refresh Miniflux.
+
+    Evita di incrementare ``parsing_error_count`` su tutti i feed quando
+    Docker/VPN DNS non è ancora pronto al boot.
+
+    Returns:
+        True se il canary host risolve entro i tentativi; False altrimenti.
+        ``retries=0`` esegue un solo tentativo immediato (no sleep).
+    """
+    target = (host if host is not None else WORKER_DNS_READY_HOST).strip() or "example.com"
+    configured = WORKER_DNS_READY_RETRIES if retries is None else int(retries)
+    # retries=0 → one immediate attempt; retries=N → N attempts
+    attempts = 1 if configured <= 0 else configured
+    delay = (
+        float(WORKER_DNS_READY_DELAY_SECONDS)
+        if delay_seconds is None
+        else float(delay_seconds)
+    )
+    loop = asyncio.get_running_loop()
+
+    for attempt in range(1, attempts + 1):
+        try:
+            await loop.getaddrinfo(target, 443)
+            if attempt > 1:
+                logger.info(
+                    "DNS esterno pronto per %s (tentativo %d/%d).",
+                    target,
+                    attempt,
+                    attempts,
+                )
+            return True
+        except OSError as exc:
+            logger.warning(
+                "DNS esterno non pronto per %s (tentativo %d/%d): %s",
+                target,
+                attempt,
+                attempts,
+                exc,
+            )
+            if attempt < attempts and delay > 0:
+                await asyncio.sleep(delay)
+    return False
+
+
 async def _drain_unread(state: WorkerState, *, settle: bool = True) -> None:
     """Eager drain-until-empty: refresh feed, sosta settle (se opportuno) e loop cicli."""
     assert state.miniflux_client is not None
-    try:
-        await state.miniflux_client.refresh_all_feeds()
-    except asyncio.CancelledError:
-        raise
-    except Exception as refresh_err:
-        logger.warning("Refresh forzato feed fallito durante drain: %s", refresh_err)
+    dns_ok = await wait_for_external_dns()
+    if not dns_ok:
+        logger.warning(
+            "Skip refresh_all_feeds: DNS esterno non pronto (%s). "
+            "Evito mass parsing_error sticky su Miniflux.",
+            WORKER_DNS_READY_HOST,
+        )
+    else:
+        try:
+            await state.miniflux_client.refresh_all_feeds()
+        except asyncio.CancelledError:
+            raise
+        except Exception as refresh_err:
+            logger.warning("Refresh forzato feed fallito durante drain: %s", refresh_err)
 
-    if settle and WORKER_REFRESH_SETTLE_SECONDS > 0:
+    if settle and WORKER_REFRESH_SETTLE_SECONDS > 0 and dns_ok:
         logger.info(
             "Attesa assestamento scraping Miniflux (%ss)...",
             WORKER_REFRESH_SETTLE_SECONDS,

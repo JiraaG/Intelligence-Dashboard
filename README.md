@@ -33,7 +33,8 @@ Knobs LLM / Profili A–F: [`radar/.env.example`](radar/.env.example) + SoT [`so
 
 **Routing LLM:** `.env.example` ops tipico = **Profilo B** + `LLM_ROUTING_MODE=complexity`. Effort BORDERLINE configurabile via `LLM_BORDERLINE_REASONING_EFFORT` (default safe `high`, target ops `none` con escalate `high` su `ValidationError`). Default codice boot-safe (senza env) = `LLM_ROUTING_MODE=off` + `LLM_ROUTING_SHADOW=true` — non confondere i due. Local-Hybrid = **Profilo F** (SIMPLE Ollama / COMPLEX cloud).
 
-**Miniflux / PC nuovo / backup:** seed in [`radar/config/`](radar/config/); dettaglio §6 [docs/01_getting_started.md](docs/01_getting_started.md) + [radar/ops/README.md](radar/ops/README.md). Backup config-first: `./ops/backup-postgres.sh` (senza vault di default).
+**Miniflux / PC nuovo / backup:** seed in [`radar/config/`](radar/config/); dettaglio §6 [docs/01_getting_started.md](docs/01_getting_started.md) + [radar/ops/README.md](radar/ops/README.md). Backup config-first: `./ops/backup-postgres.sh` (senza vault di default).  
+**Miniflux DNS / ERR sticky:** `radar-miniflux` ha `dns:` pubblici in Compose; worker gate `WORKER_DNS_READY_*` skippa `refresh_all_feeds` se DNS canary down. Se FONTI mostra tutti ERR (`no such host`): `ops/verify_miniflux_egress.py` (mode `per_feed`) — vedi ops README § Miniflux egress.
 
 Dettagli env e health: [docs/01_getting_started.md](docs/01_getting_started.md).  
 Requeue (re-ingest distruttivo): [radar/docs/runbook.md](radar/docs/runbook.md) — preview `… requeue_articles 50 --dry-run`; reale senza `--dry-run`; **prova da zero** `… --purge-all` poi `docker compose restart radar-worker`.  

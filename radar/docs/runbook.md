@@ -326,6 +326,7 @@ Frontend **mai** su data. CORS allowlist vuota in prod dietro Nginx. Secret solo
 | P1 API live fail | restart loop backend | live + log + `pg_isready` — **non** cambiare healthcheck in ready |
 | P2 ready stale | ready 503 > ~2 min | worker up? heartbeat? migrazione `004`+? |
 | P2 ingest stuck | zero articoli | API key Miniflux/LLM lane, quota, outbox, log worker |
+| P2 FONTI tutti ERR | `error_count` = N/N, msg `no such host` | Compose `dns:` su miniflux; `docker compose up -d radar-miniflux`; `ops/verify_miniflux_egress.py` (per_feed); worker log `Skip refresh_all_feeds` / `WORKER_DNS_READY_*` |
 | P2 outbox backlog | `failed`/`pending` alti | vault mount, reconcile |
 | P3 data | corruzione | restore drill ops su stack usa-e-getta |
 

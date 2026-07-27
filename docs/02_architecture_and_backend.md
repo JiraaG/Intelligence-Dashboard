@@ -152,5 +152,6 @@ Vedi `radar/docker-compose.yml`:
 
 - **`radar-edge`**: frontend ↔ backend
 - **`radar-data`**: backend, worker, db, miniflux (frontend mai qui)
+- **`radar-miniflux` DNS:** Compose `dns:`/`dns_opt` (1.1.1.1, 8.8.8.8) per egress feed stabili; worker `WORKER_DNS_READY_*` evita refresh a boot con DNS down; ops `verify_miniflux_egress.py`
 
 Ops/backup: [`radar/ops/README.md`](../radar/ops/README.md). Runbook: [`radar/docs/runbook.md`](../radar/docs/runbook.md).

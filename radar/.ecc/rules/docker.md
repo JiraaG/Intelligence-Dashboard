@@ -94,6 +94,24 @@ networks:
 # worker, db, miniflux: solo radar-data
 ```
 
+**Egress Miniflux / DNS:** `radar-miniflux` deve risolvere host pubblici dei feed RSS.
+Su Docker Desktop/VPN il forward da `127.0.0.11` al DNS host può fallire con
+`no such host` su **tutti** i feed (`parsing_error_count` sticky in FONTI).
+Best practice Compose (servizio `radar-miniflux`):
+
+```yaml
+dns:
+  - 1.1.1.1
+  - 8.8.8.8
+dns_opt:
+  - timeout:2
+  - attempts:3
+```
+
+I nomi interni (`radar-db`, …) restano via embedded DNS; solo le query esterne
+usano i resolver pinnati. Worker: gate DNS prima di `refresh_all_feeds` (skip se
+rete non pronta). Ops: `ops/verify_miniflux_egress.py`.
+
 ---
 
 ## Regola 4: Healthcheck Obbligatori

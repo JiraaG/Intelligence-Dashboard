@@ -229,5 +229,6 @@ Riavviare solo `radar-backend` **non** riavvia l’ingest: serve `radar-worker`.
 | Classificazione → fallback / HTTP 500 modello | Verificare `LLM_*_MODEL` / legacy `GEMINI_MODEL` in `.env`; riavviare `radar-worker` — **non** commitare `.env` |
 | Soft-news → `Tecnologia`/`XX` eccessivo | Prompt + soft-remap in `classification/` (anti-XX, sport→Geopolitica); requeue mirato |
 | Solo 2 feed / config “vuota” dopo restore | Il dump Postgres non è il SoT feed: rieseguire `./ops/import-miniflux-feeds.sh` dallo seed in `config/` |
+| FONTI / STATUS: **N/N attive · N con errori** (tutti ERR, `no such host`) | DNS Docker/host flaky al poll Miniflux → `parsing_error_count` sticky. Compose: `dns:` su `radar-miniflux` (1.1.1.1/8.8.8.8); `docker compose up -d radar-miniflux radar-worker`; poi `ops/verify_miniflux_egress.py` (refresh + assert `error_count`). Worker skippa `refresh_all_feeds` se DNS canary non pronto. |
 
 Backup/restore e seed Miniflux: [radar/ops/README.md](../radar/ops/README.md) + §6 sopra. Persistenza DB: `radar/data/postgres/` (gitignored); vault: `radar/vault/` (solo `.gitkeep` in Git).

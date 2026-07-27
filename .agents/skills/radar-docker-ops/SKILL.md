@@ -2,11 +2,12 @@
 name: radar-docker-ops
 description: >
   Compose/Dockerfile Radar: reti edge/data, health live vs ready, verify-geojson,
-  volume ./data/postgres, no latest, npm ci, digest pin deferred.
+  volume ./data/postgres, no latest, npm ci, digest pin deferred, Miniflux dns + verify_miniflux_egress.
 when_to_use:
   - docker-compose.yml, Dockerfile, nginx.conf, runbook ops
   - Healthcheck, reti, rebuild frontend, GeoJSON in build
-version: 1.1.0
+  - Miniflux DNS / FONTI mass ERR / verify_miniflux_egress
+version: 1.2.0
 ---
 
 ## Quando attivare
@@ -25,6 +26,8 @@ Modifiche a containerizzazione, reti, health, o build FE in Docker.
 8. Frontend runs as unprivileged nginx user listening on port 8080 (host mapped 80:8080).
 9. **Profilo F / Ollama host:** overlay `docker-compose.ollama-host.yml` aggiunge `extra_hosts: host.docker.internal:host-gateway` su `radar-worker` — non inventare un servizio `radar-ollama` ROCm di default.
 
+10. **Miniflux egress DNS:** `radar-miniflux` in Compose ha `dns:` pubblici (1.1.1.1 / 8.8.8.8) + `dns_opt`; embedded `127.0.0.11` resta per nomi servizio. Worker: `WORKER_DNS_READY_*` skippa `refresh_all_feeds` se canary non risolve. Sticky ERR → `ops/verify_miniflux_egress.py` (`VERIFY_MODE=per_feed`).
+
 ## Deferred (non inventare come fatto; non trattare come backlog obbligatorio)
 
 - Drop `--legacy-peer-deps` solo con matrix allineata (decisione esplicita)
@@ -42,6 +45,9 @@ Backup/restore su host Windows: seguire `radar/ops/README.md` §Windows (Git Bas
 # Preferire up -d (rispetta depends_on healthy). Evitare restart parallelo di tutto lo stack:
 # compose restart non ri-applica depends_on → race CannotConnectNowError su DB starting up.
 docker compose up -d
+# Miniflux sticky ERR clear (inside backend):
+# docker compose cp ops/verify_miniflux_egress.py radar-backend:/tmp/ && \
+#   docker compose exec -T radar-backend python /tmp/verify_miniflux_egress.py
 docker compose up --build -d radar-frontend
 # Local-Hybrid (Profilo F): bridge host Ollama
 # docker compose -f docker-compose.yml -f docker-compose.ollama-host.yml up -d radar-worker
@@ -53,6 +59,7 @@ node frontend/scripts/verify-geojson.mjs
 ## Knobs ops frequenti
 
 - `MINIFLUX_LIMIT`: default/tipico **50** (`.env.example`). Con molti unread, `100` può superare `MAX_MINIFLUX_RESPONSE_BYTES=5MB`.
+- Miniflux DNS / sticky ERR: `dns:` su servizio; `WORKER_DNS_READY_HOST|RETRIES|DELAY_SECONDS`; `ops/verify_miniflux_egress.py` (default per_feed).
 - Profilo A hybrid: `LLM_SIMPLE_MODEL=gemini-3.5-flash-lite`, `LLM_SIMPLE_FALLBACKS=gemini-3.1-flash-lite` (L1 same-provider; L2 residual COMPLEX). `GEMINI_MODEL` legacy allineato al primary SIMPLE. HTTP 500 su Gemma legacy → flash-lite in `.env` + restart `radar-worker`. Non commitare `.env`.
 - Profilo F: `LLM_SIMPLE_BASE_URL=http://host.docker.internal:11434/v1` + modello host tipico `gemma4-radar` (base `gemma4:12b`); runbook § Local-Hybrid; `WORKER_*_CONCURRENCY=1` + `OLLAMA_NUM_PARALLEL=1` consigliati. VRAM unload: `OLLAMA_AUTO_UNLOAD` + `ops/verify-ollama-vram.sh`.
 

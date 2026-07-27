@@ -82,7 +82,7 @@ Regola d’oro (upstream cross-harness): comportamento durevole in skill/rules/h
 
 4. **radar-sidebar-freeze** — freeze `radar-sidebar/**` + eccezione mirata (toggle Salva e chip `related_countries`); `p-carousel` only  
 5. **radar-api-contract** — map-summary + saved-summary + envelope `{items,next_cursor,total}` (+ `saved=true`); PATCH read/save; metrics FinOps; **FONTI** `GET/PATCH /api/feeds` + by-feed `date_field`; `MOCK_MODE`  
-6. **radar-docker-ops** — edge/data, live/ready, verify-geojson, `./data/postgres`; ops backup → [`ops/README.md`](../radar/ops/README.md) §Windows  
+6. **radar-docker-ops** — edge/data, live/ready, verify-geojson, `./data/postgres`; Miniflux `dns:` + `verify_miniflux_egress`; ops backup → [`ops/README.md`](../radar/ops/README.md) §Windows
 7. **radar-geojson-assets** — gitignore + `--fetch` in Docker build; `ASSET_LICENSE`  
 8. **radar-quota-ledger** — reserve/complete/fail; limiti per-lane `LLM_SIMPLE_*`/`LLM_COMPLEX_*`; BORDERLINE → `purpose=classify:complex` con effort da `LLM_BORDERLINE_REASONING_EFFORT`; soft-trim = `LLM_SIMPLE.rpd`; RPM/TPM attesa stessa lane; RPD esaurita → `QuotaDailyExceeded` + residual cross-lane; 429 Retry-After; free vs paid budget; provider `gemini`\|`deepseek`\|`openai`\|`glm`\|`grok`\|`claude` (**stub**)  
 9. **radar-requeue-ops** — re-ingest Miniflux: dry-run → exec → `restart radar-worker`
