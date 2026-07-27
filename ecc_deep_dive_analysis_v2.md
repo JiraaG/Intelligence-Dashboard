@@ -1,13 +1,14 @@
 # Manuale ECC Radar — Deep Dive V2
 
-> **Versione:** 2.0 (2026-07-15)  
-> **Sostituisce come SoT descrittiva:** [`ecc_deep_dive_analysis.md`](ecc_deep_dive_analysis.md) (V1 — archivio / snapshot teorico pre–Phase 6)  
-> **Workspace:** `c:\Users\lucag\Documents\Dashboard finance`  
-> **Branch tip analizzato:** `refactor/enterprise-consolidation` @ `526c856` (post Phase 6 `56c2eff` + ECC remediation)  
+> **Versione:** 2.1 (2026-07-27) — allineamento post-`feature/upgrades`  
+> **SoT operativa:** [`docs/04_ecc_framework.md`](docs/04_ecc_framework.md) (preferire sempre questo file per inventory/wiring)  
+> **V1:** `ecc_deep_dive_analysis.md` **non** è in questo monorepo (rimosso/assente)  
+> **Workspace:** monorepo `Intelligence-Dashboard` (Linux)  
+> **Branch tip allineato:** `feature/upgrades` (migrazioni `001`–`017`, 15 categorie, MapLibre primary)  
 > **Upstream ECC:** [github.com/affaan-m/ECC](https://github.com/affaan-m/ECC) · [ecc.tools](https://ecc.tools) · docs [Mintlify Architecture](https://affaan-m-everything-claude-code.mintlify.app/concepts/overview)  
 > **CodeWiki:** [codewiki.google/github.com/affaan-m/ecc](https://codewiki.google/github.com/affaan-m/ecc) — al momento della stesura **shell vuota**; non usarla come SoT.
 
-Questo file è un **manuale di descrizione** dell’architettura ECC: cosa è ECC upstream, cosa c’è nel progetto Radar, cosa è *realmente* attivo in Cursor, e come espandere l’overlay **senza** reinventare l’OS ECC e **senza** contraddire i vincoli di prodotto (sidebar freeze, worker vs API, 10 categorie, ecc.).
+Questo file è un **manuale di descrizione** dell’architettura ECC: cosa è ECC upstream, cosa c’è nel progetto Radar, cosa è *realmente* attivo in Cursor, e come espandere l’overlay **senza** reinventare l’OS ECC e **senza** contraddire i vincoli di prodotto (sidebar freeze, worker vs API, **15** categorie, MapLibre primary, ecc.).
 
 ---
 
@@ -17,7 +18,7 @@ Questo file è un **manuale di descrizione** dell’architettura ECC: cosa è EC
 |---------|----------------|
 | ECC upstream cos’è? | Un **harness OS** multi-IDE (skills, agents, hooks, rules, MCP, commands) — non un singolo file di config |
 | Cosa abbiamo in Radar? | Un **overlay di prodotto** a due namespace: `.agents/` (vivo in Cursor) + `radar/.ecc/` (policy, rules, agents, hooks, mirror) |
-| È allineato al codice? | **Sì** dopo remediation ECC (`526c856`); contenuti vs worker/Compose/API Phase 5/FE Phase 4–5 |
+| È allineato al codice? | **Parziale** — usare `docs/04` + skill SoT come verità; questo deep-dive può restare descrittivo |
 | È “pienamente” in uso? | **Hooks/rules wiring DONE** (`.cursor/hooks.json` + `.cursor/rules` globs); skill dominio Radar in espansione selettiva; profili agent = ancora prompt/Task manuale |
 | Si può espandere? | **Sì**, seguendo la regola d’oro ECC: comportamento durevole in skill/rules/hooks; adapter harness sottili |
 | Piano eseguibile? | Expansion **DONE** — vedi [`plan_impl_phase_0_6_execution.md`](plan-audit/complete/plan_impl_phase_0_6_execution.md); handoff [`handoff_ecc_expansion.md`](plan-audit/archive/ecc/handoff_ecc_expansion.md) resta come audit trail |
@@ -147,7 +148,7 @@ Install selettivo (v1.9+): `manifests/` + `install-plan` / `install-apply`.
 | Catalogo MCP generico | Copia selettiva |
 | I ~67 agent generici | Solo specializzare dove Radar diverge |
 
-**Va specializzato localmente:** sidebar freeze, `worker.py` vs `main.py`, Pydantic CSV `str`, reti `radar-edge`/`radar-data`, `MOCK_MODE`, 10 categorie, cluster 40/spiderfy false, GeoJSON verify.
+**Va specializzato localmente:** sidebar freeze, `worker.py` vs `main.py`, Pydantic CSV `str`, reti `radar-edge`/`radar-data`, `MOCK_MODE`, 15 categorie, cluster 40/spiderfy false, GeoJSON verify.
 
 ---
 
@@ -223,7 +224,7 @@ Dashboard finance/
 |-------|--------|------------|
 | `angular-developer` | FE Angular 21 generico + references | Pattern Angular; non Radar-specific |
 | `llm-json-extraction` | `worker.py` / classification / commit (Gemini + OpenAI-compat) | Pydantic strict, CSV `str`, complexity v2.2 |
-| `spatial-data-mocking` | UI offline / MOCK_MODE | 10 categorie, overlay, map-summary + articles page |
+| `spatial-data-mocking` | UI offline / MOCK_MODE | **15** categorie, overlay, map-summary + articles page |
 | `radar-sidebar-freeze` | UI laterale / carousel / read-unread | **BLOCCA** `radar-sidebar/**` |
 | `radar-api-contract` | `main.py`, articles query, FE services | map-summary + envelope cursor |
 | `radar-docker-ops` | Compose, Dockerfile, health, ops | edge/data, live vs ready, verify-geojson |
@@ -243,7 +244,7 @@ Entry-point: tree repo, Regola 80/20, comandi (verify-geojson, runbook, CI), ski
 | Rule | Scope dichiarato | Contenuto chiave |
 |------|------------------|------------------|
 | `backend.md` | `backend/**` | Worker loop, no sleep in finally, quote ledger, API Phase 5 map-summary |
-| `frontend.md` | `frontend/**` | Freeze sidebar, Leaflet `window.L`, cluster, MOCK_MODE, map-summary |
+| `frontend.md` | `frontend/**` | Freeze sidebar, MapLibre primary + Leaflet legacy, cluster, MOCK_MODE, map-summary |
 | `docker.md` | Compose/Dockerfile | edge/data, `./data/postgres`, uvicorn `app.main:app`, verify-geojson, nginx 1.27 |
 | `testing.md` | tests / `*.spec.ts` | `not live`, MOCK_MODE TestBed, no tocco sidebar |
 
@@ -254,7 +255,7 @@ Entry-point: tree repo, Regola 80/20, comandi (verify-geojson, runbook, CI), ski
 | Agent | Dominio | Exclude |
 |-------|---------|---------|
 | `pipeline-engineer` | ingest / worker / classification | — |
-| `angular-map-expert` | mappa Leaflet / FE | `radar-sidebar/**` |
+| `angular-map-expert` | mappa MapLibre (Leaflet legacy) / FE | `radar-sidebar/**` |
 | `geo-data-architect` | migrations / commit / DB | — |
 
 Dichiarati in `settings.agentProfiles`. **Non** dispatchano automaticamente i Task Cursor.
@@ -376,7 +377,7 @@ Preferire skill se il workflow è lungo; command solo come shortcut.
 
 | Rule | Scope | Stato |
 |------|-------|--------|
-| `testing.md` | tests / `*.spec.ts` | Aggiungere selettivo (path-scoped + `.mdc`) |
+| `testing.md` | tests / `*.spec.ts` | **DONE** — presente + wired via `.cursor/rules` |
 | `security.md` | shared | Opzionale — secret già negli hook |
 | `migrations.md` | `backend/migrations/**` | Opzionale — già in geo-data-architect / backend rule |
 
@@ -489,7 +490,7 @@ Comandi già documentati in `CLAUDE.md`:
 |-------|-----|------|
 | Phase 5 | `1dfdf60` | map-summary + articles paged |
 | Phase 6 GATE VERDE | `56c2eff` | docs/CI/GeoJSON/runbook/hooks |
-| ECC remediation | `526c856` | rules/agents/skills/settings = codice |
+| ECC remediation (storico) | `526c856` | snapshot early overlay; verità corrente = `docs/04` + skill SoT su `feature/upgrades` |
 | Phase 4 | `de9bd2f` | MOCK_MODE, XSS markers, read/unread |
 
 Sidebar freeze: **sempre** zero touch `radar/frontend/src/app/components/radar-sidebar/**`.
@@ -514,7 +515,7 @@ Sidebar freeze: **sempre** zero touch `radar/frontend/src/app/components/radar-s
 ## 10. Conclusioni
 
 1. **ECC upstream** è un OS multi-harness; Radar ne usa correttamente la *filosofia* come overlay sottile.  
-2. **Contenuti ECC Radar** sono allineati al codice post–remediation (`526c856`).  
+2. **Contenuti ECC Radar** — preferire `docs/04_ecc_framework.md` + `.agents/skills/*/SKILL.md`; questo deep-dive è descrittivo (allineato 2026-07-27 su 15 cat / migrazioni 001–017 / MapLibre).  
 3. **Uso reale in Cursor** = Magna Carta + skill + **hooks/rules wiring** (P0 DONE) + commands minimi.  
 4. **Espansione restante:** sync SoT, skill ops selettive, rule testing — non clonare catalogo.  
 5. **Manuale operativo SoT** = [`docs/04_ecc_framework.md`](docs/04_ecc_framework.md); questo V2 resta descrittivo.  

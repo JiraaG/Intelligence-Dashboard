@@ -230,7 +230,7 @@ Esempio Phase 6: `git checkout 56c2eff`. Dettaglio gate Phase 0–6: [plan_impl_
 | Cooldown modelli | `radar/backend/app/classification/cooldown.py` |
 | Requeue ops | `radar/backend/app/scripts/requeue_articles.py` |
 | API FastAPI (no ingest) | `radar/backend/app/main.py` |
-| Migrazioni / outbox | `radar/backend/migrations/` (001–011), `radar/backend/app/core/migrations.py`, `radar/backend/app/commit/outbox.py` |
+| Migrazioni / outbox | `radar/backend/migrations/` (001–017), `radar/backend/app/core/migrations.py`, `radar/backend/app/commit/outbox.py` |
 | Query articles / map-summary / map-relations / saved | `radar/backend/app/api/articles_query.py` |
 | Compose + overlay | `radar/docker-compose.yml`, `radar/docker-compose.hardened.yml`, `radar/docker-compose.lan.yml` |
 | Ops backup/restore | `radar/ops/` |
@@ -298,7 +298,7 @@ Dashboard finance/
     ├── ops/                           # backup/restore + README ops
     ├── docs/runbook.md
     ├── backend/
-    │   ├── migrations/                # 001–016
+    │   ├── migrations/                # 001–017
     │   └── app/
     │       ├── main.py                # API-only
     │       ├── worker.py              # ingest

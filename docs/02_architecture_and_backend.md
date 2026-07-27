@@ -95,7 +95,18 @@ Commit: transazione DB + riga outbox → reconcile vault → mark-read Miniflux 
 
 ### Ops scripts
 
-Solo `app/scripts/requeue_articles.py` e `verify_metrics_013.py`. Comando canonico (da `radar/`, stack up):
+Script sotto `app/scripts/` (ops + gate verify). Canonici:
+
+| Script | Ruolo |
+|--------|--------|
+| `requeue_articles.py` | Re-ingest Miniflux (dry-run / reale / `--purge-all`) |
+| `verify_metrics_013.py` | Gate Metrics / FinOps 013 |
+| `verify_semantic_dedup.py` | Gate Fase C pgvector |
+| `verify_per_model_quota.py` | Gate quote per-modello |
+| `verify_llm_finops_wave_a.py` | Gate FinOps Wave A |
+| `seed_sse_soft_refresh.py` / `seed_phase_h_demo.py` / `simulate_miniflux_webhook.py` | Seed / simulazione verify (non prod loop) |
+
+Comando canonico requeue (da `radar/`, stack up):
 
 ```bash
 docker compose exec -T radar-worker python -m app.scripts.requeue_articles 20 --dry-run
@@ -122,7 +133,7 @@ Effetti collaterali e prerequisiti: [runbook](../radar/docs/runbook.md).
 
 ## API REST
 
-CORS: middleware solo se `CORS_ALLOW_ORIGINS` non vuoto; metodi `GET`, `PATCH`, `OPTIONS`. Dietro Nginx same-origin: **lasciare vuoto**. Nessuna auth applicativa globale; mutazioni feed opzionalmente gated da `FEED_ADMIN_TOKEN` → `X-Feed-Admin-Token`.
+CORS: middleware solo se `CORS_ALLOW_ORIGINS` non vuoto; metodi `GET`, `PATCH`, `OPTIONS`. Dietro Nginx same-origin: **lasciare vuoto**. Nessuna auth applicativa globale; mutazioni feed opzionalmente gated da `FEED_ADMIN_TOKEN` → `X-Feed-Admin-Token`. **Caveat:** la UI FONTI non invia l’header — con token valorizzato il toggle Catalogo fallisce 401 a meno di proxy che lo inietti (LAN tipico: token vuoto).
 
 | Metodo | Endpoint | Parametri | Risposta |
 |--------|----------|-----------|----------|
@@ -136,7 +147,7 @@ CORS: middleware solo se `CORS_ALLOW_ORIGINS` non vuoto; metodi `GET`, `PATCH`, 
 | GET | `/api/metrics/by-feed` | `from?`, `to?`, `date_field?` (`published_at` \| `created_at`, default **`created_at`**) | Aggregazione per feed Miniflux (`feed_id`, `feed_domain`, `feed_title`, `clean_chars`, latenze). FE FONTI Giorno passa sempre `published_at`. |
 | GET | `/api/metrics/dedup` | `from?`, `to?` | Aggregazione per tipo evento dedup (`dedup_kind`, `action_taken`, count, avg_cosine, avg_confidence) |
 | GET | `/api/feeds` | — | Catalogo merge seed RO + Miniflux live (`active_count` / `total_count` / `error_count` + `groups[]` per publisher) |
-| PATCH | `/api/feeds/{id}/toggle` | `{ "disabled": bool }` (+ header `X-Feed-Admin-Token` se `FEED_ADMIN_TOKEN` set) | Abilita/disabilita feed su Miniflux; **non** scrive `config/` |
+| PATCH | `/api/feeds/{id}/toggle` | `{ "disabled": bool }` (+ header `X-Feed-Admin-Token` se `FEED_ADMIN_TOKEN` set; UI FONTI non lo invia) | Abilita/disabilita feed su Miniflux; **non** scrive `config/` |
 | PATCH | `/api/articles/{id}/read_status` | `{ "is_read": bool }` | `{ "status", "is_read", "is_saved"? }` — unread ⇒ `is_saved=false` |
 | PATCH | `/api/articles/{id}/saved_status` | `{ "is_saved": bool }` | `{ "status", "is_saved", "is_read"? }` — save ⇒ `is_read=true` |
 

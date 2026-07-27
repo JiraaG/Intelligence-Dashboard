@@ -35,7 +35,10 @@ Remote / internet exposure: put a TLS reverse proxy with auth and ACLs in front 
 ## Smoke after deploy
 
 ```bash
-curl -s http://localhost/health/live
+# FE Nginx health (host :80) — static "ok"; NOT backend liveness
+curl -s http://localhost/health
+# Backend liveness (in-container :8000)
+docker compose exec radar-backend curl -sf http://localhost:8000/health/live
 curl -s "http://localhost/api/map-summary?date=$(date -I)"
 curl -s "http://localhost/api/map-relations?date=$(date -I)"
 curl -s http://localhost/api/saved-summary
@@ -95,6 +98,7 @@ Commit-ready list (from repo-root [`RSS.txt`](../../RSS.txt)):
 Import applica `disabled = not enabled` (default enabled). Sync live→seed esporta `enabled`. Toggle da UI **non** riscrive il seed (`config/` resta `:ro`).
 
 Opzionale: `FEED_ADMIN_TOKEN` in `.env` — se set, `PATCH /api/feeds/{id}/toggle` richiede `X-Feed-Admin-Token`.
+**UI FONTI caveat:** the browser toggle does **not** send that header (`article.service.ts`); with a non-empty token, Catalogo toggles return 401 unless a trusted reverse proxy injects the header. Typical LAN: leave `FEED_ADMIN_TOKEN` empty.
 
 ```bash
 # Publish admin UI, then import/update all feeds on a fresh PC:

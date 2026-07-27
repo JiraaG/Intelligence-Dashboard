@@ -137,7 +137,7 @@ flowchart TD
   * Path 2D conservato per rollback / futuro switch UX. Caricato solo se `MAP_RENDERER=leaflet` (`window.__RADAR_MAP_RENDERER__` o `localStorage radar.mapRenderer`). Script globali `angular.json` `scripts[]` + `window.L` restano per quel host.
 * **Visualizzazione Grafica Avanzata:**
   * **Hatching (MapLibre):** fasce soft O→E (1 colore × tipologia da `map-summary`); mainland US/RU; isole significative ≥0.5% area largest; clip terra∩strip via `polygon-clipping` (no fill in mare). Helper `maplibre/country-category-fills.ts`. Leaflet legacy: SVG combo.
-  * **Pin Conic-Gradient:** un pin per nazione (HTML Marker) con distribuzione % delle 10 categorie.
+  * **Pin Conic-Gradient:** un pin per nazione (HTML Marker) con distribuzione % delle **15** categorie.
   * **Spiderfy Custom:** hub + fan emoji per categoria attiva nel carosello (parity path MapLibre senza MarkerCluster).
 
 ---

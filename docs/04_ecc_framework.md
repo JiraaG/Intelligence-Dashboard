@@ -155,6 +155,7 @@ Dopo ogni edit a una skill SoT: `--write` poi `--check` (exit 0). In CI/locale u
 | `post-tool-use.py` | Da root `radar/`: ruff su `.py`, prettier su FE; **fail** se linter assente; placeholder = soft warn |
 
 **Registrazione Cursor (DONE):** `.cursor/hooks.json` → `.cursor/hooks/*-adapter.py` → `radar/.ecc/hooks/*.py`.  
+**Distinzione enforcement:** logica Radar in `radar/.ecc/hooks/post-tool-use.py` è **fail-closed** se eseguita direttamente. L’adapter Cursor (`.cursor/hooks/post-tool-use-adapter.py`) converte i fallimenti in **advisory** (`additional_context`, `exit 0`) per non interrompere la sessione IDE. Pre-hook resta **deny** anche via adapter.  
 Rules path-scoped native: `.cursor/rules/radar-*.mdc` (globs → SoT `radar/.ecc/rules/*`).  
 `settings.json` **non** duplica la registrazione; documenta policy + **fallback manuale** (`AGENTS.md` §6, `hooks.notes`).  
 Prerequisito host per post-hook Python: `ruff` sul `PATH`.

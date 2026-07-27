@@ -40,7 +40,7 @@ Lavori su FastAPI REST, query articoli, o servizi Angular che chiamano l’API.
 | Metrics by-feed | `GET /api/metrics/by-feed?from=&to=&date_field=` | JSON `{from, to, items: [{feed_id, feed_domain, feed_title, article_count, total_clean_chars, avg_clean_chars, avg_pipeline_latency_ms, avg_embedding_time_ms}]}`. Query `date_field=published_at\|created_at` (default API **`created_at`** per compat ops; FE FONTI Giorno passa sempre `published_at`). Finestra half-open TZ come summary. |
 | Metrics dedup | `GET /api/metrics/dedup?from=&to=` | JSON `{from, to, items: [{dedup_kind, action_taken, event_count, avg_cosine_distance, avg_confidence}]}` |
 | Feeds catalog | `GET /api/feeds` | Merge seed RO + Miniflux live: `{active_count, total_count, error_count, groups: [{category, feeds: [{id, title, feed_url, site_url, category, scraper_rules, crawler, disabled, enabled_in_seed, in_seed, parsing_error_count, parsing_error_msg, checked_at, next_check_at}]}]}`. Feed seed senza match: `id: null`. Feed live senza seed: `in_seed: false`. |
-| Feed toggle | `PATCH /api/feeds/{id}/toggle` | Body `{disabled: bool}` → Miniflux `PUT /v1/feeds/{id}` (`disabled` only). Se `FEED_ADMIN_TOKEN` non vuoto → header obbligatorio `X-Feed-Admin-Token` (altrimenti 401). Seed JSON **non** riscritto (config `:ro`). |
+| Feed toggle | `PATCH /api/feeds/{id}/toggle` | Body `{disabled: bool}` → Miniflux `PUT /v1/feeds/{id}` (`disabled` only). Se `FEED_ADMIN_TOKEN` non vuoto → header obbligatorio `X-Feed-Admin-Token` (altrimenti 401). **UI FONTI:** `article.service.ts` non invia l’header — con token valorizzato il toggle browser fallisce 401 salvo proxy che lo inietti; tipico LAN = token vuoto. Seed JSON **non** riscritto (config `:ro`). |
 
 - `main.py` = **API-only** (pool, migrations, REST, webhook, SSE). Ingest solo in `worker.py`.
 - FE: `getMapSummary` / `getSavedSummary` / `getArticlesPage` allineati a `article.service.ts` e `article-mock.service.ts`.
@@ -56,7 +56,7 @@ Lavori su FastAPI REST, query articoli, o servizi Angular che chiamano l’API.
 
 - Pydantic Gemini: `companies_involved` / `tags` / `infrastructural_entities` = **`str` CSV**.
 - FE post-API può usare `string[]` dopo `array_agg` — non confondere i layer.
-- Categorie primary: 10 SoT (`Nucleare`…`Sicurezza`). Vietato `Chip`/`Acqua`/`Elettronica` come primary.
+- Categorie primary: **15 SoT** (`Nucleare`, `Energia`, `Infrastrutture`, `Geopolitica`, `Economia`, `Tecnologia`, `Spazio`, `Ambiente`, `Salute`, `Sicurezza`, `Intelligenza Artificiale`, `Cybersecurity`, `Finanza`, `Difesa`, `Materie Prime`) — allineate a `classification/validator.py` + migrazione `016`. Vietato `Chip`/`Acqua`/`Elettronica` come primary.
 - Articolo FE: `is_read?` + `is_saved?` (boolean opzionali).
 
 ## Anti-pattern

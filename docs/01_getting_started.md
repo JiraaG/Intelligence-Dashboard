@@ -165,7 +165,7 @@ docker compose -f docker-compose.yml -f docker-compose.lan.yml up -d
 | Spegnere / accendere un feed già importato | Topbar **FONTI → Catalogo** (toggle → Miniflux `disabled`; seed **non** riscritto) |
 | Conteggio sorgenti attive | **STATUS → Sorgenti N/M** (read-only) |
 | **Aggiungere un URL nuovo** | Edit seed (`enabled` opzionale, default true) + mirror `RSS.txt` → `./ops/import-miniflux-feeds.sh` → commit seed+OPML. **Non** da UI. |
-| Gate mutazioni PATCH feed (opzionale) | `FEED_ADMIN_TOKEN` in `.env`; se valorizzato, header `X-Feed-Admin-Token` obbligatorio |
+| Gate mutazioni PATCH feed (opzionale) | `FEED_ADMIN_TOKEN` in `.env`; se valorizzato, header `X-Feed-Admin-Token` obbligatorio. **Caveat UI:** il toggle FONTI Catalogo **non** invia l’header (`article.service.ts`) → con token non vuoto il browser riceve 401 salvo proxy fidato; tipico LAN = token vuoto |
 
 **Volume mappa:** dipende dai feed sottoscritti in Miniflux, non dal solo worker. Con 1–2 feed (es. BBC World + NASA) tipicamente ~40–60 articoli/48h; per ~centinaia di notizie/giorno importa lo seed completo (Guardian, BBC sezioni, NPR, DW, CNBC, …). Default catalogo: tutti abilitati (`enabled` assente = true); l’import applica `disabled = not enabled`.
 

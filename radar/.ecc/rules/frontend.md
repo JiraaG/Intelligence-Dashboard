@@ -189,17 +189,22 @@ Usare sempre le CSS Custom Properties definite in `styles.scss`.
   --color-text-secondary:   #8b949e;   // Testo secondario/metadata
   --color-text-accent:      #58a6ff;   // Link e accenti
 
-  // Categorie (per hatching SVG e marker) — 10 categorie = styles.scss
-  --color-nucleare:         #00E5FF;
-  --color-energia:          #FFEA00;
-  --color-infrastrutture:   #9E9E9E;
-  --color-geopolitica:      #E040FB;
-  --color-economia:         #00E676;
-  --color-tecnologia:       #2979FF;
-  --color-spazio:           #7C4DFF;
-  --color-ambiente:         #8BC34A;
-  --color-salute:           #FF1744;
-  --color-sicurezza:        #FF9100;
+  // Categorie (per hatching SVG e marker) — 15 categorie = styles.scss
+  --color-ambiente:                   #2ecc71;
+  --color-cybersecurity:              #ff007f;
+  --color-difesa:                     #dc2626;
+  --color-economia:                   #00e676;
+  --color-energia:                    #ffd700;
+  --color-finanza:                    #76ff03;
+  --color-geopolitica:                #a855f7;
+  --color-infrastrutture:             #78909c;
+  --color-intelligenza-artificiale:   #00f5d4;
+  --color-materie-prime:              #f59e0b;
+  --color-nucleare:                   #00f0ff;
+  --color-salute:                     #ff1744;
+  --color-sicurezza:                  #ff6d00;
+  --color-spazio:                     #6366f1;
+  --color-tecnologia:                 #2979ff;
 }
 ```
 
@@ -279,7 +284,7 @@ Il componente `p-sidebar` di PrimeNG può essere usato come wrapper UI.
 
 **VIETATO:** `article-list` / infinite scroll in sidebar; truncare il carosello nazione a N arbitrario come regola UX; modificare `radar-sidebar/**`.
 
-Il clustering utilizza un **`L.markerClusterGroup` per `primary_category`** (fino a 10 categorie) sui marker del paese aperto.
+Il clustering utilizza un **`L.markerClusterGroup` per `primary_category`** (fino a **15** categorie) sui marker del paese aperto.
 Parametri obbligatori (da `radar-map.component.ts`):
 
 ```typescript

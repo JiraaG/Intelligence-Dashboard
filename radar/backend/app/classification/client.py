@@ -1117,7 +1117,7 @@ class ClassificationClient:
                     "Correggi l'output e restituisci SOLO un JSON valido secondo lo schema "
                     "(senza campo reasoning). "
                     "CSV fields MUST be strings not arrays; primary_category MUST be one of "
-                    "the 10 Italian names; sentiment MUST be Positivo|Neutrale|Negativo."
+                    "the 15 Italian names; sentiment MUST be Positivo|Neutrale|Negativo."
                 )
                 if ref.provider == _PROVIDER_GEMINI:
                     history.append(

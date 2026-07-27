@@ -35,59 +35,36 @@ PostgreSQL via **asyncpg puro** (niente ORM/SQLAlchemy).
 **Source of truth (Phase 1 DONE):** `backend/migrations/*.sql` applicati da `backend/app/core/migrations.py`
 (`run_migrations` con tabella `schema_migrations` + checksum). `bootstrap_database()` in
 `core/database.py` chiama `run_migrations` — **non** reinventare DDL via `CREATE TABLE` ad-hoc nel bootstrap.
-Migrazioni attuali: `001_initial.sql`, `002_pipeline_outbox_and_quotas.sql` (`article_outbox`),
-`003_quota_ledger.sql`, `004_worker_heartbeat.sql`, `005_quota_ledger_align.sql`,
-`006_quota_ledger_legacy_nulls.sql`, `007_articles_query_indexes.sql` (indici query Phase 5),
-`008_outbox_miniflux_marked_at.sql`, `009_llm_model_cooldown.sql`.
+**Migrazioni attuali:** `001`–`017` in `backend/migrations/` (SoT schema). Follow-up rilevanti:
+`010_articles_is_saved`, `011_articles_related_countries`, `012_pgvector_article_embeddings`,
+`013_metrics_and_feed_tracking`, `014_articles_content_sha256`, `015_llm_ledger_reasoning_effort`,
+`016_add_new_categories` (**15** categorie primarie), `017_borderline_classification_lane`.
+Dettaglio colonne/API: `docs/02_architecture_and_backend.md`.
+Non copiare qui excerpt SQL storici — restano in `migrations/*.sql`.
+
 Phase 2 DONE (worker, `llm_request_ledger`). Phase 3 DONE (heartbeat, edge/data, `/health/live`+`/ready`).
 Phase 4 DONE (FE lifecycle/security — non tocca schema SQL).
 Phase 5 DONE (map-summary + articles keyset — indici in `007`).
+Fase H / FinOps / 15 cat / BORDERLINE lane: migrazioni `011`–`017`.
 
 ---
 
-## Schema del Database — Definizione Autoritativa
+## Schema del Database — Guardrail (non excerpt SoT)
 
-### Tabella `articles` (Entità Principale)
+Lo schema autoritativo vive **solo** in `backend/migrations/*.sql` (oggi `001`–`017`).
+Quando progetti una migrazione nuova:
 
-```sql
-CREATE TABLE IF NOT EXISTS articles (
-    id              SERIAL PRIMARY KEY,
-    title           TEXT NOT NULL,
-    summary         TEXT NOT NULL,
-    published_at    DATE NOT NULL,
-    source_url      TEXT NOT NULL UNIQUE,
-    country_code    CHAR(2) NOT NULL DEFAULT 'XX',
-    latitude        DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    longitude       DOUBLE PRECISION NOT NULL DEFAULT 0.0,
-    primary_category VARCHAR(50) NOT NULL
-                    CHECK (primary_category IN (
-                        'Nucleare', 'Energia', 'Infrastrutture',
-                        'Geopolitica', 'Economia', 'Tecnologia',
-                        'Spazio', 'Ambiente', 'Salute', 'Sicurezza'
-                    )),
-    sentiment       VARCHAR(20) NOT NULL CHECK (sentiment IN ('Positivo', 'Neutrale', 'Negativo')),
-    relevance_level INTEGER NOT NULL CHECK (relevance_level BETWEEN 1 AND 5),
-    is_read         BOOLEAN NOT NULL DEFAULT FALSE,
-    is_saved        BOOLEAN NOT NULL DEFAULT FALSE,
-    infrastructural_entities TEXT[] NOT NULL DEFAULT '{}',
-    feed_title      TEXT NOT NULL DEFAULT 'RSS Feed',
-    related_countries TEXT[] NOT NULL DEFAULT '{}',
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+- **15 categorie** CHECK allineato a `classification/validator.py` `PRIMARY_CATEGORIES` (post-`016`)
+- Colonne vault / relazioni / embeddings / FinOps / `classification_lane` già introdotte da `010`–`017`
+- Day-view hatching/pin: contratto FE = **`GET /api/map-summary`** (non inventare aggregazioni ad-hoc)
+- Rollup compat: `GET /api/countries` esiste ma **non** è il path primario mappa
 
--- Commento esplicativo
-COMMENT ON TABLE articles IS 'Articoli geopolitici processati da Gemini. source_url è UNIQUE per prevenire duplicati.';
-COMMENT ON COLUMN articles.primary_category IS 'Categoria univoca per determinare icona/colore marker sulla mappa Leaflet.';
-COMMENT ON COLUMN articles.country_code IS 'ISO Alpha-2 (IT, US, CN...). XX = fallback errore Gemini.';
-COMMENT ON COLUMN articles.infrastructural_entities IS 'Elenco di asset o infrastrutture fisiche citate (es. dighe, porti, fabbriche).';
-COMMENT ON COLUMN articles.related_countries IS 'ISO Alpha-2 secondari (escluso country_code e XX); vuoto = nessun arco.';
-COMMENT ON COLUMN articles.is_read IS 'Stato letto/non letto lato FE (marker-read).';
-COMMENT ON COLUMN articles.is_saved IS 'Vault salvati cross-day (Notizie Salvate). Save ⇒ is_read=true; unread ⇒ is_saved=false.';
-COMMENT ON COLUMN articles.feed_title IS 'Titolo feed Miniflux associato all entry.';
-```
+Non duplicare qui `CREATE TABLE` completi: diventano stale. Leggi il file SQL numerato + `docs/02`.
 
-> Migration `010_articles_is_saved.sql` aggiunge `is_saved` + indice parziale `(country_code) WHERE is_saved`.
+### Query di riferimento (pattern)
+
+Day-view / nazione / vault: SoT query in `backend/app/api/articles_query.py` + contratto skill `radar-api-contract`.
+Hatching: aggrega da map-summary (`country_code × primary_category`), non da un endpoint inventato.
 
 ### Tabella `schema_migrations` (Runner)
 
@@ -225,7 +202,7 @@ GROUP BY a.id
 ORDER BY a.id DESC;
 ```
 
-### GET /api/countries?date=YYYY-MM-DD&sentiment=Positivo&relevance_level=3 (Per hatching SVG)
+### GET /api/countries (compat rollup — **non** path primario; hatching = map-summary)
 
 ```sql
 SELECT

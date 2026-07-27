@@ -109,7 +109,9 @@ class GeopoliticalArticleSchema(BaseModel):
     primary_category: Literal[
         "Nucleare", "Energia", "Infrastrutture", "Geopolitica", "Economia",
         "Tecnologia", "Spazio", "Ambiente", "Salute", "Sicurezza",
-    ] = Field(description="Una delle 10 categorie chiuse")
+        "Intelligenza Artificiale", "Cybersecurity", "Finanza", "Difesa",
+        "Materie Prime",
+    ] = Field(description="Una delle 15 categorie chiuse")
     sentiment: Literal["Positivo", "Neutrale", "Negativo"] = Field(description="Sentiment strategico")
     infrastructural_entities: str = Field(description="Asset fisici separati da virgola; 'Nessuno' se nessuno")
     related_countries: str = Field(description="Stringa CSV dei codici ISO Alpha-2 dei paesi secondari coinvolti; 'Nessuno' se nessuno")
